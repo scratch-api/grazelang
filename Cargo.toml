@@ -1,0 +1,10 @@
+[package]
+name = "grazelang"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+logos = "0.16.0"
+serde = { version = "1.0.228", features = ["derive"] }
+arcstr = { version = "1.2.0", features = ["serde"] }
+serde_json = "1.0.149"
