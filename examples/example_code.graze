@@ -8,7 +8,7 @@ stage {
     let cloud var3 = 1;
 }
 
-sprite {
+sprite sawd {
     // Data
 
     // Variables:
