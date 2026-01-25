@@ -63,6 +63,14 @@ pub enum Token {
     Equals,
     #[token("!=")]
     NotEquals,
+    #[token("<")]
+    LessThan,
+    #[token(">")]
+    GreaterThan,
+    #[token("<=")]
+    LessThanOrEqual,
+    #[token(">=")]
+    GreaterThanOrEqual,
     #[token("&&")]
     And,
     #[token("||")]
