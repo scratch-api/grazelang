@@ -47,6 +47,10 @@ pub enum Token {
     Semicolon,
     #[token(",")]
     Comma,
+    #[token(".")]
+    Dot,
+    #[token("::")]
+    ScopeResolution,
     #[token("=")]
     Assign,
     #[token("+")]

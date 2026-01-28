@@ -1,10 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Namespace {
     pub assigned_names: HashMap<String, String>,
     pub used_names: HashMap<String, String>
+}
+
+impl Namespace {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 impl Namespace {
