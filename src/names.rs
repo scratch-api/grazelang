@@ -1,10 +1,15 @@
-use std::{collections::HashMap, default};
+use std::{collections::HashMap};
 use serde::{Deserialize, Serialize};
+
+type SymbolContent = ();
+type ActualNameType = String;
+type OriginalNameType = String;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Namespace {
-    pub assigned_names: HashMap<String, String>,
-    pub used_names: HashMap<String, String>
+    pub assigned_names: HashMap<OriginalNameType, ActualNameType>,
+    pub used_names: HashMap<ActualNameType, OriginalNameType>,
+    pub symbol_contents: HashMap<OriginalNameType, SymbolContent>
 }
 
 impl Namespace {
@@ -14,7 +19,7 @@ impl Namespace {
 }
 
 impl Namespace {
-    pub fn get_name_for(&mut self, original_name: String) -> String {
+    pub fn get_name_for(&mut self, original_name: OriginalNameType) -> ActualNameType {
         if let Some(name) = self.assigned_names.get(&original_name) {
             return name.to_string()
         }
@@ -26,7 +31,7 @@ impl Namespace {
         self.assign_name_for(original_name, name)
     }
     /** Panics when reassigning or reusing a name. */
-    pub fn assign_name_for(&mut self, original_name: String, name: String) -> String {
+    pub fn assign_name_for(&mut self, original_name: OriginalNameType, name: ActualNameType) -> ActualNameType {
         if self.used_names.contains_key(&name) {
             panic!("Name \"{}\" is not unique in this namespace.", name);
         }
