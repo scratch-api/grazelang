@@ -4,7 +4,7 @@ use logos::Logos;
 use parser::internal;
 
 fn main() {
-    let mut lexer = lexer::Token::lexer(r#"e^the::comm.craft("test")"#);
+    let mut lexer = lexer::Token::lexer(r#"(the)"#);
     dbg!(internal::parse_expression(make_parse_in!(&mut lexer), &mut Namespace::new()).unwrap());
     // println!("Hello, world!");
 }
