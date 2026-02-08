@@ -219,11 +219,13 @@ pub mod statement {
 
     use serde::{Deserialize, Serialize};
 
-    use crate::parser::ast::{
-        AssignmentOperator, CanonicalIdentifier, DataDeclarationScope, Expression::Literal, GetPos,
-        LeftBrace, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
-        MultiDataDeclaration, RightBrace, RightParens, SingleDataDeclaration,
-        SingleDataDeclarationType, VarKeyword, VarsKeyword,
+    use crate::{
+        lexer,
+        parser::ast::{
+            AssignmentOperator, CanonicalIdentifier, DataDeclarationScope, LeftBrace, LeftParens,
+            LetKeyword, ListEntry, ListKeyword, ListsKeyword, MultiDataDeclaration, RightBrace,
+            RightParens, SingleDataDeclaration, SingleDataDeclarationType, VarKeyword, VarsKeyword,
+        },
     };
 
     use super::*;
@@ -233,61 +235,6 @@ pub mod statement {
         single_data_declaration: &SingleDataDeclaration,
     ) {
         todo!()
-    }
-
-    #[inline]
-    pub fn parse_literal_from(
-        token_stream: ParseIn,
-        namespace: &mut Namespace,
-        token: Token,
-    ) -> ParseOut<ast::Literal> {
-        use Expression::Literal as ELiteral;
-        use ast::Literal as LLiteral;
-        match token {
-            Token::SimpleString(value) => {
-                Ok(LLiteral::String(value, get_token_position!(token_stream)))
-            }
-            Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
-                value,
-                get_token_position!(token_stream),
-            )),
-            Token::DecimalFloat(value) => Ok(LLiteral::DecimalFloat(
-                value,
-                get_token_position!(token_stream),
-            )),
-            Token::HexadecimalInt(value) => Ok(LLiteral::HexadecimalInt(
-                value,
-                get_token_position!(token_stream),
-            )),
-            Token::OctalInt(value) => {
-                Ok(LLiteral::OctalInt(value, get_token_position!(token_stream)))
-            }
-            Token::BinaryInt(value) => Ok(LLiteral::BinaryInt(
-                value,
-                get_token_position!(token_stream),
-            )),
-            Token::LeftParens => {
-                if peek_token!(token_stream) == &Token::RightParens {
-                    let left_parens_position = get_token_position!(token_stream);
-                    return Ok(LLiteral::EmptyExpression(
-                        LeftParens(left_parens_position),
-                        {
-                            skip_token!(token_stream);
-                            from_stream_pos!(token_stream => RightParens)
-                        },
-                        (left_parens_position.0, get_token_end!(token_stream)),
-                    ));
-                }
-                let value = parse_literal(token_stream, namespace)?;
-                if next_token!(token_stream) != Token::RightParens {
-                    emit_unexpected_token!(token_stream, "Expected ')'.", "')'");
-                }
-                Ok(value)
-            }
-            _ => {
-                emit_unexpected_token!(token_stream, "Expected a literal.", "a literal");
-            }
-        }
     }
 
     pub fn parse_literal(
@@ -356,7 +303,7 @@ pub mod statement {
         };
         let right_brace = loop {
             entries.push(match peek_token!(token_stream) {
-                Token::RightBrace => {
+                Token::RightBrace(lexer::LexedRightBrace::Normal) => {
                     skip_token!(token_stream);
                     break from_stream_pos!(token_stream => RightBrace);
                 }
@@ -379,7 +326,9 @@ pub mod statement {
                 token => ListEntry::Expression(parse_expression(token_stream, namespace)?),
             });
             match next_token!(token_stream) {
-                Token::RightBrace => break from_stream_pos!(token_stream => RightBrace),
+                Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+                    break from_stream_pos!(token_stream => RightBrace);
+                }
                 Token::Comma => (),
                 _ => {
                     emit_unexpected_token!(
@@ -430,7 +379,7 @@ pub mod statement {
                     start_pos = Some(get_token_start!(token_stream));
                     from_stream_pos!(token_stream => DataDeclarationScope::Cloud)
                 }
-                Token::RightBrace => break,
+                Token::RightBrace(lexer::LexedRightBrace::Normal) => break,
                 Token::RightParens => break,
                 _ => DataDeclarationScope::Unset,
             };
@@ -447,7 +396,7 @@ pub mod statement {
                     if start_pos == None {
                         start_pos = Some(get_token_start!(token_stream));
                     }
-                    from_stream_pos!(token_stream => SingleDataDeclarationType::Var)
+                    from_stream_pos!(token_stream => SingleDataDeclarationType::List)
                 }
                 _ => SingleDataDeclarationType::Unset,
             };
@@ -544,7 +493,7 @@ pub mod statement {
                     )
                 }
                 Token::Comma => DeclarationValue::None,
-                Token::RightBrace => DeclarationValue::None,
+                Token::RightBrace(lexer::LexedRightBrace::Normal) => DeclarationValue::None,
                 Token::RightParens => DeclarationValue::None,
                 _ => emit_unexpected_token!(
                     token_stream,
@@ -620,7 +569,7 @@ pub mod statement {
             declarations.push(declaration);
             match peek_token!(token_stream) {
                 Token::Comma => skip_token!(token_stream),
-                Token::RightBrace => break,
+                Token::RightBrace(lexer::LexedRightBrace::Normal) => break,
                 Token::RightParens => break,
                 _ => {
                     skip_token!(token_stream);
@@ -679,7 +628,7 @@ pub mod statement {
                 if start_pos == None {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
-                from_stream_pos!(token_stream => SingleDataDeclarationType::Var)
+                from_stream_pos!(token_stream => SingleDataDeclarationType::List)
             }
             Token::VarsKeyword => {
                 skip_token!(token_stream);
@@ -697,7 +646,9 @@ pub mod statement {
                     namespace,
                     DefaultDataDeclarationType::Var,
                 )?;
-                let right_brace = if let Token::RightBrace = next_token!(token_stream) {
+                let right_brace = if let Token::RightBrace(lexer::LexedRightBrace::Normal) =
+                    next_token!(token_stream)
+                {
                     from_stream_pos!(token_stream => RightBrace)
                 } else {
                     emit_unexpected_token!(token_stream, "Expected '{'.", "'{'");
@@ -731,7 +682,9 @@ pub mod statement {
                     namespace,
                     DefaultDataDeclarationType::List,
                 )?;
-                let right_brace = if let Token::RightBrace = next_token!(token_stream) {
+                let right_brace = if let Token::RightBrace(lexer::LexedRightBrace::Normal) =
+                    next_token!(token_stream)
+                {
                     from_stream_pos!(token_stream => RightBrace)
                 } else {
                     emit_unexpected_token!(token_stream, "Expected '}'.", "'}'");
@@ -1251,9 +1204,12 @@ pub fn parse_statement(token_stream: ParseIn, namespace: &mut Namespace) -> Pars
 pub mod expression {
     use std::collections::VecDeque;
 
-    use crate::parser::ast::{
-        Associativity, FormattedStringContent, GetPos, LeftBracket, LeftParens, RightBracket,
-        RightParens,
+    use crate::{
+        lexer,
+        parser::ast::{
+            Associativity, FormattedStringContent, GetPos, LeftBracket, LeftParens, RightBracket,
+            RightParens,
+        },
     };
 
     use super::*;
@@ -1376,7 +1332,9 @@ pub mod expression {
                         namespace,
                     )?));
                     match next_token!(token_stream) {
-                        Token::MiddleFormattedString(string) => {
+                        Token::RightBrace(lexer::LexedRightBrace::MiddleFormattedString(
+                            string,
+                        )) => {
                             if !string.is_empty() {
                                 expressions.push(FormattedStringContent::String(
                                     string,
@@ -1384,7 +1342,7 @@ pub mod expression {
                                 ));
                             }
                         }
-                        Token::RightFormattedString(string) => {
+                        Token::RightBrace(lexer::LexedRightBrace::RightFormattedString(string)) => {
                             if !string.is_empty() {
                                 expressions.push(FormattedStringContent::String(
                                     string,

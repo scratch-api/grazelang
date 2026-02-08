@@ -1,13 +1,15 @@
 use std::ops::Range;
+use std::sync::OnceLock;
 
 use arcstr::ArcStr as IString; // Immutable string
 use arcstr::literal as literal_istring;
 use logos::{Lexer, Logos};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str as json_from_str;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Logos)]
-#[logos(extras = Vec<usize>)]
+#[logos(extras = (Vec<usize>, usize))]
 #[logos(skip r"[ \t\f]+")]
 #[logos(skip(r"\n|\r\n?", register_newline))]
 #[logos(skip r"//.*")]
@@ -41,8 +43,8 @@ pub enum Token {
     ListsKeyword,
     #[token("{")]
     LeftBrace,
-    #[token("}")]
-    RightBrace,
+    #[token("}", handle_right_brace)]
+    RightBrace(LexedRightBrace),
     #[token("(")]
     LeftParens,
     #[token(")")]
@@ -98,9 +100,9 @@ pub enum Token {
     Or,
     #[token("..")]
     Unwrap,
-    #[regex(r#""(?:[^"$]|(?:\\.))*""#, parse_simple_string_literal)]
+    #[regex(r#""(?:[^\\"$]|(?:\\.))*""#, parse_simple_string_literal)]
     SimpleString(IString),
-    #[regex(r#"`(?:[^`]|(?:\\.))*`"#, parse_canonical_name)]
+    #[regex(r#"`(?:[^\\`]|(?:\\.))*`"#, parse_canonical_name)]
     CanonicalName(IString),
     #[regex(r#"\w+"#, parse_string)]
     Identifier(IString),
@@ -123,9 +125,16 @@ pub enum Token {
     BinaryInt(IString),
     #[regex(r#""(?:[^"$]|(?:\\.))*\$\{"#, parse_left_format_string)]
     LeftFormattedString(IString),
-    #[regex(r#"\}(?:[^"$]|(?:\\.))*\$\{"#, parse_middle_format_string)]
+    // #[regex(r#"\}(?:[^"$]|(?:\\.))*\$\{"#, parse_middle_format_string)]
+    // MiddleFormattedString(IString),
+    // #[regex(r#"\}(?:[^"$]|(?:\\.))*""#, parse_right_format_string)]
+    // RightFormattedString(IString),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum LexedRightBrace {
+    Normal,
     MiddleFormattedString(IString),
-    #[regex(r#"\}(?:[^"$]|(?:\\.))*""#, parse_right_format_string)]
     RightFormattedString(IString),
 }
 
@@ -151,38 +160,66 @@ pub fn parse_number(lex: &mut Lexer<Token>) -> IString {
 }
 
 pub fn parse_left_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
+    lex.extras.1 += 1;
     let slice = lex.slice();
     let json = slice[..slice.len() - 2].to_string() + "\"";
-    return json_from_str::<'_, IString>(&json).ok();
+    json_from_str::<'_, IString>(&json).ok()
 }
 
-pub fn parse_middle_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
-    let slice = lex.slice();
-    let json = String::from("\"") + &slice[1..slice.len() - 2] + "\"";
-    return json_from_str::<'_, IString>(&json).ok();
+fn middle_regex_continuation() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*\$\{"#).unwrap())
 }
 
-pub fn parse_right_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
-    let slice = lex.slice();
-    let json = String::from("\"") + &slice[1..];
-    return json_from_str::<'_, IString>(&json).ok();
+fn end_regex_continuation() -> &'static Regex {
+    static REGEX: OnceLock<Regex> = OnceLock::new();
+    REGEX.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*""#).unwrap())
+}
+
+pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
+    if lex.extras.1 <= 0 {
+        return Some(LexedRightBrace::Normal);
+    }
+    let remainder = lex.remainder();
+    if let Some(mat) = middle_regex_continuation().find(remainder) {
+        let match_len = mat.end();
+        lex.bump(match_len);
+        return Some(LexedRightBrace::MiddleFormattedString(parse_middle_format_string( mat.as_str())?));
+    }
+    if let Some(mat) = end_regex_continuation().find(remainder) {
+        let match_len = mat.end();
+        lex.bump(match_len);
+        lex.extras.1 -= 1;
+        return Some(LexedRightBrace::RightFormattedString(parse_right_format_string(mat.as_str())?));
+    }
+    None
+}
+
+pub fn parse_middle_format_string(slice: &str) -> Option<IString> {
+    let json = String::from("\"") + &slice[..slice.len() - 2] + "\"";
+    json_from_str::<'_, IString>(&json).ok()
+}
+
+pub fn parse_right_format_string(slice: &str) -> Option<IString> {
+    let json = String::from("\"") + &slice[..];
+    json_from_str::<'_, IString>(&json).ok()
 }
 
 pub fn register_newline(lex: &mut Lexer<Token>) {
-    lex.extras.push(lex.span().end);
+    lex.extras.0.push(lex.span().end);
 }
 
 pub type PosRange = ((usize, usize), (usize, usize));
 
 pub fn get_position(lex: &Lexer<Token>, character_index: usize) -> (usize, usize) {
-    let last_newline_index = *match lex.extras.last() {
+    let last_newline_index = *match lex.extras.0.last() {
         Some(value) => value,
         None => return (0, character_index),
     };
     if last_newline_index > character_index {
         todo!()
     }
-    (lex.extras.len() - 1, character_index - last_newline_index)
+    (lex.extras.0.len() - 1, character_index - last_newline_index)
 }
 
 pub fn get_pos_range(lex: &Lexer<Token>, character_range: Range<usize>) -> PosRange {
