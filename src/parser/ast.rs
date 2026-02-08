@@ -1,4 +1,4 @@
-use crate::lexer::PosRange;
+use crate::{lexer::PosRange};
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
 
@@ -61,8 +61,26 @@ impl GetPos for ListsKeyword {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VarKeyword(pub PosRange);
+
+impl GetPos for VarKeyword {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ListKeyword(pub PosRange);
+
+impl GetPos for ListKeyword {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleDataDeclarationType {
-    ImplicitVar,
+    Unset,
     Var(PosRange),
     List(PosRange)
 }
@@ -70,12 +88,14 @@ pub enum SingleDataDeclarationType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MultiDataDeclaration {
     Mixed(
+        DataDeclarationScope,
         LeftParens,
-        Vec<(SingleDataDeclarationType, SingleDataDeclaration)>,
+        Vec<SingleDataDeclaration>,
         RightParens,
         PosRange,
     ),
     Vars(
+        DataDeclarationScope,
         VarsKeyword,
         LeftBrace,
         Vec<SingleDataDeclaration>,
@@ -83,29 +103,30 @@ pub enum MultiDataDeclaration {
         PosRange,
     ),
     Lists(
+        DataDeclarationScope,
         ListsKeyword,
         LeftBrace,
         Vec<SingleDataDeclaration>,
         RightBrace,
         PosRange,
     ),
-    Single(SingleDataDeclarationType, SingleDataDeclaration),
+    Single(SingleDataDeclaration),
 }
 
 impl GetPos for MultiDataDeclaration {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
-            MultiDataDeclaration::Mixed(_, _, _, p) => p,
-            MultiDataDeclaration::Vars(_, _, _, _, p) => p,
-            MultiDataDeclaration::Lists(_, _, _, _, p) => p,
-            MultiDataDeclaration::Single(_, d) => d.get_position(),
+            MultiDataDeclaration::Mixed(_, _, _, _, p) => p,
+            MultiDataDeclaration::Vars(_, _, _, _, _, p) => p,
+            MultiDataDeclaration::Lists(_, _, _, _, _, p) => p,
+            MultiDataDeclaration::Single(d) => d.get_position(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DataDeclarationScope {
-    ImplicitLocal,
+    Unset,
     Global(PosRange),
     Local(PosRange),
     Cloud(PosRange),
@@ -117,34 +138,52 @@ pub enum AssignmentOperator {
     None,
 }
 
-pub type ConstantExpression = Literal;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ListEntry {
+    Expression(Expression),
+    Unwrap(Literal, PosRange)
+}
+
+impl GetPos for ListEntry {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        match self {
+            ListEntry::Expression(l) => l.get_position(),
+            ListEntry::Unwrap(_, p) => p,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleDataDeclaration {
     Variable(
+        Option<VarKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
         AssignmentOperator,
-        ConstantExpression,
+        Expression,
         PosRange,
     ),
     EmptyVariable(
+        Option<VarKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
         PosRange,
     ),
     List(
+        Option<ListKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
         LeftBrace,
-        Vec<ConstantExpression>,
+        Vec<ListEntry>,
         RightBrace,
         PosRange,
     ),
     EmptyList(
+        Option<ListKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
@@ -155,10 +194,10 @@ pub enum SingleDataDeclaration {
 impl GetPos for SingleDataDeclaration {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
-            SingleDataDeclaration::Variable(_, _, _, _, _, p) => p,
-            SingleDataDeclaration::EmptyVariable(_, _, _, p) => p,
-            SingleDataDeclaration::List(_, _, _, _, _, _, p) => p,
-            SingleDataDeclaration::EmptyList(_, _, _, p) => p,
+            SingleDataDeclaration::Variable(_, _, _, _, _, _, p) => p,
+            SingleDataDeclaration::EmptyVariable(_, _, _, _, p) => p,
+            SingleDataDeclaration::List(_, _, _, _, _, _, _, p) => p,
+            SingleDataDeclaration::EmptyList(_, _, _, _, p) => p,
         }
     }
 }
