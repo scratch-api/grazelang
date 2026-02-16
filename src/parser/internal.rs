@@ -1,11 +1,13 @@
-use super::ast::{BinOp, Expression, ParseError};
+use super::{
+    ast::{self, BinOp, Expression, Identifier, ParseError, Statement},
+    parse_context::ParseContext,
+};
 use crate::{
     lexer::{
-        PosRange, Token, get_pos_range as internal_get_pos_range,
+        self, PosRange, Token, get_pos_range as internal_get_pos_range,
         get_position as internal_get_position,
     },
-    names::Namespace,
-    parser::ast::{self, Identifier, Statement},
+    parser::ast::{CodeBlock, Semicolon},
 };
 use arcstr::ArcStr as IString;
 use logos::Lexer;
@@ -28,6 +30,13 @@ macro_rules! peek_token {
             None => return Ok(None),
         }
     };
+    ($token_stream:expr => Option) => {
+        match $token_stream.0.peek() {
+            Some(Ok(value)) => Some(value),
+            Some(Err(_)) => return Err(ParseError::LexerStuck(get_token_position!($token_stream))),
+            None => None,
+        }
+    };
 }
 
 macro_rules! next_token {
@@ -45,6 +54,14 @@ macro_rules! next_token {
             Some(Ok(value)) => value,
             Some(Err(_)) => return Err(ParseError::LexerStuck(get_token_position!($token_stream))),
             None => return Ok(None),
+        }
+    }};
+    ($token_stream:expr => Option) => {{
+        $token_stream.1.next();
+        match $token_stream.0.next() {
+            Some(Ok(value)) => Some(value),
+            Some(Err(_)) => return Err(ParseError::LexerStuck(get_token_position!($token_stream))),
+            None => None,
         }
     }};
 }
@@ -106,17 +123,17 @@ type ParseIn<'a, 'b, 'c, 'd, 'e, 'f> = &'a mut (
 type ParseOut<T> = Result<T, ParseError>;
 
 pub fn enter(lex: &mut Lexer<Token>) {
-    let mut namespace = Namespace::default();
-    parse_lexed_entrypoint(make_parse_in!(lex), &mut namespace);
+    let mut context = ParseContext::new();
+    parse_lexed_entrypoint(make_parse_in!(lex), &mut context);
 }
 
-pub fn parse_lexed_entrypoint(token_stream: ParseIn, namespace: &mut Namespace) {
+pub fn parse_lexed_entrypoint(token_stream: ParseIn, context: &mut ParseContext) {
     todo!()
 }
 
 pub fn parse_single_identifier(
     token_stream: ParseIn,
-    namespace: &mut Namespace,
+    context: &mut ParseContext,
 ) -> ParseOut<IString> {
     if let Token::Identifier(value) = next_token!(token_stream) {
         return Ok(value);
@@ -126,7 +143,7 @@ pub fn parse_single_identifier(
 
 pub fn parse_full_identifier(
     token_stream: ParseIn,
-    namespace: &mut Namespace,
+    context: &mut ParseContext,
 ) -> ParseOut<Identifier> {
     let mut names: Vec<(IString, PosRange)> = vec![if let Token::Identifier(value) =
         next_token!(token_stream)
@@ -173,7 +190,7 @@ pub fn parse_full_identifier(
 
 pub fn parse_full_identifier_starting_with(
     token_stream: ParseIn,
-    namespace: &mut Namespace,
+    context: &mut ParseContext,
     value: IString,
 ) -> ParseOut<Identifier> {
     let mut names: Vec<(IString, PosRange)> = vec![(value, get_token_position!(token_stream))];
@@ -213,7 +230,7 @@ pub fn parse_full_identifier_starting_with(
     })
 }
 
-/// `parse_*` `fn`s contained don't swallow semicolons.
+// Statements do not include semicolons.
 pub mod statement {
     use core::panic;
 
@@ -230,16 +247,9 @@ pub mod statement {
 
     use super::*;
 
-    pub fn register_single_data_declaration(
-        namespace: &mut Namespace,
-        single_data_declaration: &SingleDataDeclaration,
-    ) {
-        todo!()
-    }
-
     pub fn parse_literal(
         token_stream: ParseIn,
-        namespace: &mut Namespace,
+        context: &mut ParseContext,
     ) -> ParseOut<ast::Literal> {
         let token = next_token!(token_stream);
         use Expression::Literal as ELiteral;
@@ -279,7 +289,7 @@ pub mod statement {
                         (left_parens_position.0, get_token_end!(token_stream)),
                     ));
                 }
-                let value = parse_literal(token_stream, namespace)?;
+                let value = parse_literal(token_stream, context)?;
                 if next_token!(token_stream) != Token::RightParens {
                     emit_unexpected_token!(token_stream, "Expected ')'.", "')'");
                 }
@@ -293,7 +303,7 @@ pub mod statement {
 
     pub fn parse_list_content(
         token_stream: ParseIn,
-        namespace: &mut Namespace,
+        context: &mut ParseContext,
     ) -> ParseOut<(LeftBrace, Vec<ast::ListEntry>, RightBrace)> {
         let mut entries = Vec::<ast::ListEntry>::new();
         let left_brace = if let Token::LeftBrace = next_token!(token_stream) {
@@ -323,7 +333,7 @@ pub mod statement {
                         );
                     }
                 }
-                token => ListEntry::Expression(parse_expression(token_stream, namespace)?),
+                token => ListEntry::Expression(parse_expression(token_stream, context)?),
             });
             match next_token!(token_stream) {
                 Token::RightBrace(lexer::LexedRightBrace::Normal) => {
@@ -357,7 +367,7 @@ pub mod statement {
 
     pub fn parse_inner_single_declarations(
         token_stream: ParseIn,
-        namespace: &mut Namespace,
+        context: &mut ParseContext,
         default_type: DefaultDataDeclarationType,
     ) -> ParseOut<Vec<SingleDataDeclaration>> {
         let mut declarations = Vec::<SingleDataDeclaration>::new();
@@ -467,7 +477,7 @@ pub mod statement {
                         }
                     }
                     let (left_brace, list_content, right_brace) =
-                        parse_list_content(token_stream, namespace)?;
+                        parse_list_content(token_stream, context)?;
 
                     DeclarationValue::List(left_brace, list_content, right_brace)
                 }
@@ -484,12 +494,11 @@ pub mod statement {
                             _ => (),
                         }
                     }
-                    let assignment_operator =
-                        from_stream_pos!(token_stream => AssignmentOperator::Set);
+                    let assignment_operator = from_stream_pos!(token_stream => AssignmentOperator);
 
                     DeclarationValue::Var(
                         assignment_operator,
-                        parse_expression(token_stream, namespace)?,
+                        parse_expression(token_stream, context)?,
                     )
                 }
                 Token::Comma => DeclarationValue::None,
@@ -586,7 +595,7 @@ pub mod statement {
 
     pub fn parse_data_declaration(
         token_stream: ParseIn,
-        namespace: &mut Namespace,
+        context: &mut ParseContext,
     ) -> ParseOut<Statement> {
         if next_token!(token_stream) != Token::LetKeyword {
             emit_unexpected_token!(
@@ -643,7 +652,7 @@ pub mod statement {
                 };
                 let declarations = parse_inner_single_declarations(
                     token_stream,
-                    namespace,
+                    context,
                     DefaultDataDeclarationType::Var,
                 )?;
                 let right_brace = if let Token::RightBrace(lexer::LexedRightBrace::Normal) =
@@ -679,7 +688,7 @@ pub mod statement {
                 };
                 let declarations = parse_inner_single_declarations(
                     token_stream,
-                    namespace,
+                    context,
                     DefaultDataDeclarationType::List,
                 )?;
                 let right_brace = if let Token::RightBrace(lexer::LexedRightBrace::Normal) =
@@ -710,7 +719,7 @@ pub mod statement {
                 }
                 let declarations = parse_inner_single_declarations(
                     token_stream,
-                    namespace,
+                    context,
                     DefaultDataDeclarationType::Var,
                 )?;
                 let right_parens = if let Token::RightParens = next_token!(token_stream) {
@@ -796,7 +805,7 @@ pub mod statement {
                     SingleDataDeclarationType::List(_) => (),
                 }
                 let (left_brace, list_content, right_brace) =
-                    parse_list_content(token_stream, namespace)?;
+                    parse_list_content(token_stream, context)?;
 
                 DeclarationValue::List(left_brace, list_content, right_brace)
             }
@@ -809,11 +818,11 @@ pub mod statement {
                         emit_unexpected_token!(token_stream, "Expected '{'.", "'{'")
                     }
                 }
-                let assignment_operator = from_stream_pos!(token_stream => AssignmentOperator::Set);
+                let assignment_operator = from_stream_pos!(token_stream => AssignmentOperator);
 
                 DeclarationValue::Var(
                     assignment_operator,
-                    parse_expression(token_stream, namespace)?,
+                    parse_expression(token_stream, context)?,
                 )
             }
             Token::Semicolon => DeclarationValue::None,
@@ -879,343 +888,179 @@ pub mod statement {
             MultiDataDeclaration::Single(declaration),
             (let_keyword_position.0, get_token_end!(token_stream)),
         ))
+    }
 
-        // let start_token = next_token!(token_stream);
-        // let start_position = get_token_position!(token_stream);
-        // let mut current_token = start_token.clone();
-        // let mut scope = DataDeclarationScope::ImplicitLocal;
-        // let mut dec_type = DDT::ImplicitVar;
-        // let mut canonical_identifier = Option::<CanonicalIdentifier>::None;
-        // loop {
-        //     match current_token {
-        //         Token::LeftParens => {
-        //             let mut declarations =
-        //                 Vec::<(SingleDataDeclarationType, SingleDataDeclaration)>::new();
-        //             if peek_token!(token_stream) == &Token::RightParens {
-        //                 skip_token!(token_stream);
-        //                 return Ok(Statement::DataDeclaration(
-        //                     LetKeyword(let_keyword_position),
-        //                     MultiDataDeclaration::Mixed(
-        //                         LeftParens(start_position),
-        //                         declarations,
-        //                         from_stream_pos!(token_stream => RightParens),
-        //                         (start_position.0, get_token_end!(token_stream)),
-        //                     ),
-        //                     (let_keyword_position.0, get_token_end!(token_stream)),
-        //                 ));
-        //             }
-        //             loop {
-        //                 declarations.push(todo!());
-        //                 match next_token!(token_stream) {
-        //                     Token::Comma => {
-        //                         if let Token::RightParens = peek_token!(token_stream) {
-        //                             break;
-        //                         }
-        //                     }
-        //                     Token::RightParens => break,
-        //                     _ => {
-        //                         return Err(ParseError::UnexpectedToken(
-        //                             "Expected ',' or ')'.",
-        //                             "',' or ')'",
-        //                             get_token_position!(token_stream),
-        //                         ));
-        //                     }
-        //                 }
-        //             }
-        //             return Ok(Statement::DataDeclaration(
-        //                 LetKeyword(let_keyword_position),
-        //                 MultiDataDeclaration::Mixed(
-        //                     LeftParens(start_position),
-        //                     declarations,
-        //                     from_stream_pos!(token_stream => RightParens),
-        //                     (start_position.0, get_token_end!(token_stream)),
-        //                 ),
-        //                 (let_keyword_position.0, get_token_end!(token_stream)),
-        //             ));
-        //         }
-        //         Token::Identifier(identifier) => {
-        //             match dec_type {
-        //                 DDT::Vars(_) => {
-        //                     return Err(ParseError::UnexpectedToken(
-        //                         "A vars declaration cannot be completed via assignment. Use \"let vars {<declarations>};\" instead.",
-        //                         "'{'",
-        //                         get_token_position!(token_stream),
-        //                     ));
-        //                 }
-        //                 DDT::Lists(_) => {
-        //                     return Err(ParseError::UnexpectedToken(
-        //                         "A lists declaration cannot be completed via assignment. Use \"let lists {<declarations>};\" instead.",
-        //                         "'{'",
-        //                         get_token_position!(token_stream),
-        //                     ));
-        //                 }
-        //                 _ => (),
-        //             }
-        //             match peek_token!(token_stream) {
-        //                 Token::Assign => {
-        //                     if let DDT::List(_) = &dec_type {
-        //                         return Err(ParseError::UnexpectedToken(
-        //                             "Cannot declare a list via assignment. Use \"let list <list_name>{<elements>};\" instead.",
-        //                             "'{'",
-        //                             get_token_position!(token_stream),
-        //                         ));
-        //                     }
-        //                     skip_token!(token_stream);
-        //                     let assignment_operator_pos = get_token_position!(token_stream);
-        //                     let value = parse_literal(token_stream, namespace)?;
-        //                     return Ok(Statement::DataDeclaration(
-        //                         LetKeyword(let_keyword_position),
-        //                         MultiDataDeclaration::Single(
-        //                             dec_type.get_single_data_declaration_type().unwrap(),
-        //                             SingleDataDeclaration::Variable(
-        //                                 scope,
-        //                                 canonical_identifier,
-        //                                 Identifier {
-        //                                     scope: Vec::new(),
-        //                                     names: vec![(identifier.clone(), start_position)],
-        //                                     pos_range: start_position,
-        //                                 },
-        //                                 ast::AssignmentOperator::Set(assignment_operator_pos),
-        //                                 value,
-        //                                 (start_position.0, get_token_end!(token_stream)),
-        //                             ),
-        //                         ),
-        //                         (let_keyword_position.0, get_token_end!(token_stream)),
-        //                     ));
-        //                 }
-        //                 Token::Semicolon => {
-        //                     return Ok(Statement::DataDeclaration(
-        //                         LetKeyword(let_keyword_position),
-        //                         MultiDataDeclaration::Single(
-        //                             dec_type.get_single_data_declaration_type().unwrap(),
-        //                             SingleDataDeclaration::EmptyVariable(
-        //                                 ast::DataDeclarationScope::ImplicitLocal,
-        //                                 canonical_identifier,
-        //                                 Identifier {
-        //                                     scope: Vec::new(),
-        //                                     names: vec![(identifier.clone(), start_position)],
-        //                                     pos_range: start_position,
-        //                                 },
-        //                                 (start_position.0, get_token_end!(token_stream)),
-        //                             ),
-        //                         ),
-        //                         (let_keyword_position.0, get_token_end!(token_stream)),
-        //                     ));
-        //                 }
-        //                 _ => {
-        //                     return Err(ParseError::UnexpectedToken(
-        //                         "Expected an assignment operator or ';'.",
-        //                         "an assignment operator or ';'.",
-        //                         get_token_position!(token_stream),
-        //                     ));
-        //                 }
-        //             }
-        //         }
-        //         Token::GlobalKeyword => {
-        //             if dec_type != DDT::ImplicitVar {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Scope modifier should appear before declaration type.",
-        //                     "a canonical name or an identifier",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             if scope != DataDeclarationScope::ImplicitLocal {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the scope of a variable or list multiple times.",
-        //                     "a canonical name, an identifier, \"var\", \"list\", \"vars\" or \"lists\"",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             scope = from_stream_pos!(token_stream => DataDeclarationScope::Global);
-        //         }
-        //         Token::LocalKeyword => {
-        //             if dec_type != DDT::ImplicitVar {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Scope modifier should appear before declaration type.",
-        //                     "a canonical name or an identifier",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             if scope != DataDeclarationScope::ImplicitLocal {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the scope of a variable or list multiple times.",
-        //                     "a canonical name, an identifier, \"var\", \"list\", \"vars\" or \"lists\"",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             scope = from_stream_pos!(token_stream => DataDeclarationScope::Local);
-        //         }
-        //         Token::CloudKeyword => {
-        //             if dec_type != DDT::ImplicitVar {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Scope modifier should appear before declaration type.",
-        //                     "a canonical name or an identifier",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             if scope != DataDeclarationScope::ImplicitLocal {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the scope of a variable or list multiple times.",
-        //                     "a canonical name, an identifier, \"var\", \"list\", \"vars\" or \"lists\"",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             scope = from_stream_pos!(token_stream => DataDeclarationScope::Cloud);
-        //         }
-        //         Token::VarKeyword => {
-        //             if dec_type != DDT::ImplicitVar {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the type of a declaration multiple times.",
-        //                     "a canonical name, an identifier, a modifier or '('",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             dec_type = from_stream_pos!(token_stream => DDT::Var);
-        //         }
-        //         Token::ListKeyword => {
-        //             if let DataDeclarationScope::Cloud(_) = scope {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the type of a declaration to list for global declarations.",
-        //                     "a canonical name, an identifier, \"var\" or \"vars\"",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             if dec_type != DDT::ImplicitVar {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the type of a declaration multiple times.",
-        //                     "a canonical name, an identifier, a modifier or '('",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             dec_type = from_stream_pos!(token_stream => DDT::List);
-        //         }
-        //         Token::VarsKeyword => {
-        //             if dec_type != DDT::ImplicitVar {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the type of a declaration multiple times.",
-        //                     "a canonical name, an identifier, a modifier or '('",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             dec_type = from_stream_pos!(token_stream => DDT::Vars);
-        //         }
-        //         Token::ListsKeyword => {
-        //             if let DataDeclarationScope::Cloud(_) = scope {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the type of a declaration to lists for global declarations.",
-        //                     "a canonical name, an identifier, \"var\" or \"vars\"",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             if dec_type != DDT::ImplicitVar {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the type of a declaration multiple times.",
-        //                     "a canonical name, an identifier, a modifier or '('",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             dec_type = from_stream_pos!(token_stream => DDT::Lists);
-        //         }
-        //         Token::LeftBrace => {
-        //             let left_brace = from_stream_pos!(token_stream => LeftBrace);
-        //             match dec_type {
-        //                 DDT::Vars(_) => (),
-        //                 DDT::Lists(_) => (),
-        //                 _ => {
-        //                     return Err(ParseError::UnexpectedToken(
-        //                         "May only use batch data declaration with vars and lists.",
-        //                         if dec_type == DDT::ImplicitVar {
-        //                             "an identifier or a modifier"
-        //                         } else {
-        //                             "an identifier"
-        //                         },
-        //                         get_token_position!(token_stream),
-        //                     ));
-        //                 }
-        //             }
-        //             let declarations =
-        //                 parse_inner_single_declarations(token_stream, namespace, &scope, &dec_type)?;
-        //             let right_brace_pos = match next_token!(token_stream) {
-        //                 Token::RightBrace => get_token_position!(token_stream),
-        //                 _ => {
-        //                     return Err(ParseError::UnexpectedToken(
-        //                         "Expected '}'.",
-        //                         "'}'",
-        //                         get_token_position!(token_stream),
-        //                     ));
-        //                 }
-        //             };
-        //             return match dec_type {
-        //                 DDT::Vars(p) => Ok(Statement::DataDeclaration(
-        //                     LetKeyword(let_keyword_position),
-        //                     MultiDataDeclaration::Vars(
-        //                         VarsKeyword(p),
-        //                         left_brace,
-        //                         declarations,
-        //                         RightBrace(right_brace_pos),
-        //                         (p.0, right_brace_pos.1),
-        //                     ),
-        //                     (let_keyword_position.0, right_brace_pos.1),
-        //                 )),
-        //                 DDT::Lists(p) => Ok(Statement::DataDeclaration(
-        //                     LetKeyword(let_keyword_position),
-        //                     MultiDataDeclaration::Lists(
-        //                         ListsKeyword(p),
-        //                         left_brace,
-        //                         declarations,
-        //                         RightBrace(right_brace_pos),
-        //                         (p.0, right_brace_pos.1),
-        //                     ),
-        //                     (let_keyword_position.0, right_brace_pos.1),
-        //                 )),
-        //                 _ => panic!(), // Should never happen
-        //             };
-        //         }
-        //         Token::CanonicalName(value) => {
-        //             if canonical_identifier != None {
-        //                 return Err(ParseError::UnexpectedToken(
-        //                     "Cannot set the canonical name of a declaration multiple times.",
-        //                     "an identifier, a modifier, '(', \"var\", \"list\", \"vars\" or \"lists\"",
-        //                     get_token_position!(token_stream),
-        //                 ));
-        //             }
-        //             canonical_identifier = Some(CanonicalIdentifier {
-        //                 name: value,
-        //                 pos_range: get_token_position!(token_stream),
-        //             })
-        //         }
-        //         _ => {
-        //             return Err(ParseError::UnexpectedToken(
-        //                 "Expected a canonical name, an identifier, a modifier, '(', \"var\", \"list\", \"vars\" or \"lists\".",
-        //                 "a canonical name, an identifier, a modifier, '(', \"var\", \"list\", \"vars\" or \"lists\"",
-        //                 get_token_position!(token_stream),
-        //             ));
-        //         }
-        //     }
-        //     current_token = next_token!(token_stream);
-        // }
+    pub fn parse_assignment(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+        identifier: Identifier,
+    ) -> ParseOut<Statement> {
+        let start_pos = get_token_start!(token_stream);
+        if next_token!(token_stream) != Token::Assign {
+            emit_unexpected_token!(token_stream, "Expected '='.", "'='")
+        }
+        let assignment_operator = from_stream_pos!(token_stream => AssignmentOperator);
+        let expression = parse_expression(token_stream, context)?;
+        Ok(Statement::Assignment(
+            identifier,
+            assignment_operator,
+            expression,
+            (start_pos, get_token_end!(token_stream)),
+        ))
+    }
+
+    pub fn parse_call_or_control(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+        identifier: Identifier,
+    ) -> ParseOut<Statement> {
+        let start_pos = get_token_start!(token_stream);
+        if next_token!(token_stream) != Token::LeftParens {
+            emit_unexpected_token!(token_stream, "Expected '('", "'('");
+        }
+        let (left_parens, mut expressions, right_parens) =
+            parse_expression_list(token_stream, context)?;
+        if peek_token!(token_stream) == &Token::LeftBrace {
+            let expression = match expressions.len() {
+                0 => {
+                    let pos_range = (left_parens.0.0, right_parens.0.1);
+                    Expression::Literal(ast::Literal::EmptyExpression(
+                        left_parens,
+                        right_parens,
+                        pos_range,
+                    ))
+                }
+                1 => expressions.pop().unwrap(),
+                _ => emit_unexpected_token!(
+                    token_stream,
+                    "Control blocks cannot have multiple expression inputs.",
+                    "';'"
+                ),
+            };
+            let code_block = parse_code_block(token_stream, context)?;
+            return Ok(Statement::Control(
+                identifier,
+                expression,
+                code_block,
+                (start_pos, get_token_end!(token_stream)),
+            ));
+        }
+        Ok(Statement::Call(
+            identifier,
+            left_parens,
+            expressions,
+            right_parens,
+            (start_pos, get_token_end!(token_stream)),
+        ))
+    }
+
+    pub fn parse_forever(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+        identifier: Identifier,
+    ) -> ParseOut<Statement> {
+        let start_pos = get_token_start!(token_stream);
+        if peek_token!(token_stream) != &Token::LeftBrace {
+            emit_unexpected_token!(token_stream, "Expected '{'", "'{'");
+        }
+        let code_block = parse_code_block(token_stream, context)?;
+        Ok(Statement::Forever(
+            code_block,
+            (start_pos, get_token_end!(token_stream)),
+        ))
+    }
+
+    #[inline]
+    pub(crate) fn parse_statement_after_identifier(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+        identifier: Identifier,
+    ) -> ParseOut<Statement> {
+        match peek_token!(token_stream) {
+            Token::Assign => parse_assignment(token_stream, context, identifier),
+            Token::LeftParens => parse_call_or_control(token_stream, context, identifier),
+            Token::LeftBrace => {
+                if !identifier.is_forever() {
+                    skip_token!(token_stream);
+                    emit_unexpected_token!(token_stream, "Expected '=' or '('.", "'=' or '('");
+                }
+                parse_forever(token_stream, context, identifier)
+            }
+            _ => {
+                skip_token!(token_stream);
+                emit_unexpected_token!(token_stream, "Expected '=' or '('.", "'=' or '('");
+            }
+        }
     }
 }
 
-pub fn parse_statement(token_stream: ParseIn, namespace: &mut Namespace) -> ParseOut<Statement> {
-    todo!()
+/// Statements do not include semicolons.
+pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Statement> {
+    match peek_token!(token_stream) {
+        Token::LetKeyword => {
+            let dec = statement::parse_data_declaration(token_stream, context)?;
+            todo!("implement registering");
+            Ok(dec)
+        }
+        Token::Identifier(_) => {
+            let identifier = parse_full_identifier(token_stream, context)?;
+            statement::parse_statement_after_identifier(token_stream, context, identifier)
+        }
+        _ => todo!(),
+    }
+}
+
+pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<CodeBlock> {
+    if next_token!(token_stream) != Token::LeftBrace {
+        emit_unexpected_token!(token_stream, "Expected '{'.", "'{'");
+    }
+    let start_pos = get_token_start!(token_stream);
+    let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
+    let mut statements = Vec::<(Statement, Semicolon)>::new();
+    if peek_token!(token_stream) == &Token::RightBrace(lexer::LexedRightBrace::Normal) {
+        skip_token!(token_stream);
+        return Ok(CodeBlock {
+            left_brace,
+            statements,
+            right_brace: from_stream_pos!(token_stream => ast::RightBrace),
+            pos_range: (start_pos, get_token_end!(token_stream)),
+        });
+    }
+    loop {
+        statements.push((parse_statement(token_stream, context)?, {
+            if next_token!(token_stream) != Token::Semicolon {
+                emit_unexpected_token!(token_stream, "Expected ';'.", "';'");
+            }
+            from_stream_pos!(token_stream => Semicolon)
+        }));
+        match peek_token!(token_stream) {
+            Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+                skip_token!(token_stream);
+                break;
+            }
+            _ => (),
+        }
+    }
+    Ok(CodeBlock {
+        left_brace,
+        statements,
+        right_brace: from_stream_pos!(token_stream => ast::RightBrace),
+        pos_range: (start_pos, get_token_end!(token_stream)),
+    })
 }
 
 pub mod expression {
     use std::collections::VecDeque;
 
-    use crate::{
-        lexer,
-        parser::ast::{
-            Associativity, FormattedStringContent, GetPos, LeftBracket, LeftParens, RightBracket,
-            RightParens,
-        },
+    use crate::parser::ast::{
+        Associativity, FormattedStringContent, GetPos, LeftBracket, LeftParens, RightBracket,
+        RightParens,
     };
 
     use super::*;
     pub fn parse_expression_without_binops(
         token_stream: ParseIn,
-        namespace: &mut Namespace,
+        context: &mut ParseContext,
     ) -> ParseOut<Expression> {
         let token = next_token!(token_stream);
         let token_position = get_token_position!(token_stream);
@@ -1247,31 +1092,30 @@ pub mod expression {
             ))),
             Token::Minus => Ok(Expression::UnOp(
                 UnOp::Minus(token_position),
-                Box::new(parse_expression_without_binops(token_stream, namespace)?),
+                Box::new(parse_expression_without_binops(token_stream, context)?),
                 (token_position.0, get_token_end!(token_stream)),
             )),
             Token::Not => Ok(Expression::UnOp(
                 UnOp::Not(token_position),
-                Box::new(parse_expression_without_binops(token_stream, namespace)?),
+                Box::new(parse_expression_without_binops(token_stream, context)?),
                 (token_position.0, get_token_end!(token_stream)),
             )),
             Token::Exp => Ok(Expression::UnOp(
                 UnOp::Exp(token_position),
-                Box::new(parse_expression_without_binops(token_stream, namespace)?),
+                Box::new(parse_expression_without_binops(token_stream, context)?),
                 (token_position.0, get_token_end!(token_stream)),
             )),
             Token::Pow => Ok(Expression::UnOp(
                 UnOp::Pow(token_position),
-                Box::new(parse_expression_without_binops(token_stream, namespace)?),
+                Box::new(parse_expression_without_binops(token_stream, context)?),
                 (token_position.0, get_token_end!(token_stream)),
             )),
             Token::Identifier(value) => {
-                let identifier =
-                    parse_full_identifier_starting_with(token_stream, namespace, value)?;
-                match peek_token!(token_stream) {
-                    Token::LeftParens => {
+                let identifier = parse_full_identifier_starting_with(token_stream, context, value)?;
+                match peek_token!(token_stream => Option) {
+                    Some(Token::LeftParens) => {
                         let (left_parens, expressions, right_parens) =
-                            parse_expression_list(token_stream, namespace)?;
+                            parse_expression_list(token_stream, context)?;
                         Ok(Expression::Call(
                             identifier,
                             left_parens,
@@ -1280,12 +1124,12 @@ pub mod expression {
                             (token_position.0, get_token_end!(token_stream)),
                         ))
                     }
-                    Token::LeftBracket => {
+                    Some(Token::LeftBracket) => {
                         skip_token!(token_stream);
                         Ok(Expression::GetItem(
                             identifier,
                             from_stream_pos!(token_stream => LeftBracket),
-                            Box::new(parse_expression(token_stream, namespace)?),
+                            Box::new(parse_expression(token_stream, context)?),
                             {
                                 if next_token!(token_stream) != Token::RightBracket {
                                     emit_unexpected_token!(token_stream, "Expected ']'.", "']'");
@@ -1308,7 +1152,7 @@ pub mod expression {
                         (token_position.0, get_token_end!(token_stream)),
                     )));
                 }
-                let expr = parse_expression(token_stream, namespace)?;
+                let expr = parse_expression(token_stream, context)?;
                 let end_pos = if let Token::RightParens = next_token!(token_stream) {
                     get_token_end!(token_stream)
                 } else {
@@ -1329,7 +1173,7 @@ pub mod expression {
                 loop {
                     expressions.push(FormattedStringContent::Expression(parse_expression(
                         token_stream,
-                        namespace,
+                        context,
                     )?));
                     match next_token!(token_stream) {
                         Token::RightBrace(lexer::LexedRightBrace::MiddleFormattedString(
@@ -1367,7 +1211,7 @@ pub mod expression {
 
     pub fn parse_binary_operation(
         token_stream: ParseIn,
-        namespace: &mut Namespace,
+        context: &mut ParseContext,
     ) -> ParseOut<Option<BinOp>> {
         let token = peek_token!(optional token_stream);
         use super::super::ast::BinOp;
@@ -1441,18 +1285,17 @@ pub mod expression {
     }
 }
 
-pub fn parse_expression(token_stream: ParseIn, namespace: &mut Namespace) -> ParseOut<Expression> {
+pub fn parse_expression(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Expression> {
     use expression::*;
-    let mut expressions =
-        VecDeque::from([parse_expression_without_binops(token_stream, namespace)?]);
+    let mut expressions = VecDeque::from([parse_expression_without_binops(token_stream, context)?]);
     let mut binops = VecDeque::<BinOp>::new();
 
     loop {
-        binops.push_back(match parse_binary_operation(token_stream, namespace)? {
+        binops.push_back(match parse_binary_operation(token_stream, context)? {
             Some(value) => value,
             None => break,
         });
-        expressions.push_back(parse_expression_without_binops(token_stream, namespace)?);
+        expressions.push_back(parse_expression_without_binops(token_stream, context)?);
     }
 
     Ok(order_operations(expressions, binops))
@@ -1460,7 +1303,7 @@ pub fn parse_expression(token_stream: ParseIn, namespace: &mut Namespace) -> Par
 
 pub fn parse_expression_list(
     token_stream: ParseIn,
-    namespace: &mut Namespace,
+    context: &mut ParseContext,
 ) -> ParseOut<(ast::LeftParens, Vec<Expression>, ast::RightParens)> {
     if next_token!(token_stream) != Token::LeftParens {
         emit_unexpected_token!(token_stream, "Expected '('.", "'('");
@@ -1476,7 +1319,7 @@ pub fn parse_expression_list(
         ));
     }
     loop {
-        expressions.push(parse_expression(token_stream, namespace)?);
+        expressions.push(parse_expression(token_stream, context)?);
         match next_token!(token_stream) {
             Token::Comma => {
                 if let Token::RightParens = peek_token!(token_stream) {

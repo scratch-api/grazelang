@@ -9,10 +9,10 @@ pub trait GetPos {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Statement {
     DataDeclaration(LetKeyword, MultiDataDeclaration, PosRange),
-    Assignment(Identifier, Expression, PosRange),
-    SetItem(Identifier, Expression, Expression, PosRange),
-    Call(Identifier, Vec<Expression>, PosRange),
-    ControlBlock(Identifier, Expression, CodeBlock, PosRange),
+    Assignment(Identifier, AssignmentOperator, Expression, PosRange),
+    SetItem(Identifier, Expression, AssignmentOperator, Expression, PosRange),
+    Call(Identifier, LeftParens, Vec<Expression>, RightParens, PosRange),
+    Control(Identifier, Expression, CodeBlock, PosRange),
     Forever(CodeBlock, PosRange),
     IfElse(Vec<(Expression, CodeBlock)>, Option<CodeBlock>, PosRange),
     Semicolon(PosRange),
@@ -22,10 +22,10 @@ impl GetPos for Statement {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
             Statement::DataDeclaration(_, _, p) => p,
-            Statement::Assignment(_, _, p) => p,
-            Statement::SetItem(_, _, _, p) => p,
-            Statement::Call(_, _, p) => p,
-            Statement::ControlBlock(_, _, _, p) => p,
+            Statement::Assignment(_, _, _, p) => p,
+            Statement::SetItem(_, _, _, _, p) => p,
+            Statement::Call(_, _, _, _, p) => p,
+            Statement::Control(_, _, _, p) => p,
             Statement::Forever(_, p) => p,
             Statement::IfElse(_, _, p) => p,
             Statement::Semicolon(p) => p,
@@ -133,11 +133,13 @@ pub enum DataDeclarationScope {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum AssignmentOperator {
-    Set(PosRange),
-    None,
-}
+pub struct AssignmentOperator(pub PosRange);
 
+impl GetPos for AssignmentOperator {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ListEntry {
@@ -205,7 +207,7 @@ impl GetPos for SingleDataDeclaration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodeBlock {
     pub left_brace: LeftBrace,
-    pub statements: Vec<Statement>,
+    pub statements: Vec<(Statement, Semicolon)>,
     pub right_brace: RightBrace,
     pub pos_range: PosRange,
 }
@@ -289,6 +291,14 @@ impl GetPos for LeftBracket {
 pub struct RightBracket(pub PosRange);
 
 impl GetPos for RightBracket {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Semicolon(pub PosRange);
+
+impl GetPos for Semicolon {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -449,7 +459,7 @@ impl GetPos for Identifier {
 }
 
 impl Identifier {
-    pub fn is_forever() -> bool {
+    pub fn is_forever(&self) -> bool {
         todo!()
     }
 }

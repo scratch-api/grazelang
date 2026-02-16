@@ -106,6 +106,8 @@ pub enum Token {
     CanonicalName(IString),
     #[regex(r#"\w+"#, parse_string)]
     Identifier(IString),
+    #[regex(r#"\$\w+"#, parse_string)]
+    MacroIdentifier(IString),
     #[regex(r#"[+-]?[0-9](?:_?[0-9])*"#, parse_number, priority = 3)]
     DecimalInt(IString),
     #[regex(
