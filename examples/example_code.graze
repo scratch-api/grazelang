@@ -34,21 +34,21 @@ sprite sawd {
 
     // Lists:
     // Global list
-    let global list list3{1, 2, 3};
+    let global list list3 = {1, 2, 3};
     // Implicitly local list
-    let list list4{1, 2, 3};
+    let list list4 = {1, 2, 3};
     // Explicitly local valistr
-    let local list list5{1, 2, 3};
+    let local list list5 = {1, 2, 3};
     // Named list
-    let list `list 6` list6{1, 2, 3};
+    let list `list 6` list6 = {1, 2, 3};
     // List including characters from a string
-    let list list7{"", "", .."abcdefghijklmnopqrstuvwxyz", .."ABCDEFGHIJKLMNOPQRSTUVWXYZ"};
+    let list list7 = {"", "", .."abcdefghijklmnopqrstuvwxyz", .."ABCDEFGHIJKLMNOPQRSTUVWXYZ"};
     // Multiple lists
-    let (list list8{1, 2, 3}, list list9{1, 2, 3});
+    let (list list8 = {1, 2, 3}, list list9 = {1, 2, 3});
     // Many lists
     let lists {
-        list10{1, 2, 3},
-        list11{1, 2, 3}
+        list10 = {1, 2, 3},
+        list11 = {1, 2, 3}
     };
 
     // Mixed:
@@ -57,7 +57,7 @@ sprite sawd {
         var14 = 1,
         global var15 = 1,
         var var16 = 1,
-        global list list12{1, 2, 3}
+        global list list12 = {1, 2, 3}
     );
 
 

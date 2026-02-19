@@ -179,6 +179,7 @@ pub enum SingleDataDeclaration {
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
+        AssignmentOperator,
         LeftBrace,
         Vec<ListEntry>,
         RightBrace,
@@ -198,7 +199,7 @@ impl GetPos for SingleDataDeclaration {
         match self {
             SingleDataDeclaration::Variable(_, _, _, _, _, _, p) => p,
             SingleDataDeclaration::EmptyVariable(_, _, _, _, p) => p,
-            SingleDataDeclaration::List(_, _, _, _, _, _, _, p) => p,
+            SingleDataDeclaration::List(_, _, _, _, _, _, _, _, p) => p,
             SingleDataDeclaration::EmptyList(_, _, _, _, p) => p,
         }
     }

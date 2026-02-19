@@ -27,6 +27,55 @@ macro_rules! expect_token {
     }};
 }
 
+// /// Not currently required
+// macro_rules! consume_if {
+//     ($token_stream:expr, $pattern:pat => $body:expr) => {{
+//         match peek_token!($token_stream) {
+//             $pattern => {
+//                 skip_token!($token_stream);
+//                 Some($body)
+//             }
+//             _ => None,
+//         }
+//     }};
+// }
+
+/// The difference between this and `consume_if` is that we cannot use values from the match in `consume_if` due to the borrow checker.
+macro_rules! consume_and_use_if {
+    ($token_stream:expr, $pattern:pat => $body:expr) => {{
+        match peek_token!($token_stream) {
+            $pattern => match next_token!($token_stream) {
+                $pattern => Some($body),
+                _ => panic!(),
+            },
+            _ => None,
+        }
+    }};
+}
+
+macro_rules! consume_then_never_if {
+    ($token_stream:expr, $pattern:pat => $body:expr) => {{
+        if matches!(peek_token!($token_stream), $pattern) {
+            skip_token!($token_stream);
+            $body;
+        }
+    }};
+}
+
+macro_rules! match_token_or_return_none {
+    ($token_stream:expr, { $($tok:pat => $variant:path),* $(,)? }) => {{
+        match peek_token!(optional $token_stream) {
+            $(
+                $tok => {
+                    skip_token!($token_stream);
+                    from_stream_pos!($token_stream => $variant)
+                }
+            )*
+            _ => return Ok(None),
+        }
+    }};
+}
+
 macro_rules! peek_token {
     ($token_stream:expr) => {
         match $token_stream.0.peek() {
@@ -249,9 +298,10 @@ pub mod statement {
     use crate::{
         lexer,
         parser::ast::{
-            AssignmentOperator, CanonicalIdentifier, DataDeclarationScope, LeftBrace, LeftParens,
-            LetKeyword, ListEntry, ListKeyword, ListsKeyword, MultiDataDeclaration, RightBrace,
-            RightParens, SingleDataDeclaration, SingleDataDeclarationType, VarKeyword, VarsKeyword,
+            AssignmentOperator, CanonicalIdentifier, DataDeclarationScope, LeftBrace, LeftBracket,
+            LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword, MultiDataDeclaration,
+            RightBrace, RightParens, SingleDataDeclaration, SingleDataDeclarationType, VarKeyword,
+            VarsKeyword,
         },
     };
 
@@ -288,17 +338,14 @@ pub mod statement {
                 get_token_position!(token_stream),
             )),
             Token::LeftParens => {
-                if peek_token!(token_stream) == &Token::RightParens {
-                    let left_parens_position = get_token_position!(token_stream);
+                let left_parens_position = get_token_position!(token_stream);
+                consume_then_never_if!(token_stream, Token::RightParens =>
                     return Ok(LLiteral::EmptyExpression(
                         LeftParens(left_parens_position),
-                        {
-                            skip_token!(token_stream);
-                            from_stream_pos!(token_stream => RightParens)
-                        },
+                        from_stream_pos!(token_stream => RightParens),
                         (left_parens_position.0, get_token_end!(token_stream)),
-                    ));
-                }
+                    ))
+                );
                 let value = parse_literal(token_stream, context)?;
                 expect_token!(
                     token_stream,
@@ -344,7 +391,7 @@ pub mod statement {
                         "a simple string literal"
                     )
                 }
-                token => ListEntry::Expression(parse_expression(token_stream, context)?),
+                _ => ListEntry::Expression(parse_expression(token_stream, context)?),
             });
             match next_token!(token_stream) {
                 Token::RightBrace(lexer::LexedRightBrace::Normal) => {
@@ -372,7 +419,12 @@ pub mod statement {
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     enum DeclarationValue {
         None,
-        List(LeftBrace, Vec<ast::ListEntry>, RightBrace),
+        List(
+            AssignmentOperator,
+            LeftBrace,
+            Vec<ast::ListEntry>,
+            RightBrace,
+        ),
         Var(AssignmentOperator, Expression),
     }
 
@@ -421,20 +473,16 @@ pub mod statement {
                 }
                 _ => SingleDataDeclarationType::Unset,
             };
-            let canonical_identifier =
-                if let Token::CanonicalName(value) = peek_token!(token_stream) {
-                    let value = value.clone();
-                    skip_token!(token_stream);
-                    if start_pos == None {
-                        start_pos = Some(get_token_start!(token_stream));
-                    }
-                    Some(CanonicalIdentifier {
-                        name: value,
-                        pos_range: get_token_position!(token_stream),
-                    })
-                } else {
-                    None
-                };
+            let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalName(value) => {
+                let value = value.clone();
+                if start_pos == None {
+                    start_pos = Some(get_token_start!(token_stream));
+                }
+                CanonicalIdentifier {
+                    name: value,
+                    pos_range: get_token_position!(token_stream),
+                }
+            });
             let identifier = if let Token::Identifier(value) = next_token!(token_stream) {
                 if start_pos == None {
                     start_pos = Some(get_token_start!(token_stream));
@@ -473,44 +521,66 @@ pub mod statement {
                 }
             };
             let value = match peek_token!(token_stream) {
-                Token::LeftBrace => {
-                    if default_type == DefaultDataDeclarationType::Var {
-                        match dec_type {
-                            SingleDataDeclarationType::Unset => {
-                                skip_token!(token_stream);
-                                emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-                            }
-                            SingleDataDeclarationType::Var(_) => {
-                                skip_token!(token_stream);
-                                emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-                            }
-                            _ => (),
-                        }
-                    }
-                    let (left_brace, list_content, right_brace) =
-                        parse_list_content(token_stream, context)?;
+                // Token::LeftBrace => {
+                //     if default_type == DefaultDataDeclarationType::Var {
+                //         match dec_type {
+                //             SingleDataDeclarationType::Unset => {
+                //                 skip_token!(token_stream);
+                //                 emit_unexpected_token!(token_stream, "Expected '='.", "'='")
+                //             }
+                //             SingleDataDeclarationType::Var(_) => {
+                //                 skip_token!(token_stream);
+                //                 emit_unexpected_token!(token_stream, "Expected '='.", "'='")
+                //             }
+                //             _ => (),
+                //         }
+                //     }
+                //     let (left_brace, list_content, right_brace) =
+                //         parse_list_content(token_stream, context)?;
 
-                    DeclarationValue::List(left_brace, list_content, right_brace)
-                }
+                //     DeclarationValue::List(left_brace, list_content, right_brace)
+                // }
                 Token::Assign => {
                     skip_token!(token_stream);
-                    if default_type == DefaultDataDeclarationType::List {
-                        match dec_type {
-                            SingleDataDeclarationType::Unset => {
-                                emit_unexpected_token!(token_stream, "Expected '{'.", "'{'")
-                            }
-                            SingleDataDeclarationType::List(_) => {
-                                emit_unexpected_token!(token_stream, "Expected '{'.", "'{'")
+                    let assignment_operator = from_stream_pos!(token_stream => AssignmentOperator);
+                    if let Token::LeftBrace = peek_token!(token_stream) {
+                        match (&default_type, &dec_type) {
+                            (
+                                DefaultDataDeclarationType::Var,
+                                SingleDataDeclarationType::List(_),
+                            ) => (),
+                            (DefaultDataDeclarationType::Var, _)
+                            | (
+                                DefaultDataDeclarationType::List,
+                                SingleDataDeclarationType::Var(_),
+                            ) => {
+                                emit_unexpected_token!(
+                                    token_stream,
+                                    "Expected an expression.",
+                                    "an expression"
+                                );
                             }
                             _ => (),
                         }
+                        let (left_brace, list_content, right_brace) =
+                            parse_list_content(token_stream, context)?;
+                        DeclarationValue::List(
+                            assignment_operator,
+                            left_brace,
+                            list_content,
+                            right_brace,
+                        )
+                    } else {
+                        if default_type == DefaultDataDeclarationType::List
+                            && !matches!(dec_type, SingleDataDeclarationType::Var(_))
+                        {
+                            emit_unexpected_token!(token_stream, "Expected '{'.", "'{'");
+                        }
+                        DeclarationValue::Var(
+                            assignment_operator,
+                            parse_expression(token_stream, context)?,
+                        )
                     }
-                    let assignment_operator = from_stream_pos!(token_stream => AssignmentOperator);
-
-                    DeclarationValue::Var(
-                        assignment_operator,
-                        parse_expression(token_stream, context)?,
-                    )
                 }
                 Token::Comma => DeclarationValue::None,
                 Token::RightBrace(lexer::LexedRightBrace::Normal) => DeclarationValue::None,
@@ -569,7 +639,7 @@ pub mod statement {
                         (start_pos.unwrap(), get_token_end!(token_stream)),
                     )
                 }
-                DeclarationValue::List(left_brace, items, right_brace) => {
+                DeclarationValue::List(assignment_operator, left_brace, items, right_brace) => {
                     SingleDataDeclaration::List(
                         match dec_type {
                             SingleDataDeclarationType::Unset => None,
@@ -579,6 +649,7 @@ pub mod statement {
                         scope,
                         canonical_identifier,
                         identifier,
+                        assignment_operator,
                         left_brace,
                         items,
                         right_brace,
@@ -754,19 +825,16 @@ pub mod statement {
             }
             _ => SingleDataDeclarationType::Unset,
         };
-        let canonical_identifier = if let Token::CanonicalName(value) = peek_token!(token_stream) {
+        let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalName(value) => {
             let value = value.clone();
-            skip_token!(token_stream);
             if start_pos == None {
                 start_pos = from_stream_pos!(token_stream => Some);
             }
-            Some(CanonicalIdentifier {
+            CanonicalIdentifier {
                 name: value,
                 pos_range: get_token_position!(token_stream),
-            })
-        } else {
-            None
-        };
+            }
+        });
         let identifier = if let Token::Identifier(value) = next_token!(token_stream) {
             if start_pos == None {
                 start_pos = from_stream_pos!(token_stream => Some);
@@ -805,38 +873,52 @@ pub mod statement {
             }
         };
         let value = match peek_token!(token_stream) {
-            Token::LeftBrace => {
-                match dec_type {
-                    SingleDataDeclarationType::Unset => {
-                        skip_token!(token_stream);
-                        emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-                    }
-                    SingleDataDeclarationType::Var(_) => {
-                        skip_token!(token_stream);
-                        emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-                    }
-                    SingleDataDeclarationType::List(_) => (),
-                }
-                let (left_brace, list_content, right_brace) =
-                    parse_list_content(token_stream, context)?;
+            // Token::LeftBrace => {
+            //     match dec_type {
+            //         SingleDataDeclarationType::Unset => {
+            //             skip_token!(token_stream);
+            //             emit_unexpected_token!(token_stream, "Expected '='.", "'='")
+            //         }
+            //         SingleDataDeclarationType::Var(_) => {
+            //             skip_token!(token_stream);
+            //             emit_unexpected_token!(token_stream, "Expected '='.", "'='")
+            //         }
+            //         SingleDataDeclarationType::List(_) => (),
+            //     }
+            //     let (left_brace, list_content, right_brace) =
+            //         parse_list_content(token_stream, context)?;
 
-                DeclarationValue::List(left_brace, list_content, right_brace)
-            }
+            //     DeclarationValue::List(left_brace, list_content, right_brace)
+            // }
             Token::Assign => {
                 skip_token!(token_stream);
-                match dec_type {
-                    SingleDataDeclarationType::Unset => (),
-                    SingleDataDeclarationType::Var(_) => (),
-                    SingleDataDeclarationType::List(_) => {
-                        emit_unexpected_token!(token_stream, "Expected '{'.", "'{'")
-                    }
-                }
                 let assignment_operator = from_stream_pos!(token_stream => AssignmentOperator);
 
-                DeclarationValue::Var(
-                    assignment_operator,
-                    parse_expression(token_stream, context)?,
-                )
+                if let Token::LeftBrace = peek_token!(token_stream) {
+                    if !matches!(dec_type, SingleDataDeclarationType::List(_)) {
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected an expression.",
+                            "an expression"
+                        );
+                    }
+                    let (left_brace, list_content, right_brace) =
+                        parse_list_content(token_stream, context)?;
+                    DeclarationValue::List(
+                        assignment_operator,
+                        left_brace,
+                        list_content,
+                        right_brace,
+                    )
+                } else {
+                    if matches!(dec_type, SingleDataDeclarationType::List(_)) {
+                        emit_unexpected_token!(token_stream, "Expected '{'.", "'{'");
+                    }
+                    DeclarationValue::Var(
+                        assignment_operator,
+                        parse_expression(token_stream, context)?,
+                    )
+                }
             }
             Token::Semicolon => DeclarationValue::None,
             _ => {
@@ -881,20 +963,23 @@ pub mod statement {
                 literal,
                 (start_pos.unwrap().0, get_token_end!(token_stream)),
             ),
-            DeclarationValue::List(left_brace, items, right_brace) => SingleDataDeclaration::List(
-                match dec_type {
-                    SingleDataDeclarationType::Unset => None,
-                    SingleDataDeclarationType::Var(_) => panic!(),
-                    SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
-                },
-                scope,
-                canonical_identifier,
-                identifier,
-                left_brace,
-                items,
-                right_brace,
-                (start_pos.unwrap().0, get_token_end!(token_stream)),
-            ),
+            DeclarationValue::List(assignment_operator, left_brace, items, right_brace) => {
+                SingleDataDeclaration::List(
+                    match dec_type {
+                        SingleDataDeclarationType::Unset => None,
+                        SingleDataDeclarationType::Var(_) => panic!(),
+                        SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
+                    },
+                    scope,
+                    canonical_identifier,
+                    identifier,
+                    assignment_operator,
+                    left_brace,
+                    items,
+                    right_brace,
+                    (start_pos.unwrap().0, get_token_end!(token_stream)),
+                )
+            }
         };
         Ok(Statement::DataDeclaration(
             LetKeyword(let_keyword_position),
@@ -995,6 +1080,12 @@ pub mod statement {
                 }
                 parse_forever(token_stream, context, identifier)
             }
+            Token::LeftBracket => {
+                skip_token!(token_stream);
+                let left_bracket = from_stream_pos!(token_stream => LeftBracket);
+                let item = parse_expression(token_stream, context)?;
+                todo!()
+            }
             _ => {
                 skip_token!(token_stream);
                 emit_unexpected_token!(token_stream, "Expected '=' or '('.", "'=' or '('");
@@ -1024,27 +1115,22 @@ pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> Pa
     let start_pos = get_token_start!(token_stream);
     let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
     let mut statements = Vec::<(Statement, Semicolon)>::new();
-    if peek_token!(token_stream) == &Token::RightBrace(lexer::LexedRightBrace::Normal) {
-        skip_token!(token_stream);
+    consume_then_never_if!(token_stream, Token::RightBrace(lexer::LexedRightBrace::Normal) =>
         return Ok(CodeBlock {
             left_brace,
             statements,
             right_brace: from_stream_pos!(token_stream => ast::RightBrace),
             pos_range: (start_pos, get_token_end!(token_stream)),
-        });
-    }
+        })
+    );
     loop {
         statements.push((parse_statement(token_stream, context)?, {
             expect_token!(token_stream, Token::Semicolon => (), "Expected ';'.", "';'");
             from_stream_pos!(token_stream => Semicolon)
         }));
-        match peek_token!(token_stream) {
-            Token::RightBrace(lexer::LexedRightBrace::Normal) => {
-                skip_token!(token_stream);
-                break;
-            }
-            _ => (),
-        }
+        consume_then_never_if!(token_stream, Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+            break;
+        });
     }
     Ok(CodeBlock {
         left_brace,
@@ -1147,14 +1233,13 @@ pub mod expression {
             }
             Token::LeftParens => {
                 let left_parens = LeftParens(token_position);
-                if peek_token!(token_stream) == &Token::RightParens {
-                    skip_token!(token_stream);
+                consume_then_never_if!(token_stream, Token::RightParens => {
                     return Ok(ELiteral(LLiteral::EmptyExpression(
                         left_parens,
                         from_stream_pos!(token_stream => RightParens),
                         (token_position.0, get_token_end!(token_stream)),
                     )));
-                }
+                });
                 let expr = parse_expression(token_stream, context)?;
                 expect_token!(token_stream, Token::RightParens => (), "Expected ')'.", "')'");
                 let end_pos = get_token_end!(token_stream);
@@ -1213,29 +1298,23 @@ pub mod expression {
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<Option<BinOp>> {
-        let token = peek_token!(optional token_stream);
         use super::super::ast::BinOp;
-        let result = match token {
-            Token::Plus => from_stream_pos!(token_stream => BinOp::Plus),
-            Token::Minus => from_stream_pos!(token_stream => BinOp::Minus),
-            Token::Times => from_stream_pos!(token_stream => BinOp::Times),
-            Token::Div => from_stream_pos!(token_stream => BinOp::Div),
-            Token::Mod => from_stream_pos!(token_stream => BinOp::Mod),
-            Token::Join => from_stream_pos!(token_stream => BinOp::Join),
-            Token::And => from_stream_pos!(token_stream => BinOp::And),
-            Token::Or => from_stream_pos!(token_stream => BinOp::Or),
-            Token::Equals => from_stream_pos!(token_stream => BinOp::Equals),
-            Token::NotEquals => from_stream_pos!(token_stream => BinOp::NotEquals),
-            Token::LessThan => from_stream_pos!(token_stream => BinOp::LessThan),
-            Token::GreaterThan => from_stream_pos!(token_stream => BinOp::GreaterThan),
-            Token::LessThanOrEqual => from_stream_pos!(token_stream => BinOp::LessThanOrEqual),
-            Token::GreaterThanOrEqual => {
-                from_stream_pos!(token_stream => BinOp::GreaterThanOrEqual)
-            }
-            _ => return Ok(None),
-        };
-        skip_token!(token_stream);
-        Ok(Some(result))
+        Ok(Some(match_token_or_return_none!(token_stream, {
+            Token::Plus => BinOp::Plus,
+            Token::Minus => BinOp::Minus,
+            Token::Times => BinOp::Times,
+            Token::Div => BinOp::Div,
+            Token::Mod => BinOp::Mod,
+            Token::Join => BinOp::Join,
+            Token::And => BinOp::And,
+            Token::Or => BinOp::Or,
+            Token::Equals => BinOp::Equals,
+            Token::NotEquals => BinOp::NotEquals,
+            Token::LessThan => BinOp::LessThan,
+            Token::GreaterThan => BinOp::GreaterThan,
+            Token::LessThanOrEqual => BinOp::LessThanOrEqual,
+            Token::GreaterThanOrEqual => BinOp::GreaterThanOrEqual,
+        })))
     }
 
     /**
@@ -1308,22 +1387,13 @@ pub fn parse_expression_list(
     expect_token!(token_stream, Token::LeftParens => (), "Expected '('.", "'('");
     let left_parens = from_stream_pos!(token_stream => ast::LeftParens);
     let mut expressions = Vec::<Expression>::new();
-    if peek_token!(token_stream) == &Token::RightParens {
-        skip_token!(token_stream);
-        return Ok((
-            left_parens,
-            expressions,
-            from_stream_pos!(token_stream => ast::RightParens),
-        ));
-    }
     loop {
+        consume_then_never_if!(token_stream, Token::RightParens => {
+            break;
+        });
         expressions.push(parse_expression(token_stream, context)?);
         match next_token!(token_stream) {
-            Token::Comma => {
-                if let Token::RightParens = peek_token!(token_stream) {
-                    break;
-                }
-            }
+            Token::Comma => (),
             Token::RightParens => break,
             _ => {
                 emit_unexpected_token!(token_stream, "Expected a comma or ')'.", "a comma or ')'");
