@@ -53,6 +53,8 @@ pub struct ParseContext {
 
 impl ParseContext {
     pub fn new() -> Self {
-        todo!()
+        Self {
+            targets: vec![]
+        }
     }
 }

@@ -212,7 +212,10 @@ pub fn parse_full_identifier(
     let start_pos = get_token_start!(token_stream);
     let mut scope: Option<Vec<(IString, PosRange)>> = None;
     loop {
-        match peek_token!(token_stream) {
+        match match peek_token!(token_stream => Option) {
+            Some(value) => value,
+            None => break
+        } {
             Token::ScopeResolution => {
                 if let Some(_) = scope {
                     skip_token!(token_stream);
@@ -251,11 +254,17 @@ pub fn parse_full_identifier_starting_with(
     context: &mut ParseContext,
     value: IString,
 ) -> ParseOut<Identifier> {
-    let mut names: Vec<(IString, PosRange)> = vec![(value, get_token_position!(token_stream))];
+    let mut names: Vec<(IString, PosRange)> = vec![(
+        value,
+        get_token_position!(token_stream),
+    )];
     let start_pos = get_token_start!(token_stream);
     let mut scope: Option<Vec<(IString, PosRange)>> = None;
     loop {
-        match peek_token!(token_stream) {
+        match match peek_token!(token_stream => Option) {
+            Some(value) => value,
+            None => break
+        } {
             Token::ScopeResolution => {
                 if let Some(_) = scope {
                     skip_token!(token_stream);
@@ -300,8 +309,8 @@ pub mod statement {
         parser::ast::{
             AssignmentOperator, CanonicalIdentifier, DataDeclarationScope, LeftBrace, LeftBracket,
             LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword, MultiDataDeclaration,
-            RightBrace, RightParens, SingleDataDeclaration, SingleDataDeclarationType, VarKeyword,
-            VarsKeyword,
+            RightBrace, RightBracket, RightParens, SingleDataDeclaration,
+            SingleDataDeclarationType, VarKeyword, VarsKeyword,
         },
     };
 
@@ -923,7 +932,7 @@ pub mod statement {
             Token::Semicolon => DeclarationValue::None,
             _ => {
                 skip_token!(token_stream);
-                emit_unexpected_token!(token_stream, "Expected '=', '{' or ';'", "'=', '{' or ';'")
+                emit_unexpected_token!(token_stream, "Expected '=', '{' or ';'", "'=', '{' or ';'");
             }
         };
         let declaration = match value {
@@ -1012,7 +1021,7 @@ pub mod statement {
     ) -> ParseOut<Statement> {
         let start_pos = get_token_start!(token_stream);
         expect_token!(token_stream, Token::LeftParens => (), "Expected '('", "'('");
-        let (left_parens, mut expressions, right_parens) =
+        let (left_parens, expressions, right_parens) =
             parse_expression_list(token_stream, context)?;
         if peek_token!(token_stream) == &Token::LeftBrace {
             let expression = match expressions.len() {
@@ -1024,7 +1033,15 @@ pub mod statement {
                         pos_range,
                     ))
                 }
-                1 => expressions.pop().unwrap(),
+                1 => {
+                    let pos_range = (left_parens.0.0, right_parens.0.1);
+                    Expression::Parentheses(
+                        left_parens,
+                        Box::new(expressions.into_iter().next().unwrap()),
+                        right_parens,
+                        pos_range,
+                    )
+                }
                 _ => emit_unexpected_token!(
                     token_stream,
                     "Control blocks cannot have multiple expression inputs.",
@@ -1032,6 +1049,56 @@ pub mod statement {
                 ),
             };
             let code_block = parse_code_block(token_stream, context)?;
+            if identifier.is_if() {
+                let initial_code_block = (identifier, expression, code_block);
+                let mut code_blocks = Vec::<(Identifier, Identifier, Expression, CodeBlock)>::new();
+                let final_code_block = loop {
+                    match match peek_token!(token_stream => Option) {
+                        Some(value) => value,
+                        None => break None,
+                    } {
+                        Token::Semicolon => break None,
+                        Token::Identifier(_) => {
+                            let else_identifier = parse_full_identifier(token_stream, context)?;
+                            if !else_identifier.is_else() {
+                                emit_unexpected_token!(
+                                    token_stream,
+                                    "Expected \"else\" identifier.",
+                                    "\"else\" identifier"
+                                );
+                            }
+                            if matches!(peek_token!(token_stream), Token::Identifier(_)) {
+                                let if_identifier = parse_full_identifier(token_stream, context)?;
+                                if !if_identifier.is_if() {
+                                    emit_unexpected_token!(
+                                        token_stream,
+                                        "Expected \"if\" identifier.",
+                                        "\"if\" identifier"
+                                    );
+                                }
+                                code_blocks.push((
+                                    else_identifier,
+                                    if_identifier,
+                                    parse_expression(token_stream, context)?,
+                                    parse_code_block(token_stream, context)?,
+                                ));
+                            } else {
+                                break Some((
+                                    else_identifier,
+                                    parse_code_block(token_stream, context)?,
+                                ));
+                            }
+                        }
+                        _ => break None,
+                    }
+                };
+                return Ok(Statement::IfElse(
+                    initial_code_block,
+                    code_blocks,
+                    final_code_block,
+                    (start_pos, get_token_end!(token_stream)),
+                ));
+            }
             return Ok(Statement::Control(
                 identifier,
                 expression,
@@ -1059,6 +1126,7 @@ pub mod statement {
         }
         let code_block = parse_code_block(token_stream, context)?;
         Ok(Statement::Forever(
+            identifier,
             code_block,
             (start_pos, get_token_end!(token_stream)),
         ))
@@ -1081,10 +1149,32 @@ pub mod statement {
                 parse_forever(token_stream, context, identifier)
             }
             Token::LeftBracket => {
+                let start_pos = get_token_start!(token_stream);
                 skip_token!(token_stream);
                 let left_bracket = from_stream_pos!(token_stream => LeftBracket);
                 let item = parse_expression(token_stream, context)?;
-                todo!()
+                let right_bracket = expect_token!(
+                    token_stream,
+                    Token::RightBracket => from_stream_pos!(token_stream => RightBracket),
+                    "Expected ']'.",
+                    "']'"
+                );
+                let assignment_operator = expect_token!(
+                    token_stream,
+                    Token::Assign => from_stream_pos!(token_stream => AssignmentOperator),
+                    "Expected '='.",
+                    "'='"
+                );
+                let value = parse_expression(token_stream, context)?;
+                Ok(Statement::SetItem(
+                    identifier,
+                    left_bracket,
+                    item,
+                    right_bracket,
+                    assignment_operator,
+                    value,
+                    (start_pos, get_token_end!(token_stream)),
+                ))
             }
             _ => {
                 skip_token!(token_stream);
@@ -1106,6 +1196,10 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             let identifier = parse_full_identifier(token_stream, context)?;
             statement::parse_statement_after_identifier(token_stream, context, identifier)
         }
+        Token::Semicolon => Ok(Statement::EmptyStatement((
+            get_token_end!(token_stream), // It doesn't include the semicolon and so doesn't include anything.
+            get_token_end!(token_stream), // Therefore it must be zero width.
+        ))),
         _ => todo!(),
     }
 }
@@ -1124,10 +1218,15 @@ pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> Pa
         })
     );
     loop {
-        statements.push((parse_statement(token_stream, context)?, {
-            expect_token!(token_stream, Token::Semicolon => (), "Expected ';'.", "';'");
-            from_stream_pos!(token_stream => Semicolon)
-        }));
+        statements.push((
+            parse_statement(token_stream, context)?,
+            expect_token!(
+                token_stream,
+                Token::Semicolon => from_stream_pos!(token_stream => Semicolon),
+                "Expected ';'.",
+                "';'"
+            ),
+        ));
         consume_then_never_if!(token_stream, Token::RightBrace(lexer::LexedRightBrace::Normal) => {
             break;
         });

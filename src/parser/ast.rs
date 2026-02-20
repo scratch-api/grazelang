@@ -10,12 +10,12 @@ pub trait GetPos {
 pub enum Statement {
     DataDeclaration(LetKeyword, MultiDataDeclaration, PosRange),
     Assignment(Identifier, AssignmentOperator, Expression, PosRange),
-    SetItem(Identifier, Expression, AssignmentOperator, Expression, PosRange),
+    SetItem(Identifier, LeftBracket, Expression, RightBracket, AssignmentOperator, Expression, PosRange),
     Call(Identifier, LeftParens, Vec<Expression>, RightParens, PosRange),
     Control(Identifier, Expression, CodeBlock, PosRange),
-    Forever(CodeBlock, PosRange),
-    IfElse(Vec<(Expression, CodeBlock)>, Option<CodeBlock>, PosRange),
-    Semicolon(PosRange),
+    Forever(Identifier, CodeBlock, PosRange),
+    IfElse((Identifier, Expression, CodeBlock), Vec<(Identifier, Identifier, Expression, CodeBlock)>, Option<(Identifier, CodeBlock)>, PosRange),
+    EmptyStatement(PosRange),
 }
 
 impl GetPos for Statement {
@@ -23,12 +23,12 @@ impl GetPos for Statement {
         match self {
             Statement::DataDeclaration(_, _, p) => p,
             Statement::Assignment(_, _, _, p) => p,
-            Statement::SetItem(_, _, _, _, p) => p,
+            Statement::SetItem(_, _, _, _, _, _, p) => p,
             Statement::Call(_, _, _, _, p) => p,
             Statement::Control(_, _, _, p) => p,
-            Statement::Forever(_, p) => p,
-            Statement::IfElse(_, _, p) => p,
-            Statement::Semicolon(p) => p,
+            Statement::Forever(_, _, p) => p,
+            Statement::IfElse(_, _, _, p) => p,
+            Statement::EmptyStatement(p) => p,
         }
     }
 }
@@ -446,6 +446,11 @@ impl GetPos for FormattedStringContent {
     }
 }
 
+/// What counts as `scope`, what counts as `names`?
+/// 
+/// When there is only one segment: it counts as `names`.
+/// 
+/// When there are multiple segments: everything before the first dot is in `scope`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Identifier {
     pub scope: Vec<(IString, PosRange)>,
@@ -461,6 +466,12 @@ impl GetPos for Identifier {
 
 impl Identifier {
     pub fn is_forever(&self) -> bool {
+        todo!()
+    }
+    pub fn is_if(&self) -> bool {
+        todo!()
+    }
+    pub fn is_else(&self) -> bool {
         todo!()
     }
 }
