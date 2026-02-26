@@ -1,4 +1,4 @@
-use crate::{lexer::PosRange};
+use crate::lexer::PosRange;
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
 
@@ -7,14 +7,134 @@ pub trait GetPos {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CostumeKeyword(pub PosRange);
+
+impl GetPos for CostumeKeyword {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SoundKeyword(pub PosRange);
+
+impl GetPos for SoundKeyword {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SpriteStatement {
+    DataDeclaration(LetKeyword, DataDeclaration, PosRange),
+    CostumeDeclaration(CostumeKeyword, AssetDeclaration, PosRange),
+    SoundDeclaration(SoundKeyword, AssetDeclaration, PosRange),
+    SingleInputHatStatement(Identifier, Expression, CodeBlock, PosRange),
+    MultiInputHatStatement(
+        Identifier,
+        LeftParens,
+        Vec<(Expression, Option<Comma>)>,
+        RightParens,
+        CodeBlock,
+        PosRange,
+    ),
+}
+
+impl GetPos for SpriteStatement {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        match self {
+            SpriteStatement::DataDeclaration(_, _, p) => p,
+            SpriteStatement::CostumeDeclaration(_, _, p) => p,
+            SpriteStatement::SoundDeclaration(_, _, p) => p,
+            SpriteStatement::SingleInputHatStatement(_, _, _, p) => p,
+            SpriteStatement::MultiInputHatStatement(_, _, _, _, _, p) => p,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum AssetDeclaration {
+    Multiple(
+        LeftParens,
+        Vec<(SingleAssetDeclaration, Option<Comma>)>,
+        RightParens,
+        PosRange,
+    ),
+    Single(SingleAssetDeclaration),
+}
+
+impl GetPos for AssetDeclaration {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        match self {
+            AssetDeclaration::Multiple(_, _, _, p) => p,
+            AssetDeclaration::Single(d) => d.get_position(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SingleAssetDeclaration(
+    pub Option<CanonicalIdentifier>,
+    pub Identifier,
+    pub LeftParens,
+    pub Literal,
+    pub RightParens,
+    pub PosRange,
+);
+
+impl GetPos for SingleAssetDeclaration {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.5
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Statement {
-    DataDeclaration(LetKeyword, MultiDataDeclaration, PosRange),
-    Assignment(Identifier, AssignmentOperator, Expression, PosRange),
-    SetItem(Identifier, LeftBracket, Expression, RightBracket, AssignmentOperator, Expression, PosRange),
-    Call(Identifier, LeftParens, Vec<Expression>, RightParens, PosRange),
-    Control(Identifier, Expression, CodeBlock, PosRange),
+    DataDeclaration(LetKeyword, DataDeclaration, PosRange),
+    Assignment(Identifier, NormalAssignmentOperator, Expression, PosRange),
+    ListAssignment(
+        Identifier,
+        NormalAssignmentOperator,
+        LeftBrace,
+        Vec<(ListEntry, Option<Comma>)>,
+        RightBrace,
+        PosRange,
+    ),
+    SetItem(
+        Identifier,
+        LeftBracket,
+        Expression,
+        RightBracket,
+        NormalAssignmentOperator,
+        Expression,
+        PosRange,
+    ),
+    Call(
+        Identifier,
+        LeftParens,
+        Vec<(Expression, Option<Comma>)>,
+        RightParens,
+        PosRange,
+    ),
+    SingleInputControl(Identifier, Expression, CodeBlock, PosRange),
+    MultiInputControl(
+        Identifier,
+        LeftParens,
+        Vec<(Expression, Option<Comma>)>,
+        RightParens,
+        CodeBlock,
+        PosRange,
+    ),
     Forever(Identifier, CodeBlock, PosRange),
-    IfElse((Identifier, Expression, CodeBlock), Vec<(Identifier, Identifier, Expression, CodeBlock)>, Option<(Identifier, CodeBlock)>, PosRange),
+    IfElse(
+        (Identifier, Expression, CodeBlock),
+        Vec<(Identifier, Identifier, Expression, CodeBlock)>,
+        Option<(Identifier, CodeBlock)>,
+        PosRange,
+    ),
     EmptyStatement(PosRange),
 }
 
@@ -23,9 +143,11 @@ impl GetPos for Statement {
         match self {
             Statement::DataDeclaration(_, _, p) => p,
             Statement::Assignment(_, _, _, p) => p,
+            Statement::ListAssignment(_, _, _, _, _, p) => p,
             Statement::SetItem(_, _, _, _, _, _, p) => p,
             Statement::Call(_, _, _, _, p) => p,
-            Statement::Control(_, _, _, p) => p,
+            Statement::SingleInputControl(_, _, _, p) => p,
+            Statement::MultiInputControl(_, _, _, _, _, p) => p,
             Statement::Forever(_, _, p) => p,
             Statement::IfElse(_, _, _, p) => p,
             Statement::EmptyStatement(p) => p,
@@ -37,6 +159,7 @@ impl GetPos for Statement {
 pub struct LetKeyword(pub PosRange);
 
 impl GetPos for LetKeyword {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -46,6 +169,7 @@ impl GetPos for LetKeyword {
 pub struct VarsKeyword(pub PosRange);
 
 impl GetPos for VarsKeyword {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -55,6 +179,7 @@ impl GetPos for VarsKeyword {
 pub struct ListsKeyword(pub PosRange);
 
 impl GetPos for ListsKeyword {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -64,6 +189,7 @@ impl GetPos for ListsKeyword {
 pub struct VarKeyword(pub PosRange);
 
 impl GetPos for VarKeyword {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -73,6 +199,7 @@ impl GetPos for VarKeyword {
 pub struct ListKeyword(pub PosRange);
 
 impl GetPos for ListKeyword {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -82,15 +209,15 @@ impl GetPos for ListKeyword {
 pub enum SingleDataDeclarationType {
     Unset,
     Var(PosRange),
-    List(PosRange)
+    List(PosRange),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum MultiDataDeclaration {
+pub enum DataDeclaration {
     Mixed(
         DataDeclarationScope,
         LeftParens,
-        Vec<SingleDataDeclaration>,
+        Vec<(SingleDataDeclaration, Option<Comma>)>,
         RightParens,
         PosRange,
     ),
@@ -98,7 +225,7 @@ pub enum MultiDataDeclaration {
         DataDeclarationScope,
         VarsKeyword,
         LeftBrace,
-        Vec<SingleDataDeclaration>,
+        Vec<(SingleDataDeclaration, Option<Comma>)>,
         RightBrace,
         PosRange,
     ),
@@ -106,20 +233,20 @@ pub enum MultiDataDeclaration {
         DataDeclarationScope,
         ListsKeyword,
         LeftBrace,
-        Vec<SingleDataDeclaration>,
+        Vec<(SingleDataDeclaration, Option<Comma>)>,
         RightBrace,
         PosRange,
     ),
     Single(SingleDataDeclaration),
 }
 
-impl GetPos for MultiDataDeclaration {
+impl GetPos for DataDeclaration {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
-            MultiDataDeclaration::Mixed(_, _, _, _, p) => p,
-            MultiDataDeclaration::Vars(_, _, _, _, _, p) => p,
-            MultiDataDeclaration::Lists(_, _, _, _, _, p) => p,
-            MultiDataDeclaration::Single(d) => d.get_position(),
+            DataDeclaration::Mixed(_, _, _, _, p) => p,
+            DataDeclaration::Vars(_, _, _, _, _, p) => p,
+            DataDeclaration::Lists(_, _, _, _, _, p) => p,
+            DataDeclaration::Single(d) => d.get_position(),
         }
     }
 }
@@ -133,9 +260,10 @@ pub enum DataDeclarationScope {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AssignmentOperator(pub PosRange);
+pub struct NormalAssignmentOperator(pub PosRange);
 
-impl GetPos for AssignmentOperator {
+impl GetPos for NormalAssignmentOperator {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -144,7 +272,7 @@ impl GetPos for AssignmentOperator {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ListEntry {
     Expression(Expression),
-    Unwrap(Literal, PosRange)
+    Unwrap(Literal, PosRange),
 }
 
 impl GetPos for ListEntry {
@@ -163,7 +291,7 @@ pub enum SingleDataDeclaration {
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
-        AssignmentOperator,
+        NormalAssignmentOperator,
         Expression,
         PosRange,
     ),
@@ -179,9 +307,9 @@ pub enum SingleDataDeclaration {
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
-        AssignmentOperator,
+        NormalAssignmentOperator,
         LeftBrace,
-        Vec<ListEntry>,
+        Vec<(ListEntry, Option<Comma>)>,
         RightBrace,
         PosRange,
     ),
@@ -206,17 +334,20 @@ impl GetPos for SingleDataDeclaration {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CodeBlock {
-    pub left_brace: LeftBrace,
-    pub statements: Vec<(Statement, Semicolon)>,
-    pub right_brace: RightBrace,
-    pub pos_range: PosRange,
+pub struct Comma(pub PosRange);
+
+impl GetPos for Comma {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LeftBrace(pub PosRange);
 
 impl GetPos for LeftBrace {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -226,12 +357,22 @@ impl GetPos for LeftBrace {
 pub struct RightBrace(pub PosRange);
 
 impl GetPos for RightBrace {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CodeBlock {
+    pub left_brace: LeftBrace,
+    pub statements: Vec<(Statement, Semicolon)>,
+    pub right_brace: RightBrace,
+    pub pos_range: PosRange,
+}
+
 impl GetPos for CodeBlock {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.pos_range
     }
@@ -247,7 +388,7 @@ pub enum Expression {
     Call(
         Identifier,
         LeftParens,
-        Vec<Expression>,
+        Vec<(Expression, Option<Comma>)>,
         RightParens,
         PosRange,
     ),
@@ -265,6 +406,7 @@ pub enum Expression {
 pub struct LeftParens(pub PosRange);
 
 impl GetPos for LeftParens {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -274,6 +416,7 @@ impl GetPos for LeftParens {
 pub struct RightParens(pub PosRange);
 
 impl GetPos for RightParens {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -283,6 +426,7 @@ impl GetPos for RightParens {
 pub struct LeftBracket(pub PosRange);
 
 impl GetPos for LeftBracket {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -292,6 +436,7 @@ impl GetPos for LeftBracket {
 pub struct RightBracket(pub PosRange);
 
 impl GetPos for RightBracket {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -300,6 +445,7 @@ impl GetPos for RightBracket {
 pub struct Semicolon(pub PosRange);
 
 impl GetPos for Semicolon {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
     }
@@ -447,9 +593,9 @@ impl GetPos for FormattedStringContent {
 }
 
 /// What counts as `scope`, what counts as `names`?
-/// 
+///
 /// When there is only one segment: it counts as `names`.
-/// 
+///
 /// When there are multiple segments: everything before the first dot is in `scope`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Identifier {
@@ -459,6 +605,7 @@ pub struct Identifier {
 }
 
 impl GetPos for Identifier {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.pos_range
     }
@@ -483,6 +630,7 @@ pub struct CanonicalIdentifier {
 }
 
 impl GetPos for CanonicalIdentifier {
+    #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.pos_range
     }
@@ -490,7 +638,7 @@ impl GetPos for CanonicalIdentifier {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ParseError {
-    UnexpectedEndOfInput,
-    UnexpectedToken(&'static str, &'static str, PosRange),
-    LexerStuck(PosRange),
+    UnexpectedEndOfInput(&'static str),
+    UnexpectedToken(&'static str, &'static str, &'static str, PosRange),
+    LexerStuck(&'static str, PosRange),
 }

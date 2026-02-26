@@ -41,6 +41,10 @@ pub enum Token {
     ListKeyword,
     #[token("lists")]
     ListsKeyword,
+    #[token("costume")]
+    CostumeKeyword,
+    #[token("sound")]
+    SoundKeyword,
     #[token("{")]
     LeftBrace,
     #[token("}", handle_right_brace)]
@@ -103,7 +107,7 @@ pub enum Token {
     #[regex(r#""(?:[^\\"$]|(?:\\.))*""#, parse_simple_string_literal)]
     SimpleString(IString),
     #[regex(r#"`(?:[^\\`]|(?:\\.))*`"#, parse_canonical_name)]
-    CanonicalName(IString),
+    CanonicalIdentifier(IString),
     #[regex(r#"\w+"#, parse_string)]
     Identifier(IString),
     #[regex(r#"\$\w+"#, parse_string)]
@@ -221,7 +225,7 @@ pub fn get_position(lex: &Lexer<Token>, character_index: usize) -> (usize, usize
     if last_newline_index > character_index {
         todo!()
     }
-    (lex.extras.0.len() - 1, character_index - last_newline_index)
+    (lex.extras.0.len(), character_index - last_newline_index)
 }
 
 pub fn get_pos_range(lex: &Lexer<Token>, character_range: Range<usize>) -> PosRange {

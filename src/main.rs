@@ -6,18 +6,88 @@ use parser::internal;
 
 fn test_case(case: &str) {
     let mut lexer = lexer::Token::lexer(case);
-    match internal::parse_expression(make_parse_in!(&mut lexer), &mut ParseContext::new()) {
+    match internal::parse_code_block(make_parse_in!(&mut lexer), &mut ParseContext::new()) {
         Ok(value) => {
-            dbg!(value);
+            dbg!(&value);
+            println!("{}", serde_json::to_string(&value).unwrap());
         },
         Err(err) => {
             dbg!(err);
         },
     }
 }
+/*
+// Variables:
+    // Global var
+    let global var4 = 1;
+    // Implicitly local var
+    let var5 = 1;
+    // Explicitly local var
+    let local var6 = 1;
+    // Cloud var
+    let cloud var7 = 1;
+    // Named var
+    let `variable 8` var8 = 1;
+    // Multiple vars
+    let (var9 = 1, var10 = 1);
+    // Many vars
+    let vars {
+        var11 = 1,
+        var12 = 1
+    }; */
 
 fn main() {
-    test_case("case");
-    test_case("case.case");
-    test_case("case::case");
+    test_case(r#"
+{
+// Data
+
+    // Variables:
+    // Global var
+    let global var4 = 1;
+    // Implicitly local var
+    let var5 = 1;
+    // Explicitly local var
+    let local var6 = 1;
+    // Cloud var
+    let cloud var7 = 1;
+    // Named var
+    let `variable 8` var8 = 1;
+    // Multiple vars
+    let (var9 = 1, var10 =    1   );
+    // Many vars
+    let vars {
+        var11 = 1,
+        var12 = 1
+    };
+    // Explicit var
+    let var var11 = 1;
+
+    // Lists:
+    // Global list
+    let global list list3 = {1, 2, 3};
+    // Implicitly local list
+    let list list4 = {1, 2, 3};
+    // Explicitly local valistr
+    let local list list5 = {1, 2, 3};
+    // Named list
+    let list `list 6` list6 = {1, 2, 3};
+    // List including characters from a string
+    let list list7 = {"", "", .."abcdefghijklmnopqrstuvwxyz", .."ABCDEFGHIJKLMNOPQRSTUVWXYZ"};
+    // Multiple lists
+    let (list list8 = {1, 2, 3}, list list9 = {1, 2, 3});
+    // Many lists
+    let lists {
+        list10 = {1, 2, 3},
+        list11 = {1, 2, 3}
+    };
+
+    // Mixed:
+    // Mixed definitions
+    let (
+        var14 = 1,
+        global var15 = 1,
+        var var16 = 1,
+        global list list12 = {1, 2, 3}
+    );
+}"#);
 }
