@@ -7,6 +7,13 @@ pub trait GetPos {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TopLevelStatement {
+    Stage(),
+    Sprite(),
+    Mod(),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CostumeKeyword(pub PosRange);
 
 impl GetPos for CostumeKeyword {
@@ -38,16 +45,23 @@ impl GetPos for SoundKeyword {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StageStatement {
-    DataDeclaration(LetKeyword, DataDeclaration, PosRange),
-    BackdropDeclaration(BackdropKeyword, AssetDeclaration, PosRange),
-    SoundDeclaration(SoundKeyword, AssetDeclaration, PosRange),
-    SingleInputHatStatement(Identifier, Expression, CodeBlock, PosRange),
+    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
+    BackdropDeclaration(BackdropKeyword, AssetDeclaration, Semicolon, PosRange),
+    SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, PosRange),
+    SingleInputHatStatement(
+        Identifier,
+        Expression,
+        CodeBlock,
+        Option<Semicolon>,
+        PosRange,
+    ),
     MultiInputHatStatement(
         Identifier,
         LeftParens,
         Vec<(Expression, Option<Comma>)>,
         RightParens,
         CodeBlock,
+        Option<Semicolon>,
         PosRange,
     ),
 }
@@ -55,27 +69,34 @@ pub enum StageStatement {
 impl GetPos for StageStatement {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
-            StageStatement::DataDeclaration(_, _, p) => p,
-            StageStatement::BackdropDeclaration(_, _, p) => p,
-            StageStatement::SoundDeclaration(_, _, p) => p,
-            StageStatement::SingleInputHatStatement(_, _, _, p) => p,
-            StageStatement::MultiInputHatStatement(_, _, _, _, _, p) => p,
+            StageStatement::DataDeclaration(_, _, _, p) => p,
+            StageStatement::BackdropDeclaration(_, _, _, p) => p,
+            StageStatement::SoundDeclaration(_, _, _, p) => p,
+            StageStatement::SingleInputHatStatement(_, _, _, _, p) => p,
+            StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SpriteStatement {
-    DataDeclaration(LetKeyword, DataDeclaration, PosRange),
-    CostumeDeclaration(CostumeKeyword, AssetDeclaration, PosRange),
-    SoundDeclaration(SoundKeyword, AssetDeclaration, PosRange),
-    SingleInputHatStatement(Identifier, Expression, CodeBlock, PosRange),
+    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
+    CostumeDeclaration(CostumeKeyword, AssetDeclaration, Semicolon, PosRange),
+    SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, PosRange),
+    SingleInputHatStatement(
+        Identifier,
+        Expression,
+        CodeBlock,
+        Option<Semicolon>,
+        PosRange,
+    ),
     MultiInputHatStatement(
         Identifier,
         LeftParens,
         Vec<(Expression, Option<Comma>)>,
         RightParens,
         CodeBlock,
+        Option<Semicolon>,
         PosRange,
     ),
 }
@@ -83,11 +104,11 @@ pub enum SpriteStatement {
 impl GetPos for SpriteStatement {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
-            SpriteStatement::DataDeclaration(_, _, p) => p,
-            SpriteStatement::CostumeDeclaration(_, _, p) => p,
-            SpriteStatement::SoundDeclaration(_, _, p) => p,
-            SpriteStatement::SingleInputHatStatement(_, _, _, p) => p,
-            SpriteStatement::MultiInputHatStatement(_, _, _, _, _, p) => p,
+            SpriteStatement::DataDeclaration(_, _, _, p) => p,
+            SpriteStatement::CostumeDeclaration(_, _, _, p) => p,
+            SpriteStatement::SoundDeclaration(_, _, _, p) => p,
+            SpriteStatement::SingleInputHatStatement(_, _, _, _, p) => p,
+            SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
         }
     }
 }
@@ -131,14 +152,21 @@ impl GetPos for SingleAssetDeclaration {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Statement {
-    DataDeclaration(LetKeyword, DataDeclaration, PosRange),
-    Assignment(Identifier, NormalAssignmentOperator, Expression, PosRange),
+    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
+    Assignment(
+        Identifier,
+        NormalAssignmentOperator,
+        Expression,
+        Semicolon,
+        PosRange,
+    ),
     ListAssignment(
         Identifier,
         NormalAssignmentOperator,
         LeftBrace,
         Vec<(ListEntry, Option<Comma>)>,
         RightBrace,
+        Semicolon,
         PosRange,
     ),
     SetItem(
@@ -148,6 +176,7 @@ pub enum Statement {
         RightBracket,
         NormalAssignmentOperator,
         Expression,
+        Semicolon,
         PosRange,
     ),
     Call(
@@ -155,40 +184,49 @@ pub enum Statement {
         LeftParens,
         Vec<(Expression, Option<Comma>)>,
         RightParens,
+        Semicolon,
         PosRange,
     ),
-    SingleInputControl(Identifier, Expression, CodeBlock, PosRange),
+    SingleInputControl(
+        Identifier,
+        Expression,
+        CodeBlock,
+        Option<Semicolon>,
+        PosRange,
+    ),
     MultiInputControl(
         Identifier,
         LeftParens,
         Vec<(Expression, Option<Comma>)>,
         RightParens,
         CodeBlock,
+        Option<Semicolon>,
         PosRange,
     ),
-    Forever(Identifier, CodeBlock, PosRange),
+    Forever(Identifier, CodeBlock, Option<Semicolon>, PosRange),
     IfElse(
         (Identifier, Expression, CodeBlock),
         Vec<(Identifier, Identifier, Expression, CodeBlock)>,
         Option<(Identifier, CodeBlock)>,
+        Option<Semicolon>,
         PosRange,
     ),
-    EmptyStatement(PosRange),
+    EmptyStatement(Semicolon),
 }
 
 impl GetPos for Statement {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
-            Statement::DataDeclaration(_, _, p) => p,
-            Statement::Assignment(_, _, _, p) => p,
-            Statement::ListAssignment(_, _, _, _, _, p) => p,
-            Statement::SetItem(_, _, _, _, _, _, p) => p,
-            Statement::Call(_, _, _, _, p) => p,
-            Statement::SingleInputControl(_, _, _, p) => p,
-            Statement::MultiInputControl(_, _, _, _, _, p) => p,
-            Statement::Forever(_, _, p) => p,
-            Statement::IfElse(_, _, _, p) => p,
-            Statement::EmptyStatement(p) => p,
+            Statement::DataDeclaration(_, _, _, p) => p,
+            Statement::Assignment(_, _, _, _, p) => p,
+            Statement::ListAssignment(_, _, _, _, _, _, p) => p,
+            Statement::SetItem(_, _, _, _, _, _, _, p) => p,
+            Statement::Call(_, _, _, _, _, p) => p,
+            Statement::SingleInputControl(_, _, _, _, p) => p,
+            Statement::MultiInputControl(_, _, _, _, _, _, p) => p,
+            Statement::Forever(_, _, _, p) => p,
+            Statement::IfElse(_, _, _, _, p) => p,
+            Statement::EmptyStatement(p) => &p.0,
         }
     }
 }
@@ -402,9 +440,39 @@ impl GetPos for RightBrace {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StageCodeBlock {
+    pub left_brace: LeftBrace,
+    pub statements: Vec<StageStatement>,
+    pub right_brace: RightBrace,
+    pub pos_range: PosRange,
+}
+
+impl GetPos for StageCodeBlock {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.pos_range
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpriteCodeBlock {
+    pub left_brace: LeftBrace,
+    pub statements: Vec<SpriteStatement>,
+    pub right_brace: RightBrace,
+    pub pos_range: PosRange,
+}
+
+impl GetPos for SpriteCodeBlock {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.pos_range
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodeBlock {
     pub left_brace: LeftBrace,
-    pub statements: Vec<(Statement, Semicolon)>,
+    pub statements: Vec<Statement>,
     pub right_brace: RightBrace,
     pub pos_range: PosRange,
 }

@@ -1,4 +1,3 @@
-use grazelang::names::Namespace;
 use grazelang::parser::parse_context::ParseContext;
 use grazelang::{lexer, make_parse_in, parser};
 use logos::Logos;
