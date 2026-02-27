@@ -17,12 +17,50 @@ impl GetPos for CostumeKeyword {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BackdropKeyword(pub PosRange);
+
+impl GetPos for BackdropKeyword {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SoundKeyword(pub PosRange);
 
 impl GetPos for SoundKeyword {
     #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum StageStatement {
+    DataDeclaration(LetKeyword, DataDeclaration, PosRange),
+    BackdropDeclaration(BackdropKeyword, AssetDeclaration, PosRange),
+    SoundDeclaration(SoundKeyword, AssetDeclaration, PosRange),
+    SingleInputHatStatement(Identifier, Expression, CodeBlock, PosRange),
+    MultiInputHatStatement(
+        Identifier,
+        LeftParens,
+        Vec<(Expression, Option<Comma>)>,
+        RightParens,
+        CodeBlock,
+        PosRange,
+    ),
+}
+
+impl GetPos for StageStatement {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        match self {
+            StageStatement::DataDeclaration(_, _, p) => p,
+            StageStatement::BackdropDeclaration(_, _, p) => p,
+            StageStatement::SoundDeclaration(_, _, p) => p,
+            StageStatement::SingleInputHatStatement(_, _, _, p) => p,
+            StageStatement::MultiInputHatStatement(_, _, _, _, _, p) => p,
+        }
     }
 }
 

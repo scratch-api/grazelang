@@ -43,6 +43,8 @@ pub enum Token {
     ListsKeyword,
     #[token("costume")]
     CostumeKeyword,
+    #[token("backdrop")]
+    BackdropKeyword,
     #[token("sound")]
     SoundKeyword,
     #[token("{")]

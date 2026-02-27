@@ -1,16 +1,12 @@
 use super::{
-    ast::{self, BinOp, Expression, Identifier, ParseError, Statement},
+    ast::{self, BinOp, Expression, Identifier, ParseError, Statement, CodeBlock, SpriteStatement, StageStatement},
     parse_context::ParseContext,
 };
 use crate::{
     lexer::{
         self, PosRange, Token, get_pos_range as internal_get_pos_range,
         get_position as internal_get_position,
-    },
-    parser::{
-        ast::{CodeBlock, Semicolon, SpriteStatement},
-        internal::statement::parse_sprite_data_declaration_and_register,
-    },
+    }
 };
 use arcstr::ArcStr as IString;
 use logos::Lexer;
@@ -99,7 +95,12 @@ macro_rules! peek_token {
         match $token_stream.0.peek() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
-                return { Err(ParseError::LexerStuck(current_context!(), get_token_position!($token_stream))) }
+                return {
+                    Err(ParseError::LexerStuck(
+                        current_context!(),
+                        get_token_position!($token_stream),
+                    ))
+                }
             }
             None => return Err(ParseError::UnexpectedEndOfInput(current_context!())),
         }
@@ -107,14 +108,24 @@ macro_rules! peek_token {
     (optional $token_stream:expr) => {
         match $token_stream.0.peek() {
             Some(Ok(value)) => value,
-            Some(Err(_)) => return Err(ParseError::LexerStuck(current_context!(), get_token_position!($token_stream))),
+            Some(Err(_)) => {
+                return Err(ParseError::LexerStuck(
+                    current_context!(),
+                    get_token_position!($token_stream),
+                ))
+            }
             None => return Ok(None),
         }
     };
     ($token_stream:expr => Option) => {
         match $token_stream.0.peek() {
             Some(Ok(value)) => Some(value),
-            Some(Err(_)) => return Err(ParseError::LexerStuck(current_context!(), get_token_position!($token_stream))),
+            Some(Err(_)) => {
+                return Err(ParseError::LexerStuck(
+                    current_context!(),
+                    get_token_position!($token_stream),
+                ))
+            }
             None => None,
         }
     };
@@ -125,7 +136,12 @@ macro_rules! next_token {
         $token_stream.1.next();
         match $token_stream.0.next() {
             Some(Ok(value)) => value,
-            Some(Err(_)) => return Err(ParseError::LexerStuck(current_context!(), get_token_position!($token_stream))),
+            Some(Err(_)) => {
+                return Err(ParseError::LexerStuck(
+                    current_context!(),
+                    get_token_position!($token_stream),
+                ));
+            }
             None => return Err(ParseError::UnexpectedEndOfInput(current_context!())),
         }
     }};
@@ -133,7 +149,12 @@ macro_rules! next_token {
         $token_stream.1.next();
         match $token_stream.0.next() {
             Some(Ok(value)) => value,
-            Some(Err(_)) => return Err(ParseError::LexerStuck(current_context!(), get_token_position!($token_stream))),
+            Some(Err(_)) => {
+                return Err(ParseError::LexerStuck(
+                    current_context!(),
+                    get_token_position!($token_stream),
+                ));
+            }
             None => return Ok(None),
         }
     }};
@@ -141,7 +162,12 @@ macro_rules! next_token {
         $token_stream.1.next();
         match $token_stream.0.next() {
             Some(Ok(value)) => Some(value),
-            Some(Err(_)) => return Err(ParseError::LexerStuck(current_context!(), get_token_position!($token_stream))),
+            Some(Err(_)) => {
+                return Err(ParseError::LexerStuck(
+                    current_context!(),
+                    get_token_position!($token_stream),
+                ));
+            }
             None => None,
         }
     }};
@@ -151,7 +177,10 @@ macro_rules! skip_token {
     ($token_stream:expr) => {{
         $token_stream.1.next();
         if let Some(Err(_)) = $token_stream.0.next() {
-            return Err(ParseError::LexerStuck(current_context!(), get_token_position!($token_stream)));
+            return Err(ParseError::LexerStuck(
+                current_context!(),
+                get_token_position!($token_stream),
+            ));
         }
     }};
 }
@@ -405,7 +434,11 @@ pub mod statement {
     pub fn parse_list_content(
         token_stream: ParseIn,
         context: &mut ParseContext,
-    ) -> ParseOut<(LeftBrace, Vec<(ast::ListEntry, Option<ast::Comma>)>, RightBrace)> {
+    ) -> ParseOut<(
+        LeftBrace,
+        Vec<(ast::ListEntry, Option<ast::Comma>)>,
+        RightBrace,
+    )> {
         let mut entries = Vec::<(ast::ListEntry, Option<ast::Comma>)>::new();
         let left_brace = expect_token!(
             token_stream,
@@ -416,9 +449,9 @@ pub mod statement {
         let right_brace = loop {
             if peek_token!(token_stream) == &Token::RightBrace(lexer::LexedRightBrace::Normal) {
                 skip_token!(token_stream);
-                break from_stream_pos!(token_stream => RightBrace)
+                break from_stream_pos!(token_stream => RightBrace);
             }
-            let list_entry =match peek_token!(token_stream) {
+            let list_entry = match peek_token!(token_stream) {
                 Token::RightBrace(lexer::LexedRightBrace::Normal) => {
                     skip_token!(token_stream);
                     break from_stream_pos!(token_stream => RightBrace);
@@ -438,20 +471,23 @@ pub mod statement {
                 }
                 _ => ListEntry::Expression(parse_expression(token_stream, context)?),
             };
-            entries.push((list_entry, match peek_token!(token_stream) {
-                Token::RightBrace(lexer::LexedRightBrace::Normal) => None,
-                Token::Comma => {
-                    skip_token!(token_stream);
-                    Some(from_stream_pos!(token_stream => ast::Comma))
+            entries.push((
+                list_entry,
+                match peek_token!(token_stream) {
+                    Token::RightBrace(lexer::LexedRightBrace::Normal) => None,
+                    Token::Comma => {
+                        skip_token!(token_stream);
+                        Some(from_stream_pos!(token_stream => ast::Comma))
+                    }
+                    _ => {
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected a comma or '}'.",
+                            "a comma or '}'"
+                        );
+                    }
                 },
-                _ => {
-                    emit_unexpected_token!(
-                        token_stream,
-                        "Expected a comma or '}'.",
-                        "a comma or '}'"
-                    );
-                }
-            }));
+            ));
         };
         Ok((left_brace, entries, right_brace))
     }
@@ -481,8 +517,11 @@ pub mod statement {
     ) -> ParseOut<Vec<(SingleDataDeclaration, Option<Comma>)>> {
         let mut declarations = Vec::<(SingleDataDeclaration, Option<Comma>)>::new();
         loop {
-            if matches!(peek_token!(token_stream), Token::RightBrace(lexer::LexedRightBrace::Normal) | Token::RightParens) {
-                break
+            if matches!(
+                peek_token!(token_stream),
+                Token::RightBrace(lexer::LexedRightBrace::Normal) | Token::RightParens
+            ) {
+                break;
             }
             let mut start_pos = None::<(usize, usize)>;
             let scope = match peek_token!(token_stream) {
@@ -1168,19 +1207,21 @@ pub mod statement {
                     ))
                 }
                 1 => {
+                    if expressions[0].1 != None {
+                        return Ok(Statement::MultiInputControl(
+                            identifier,
+                            left_parens,
+                            expressions,
+                            right_parens,
+                            parse_code_block(token_stream, context)?,
+                            (start_pos, get_token_end!(token_stream)),
+                        ));
+                    }
                     let pos_range = (left_parens.0.0, right_parens.0.1);
                     Expression::Parentheses(
                         left_parens,
                         Box::new({
-                            let (expression, comma) = expressions.into_iter().next().unwrap();
-                            if matches!(comma, Some(_)) {
-                                skip_token!(token_stream);
-                                emit_unexpected_token!(
-                                    token_stream,
-                                    "Control blocks do not allow trailing commas after their expression.",
-                                    "';'"
-                                )
-                            }
+                            let (expression, _) = expressions.into_iter().next().unwrap();
                             expression
                         }),
                         right_parens,
@@ -1284,25 +1325,37 @@ pub mod statement {
     }
 
     #[inline]
-    pub fn parse_data_declaration_and_register(
+    pub fn parse_data_declaration_fully(
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<Statement> {
         let (let_keyword, data_dec, pos_range) =
             statement::parse_data_declaration(token_stream, context)?;
-        // todo!("implement registering");
         Ok(Statement::DataDeclaration(let_keyword, data_dec, pos_range))
     }
 
     #[inline]
-    pub fn parse_sprite_data_declaration_and_register(
+    pub fn parse_sprite_data_declaration_fully(
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<SpriteStatement> {
         let (let_keyword, data_dec, pos_range) =
             statement::parse_data_declaration(token_stream, context)?;
-        // todo!("implement registering");
         Ok(SpriteStatement::DataDeclaration(
+            let_keyword,
+            data_dec,
+            pos_range,
+        ))
+    }
+
+    #[inline]
+    pub fn parse_stage_data_declaration_fully(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+    ) -> ParseOut<StageStatement> {
+        let (let_keyword, data_dec, pos_range) =
+            statement::parse_data_declaration(token_stream, context)?;
+        Ok(StageStatement::DataDeclaration(
             let_keyword,
             data_dec,
             pos_range,
@@ -1450,7 +1503,7 @@ pub mod statement {
 /// Statements do not include semicolons.
 pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Statement> {
     match peek_token!(token_stream) {
-        Token::LetKeyword => statement::parse_data_declaration_and_register(token_stream, context),
+        Token::LetKeyword => statement::parse_data_declaration_fully(token_stream, context),
         Token::Identifier(_) => {
             let identifier = parse_full_identifier(token_stream, context)?;
             statement::parse_statement_after_identifier(token_stream, context, identifier)
@@ -1488,10 +1541,172 @@ pub fn parse_sprite_statement(
                 (start_pos, get_token_end!(token_stream)),
             ))
         }
-        Token::LetKeyword => parse_sprite_data_declaration_and_register(token_stream, context),
+        Token::LetKeyword => statement::parse_sprite_data_declaration_fully(token_stream, context),
         Token::Identifier(_) => {
+            #[inline]
+            fn parse_sprite_rest_of_single_input_control(
+                token_stream: ParseIn,
+                context: &mut ParseContext,
+                identifier: Identifier,
+                expression: Expression,
+                start_pos: (usize, usize),
+            ) -> ParseOut<SpriteStatement> {
+                Ok(SpriteStatement::SingleInputHatStatement(
+                    identifier,
+                    expression,
+                    parse_code_block(token_stream, context)?,
+                    (start_pos, get_token_end!(token_stream)),
+                ))
+            }
             let identifier = parse_full_identifier(token_stream, context)?;
-            todo!()
+            let start_pos = identifier.pos_range.0;
+            match peek_token!(token_stream) {
+                Token::LeftParens => {
+                    let (left_parens, expressions, right_parens) =
+                        parse_expression_list(token_stream, context)?;
+                    if expressions.is_empty() {
+                        let pos_range = (left_parens.0.0, right_parens.0.1);
+                        return parse_sprite_rest_of_single_input_control(
+                            token_stream,
+                            context,
+                            identifier,
+                            Expression::Literal(ast::Literal::EmptyExpression(
+                                left_parens,
+                                right_parens,
+                                pos_range,
+                            )),
+                            start_pos,
+                        );
+                    }
+                    if expressions.len() == 1 && expressions[0].1 == None {
+                        let pos_range = (left_parens.0.0, right_parens.0.1);
+                        return parse_sprite_rest_of_single_input_control(
+                            token_stream,
+                            context,
+                            identifier,
+                            Expression::Parentheses(
+                                left_parens,
+                                Box::new(expressions.into_iter().next().unwrap().0),
+                                right_parens,
+                                pos_range,
+                            ),
+                            start_pos,
+                        );
+                    }
+                    Ok(SpriteStatement::MultiInputHatStatement(
+                        identifier,
+                        left_parens,
+                        expressions,
+                        right_parens,
+                        parse_code_block(token_stream, context)?,
+                        (start_pos, get_token_end!(token_stream)),
+                    ))
+                }
+                _ => {
+                    let expression = parse_expression(token_stream, context)?;
+                    parse_sprite_rest_of_single_input_control(token_stream, context, identifier, expression, start_pos)
+                }
+            }
+        }
+        _ => emit_unexpected_token!(
+            token_stream,
+            "Expected hat statement, \"let\", \"sound\" or \"costume\".",
+            "hat statement, \"let\", \"sound\" or \"costume\""
+        ),
+    }
+}
+
+pub fn parse_stage_statement(
+    token_stream: ParseIn,
+    context: &mut ParseContext,
+) -> ParseOut<StageStatement> {
+    match peek_token!(token_stream) {
+        Token::CostumeKeyword => {
+            skip_token!(token_stream);
+            let backdrop_keyword = from_stream_pos!(token_stream => ast::BackdropKeyword);
+            let start_pos = get_token_start!(token_stream);
+            Ok(StageStatement::BackdropDeclaration(
+                backdrop_keyword,
+                statement::parse_asset_declaration(token_stream, context)?,
+                (start_pos, get_token_end!(token_stream)),
+            ))
+        }
+        Token::SoundKeyword => {
+            skip_token!(token_stream);
+            let sound_keyword = from_stream_pos!(token_stream => ast::SoundKeyword);
+            let start_pos = get_token_start!(token_stream);
+            Ok(StageStatement::SoundDeclaration(
+                sound_keyword,
+                statement::parse_asset_declaration(token_stream, context)?,
+                (start_pos, get_token_end!(token_stream)),
+            ))
+        }
+        Token::LetKeyword => statement::parse_stage_data_declaration_fully(token_stream, context),
+        Token::Identifier(_) => {
+            #[inline]
+            fn parse_stage_rest_of_single_input_control(
+                token_stream: ParseIn,
+                context: &mut ParseContext,
+                identifier: Identifier,
+                expression: Expression,
+                start_pos: (usize, usize),
+            ) -> ParseOut<StageStatement> {
+                Ok(StageStatement::SingleInputHatStatement(
+                    identifier,
+                    expression,
+                    parse_code_block(token_stream, context)?,
+                    (start_pos, get_token_end!(token_stream)),
+                ))
+            }
+            let identifier = parse_full_identifier(token_stream, context)?;
+            let start_pos = identifier.pos_range.0;
+            match peek_token!(token_stream) {
+                Token::LeftParens => {
+                    let (left_parens, expressions, right_parens) =
+                        parse_expression_list(token_stream, context)?;
+                    if expressions.is_empty() {
+                        let pos_range = (left_parens.0.0, right_parens.0.1);
+                        return parse_stage_rest_of_single_input_control(
+                            token_stream,
+                            context,
+                            identifier,
+                            Expression::Literal(ast::Literal::EmptyExpression(
+                                left_parens,
+                                right_parens,
+                                pos_range,
+                            )),
+                            start_pos,
+                        );
+                    }
+                    if expressions.len() == 1 && expressions[0].1 == None {
+                        let pos_range = (left_parens.0.0, right_parens.0.1);
+                        return parse_stage_rest_of_single_input_control(
+                            token_stream,
+                            context,
+                            identifier,
+                            Expression::Parentheses(
+                                left_parens,
+                                Box::new(expressions.into_iter().next().unwrap().0),
+                                right_parens,
+                                pos_range,
+                            ),
+                            start_pos,
+                        );
+                    }
+                    Ok(StageStatement::MultiInputHatStatement(
+                        identifier,
+                        left_parens,
+                        expressions,
+                        right_parens,
+                        parse_code_block(token_stream, context)?,
+                        (start_pos, get_token_end!(token_stream)),
+                    ))
+                }
+                _ => {
+                    let expression = parse_expression(token_stream, context)?;
+                    parse_stage_rest_of_single_input_control(token_stream, context, identifier, expression, start_pos)
+                }
+            }
         }
         _ => emit_unexpected_token!(
             token_stream,
@@ -1505,7 +1720,7 @@ pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> Pa
     expect_token!(token_stream, Token::LeftBrace => (), "Expected '{'.", "'{'");
     let start_pos = get_token_start!(token_stream);
     let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
-    let mut statements = Vec::<(Statement, Semicolon)>::new();
+    let mut statements = Vec::<(Statement, ast::Semicolon)>::new();
     consume_then_never_if!(token_stream, Token::RightBrace(lexer::LexedRightBrace::Normal) =>
         return Ok(CodeBlock {
             left_brace,
@@ -1519,7 +1734,7 @@ pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> Pa
             parse_statement(token_stream, context)?,
             expect_token!(
                 token_stream,
-                Token::Semicolon => from_stream_pos!(token_stream => Semicolon),
+                Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
                 "Expected ';'.",
                 "';'"
             ),
