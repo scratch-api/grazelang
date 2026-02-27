@@ -5,9 +5,12 @@ use super::{
     },
     parse_context::ParseContext,
 };
-use crate::lexer::{
-    self, PosRange, Token, get_pos_range as internal_get_pos_range,
-    get_position as internal_get_position,
+use crate::{
+    lexer::{
+        self, PosRange, Token, get_pos_range as internal_get_pos_range,
+        get_position as internal_get_position,
+    },
+    parser::ast::{GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
 };
 use arcstr::ArcStr as IString;
 use logos::Lexer;
@@ -235,11 +238,21 @@ type ParseOut<T> = Result<T, ParseError>;
 
 pub fn enter(lex: &mut Lexer<Token>) {
     let mut context = ParseContext::new();
-    parse_lexed_entrypoint(make_parse_in!(lex), &mut context);
+    parse_graze_program(make_parse_in!(lex), &mut context);
 }
 
-pub fn parse_lexed_entrypoint(token_stream: ParseIn, context: &mut ParseContext) {
-    todo!()
+pub fn parse_graze_program(
+    token_stream: ParseIn,
+    context: &mut ParseContext,
+) -> ParseOut<GrazeProgram> {
+    let mut statements = Vec::<TopLevelStatement>::new();
+    loop {
+        if peek_token!(token_stream => Option) == None {
+            break;
+        }
+        statements.push(parse_top_level_statement(token_stream, context)?);
+    }
+    Ok(GrazeProgram(statements))
 }
 
 pub fn parse_single_identifier(
@@ -1809,29 +1822,102 @@ pub fn parse_stage_statement(
     }
 }
 
+pub fn parse_top_level_statement(
+    token_stream: ParseIn,
+    context: &mut ParseContext,
+) -> ParseOut<TopLevelStatement> {
+    match next_token!(token_stream) {
+        Token::StageKeyword => {
+            let stage_keyword = from_stream_pos!(token_stream => ast::StageKeyword);
+            let start_pos = get_token_start!(token_stream);
+            Ok(TopLevelStatement::Stage(
+                stage_keyword,
+                parse_stage_code_block(token_stream, context)?,
+                (start_pos, get_token_end!(token_stream)),
+            ))
+        }
+        Token::SpriteKeyword => {
+            let sprite_keyword = from_stream_pos!(token_stream => ast::SpriteKeyword);
+            let start_pos = get_token_start!(token_stream);
+            Ok(TopLevelStatement::Sprite(
+                sprite_keyword,
+                parse_sprite_code_block(token_stream, context)?,
+                (start_pos, get_token_end!(token_stream)),
+            ))
+        }
+        Token::Semicolon => Ok(TopLevelStatement::EmptyStatement(
+            from_stream_pos!(token_stream => ast::Semicolon),
+        )),
+        _ => emit_unexpected_token!(
+            token_stream,
+            "Expected \"stage\", \"sprite\" or ';'.",
+            "\"stage\", \"sprite\" or ';'"
+        ),
+    }
+}
+
 pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<CodeBlock> {
     expect_token!(token_stream, Token::LeftBrace => (), "Expected '{'.", "'{'");
     let start_pos = get_token_start!(token_stream);
     let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
     let mut statements = Vec::<Statement>::new();
-    consume_then_never_if!(token_stream, Token::RightBrace(lexer::LexedRightBrace::Normal) =>
-        return Ok(CodeBlock {
-            left_brace,
-            statements,
-            right_brace: from_stream_pos!(token_stream => ast::RightBrace),
-            pos_range: (start_pos, get_token_end!(token_stream)),
-        })
-    );
-    loop {
+    let right_brace = loop {
+        consume_then_never_if!(
+            token_stream,
+            Token::RightBrace(lexer::LexedRightBrace::Normal) => break from_stream_pos!(token_stream => ast::RightBrace)
+        );
         statements.push(parse_statement(token_stream, context)?);
-        consume_then_never_if!(token_stream, Token::RightBrace(lexer::LexedRightBrace::Normal) => {
-            break;
-        });
-    }
+    };
     Ok(CodeBlock {
         left_brace,
         statements,
-        right_brace: from_stream_pos!(token_stream => ast::RightBrace),
+        right_brace,
+        pos_range: (start_pos, get_token_end!(token_stream)),
+    })
+}
+
+pub fn parse_sprite_code_block(
+    token_stream: ParseIn,
+    context: &mut ParseContext,
+) -> ParseOut<SpriteCodeBlock> {
+    expect_token!(token_stream, Token::LeftBrace => (), "Expected '{'.", "'{'");
+    let start_pos = get_token_start!(token_stream);
+    let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
+    let mut statements = Vec::<SpriteStatement>::new();
+    let right_brace = loop {
+        consume_then_never_if!(
+            token_stream,
+            Token::RightBrace(lexer::LexedRightBrace::Normal) => break from_stream_pos!(token_stream => ast::RightBrace)
+        );
+        statements.push(parse_sprite_statement(token_stream, context)?);
+    };
+    Ok(SpriteCodeBlock {
+        left_brace,
+        statements,
+        right_brace,
+        pos_range: (start_pos, get_token_end!(token_stream)),
+    })
+}
+
+pub fn parse_stage_code_block(
+    token_stream: ParseIn,
+    context: &mut ParseContext,
+) -> ParseOut<StageCodeBlock> {
+    expect_token!(token_stream, Token::LeftBrace => (), "Expected '{'.", "'{'");
+    let start_pos = get_token_start!(token_stream);
+    let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
+    let mut statements = Vec::<StageStatement>::new();
+    let right_brace = loop {
+        consume_then_never_if!(
+            token_stream,
+            Token::RightBrace(lexer::LexedRightBrace::Normal) => break from_stream_pos!(token_stream => ast::RightBrace)
+        );
+        statements.push(parse_stage_statement(token_stream, context)?);
+    };
+    Ok(StageCodeBlock {
+        left_brace,
+        statements,
+        right_brace,
         pos_range: (start_pos, get_token_end!(token_stream)),
     })
 }

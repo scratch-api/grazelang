@@ -6,11 +6,46 @@ pub trait GetPos {
     fn get_position<'a>(&'a self) -> &'a PosRange;
 }
 
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GrazeProgram(pub Vec<TopLevelStatement>);
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TopLevelStatement {
-    Stage(),
-    Sprite(),
-    Mod(),
+    Stage(StageKeyword, StageCodeBlock, PosRange),
+    Sprite(SpriteKeyword, SpriteCodeBlock, PosRange),
+    // Mod(),
+    EmptyStatement(Semicolon),
+}
+
+impl GetPos for TopLevelStatement {
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        match self {
+            TopLevelStatement::Stage(_, _, p) => p,
+            TopLevelStatement::Sprite(_, _, p) => p,
+            TopLevelStatement::EmptyStatement(p) => &p.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpriteKeyword(pub PosRange);
+
+impl GetPos for SpriteKeyword {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StageKeyword(pub PosRange);
+
+impl GetPos for StageKeyword {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -64,6 +99,8 @@ pub enum StageStatement {
         Option<Semicolon>,
         PosRange,
     ),
+    // Mod(),
+    EmptyStatement(Semicolon),
 }
 
 impl GetPos for StageStatement {
@@ -74,6 +111,7 @@ impl GetPos for StageStatement {
             StageStatement::SoundDeclaration(_, _, _, p) => p,
             StageStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
+            StageStatement::EmptyStatement(p) => &p.0,
         }
     }
 }
@@ -99,6 +137,8 @@ pub enum SpriteStatement {
         Option<Semicolon>,
         PosRange,
     ),
+    // Mod(),
+    EmptyStatement(Semicolon),
 }
 
 impl GetPos for SpriteStatement {
@@ -109,6 +149,7 @@ impl GetPos for SpriteStatement {
             SpriteStatement::SoundDeclaration(_, _, _, p) => p,
             SpriteStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
+            SpriteStatement::EmptyStatement(p) => &p.0,
         }
     }
 }
