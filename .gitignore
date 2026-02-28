@@ -1,6 +1,6 @@
 local_tests.rs
 debug_out.txt
-
+std
 # Added by cargo
 
 /target

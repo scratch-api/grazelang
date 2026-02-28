@@ -12,8 +12,9 @@ pub struct GrazeProgram(pub Vec<TopLevelStatement>);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TopLevelStatement {
-    Stage(StageKeyword, StageCodeBlock, PosRange),
-    Sprite(SpriteKeyword, SpriteCodeBlock, PosRange),
+    Stage(StageKeyword, StageCodeBlock, Option<Semicolon>, PosRange),
+    Sprite(SpriteKeyword, Option<CanonicalIdentifier>, Identifier, SpriteCodeBlock, Option<Semicolon>, PosRange),
+    BroadcastDeclaration(BroadcastKeyword, Option<CanonicalIdentifier>, Identifier, Semicolon, PosRange),
     // Mod(),
     EmptyStatement(Semicolon),
 }
@@ -21,8 +22,9 @@ pub enum TopLevelStatement {
 impl GetPos for TopLevelStatement {
     fn get_position<'a>(&'a self) -> &'a PosRange {
         match self {
-            TopLevelStatement::Stage(_, _, p) => p,
-            TopLevelStatement::Sprite(_, _, p) => p,
+            TopLevelStatement::Stage(_, _, _, p) => p,
+            TopLevelStatement::Sprite(_, _, _, _, _, p) => p,
+            TopLevelStatement::BroadcastDeclaration(_, _, _, _, p) => p,
             TopLevelStatement::EmptyStatement(p) => &p.0,
         }
     }
@@ -52,6 +54,16 @@ impl GetPos for StageKeyword {
 pub struct CostumeKeyword(pub PosRange);
 
 impl GetPos for CostumeKeyword {
+    #[inline]
+    fn get_position<'a>(&'a self) -> &'a PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BroadcastKeyword(pub PosRange);
+
+impl GetPos for BroadcastKeyword {
     #[inline]
     fn get_position<'a>(&'a self) -> &'a PosRange {
         &self.0

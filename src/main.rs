@@ -5,7 +5,9 @@ use parser::internal;
 
 fn test_case(case: &str) {
     let mut lexer = lexer::Token::lexer(case);
-    match internal::parse_code_block(make_parse_in!(&mut lexer), &mut ParseContext::new()) {
+    let mut context = ParseContext::new();
+    context.next_target = Some(parser::parse_context::Target::Stage { symbols: Default::default() });
+    match internal::parse_code_block(make_parse_in!(&mut lexer), &mut context) {
         Ok(value) => {
             dbg!(&value);
             println!("{}", serde_json::to_string(&value).unwrap());
@@ -14,31 +16,12 @@ fn test_case(case: &str) {
             dbg!(err);
         },
     }
+    dbg!(context);
 }
-/*
-// Variables:
-    // Global var
-    let global var4 = 1;
-    // Implicitly local var
-    let var5 = 1;
-    // Explicitly local var
-    let local var6 = 1;
-    // Cloud var
-    let cloud var7 = 1;
-    // Named var
-    let `variable 8` var8 = 1;
-    // Multiple vars
-    let (var9 = 1, var10 = 1);
-    // Many vars
-    let vars {
-        var11 = 1,
-        var12 = 1
-    }; */
-
 fn main() {
     test_case(r#"
 {
-// Data
+    // Data
 
     // Variables:
     // Global var

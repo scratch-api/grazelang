@@ -1,8 +1,10 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, VecDeque},
+    vec,
+};
 
-use serde::{Serialize, Deserialize};
 use arcstr::ArcStr as IString;
-
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Primitive {
@@ -11,27 +13,66 @@ pub enum Primitive {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Var {
+pub struct VarDescriptor {
     pub name: IString,
-    pub initial_value: Primitive
+    pub canonical_name: Option<IString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct List {
+pub struct ListDescriptor {
     pub name: IString,
-    pub initial_value: Vec<Primitive>
+    pub canonical_name: Option<IString>,
+}
+
+type CustomBlockDescriptor = ();
+type CostumeDescriptor = ();
+type BackdropDescriptor = ();
+type SoundDescriptor = ();
+type TopLevelSymbol = ();
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BroadcastDescriptor {
+    pub name: IString,
+    pub canonical_name: Option<IString>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TargetSymbolDescriptor {
+    Var(VarDescriptor),
+    List(ListDescriptor),
+    CustomBlockDescriptor(CustomBlockDescriptor),
+    Costume(CostumeDescriptor),
+    Backdrop(BackdropDescriptor),
+    Sound(SoundDescriptor),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Target {
     Sprite {
         name: IString,
-        vars: HashMap<String, Var>,
-        lists: HashMap<String, List>,
+        canonical_name: Option<IString>,
+        symbols: HashMap<IString, TargetSymbolDescriptor>,
     },
-    Backdrop {
-        vars: HashMap<String, Var>,
-        lists: HashMap<String, List>,
+    Stage {
+        symbols: HashMap<IString, TargetSymbolDescriptor>,
+    },
+}
+
+impl Target {
+    #[inline]
+    pub fn borrow_symbols_mut<'a>(&'a mut self) -> &'a mut HashMap<IString, TargetSymbolDescriptor> {
+        match self {
+            Target::Sprite {
+                name: _,
+                canonical_name: _,
+                symbols,
+            } => {
+                symbols
+            }
+            Target::Stage { symbols } => {
+                symbols
+            }
+        }
     }
 }
 
@@ -42,19 +83,31 @@ impl From<Target> for RawTarget {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RawTarget {
-
-}
+pub struct RawTarget {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParseContext {
-    pub targets: Vec<Target>,
+    // If stage is in this, it must be the first element
+    pub parsed_targets: VecDeque<Target>,
+    pub broadcasts: Vec<BroadcastDescriptor>,
+    pub top_level_symbols: HashMap<IString, TopLevelSymbol>,
+    pub next_target: Option<Target>,
 }
 
 impl ParseContext {
     pub fn new() -> Self {
         Self {
-            targets: vec![]
+            parsed_targets: VecDeque::from([Target::Stage { symbols: HashMap::new() }]),
+            broadcasts: vec![],
+            top_level_symbols: HashMap::new(),
+            next_target: None,
         }
+    }
+
+    pub fn get_stage_mut<'a>(&'a mut self) -> &'a mut Target {
+        if matches!(self.next_target, Some(Target::Stage { symbols: _ })) {
+            return self.next_target.as_mut().unwrap()
+        }
+        &mut self.parsed_targets[0]
     }
 }

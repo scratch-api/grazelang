@@ -47,6 +47,8 @@ pub enum Token {
     BackdropKeyword,
     #[token("sound")]
     SoundKeyword,
+    #[token("broadcast")]
+    BroadcastKeyword,
     #[token("{")]
     LeftBrace,
     #[token("}", handle_right_brace)]

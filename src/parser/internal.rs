@@ -10,7 +10,12 @@ use crate::{
         self, PosRange, Token, get_pos_range as internal_get_pos_range,
         get_position as internal_get_position,
     },
-    parser::ast::{GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
+    parser::{
+        ast::{
+            CanonicalIdentifier, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement,
+        },
+        parse_context,
+    },
 };
 use arcstr::ArcStr as IString;
 use logos::Lexer;
@@ -30,13 +35,11 @@ macro_rules! static_current_context {
 }
 
 macro_rules! expect_token {
-    ($token_stream:expr, $pattern:expr => (), $msg1:expr, $msg2:expr) => {{
-        let test = next_token!($token_stream);
-        if test != $pattern {
-            dbg!("{}", test);
+    ($token_stream:expr, $pattern:expr => (), $msg1:expr, $msg2:expr) => {
+        if next_token!($token_stream) != $pattern {
             emit_unexpected_token!($token_stream, $msg1, $msg2)
         }
-    }};
+    };
     ($token_stream:expr, $pattern:pat => $value:expr, $msg1:expr, $msg2:expr) => {{
         match next_token!($token_stream) {
             $pattern => $value,
@@ -48,12 +51,14 @@ macro_rules! expect_token {
 /// The difference between this and `consume_if` is that we cannot use values from the match in `consume_if` due to the borrow checker.
 macro_rules! consume_and_use_if {
     ($token_stream:expr, $pattern:pat => $body:expr) => {{
-        match peek_token!($token_stream) {
-            $pattern => match next_token!($token_stream) {
+        #[allow(unused_variables)]
+        if matches!(peek_token!($token_stream), $pattern) {
+            match next_token!($token_stream) {
                 $pattern => Some($body),
                 _ => panic!(),
-            },
-            _ => None,
+            }
+        } else {
+            None
         }
     }};
 }
@@ -223,6 +228,14 @@ macro_rules! from_stream_pos {
     };
 }
 
+macro_rules! with_mut_next_target {
+    ($context:expr, $var:ident => $body:expr) => {
+        if let Some($var) = &mut $context.next_target {
+            $body
+        }
+    };
+}
+
 #[macro_export]
 macro_rules! make_parse_in {
     ($lexer:expr) => {
@@ -236,9 +249,9 @@ type ParseIn<'a, 'b, 'c, 'd, 'e, 'f> = &'a mut (
 );
 type ParseOut<T> = Result<T, ParseError>;
 
-pub fn enter(lex: &mut Lexer<Token>) {
+pub fn enter(lex: &mut Lexer<Token>) -> ParseOut<GrazeProgram> {
     let mut context = ParseContext::new();
-    parse_graze_program(make_parse_in!(lex), &mut context);
+    parse_graze_program(make_parse_in!(lex), &mut context)
 }
 
 pub fn parse_graze_program(
@@ -374,7 +387,6 @@ pub fn parse_full_identifier_starting_with(
 pub mod statement {
     use core::panic;
 
-    use logos::skip;
     use serde::{Deserialize, Serialize};
 
     use crate::{
@@ -693,6 +705,28 @@ pub mod statement {
                     "',', '=', '{', '}' or ')'"
                 ),
             };
+            with_mut_next_target!(context, target => {
+                // TODO: warn about shadowing
+                // TODO: move global declarations
+                let name = &identifier.names[0].0;
+                target.borrow_symbols_mut().insert(
+                    name.clone(),
+                    if (
+                        matches!(dec_type, SingleDataDeclarationType::List(_)) ||
+                        (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)
+                    ) {
+                        parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
+                        })
+                    } else {
+                        parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
+                        })
+                    }
+                );
+            });
             let declaration = match value {
                 DeclarationValue::None => match dec_type {
                     SingleDataDeclarationType::Unset => match default_type {
@@ -1034,6 +1068,25 @@ pub mod statement {
                 emit_unexpected_token!(token_stream, "Expected '=', '{' or ';'", "'=', '{' or ';'");
             }
         };
+        with_mut_next_target!(context, target => {
+            // TODO: warn about shadowing
+            // TODO: move global declarations
+            let name = &identifier.names[0].0;
+            target.borrow_symbols_mut().insert(
+                name.clone(),
+                if matches!(dec_type, SingleDataDeclarationType::List(_)) {
+                    parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
+                        name: name.clone(),
+                        canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
+                    })
+                } else {
+                    parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
+                        name: name.clone(),
+                        canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
+                    })
+                }
+            );
+        });
         let declaration = match value {
             DeclarationValue::None => match dec_type {
                 SingleDataDeclarationType::Unset => SingleDataDeclaration::EmptyVariable(
@@ -1830,20 +1883,72 @@ pub fn parse_top_level_statement(
         Token::StageKeyword => {
             let stage_keyword = from_stream_pos!(token_stream => ast::StageKeyword);
             let start_pos = get_token_start!(token_stream);
-            Ok(TopLevelStatement::Stage(
+            context.next_target = Some(context.parsed_targets.swap_remove_front(0).unwrap());
+            let return_value = Ok(TopLevelStatement::Stage(
                 stage_keyword,
                 parse_stage_code_block(token_stream, context)?,
+                consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
                 (start_pos, get_token_end!(token_stream)),
-            ))
+            ));
+            let stage = context.next_target.take().unwrap();
+            context.parsed_targets.push_front(stage);
+            return_value
         }
         Token::SpriteKeyword => {
             let sprite_keyword = from_stream_pos!(token_stream => ast::SpriteKeyword);
             let start_pos = get_token_start!(token_stream);
-            Ok(TopLevelStatement::Sprite(
+            let canonical_identifier = consume_and_use_if!(
+                token_stream,
+                Token::CanonicalIdentifier(name) => ast::CanonicalIdentifier {
+                    name,
+                    pos_range: get_token_position!(token_stream)
+                }
+            );
+            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            context.next_target = Some(parse_context::Target::Sprite {
+                name: identifier.names[0].0.clone(),
+                canonical_name: canonical_identifier
+                    .as_ref()
+                    .map(|value| value.name.clone()),
+                symbols: Default::default(),
+            });
+            let return_val = Ok(TopLevelStatement::Sprite(
                 sprite_keyword,
+                canonical_identifier,
+                identifier,
                 parse_sprite_code_block(token_stream, context)?,
+                consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
                 (start_pos, get_token_end!(token_stream)),
-            ))
+            ));
+            let target = context.next_target.take().unwrap();
+            context.parsed_targets.push_back(target);
+            return_val
+        }
+        Token::BroadcastKeyword => {
+            let broadcast_keyword = from_stream_pos!(token_stream => ast::BroadcastKeyword);
+            let start_pos = get_token_start!(token_stream);
+            let canonical_identifier = consume_and_use_if!(
+                token_stream,
+                Token::CanonicalIdentifier(name) => ast::CanonicalIdentifier {
+                    name,
+                    pos_range: get_token_position!(token_stream)
+                }
+            );
+            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            let return_val = Ok(TopLevelStatement::BroadcastDeclaration(
+                broadcast_keyword,
+                canonical_identifier,
+                identifier,
+                expect_token!(
+                    token_stream,
+                    Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
+                    "Expected ';'.",
+                    "';'"
+                ),
+                (start_pos, get_token_end!(token_stream)),
+            ));
+            context.next_target = None;
+            return_val
         }
         Token::Semicolon => Ok(TopLevelStatement::EmptyStatement(
             from_stream_pos!(token_stream => ast::Semicolon),
@@ -1857,9 +1962,13 @@ pub fn parse_top_level_statement(
 }
 
 pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<CodeBlock> {
-    expect_token!(token_stream, Token::LeftBrace => (), "Expected '{'.", "'{'");
+    let left_brace = expect_token!(
+        token_stream,
+        Token::LeftBrace => from_stream_pos!(token_stream => ast::LeftBrace),
+        "Expected '{'.",
+        "'{'"
+    );
     let start_pos = get_token_start!(token_stream);
-    let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
     let mut statements = Vec::<Statement>::new();
     let right_brace = loop {
         consume_then_never_if!(
