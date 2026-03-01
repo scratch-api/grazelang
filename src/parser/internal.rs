@@ -11,9 +11,7 @@ use crate::{
         get_position as internal_get_position,
     },
     parser::{
-        ast::{
-            CanonicalIdentifier, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement,
-        },
+        ast::{GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
         parse_context,
     },
 };
@@ -52,7 +50,7 @@ macro_rules! expect_token {
 macro_rules! consume_and_use_if {
     ($token_stream:expr, $pattern:pat => $body:expr) => {{
         #[allow(unused_variables)]
-        if matches!(peek_token!($token_stream), $pattern) {
+        if matches!(peek_token!($token_stream => Option), Some($pattern)) {
             match next_token!($token_stream) {
                 $pattern => Some($body),
                 _ => panic!(),
@@ -65,8 +63,8 @@ macro_rules! consume_and_use_if {
 
 macro_rules! consume_if {
     ($token_stream:expr, $pattern:path => $body:expr) => {{
-        match peek_token!($token_stream) {
-            $pattern => {
+        match peek_token!($token_stream => Option) {
+            Some($pattern) => {
                 skip_token!($token_stream);
                 Some($body)
             }
@@ -77,7 +75,7 @@ macro_rules! consume_if {
 
 macro_rules! consume_then_never_if {
     ($token_stream:expr, $pattern:pat => $body:expr) => {{
-        if matches!(peek_token!($token_stream), $pattern) {
+        if matches!(peek_token!($token_stream => Option), Some($pattern)) {
             skip_token!($token_stream);
             $body;
         }
@@ -231,6 +229,18 @@ macro_rules! from_stream_pos {
 macro_rules! with_mut_next_target {
     ($context:expr, $var:ident => $body:expr) => {
         if let Some($var) = &mut $context.next_target {
+            $body
+        }
+    };
+}
+
+macro_rules! with_mut_next_target_or_stage {
+    ($context:expr, $stage:expr, $var:ident => $body:expr) => {
+        if let Some($var) = if $stage {
+            Some($context.get_stage_mut())
+        } else {
+            $context.next_target.as_mut()
+        } {
             $body
         }
     };
@@ -539,6 +549,7 @@ pub mod statement {
         token_stream: ParseIn,
         context: &mut ParseContext,
         default_type: DefaultDataDeclarationType,
+        default_scope: &DataDeclarationScope,
     ) -> ParseOut<Vec<(SingleDataDeclaration, Option<Comma>)>> {
         let mut declarations = Vec::<(SingleDataDeclaration, Option<Comma>)>::new();
         loop {
@@ -705,28 +716,37 @@ pub mod statement {
                     "',', '=', '{', '}' or ')'"
                 ),
             };
-            with_mut_next_target!(context, target => {
-                // TODO: warn about shadowing
-                // TODO: move global declarations
-                let name = &identifier.names[0].0;
-                target.borrow_symbols_mut().insert(
-                    name.clone(),
-                    if (
-                        matches!(dec_type, SingleDataDeclarationType::List(_)) ||
-                        (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)
-                    ) {
-                        parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
-                            name: name.clone(),
-                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
-                        })
-                    } else {
-                        parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
-                            name: name.clone(),
-                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
-                        })
-                    }
-                );
-            });
+            with_mut_next_target_or_stage!(
+                context,
+                match (default_scope, &scope) {
+                    (DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset) => true,
+                    (_, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) => true,
+                    _ => false,
+                },
+                target => {
+                    // TODO: warn about shadowing
+                    let name = &identifier.names[0].0;
+                    target.borrow_symbols_mut().insert(
+                        name.clone(),
+                        if (
+                            matches!(dec_type, SingleDataDeclarationType::List(_)) ||
+                            (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)
+                        ) {
+                            parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
+                                name: name.clone(),
+                                canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                                id: None,
+                            })
+                        } else {
+                            parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
+                                name: name.clone(),
+                                canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                                id: None,
+                            })
+                        }
+                    );
+                }
+            );
             let declaration = match value {
                 DeclarationValue::None => match dec_type {
                     SingleDataDeclarationType::Unset => match default_type {
@@ -877,6 +897,7 @@ pub mod statement {
                     token_stream,
                     context,
                     DefaultDataDeclarationType::Var,
+                    &scope,
                 )?;
                 let right_brace = expect_token!(
                     token_stream,
@@ -914,6 +935,7 @@ pub mod statement {
                     token_stream,
                     context,
                     DefaultDataDeclarationType::List,
+                    &scope,
                 )?;
                 let right_brace = expect_token!(
                     token_stream,
@@ -945,6 +967,7 @@ pub mod statement {
                     token_stream,
                     context,
                     DefaultDataDeclarationType::Var,
+                    &scope,
                 )?;
                 let right_parens = expect_token!(
                     token_stream,
@@ -1068,25 +1091,30 @@ pub mod statement {
                 emit_unexpected_token!(token_stream, "Expected '=', '{' or ';'", "'=', '{' or ';'");
             }
         };
-        with_mut_next_target!(context, target => {
-            // TODO: warn about shadowing
-            // TODO: move global declarations
-            let name = &identifier.names[0].0;
-            target.borrow_symbols_mut().insert(
-                name.clone(),
-                if matches!(dec_type, SingleDataDeclarationType::List(_)) {
-                    parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
-                        name: name.clone(),
-                        canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
-                    })
-                } else {
-                    parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
-                        name: name.clone(),
-                        canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone())
-                    })
-                }
-            );
-        });
+        with_mut_next_target_or_stage!(
+            context,
+            matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)),
+            target => {
+                // TODO: warn about shadowing
+                let name = &identifier.names[0].0;
+                target.borrow_symbols_mut().insert(
+                    name.clone(),
+                    if matches!(dec_type, SingleDataDeclarationType::List(_)) {
+                        parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                            id: None,
+                        })
+                    } else {
+                        parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                            id: None,
+                        })
+                    }
+                );
+            }
+        );
         let declaration = match value {
             DeclarationValue::None => match dec_type {
                 SingleDataDeclarationType::Unset => SingleDataDeclaration::EmptyVariable(
@@ -1479,9 +1507,17 @@ pub mod statement {
         ))
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+    pub enum AssetDeclarationType {
+        Costume,
+        Backdrop,
+        Sound,
+    }
+
     pub fn parse_asset_declaration(
         token_stream: ParseIn,
         context: &mut ParseContext,
+        asset_type: AssetDeclarationType,
     ) -> ParseOut<AssetDeclaration> {
         match peek_token!(token_stream) {
             Token::LeftParens => {
@@ -1519,6 +1555,39 @@ pub mod statement {
                         "Expected ')'.",
                         "')'"
                     );
+                    with_mut_next_target!(context, target => {
+                        use parse_context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
+                        // TODO: Warn about shadowing
+                        let symbols = target.borrow_symbols_mut();
+                        let name = &identifier.names[0].0;
+                        let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
+                        symbols.insert(
+                            name.clone(),
+                            match asset_type {
+                                AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
+                                    CostumeDescriptor {
+                                        name: name.clone(),
+                                        canonical_name,
+                                        id: None
+                                    }
+                                ),
+                                AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
+                                    BackdropDescriptor {
+                                        name: name.clone(),
+                                        canonical_name,
+                                        id: None
+                                    }
+                                ),
+                                AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
+                                    SoundDescriptor {
+                                        name: name.clone(),
+                                        canonical_name,
+                                        id: None
+                                    }
+                                ),
+                            }
+                        );
+                    });
                     declarations.push((
                         SingleAssetDeclaration(
                             canonical_identifier,
@@ -1574,6 +1643,27 @@ pub mod statement {
                     "Expected ')'.",
                     "')'"
                 );
+                // TODO: Warn about shadowing
+                with_mut_next_target!(context, target => {
+                    use parse_context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
+                    let symbols = target.borrow_symbols_mut();
+                    let name = &identifier.names[0].0;
+                    let canonical_name = Some(canonical_identifier.name.clone());
+                    symbols.insert(
+                        name.clone(),
+                        match asset_type {
+                            AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
+                                CostumeDescriptor { name: name.clone(), canonical_name, id: None }
+                            ),
+                            AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
+                                BackdropDescriptor { name: name.clone(), canonical_name, id: None }
+                            ),
+                            AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
+                                SoundDescriptor { name: name.clone(), canonical_name, id: None }
+                            ),
+                        }
+                    );
+                });
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     Some(canonical_identifier),
                     identifier,
@@ -1599,6 +1689,27 @@ pub mod statement {
                     "Expected ')'.",
                     "')'"
                 );
+                // TODO: Warn about shadowing
+                with_mut_next_target!(context, target => {
+                    use parse_context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
+                    let symbols = target.borrow_symbols_mut();
+                    let name = &identifier.names[0].0;
+                    let canonical_name = None;
+                    symbols.insert(
+                        name.clone(),
+                        match asset_type {
+                            AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
+                                CostumeDescriptor { name: name.clone(), canonical_name, id: None }
+                            ),
+                            AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
+                                BackdropDescriptor { name: name.clone(), canonical_name, id: None }
+                            ),
+                            AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
+                                SoundDescriptor { name: name.clone(), canonical_name, id: None }
+                            ),
+                        }
+                    );
+                });
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     None,
                     identifier,
@@ -1646,7 +1757,11 @@ pub fn parse_sprite_statement(
             let start_pos = get_token_start!(token_stream);
             Ok(SpriteStatement::CostumeDeclaration(
                 costume_keyword,
-                statement::parse_asset_declaration(token_stream, context)?,
+                statement::parse_asset_declaration(
+                    token_stream,
+                    context,
+                    statement::AssetDeclarationType::Costume,
+                )?,
                 expect_token!(
                     token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
@@ -1662,7 +1777,11 @@ pub fn parse_sprite_statement(
             let start_pos = get_token_start!(token_stream);
             Ok(SpriteStatement::SoundDeclaration(
                 sound_keyword,
-                statement::parse_asset_declaration(token_stream, context)?,
+                statement::parse_asset_declaration(
+                    token_stream,
+                    context,
+                    statement::AssetDeclarationType::Sound,
+                )?,
                 expect_token!(
                     token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
@@ -1766,7 +1885,11 @@ pub fn parse_stage_statement(
             let start_pos = get_token_start!(token_stream);
             Ok(StageStatement::BackdropDeclaration(
                 backdrop_keyword,
-                statement::parse_asset_declaration(token_stream, context)?,
+                statement::parse_asset_declaration(
+                    token_stream,
+                    context,
+                    statement::AssetDeclarationType::Backdrop,
+                )?,
                 expect_token!(
                     token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
@@ -1782,7 +1905,11 @@ pub fn parse_stage_statement(
             let start_pos = get_token_start!(token_stream);
             Ok(StageStatement::SoundDeclaration(
                 sound_keyword,
-                statement::parse_asset_declaration(token_stream, context)?,
+                statement::parse_asset_declaration(
+                    token_stream,
+                    context,
+                    statement::AssetDeclarationType::Sound,
+                )?,
                 expect_token!(
                     token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),

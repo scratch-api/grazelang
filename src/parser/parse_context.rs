@@ -3,8 +3,10 @@ use std::{
     vec,
 };
 
-use arcstr::ArcStr as IString;
+use arcstr::{ArcStr as IString};
 use serde::{Deserialize, Serialize};
+
+type IDString = IString;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Primitive {
@@ -16,24 +18,46 @@ pub enum Primitive {
 pub struct VarDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
+    pub id: Option<IDString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ListDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
+    pub id: Option<IDString>,
 }
 
 type CustomBlockDescriptor = ();
-type CostumeDescriptor = ();
-type BackdropDescriptor = ();
-type SoundDescriptor = ();
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CostumeDescriptor {
+    pub name: IString,
+    pub canonical_name: Option<IString>,
+    pub id: Option<IDString>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BackdropDescriptor {
+    pub name: IString,
+    pub canonical_name: Option<IString>,
+    pub id: Option<IDString>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SoundDescriptor {
+    pub name: IString,
+    pub canonical_name: Option<IString>,
+    pub id: Option<IDString>,
+}
+
 type TopLevelSymbol = ();
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BroadcastDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
+    pub id: Option<IDString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
