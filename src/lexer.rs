@@ -177,13 +177,13 @@ pub fn parse_left_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
 }
 
 fn middle_regex_continuation() -> &'static Regex {
-    static REGEX: OnceLock<Regex> = OnceLock::new();
-    REGEX.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*\$\{"#).unwrap())
+    static REGEX_LOCK: OnceLock<Regex> = OnceLock::new();
+    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*\$\{"#).unwrap())
 }
 
 fn end_regex_continuation() -> &'static Regex {
-    static REGEX: OnceLock<Regex> = OnceLock::new();
-    REGEX.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*""#).unwrap())
+    static REGEX_LOCK: OnceLock<Regex> = OnceLock::new();
+    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*""#).unwrap())
 }
 
 pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
@@ -238,3 +238,9 @@ pub fn get_pos_range(lex: &Lexer<Token>, character_range: Range<usize>) -> PosRa
         get_position(lex, character_range.end),
     )
 }
+
+#[inline]
+pub fn create_lexer<'a>(input: &'a str) -> Lexer<'a, Token> {
+    Token::lexer(input)
+}
+

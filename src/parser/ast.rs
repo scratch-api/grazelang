@@ -1,4 +1,4 @@
-use crate::lexer::PosRange;
+use crate::{lexer::PosRange};
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
 
@@ -720,6 +720,20 @@ pub enum Literal {
     OctalInt(IString, PosRange),
     BinaryInt(IString, PosRange),
     EmptyExpression(LeftParens, RightParens, PosRange),
+}
+
+impl Literal {
+    pub fn cast_to_string(&self) -> IString {
+        match self {
+            Literal::String(value, _) => value.clone(),
+            Literal::DecimalInt(value, _) => value.clone(),
+            Literal::DecimalFloat(value, _) => value.clone(),
+            Literal::HexadecimalInt(value, _) => value.clone(),
+            Literal::OctalInt(value, _) => value.clone(),
+            Literal::BinaryInt(value, _) => value.clone(),
+            Literal::EmptyExpression(_, _, _) => arcstr::literal!(""),
+        }
+    }
 }
 
 impl GetPos for Literal {

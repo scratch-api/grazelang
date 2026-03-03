@@ -1,12 +1,10 @@
 use grazelang::parser::parse_context::ParseContext;
-use grazelang::{lexer, make_parse_in, parser};
-use logos::Logos;
-use parser::internal;
+use grazelang::{codegen, lexer, make_parse_in, parser};
 
 fn test_case(case: &str) {
-    let mut lexer = lexer::Token::lexer(case);
+    let mut lexer = lexer::create_lexer(case);
     let mut context = ParseContext::new();
-    match internal::parse_graze_program(make_parse_in!(&mut lexer), &mut context) {
+    match parser::parse_graze_program(make_parse_in!(&mut lexer), &mut context) {
         Ok(value) => {
             dbg!(&value);
             println!("{}", serde_json::to_string(&value).unwrap());

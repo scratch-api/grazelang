@@ -12,7 +12,7 @@ use crate::{
     },
     parser::{
         ast::{GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
-        parse_context,
+        parse_context::{self, BroadcastDescriptor},
     },
 };
 use arcstr::ArcStr as IString;
@@ -1568,21 +1568,24 @@ pub mod statement {
                                     CostumeDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        id: None
+                                        id: None,
+                                        source: literal.clone(),
                                     }
                                 ),
                                 AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
                                     BackdropDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        id: None
+                                        id: None,
+                                        source: literal.clone(),
                                     }
                                 ),
                                 AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
                                     SoundDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        id: None
+                                        id: None,
+                                        source: literal.clone(),
                                     }
                                 ),
                             }
@@ -1653,13 +1656,16 @@ pub mod statement {
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
-                                CostumeDescriptor { name: name.clone(), canonical_name, id: None }
+                                CostumeDescriptor { name: name.clone(), canonical_name, id: None,
+                                    source: literal.clone(), }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
-                                BackdropDescriptor { name: name.clone(), canonical_name, id: None }
+                                BackdropDescriptor { name: name.clone(), canonical_name, id: None,
+                                    source: literal.clone(), }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
-                                SoundDescriptor { name: name.clone(), canonical_name, id: None }
+                                SoundDescriptor { name: name.clone(), canonical_name, id: None,
+                                    source: literal.clone(), }
                             ),
                         }
                     );
@@ -1699,13 +1705,16 @@ pub mod statement {
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
-                                CostumeDescriptor { name: name.clone(), canonical_name, id: None }
+                                CostumeDescriptor { name: name.clone(), canonical_name, id: None,
+                                    source: literal.clone(), }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
-                                BackdropDescriptor { name: name.clone(), canonical_name, id: None }
+                                BackdropDescriptor { name: name.clone(), canonical_name, id: None,
+                                    source: literal.clone(), }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
-                                SoundDescriptor { name: name.clone(), canonical_name, id: None }
+                                SoundDescriptor { name: name.clone(), canonical_name, id: None,
+                                    source: literal.clone(), }
                             ),
                         }
                     );
@@ -2062,6 +2071,18 @@ pub fn parse_top_level_statement(
                 }
             );
             let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            let name = &identifier.names[0].0;
+            let canonical_name = canonical_identifier
+                .as_ref()
+                .map(|value| value.name.clone());
+            context.broadcasts.insert(
+                name.clone(),
+                BroadcastDescriptor {
+                    name: name.clone(),
+                    canonical_name,
+                    id: None,
+                },
+            );
             let return_val = Ok(TopLevelStatement::BroadcastDeclaration(
                 broadcast_keyword,
                 canonical_identifier,
