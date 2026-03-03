@@ -1,9 +1,12 @@
-use std::{collections::VecDeque, sync::OnceLock};
-
 use crate::parser::parse_context;
 use parse_context::{IDString, ParseContext};
-use rand::{Rng, SeedableRng, distr::{Distribution, Uniform}};
+use rand::{
+    Rng, SeedableRng,
+    distr::{Distribution, Uniform},
+};
 use rand_xoshiro::Xoshiro256StarStar;
+use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 
 impl From<ParseContext> for Xoshiro256StarStar {
     fn from(value: ParseContext) -> Self {
@@ -11,8 +14,9 @@ impl From<ParseContext> for Xoshiro256StarStar {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IdCounter {
-    pub index: usize
+    pub index: usize,
 }
 
 impl Iterator for IdCounter {
