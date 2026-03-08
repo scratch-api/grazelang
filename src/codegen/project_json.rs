@@ -263,9 +263,10 @@ pub struct Sb3Block {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sb3InputValue {
-    Shadow(Sb3InputRepr), // tag: 1
+    Shadow(Sb3InputRepr),   // tag: 1
     NoShadow(Sb3InputRepr), // tag: 2
-    ObscuredShadow { // tag: 3
+    ObscuredShadow {
+        // tag: 3
         value: Sb3InputRepr,
         shadow: Sb3InputRepr,
     },
@@ -316,37 +317,38 @@ impl<'de> Visitor<'de> for Sb3InputValueVisitor {
         let kind = seq
             .next_element::<u8>()?
             .ok_or_else(|| de::Error::invalid_length(0, &"2 to 3"))?;
-        match kind {
-            1 => Ok(Sb3InputValue::Shadow(
+        Ok(match kind {
+            1 => Sb3InputValue::Shadow(
                 seq.next_element()?
                     .ok_or_else(|| de::Error::invalid_length(1, &"2"))?,
-            )),
-            2 => Ok(Sb3InputValue::NoShadow(
+            ),
+            2 => Sb3InputValue::NoShadow(
                 seq.next_element()?
                     .ok_or_else(|| de::Error::invalid_length(1, &"2"))?,
-            )),
-            3 => Ok(Sb3InputValue::ObscuredShadow {
+            ),
+            3 => Sb3InputValue::ObscuredShadow {
                 value: seq
                     .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(1, &"3"))?,
                 shadow: seq
                     .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(2, &"3"))?,
-            }),
+            },
             _ => {
                 return Err(de::Error::invalid_value(
                     de::Unexpected::Signed(kind as i64),
                     &"1 to 3",
                 ));
             }
-        }
+        })
     }
 }
 
 impl<'de> Deserialize<'de> for Sb3InputValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: de::Deserializer<'de> {
+    where
+        D: de::Deserializer<'de>,
+    {
         deserializer.deserialize_seq(Sb3InputValueVisitor)
     }
 }
@@ -422,75 +424,89 @@ impl<'de> Deserialize<'de> for Sb3InputRepr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sb3PrimitiveBlock {
-    Number(Sb3Primitive), // tag: 4
-    PositiveNumber(Sb3Primitive), // tag: 5 
+    Number(Sb3Primitive),          // tag: 4
+    PositiveNumber(Sb3Primitive),  // tag: 5
     PositiveInteger(Sb3Primitive), // tag: 6
-    Integer(Sb3Primitive), // tag: 7
-    Angle(Sb3Primitive), // tag: 8
-    Color(Sb3Primitive), // tag: 9
-    String(Sb3Primitive), // tag: 10
-    Broadcast(String, String), // tag: 11
-    Variable(String, String, Option<f64>, Option<f64>), // tag: 12
-    List(String, String, Option<f64>, Option<f64>), // tag: 13
+    Integer(Sb3Primitive),         // tag: 7
+    Angle(Sb3Primitive),           // tag: 8
+    Color(Sb3Primitive),           // tag: 9
+    String(Sb3Primitive),          // tag: 10
+    Broadcast {
+        name: String,
+        id: String,
+    }, // tag: 11
+    Variable {
+        name: String,
+        id: String,
+        x: Option<f64>,
+        y: Option<f64>,
+    }, // tag: 12
+    List {
+        name: String,
+        id: String,
+        x: Option<f64>,
+        y: Option<f64>,
+    }, // tag: 13
 }
 
 impl Serialize for Sb3PrimitiveBlock {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         match self {
             Sb3PrimitiveBlock::Number(sb3_primitive) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                seq.serialize_element(&4)?;
+                seq.serialize_element(&4_u8)?;
                 seq.serialize_element(sb3_primitive)?;
                 seq.end()
-            }, // tag: 4
+            } // tag: 4
             Sb3PrimitiveBlock::PositiveNumber(sb3_primitive) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                seq.serialize_element(&5)?;
+                seq.serialize_element(&5_u8)?;
                 seq.serialize_element(sb3_primitive)?;
                 seq.end()
-            }, // tag: 5 
+            } // tag: 5
             Sb3PrimitiveBlock::PositiveInteger(sb3_primitive) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                seq.serialize_element(&6)?;
+                seq.serialize_element(&6_u8)?;
                 seq.serialize_element(sb3_primitive)?;
                 seq.end()
-            }, // tag: 6
+            } // tag: 6
             Sb3PrimitiveBlock::Integer(sb3_primitive) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                seq.serialize_element(&7)?;
+                seq.serialize_element(&7_u8)?;
                 seq.serialize_element(sb3_primitive)?;
                 seq.end()
-            }, // tag: 7
+            } // tag: 7
             Sb3PrimitiveBlock::Angle(sb3_primitive) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                seq.serialize_element(&8)?;
+                seq.serialize_element(&8_u8)?;
                 seq.serialize_element(sb3_primitive)?;
                 seq.end()
-            }, // tag: 8
+            } // tag: 8
             Sb3PrimitiveBlock::Color(sb3_primitive) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                seq.serialize_element(&9)?;
+                seq.serialize_element(&9_u8)?;
                 seq.serialize_element(sb3_primitive)?;
                 seq.end()
-            }, // tag: 9
+            } // tag: 9
             Sb3PrimitiveBlock::String(sb3_primitive) => {
                 let mut seq = serializer.serialize_seq(Some(2))?;
-                seq.serialize_element(&10)?;
+                seq.serialize_element(&10_u8)?;
                 seq.serialize_element(sb3_primitive)?;
                 seq.end()
-            }, // tag: 10
-            Sb3PrimitiveBlock::Broadcast(name, id) => {
+            } // tag: 10
+            Sb3PrimitiveBlock::Broadcast { name, id } => {
                 let mut seq = serializer.serialize_seq(Some(3))?;
-                seq.serialize_element(&11)?;
+                seq.serialize_element(&11_u8)?;
                 seq.serialize_element(name)?;
                 seq.serialize_element(id)?;
                 seq.end()
-            }, // tag: 11
-            Sb3PrimitiveBlock::Variable(name, id, x, y) => {
+            } // tag: 11
+            Sb3PrimitiveBlock::Variable { name, id, x, y } => {
                 let mut seq = serializer.serialize_seq(Some(if x == &None { 3 } else { 5 }))?;
-                seq.serialize_element(&12)?;
+                seq.serialize_element(&12_u8)?;
                 seq.serialize_element(name)?;
                 seq.serialize_element(id)?;
                 if x != &None {
@@ -498,10 +514,10 @@ impl Serialize for Sb3PrimitiveBlock {
                     seq.serialize_element(y)?;
                 }
                 seq.end()
-            }, // tag: 12
-            Sb3PrimitiveBlock::List(name, id, x, y) => {
+            } // tag: 12
+            Sb3PrimitiveBlock::List { name, id, x, y } => {
                 let mut seq = serializer.serialize_seq(Some(if x == &None { 3 } else { 5 }))?;
-                seq.serialize_element(&13)?;
+                seq.serialize_element(&13_u8)?;
                 seq.serialize_element(name)?;
                 seq.serialize_element(id)?;
                 if x != &None {
@@ -509,7 +525,7 @@ impl Serialize for Sb3PrimitiveBlock {
                     seq.serialize_element(y)?;
                 }
                 seq.end()
-            }, // tag: 13
+            } // tag: 13
         }
     }
 }
@@ -522,9 +538,166 @@ impl<'de> Visitor<'de> for Sb3PrimitiveBlockVisitor {
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("a primitive block")
     }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let tag = seq
+            .next_element::<u8>()?
+            .ok_or_else(|| de::Error::invalid_length(0, &"2 to 5"))?;
+        Ok(match tag {
+            4 => {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                Sb3PrimitiveBlock::Number(value)
+            } // tag: 4
+            5 => {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                Sb3PrimitiveBlock::PositiveNumber(value)
+            } // tag: 5
+            6 => {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                Sb3PrimitiveBlock::PositiveInteger(value)
+            } // tag: 6
+            7 => {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                Sb3PrimitiveBlock::Integer(value)
+            } // tag: 7
+            8 => {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                Sb3PrimitiveBlock::Angle(value)
+            } // tag: 8
+            9 => {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                Sb3PrimitiveBlock::Color(value)
+            } // tag: 9
+            10 => {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                Sb3PrimitiveBlock::String(value)
+            } // tag: 10
+            11 => {
+                let name = seq
+                    .next_element::<String>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"3"))?;
+                let id = seq
+                    .next_element::<String>()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &"3"))?;
+                Sb3PrimitiveBlock::Broadcast { name, id }
+            } // tag: 11
+            12 => {
+                let name = seq
+                    .next_element::<String>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"3 or 5"))?;
+                let id = seq
+                    .next_element::<String>()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &"3 or 5"))?;
+                let x = seq.next_element::<f64>()?;
+                let y = x.map_or(Ok(None), |_| seq.next_element::<f64>())?;
+                Sb3PrimitiveBlock::Variable { name, id, x, y }
+            } // tag: 12
+            13 => {
+                let name = seq
+                    .next_element::<String>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"3 or 5"))?;
+                let id = seq
+                    .next_element::<String>()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &"3 or 5"))?;
+                let x = seq.next_element::<f64>()?;
+                let y = x.map_or(Ok(None), |_| seq.next_element::<f64>())?;
+                Sb3PrimitiveBlock::List { name, id, x, y }
+            } // tag: 13
+            _ => {
+                return Err(de::Error::invalid_value(
+                    de::Unexpected::Signed(tag as i64),
+                    &"4 to 13",
+                ));
+            }
+        })
+    }
 }
 
-type Sb3FieldValue = ();
+impl<'de> Deserialize<'de> for Sb3PrimitiveBlock {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(Sb3PrimitiveBlockVisitor)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Sb3FieldValue {
+    Normal(Sb3Primitive),
+    WithId { value: Sb3Primitive, id: String },
+}
+
+impl Serialize for Sb3FieldValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Sb3FieldValue::Normal(sb3_primitive) => {
+                let mut seq = serializer.serialize_seq(Some(1))?;
+                seq.serialize_element(sb3_primitive)?;
+                seq.end()
+            }
+            Sb3FieldValue::WithId { value, id } => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(value)?;
+                seq.serialize_element(id)?;
+                seq.end()
+            }
+        }
+    }
+}
+
+struct Sb3FieldValueVisitor;
+
+impl<'de> Visitor<'de> for Sb3FieldValueVisitor {
+    type Value = Sb3FieldValue;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a field value")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let value = seq
+            .next_element::<Sb3Primitive>()?
+            .ok_or_else(|| de::Error::invalid_length(0, &"1 to 2"))?;
+        Ok(match seq.next_element::<String>()? {
+            None => Sb3FieldValue::Normal(value),
+            Some(id) => Sb3FieldValue::WithId { value, id },
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for Sb3FieldValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(Sb3FieldValueVisitor)
+    }
+}
+
 type Sb3BlockMutation = ();
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
