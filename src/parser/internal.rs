@@ -1530,7 +1530,7 @@ pub mod statement {
                         token_stream,
                         Token::RightParens => break from_stream_pos!(token_stream => RightParens)
                     );
-                    let (canonical_identifier, mut start_pos) = consume_and_use_if!(
+                    let (canonical_identifier, start_pos) = consume_and_use_if!(
                         token_stream,
                         Token::CanonicalIdentifier(name) => (
                             Some(CanonicalIdentifier {

@@ -1,10 +1,9 @@
 use serde::{
     Deserialize, Serialize,
-    de::{self, Expected, Visitor},
-    ser::{SerializeSeq, SerializeTuple},
+    de::{self, Visitor},
+    ser::{SerializeMap, SerializeSeq},
 };
 use serde_json::Value;
-use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -83,39 +82,38 @@ impl Serialize for Sb3VariableDeclaration {
     }
 }
 
-struct Sb3VariableDeclarationVisitor;
-
-impl<'de> Visitor<'de> for Sb3VariableDeclarationVisitor {
-    type Value = Sb3VariableDeclaration;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an array representing a variable declaration")
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: serde::de::SeqAccess<'de>,
-    {
-        let name = seq
-            .next_element::<String>()?
-            .ok_or_else(|| de::Error::invalid_length(0, &"2 to 3"))?;
-        let value = seq
-            .next_element::<Sb3Primitive>()?
-            .ok_or_else(|| de::Error::invalid_length(1, &"2 to 3"))?;
-        let is_cloud = seq.next_element::<bool>()?.unwrap_or(false);
-        Ok(Sb3VariableDeclaration {
-            name: name,
-            value: value,
-            is_cloud: is_cloud,
-        })
-    }
-}
-
 impl<'de> Deserialize<'de> for Sb3VariableDeclaration {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
+        struct Sb3VariableDeclarationVisitor;
+
+        impl<'de> Visitor<'de> for Sb3VariableDeclarationVisitor {
+            type Value = Sb3VariableDeclaration;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("an array representing a variable declaration")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let name = seq
+                    .next_element::<String>()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &"2 to 3"))?;
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &"2 to 3"))?;
+                let is_cloud = seq.next_element::<bool>()?.unwrap_or(false);
+                Ok(Sb3VariableDeclaration {
+                    name: name,
+                    value: value,
+                    is_cloud: is_cloud,
+                })
+            }
+        }
         deserializer.deserialize_seq(Sb3VariableDeclarationVisitor)
     }
 }
@@ -146,88 +144,93 @@ impl Serialize for Sb3Primitive {
     }
 }
 
-struct Sb3PrimitiveVisitor;
+mod sb3_primitive {
+    use super::Sb3Primitive;
+    use serde::de::{self, Visitor};
 
-impl<'de> Visitor<'de> for Sb3PrimitiveVisitor {
-    type Value = Sb3Primitive;
+    pub(super) struct Sb3PrimitiveVisitor;
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a json primitive")
-    }
+    impl<'de> Visitor<'de> for Sb3PrimitiveVisitor {
+        type Value = Sb3Primitive;
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::String(v.to_string()))
-    }
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a json primitive")
+        }
 
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::String(v))
-    }
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::String(v.to_string()))
+        }
 
-    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::Int(v))
-    }
+        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::String(v))
+        }
 
-    fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::Int128(v))
-    }
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::Int(v))
+        }
 
-    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(match v.try_into() {
-            Ok(value) => Sb3Primitive::Int(value),
-            Err(_) => Sb3Primitive::Int128(v as i128),
-        })
-    }
+        fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::Int128(v))
+        }
 
-    fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::Int128(v.try_into().map_err(|_| {
-            de::Error::invalid_value(de::Unexpected::Other("integer too big for i128"), &"i128")
-        })?))
-    }
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(match v.try_into() {
+                Ok(value) => Sb3Primitive::Int(value),
+                Err(_) => Sb3Primitive::Int128(v as i128),
+            })
+        }
 
-    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::Float(v))
-    }
+        fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::Int128(v.try_into().map_err(|_| {
+                de::Error::invalid_value(de::Unexpected::Other("integer too big for i128"), &"i128")
+            })?))
+        }
 
-    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::Bool(v))
-    }
+        fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::Float(v))
+        }
 
-    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        deserializer.deserialize_any(self)
-    }
+        fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::Bool(v))
+        }
 
-    fn visit_none<E>(self) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3Primitive::Null)
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: de::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(self)
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3Primitive::Null)
+        }
     }
 }
 
@@ -236,7 +239,7 @@ impl<'de> Deserialize<'de> for Sb3Primitive {
     where
         D: de::Deserializer<'de>,
     {
-        deserializer.deserialize_any(Sb3PrimitiveVisitor)
+        deserializer.deserialize_any(sb3_primitive::Sb3PrimitiveVisitor)
     }
 }
 
@@ -301,54 +304,53 @@ impl Serialize for Sb3InputValue {
     }
 }
 
-struct Sb3InputValueVisitor;
-
-impl<'de> Visitor<'de> for Sb3InputValueVisitor {
-    type Value = Sb3InputValue;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an input value")
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        let kind = seq
-            .next_element::<u8>()?
-            .ok_or_else(|| de::Error::invalid_length(0, &"2 to 3"))?;
-        Ok(match kind {
-            1 => Sb3InputValue::Shadow(
-                seq.next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?,
-            ),
-            2 => Sb3InputValue::NoShadow(
-                seq.next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?,
-            ),
-            3 => Sb3InputValue::ObscuredShadow {
-                value: seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"3"))?,
-                shadow: seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(2, &"3"))?,
-            },
-            _ => {
-                return Err(de::Error::invalid_value(
-                    de::Unexpected::Signed(kind as i64),
-                    &"1 to 3",
-                ));
-            }
-        })
-    }
-}
-
 impl<'de> Deserialize<'de> for Sb3InputValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
+        struct Sb3InputValueVisitor;
+
+        impl<'de> Visitor<'de> for Sb3InputValueVisitor {
+            type Value = Sb3InputValue;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("an input value")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let kind = seq
+                    .next_element::<u8>()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &"2 to 3"))?;
+                Ok(match kind {
+                    1 => Sb3InputValue::Shadow(
+                        seq.next_element()?
+                            .ok_or_else(|| de::Error::invalid_length(1, &"2"))?,
+                    ),
+                    2 => Sb3InputValue::NoShadow(
+                        seq.next_element()?
+                            .ok_or_else(|| de::Error::invalid_length(1, &"2"))?,
+                    ),
+                    3 => Sb3InputValue::ObscuredShadow {
+                        value: seq
+                            .next_element()?
+                            .ok_or_else(|| de::Error::invalid_length(1, &"3"))?,
+                        shadow: seq
+                            .next_element()?
+                            .ok_or_else(|| de::Error::invalid_length(2, &"3"))?,
+                    },
+                    _ => {
+                        return Err(de::Error::invalid_value(
+                            de::Unexpected::Signed(kind as i64),
+                            &"1 to 3",
+                        ));
+                    }
+                })
+            }
+        }
         deserializer.deserialize_seq(Sb3InputValueVisitor)
     }
 }
@@ -373,51 +375,50 @@ impl Serialize for Sb3InputRepr {
     }
 }
 
-struct Sb3InputReprVisitor;
-
-impl<'de> Visitor<'de> for Sb3InputReprVisitor {
-    type Value = Sb3InputRepr;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("an input representation")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3InputRepr::Reference(v.to_string()))
-    }
-
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(Sb3InputRepr::Reference(v))
-    }
-
-    fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        Ok(Sb3InputRepr::PrimitiveBlock(
-            Sb3PrimitiveBlockVisitor.visit_seq(seq)?,
-        ))
-    }
-
-    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        deserializer.deserialize_any(self)
-    }
-}
-
 impl<'de> Deserialize<'de> for Sb3InputRepr {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
+        struct Sb3InputReprVisitor;
+
+        impl<'de> Visitor<'de> for Sb3InputReprVisitor {
+            type Value = Sb3InputRepr;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("an input representation")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3InputRepr::Reference(v.to_string()))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3InputRepr::Reference(v))
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(Sb3InputRepr::PrimitiveBlock(
+                    sb3_primitive_block::Sb3PrimitiveBlockVisitor.visit_seq(seq)?,
+                ))
+            }
+
+            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: de::Deserializer<'de>,
+            {
+                deserializer.deserialize_any(self)
+            }
+        }
         deserializer.deserialize_any(Sb3InputReprVisitor)
     }
 }
@@ -530,112 +531,116 @@ impl Serialize for Sb3PrimitiveBlock {
     }
 }
 
-struct Sb3PrimitiveBlockVisitor;
+mod sb3_primitive_block {
+    use super::{Sb3Primitive, Sb3PrimitiveBlock};
+    use serde::de::{self, Visitor};
 
-impl<'de> Visitor<'de> for Sb3PrimitiveBlockVisitor {
-    type Value = Sb3PrimitiveBlock;
+    pub(super) struct Sb3PrimitiveBlockVisitor;
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a primitive block")
-    }
+    impl<'de> Visitor<'de> for Sb3PrimitiveBlockVisitor {
+        type Value = Sb3PrimitiveBlock;
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        let tag = seq
-            .next_element::<u8>()?
-            .ok_or_else(|| de::Error::invalid_length(0, &"2 to 5"))?;
-        Ok(match tag {
-            4 => {
-                let value = seq
-                    .next_element::<Sb3Primitive>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
-                Sb3PrimitiveBlock::Number(value)
-            } // tag: 4
-            5 => {
-                let value = seq
-                    .next_element::<Sb3Primitive>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
-                Sb3PrimitiveBlock::PositiveNumber(value)
-            } // tag: 5
-            6 => {
-                let value = seq
-                    .next_element::<Sb3Primitive>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
-                Sb3PrimitiveBlock::PositiveInteger(value)
-            } // tag: 6
-            7 => {
-                let value = seq
-                    .next_element::<Sb3Primitive>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
-                Sb3PrimitiveBlock::Integer(value)
-            } // tag: 7
-            8 => {
-                let value = seq
-                    .next_element::<Sb3Primitive>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
-                Sb3PrimitiveBlock::Angle(value)
-            } // tag: 8
-            9 => {
-                let value = seq
-                    .next_element::<Sb3Primitive>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
-                Sb3PrimitiveBlock::Color(value)
-            } // tag: 9
-            10 => {
-                let value = seq
-                    .next_element::<Sb3Primitive>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
-                Sb3PrimitiveBlock::String(value)
-            } // tag: 10
-            11 => {
-                let name = seq
-                    .next_element::<String>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"3"))?;
-                let id = seq
-                    .next_element::<String>()?
-                    .ok_or_else(|| de::Error::invalid_length(2, &"3"))?;
-                Sb3PrimitiveBlock::Broadcast { name, id }
-            } // tag: 11
-            12 => {
-                let name = seq
-                    .next_element::<String>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"3 or 5"))?;
-                let id = seq
-                    .next_element::<String>()?
-                    .ok_or_else(|| de::Error::invalid_length(2, &"3 or 5"))?;
-                let x = seq.next_element::<f64>()?;
-                let y = x.map_or(Ok(None), |_| seq.next_element::<f64>())?;
-                Sb3PrimitiveBlock::Variable { name, id, x, y }
-            } // tag: 12
-            13 => {
-                let name = seq
-                    .next_element::<String>()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &"3 or 5"))?;
-                let id = seq
-                    .next_element::<String>()?
-                    .ok_or_else(|| de::Error::invalid_length(2, &"3 or 5"))?;
-                let x = seq.next_element::<f64>()?;
-                let y = x.map_or(Ok(None), |_| seq.next_element::<f64>())?;
-                Sb3PrimitiveBlock::List { name, id, x, y }
-            } // tag: 13
-            _ => {
-                return Err(de::Error::invalid_value(
-                    de::Unexpected::Signed(tag as i64),
-                    &"4 to 13",
-                ));
-            }
-        })
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a primitive block")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let tag = seq
+                .next_element::<u8>()?
+                .ok_or_else(|| de::Error::invalid_length(0, &"2 to 5"))?;
+            Ok(match tag {
+                4 => {
+                    let value = seq
+                        .next_element::<Sb3Primitive>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                    Sb3PrimitiveBlock::Number(value)
+                } // tag: 4
+                5 => {
+                    let value = seq
+                        .next_element::<Sb3Primitive>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                    Sb3PrimitiveBlock::PositiveNumber(value)
+                } // tag: 5
+                6 => {
+                    let value = seq
+                        .next_element::<Sb3Primitive>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                    Sb3PrimitiveBlock::PositiveInteger(value)
+                } // tag: 6
+                7 => {
+                    let value = seq
+                        .next_element::<Sb3Primitive>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                    Sb3PrimitiveBlock::Integer(value)
+                } // tag: 7
+                8 => {
+                    let value = seq
+                        .next_element::<Sb3Primitive>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                    Sb3PrimitiveBlock::Angle(value)
+                } // tag: 8
+                9 => {
+                    let value = seq
+                        .next_element::<Sb3Primitive>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                    Sb3PrimitiveBlock::Color(value)
+                } // tag: 9
+                10 => {
+                    let value = seq
+                        .next_element::<Sb3Primitive>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"2"))?;
+                    Sb3PrimitiveBlock::String(value)
+                } // tag: 10
+                11 => {
+                    let name = seq
+                        .next_element::<String>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"3"))?;
+                    let id = seq
+                        .next_element::<String>()?
+                        .ok_or_else(|| de::Error::invalid_length(2, &"3"))?;
+                    Sb3PrimitiveBlock::Broadcast { name, id }
+                } // tag: 11
+                12 => {
+                    let name = seq
+                        .next_element::<String>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"3 or 5"))?;
+                    let id = seq
+                        .next_element::<String>()?
+                        .ok_or_else(|| de::Error::invalid_length(2, &"3 or 5"))?;
+                    let x = seq.next_element::<f64>()?;
+                    let y = x.map_or(Ok(None), |_| seq.next_element::<f64>())?;
+                    Sb3PrimitiveBlock::Variable { name, id, x, y }
+                } // tag: 12
+                13 => {
+                    let name = seq
+                        .next_element::<String>()?
+                        .ok_or_else(|| de::Error::invalid_length(1, &"3 or 5"))?;
+                    let id = seq
+                        .next_element::<String>()?
+                        .ok_or_else(|| de::Error::invalid_length(2, &"3 or 5"))?;
+                    let x = seq.next_element::<f64>()?;
+                    let y = x.map_or(Ok(None), |_| seq.next_element::<f64>())?;
+                    Sb3PrimitiveBlock::List { name, id, x, y }
+                } // tag: 13
+                _ => {
+                    return Err(de::Error::invalid_value(
+                        de::Unexpected::Signed(tag as i64),
+                        &"4 to 13",
+                    ));
+                }
+            })
+        }
     }
 }
-
 impl<'de> Deserialize<'de> for Sb3PrimitiveBlock {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        deserializer.deserialize_seq(Sb3PrimitiveBlockVisitor)
+        deserializer.deserialize_seq(sb3_primitive_block::Sb3PrimitiveBlockVisitor)
     }
 }
 
@@ -666,39 +671,285 @@ impl Serialize for Sb3FieldValue {
     }
 }
 
-struct Sb3FieldValueVisitor;
-
-impl<'de> Visitor<'de> for Sb3FieldValueVisitor {
-    type Value = Sb3FieldValue;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a field value")
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: de::SeqAccess<'de>,
-    {
-        let value = seq
-            .next_element::<Sb3Primitive>()?
-            .ok_or_else(|| de::Error::invalid_length(0, &"1 to 2"))?;
-        Ok(match seq.next_element::<String>()? {
-            None => Sb3FieldValue::Normal(value),
-            Some(id) => Sb3FieldValue::WithId { value, id },
-        })
-    }
-}
-
 impl<'de> Deserialize<'de> for Sb3FieldValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
+        struct Sb3FieldValueVisitor;
+
+        impl<'de> Visitor<'de> for Sb3FieldValueVisitor {
+            type Value = Sb3FieldValue;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a field value")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let value = seq
+                    .next_element::<Sb3Primitive>()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &"1 to 2"))?;
+                Ok(match seq.next_element()? {
+                    None => Sb3FieldValue::Normal(value),
+                    Some(None) => Sb3FieldValue::Normal(value),
+                    Some(Some(id)) => Sb3FieldValue::WithId { value, id },
+                })
+            }
+        }
         deserializer.deserialize_seq(Sb3FieldValueVisitor)
     }
 }
 
-type Sb3BlockMutation = ();
+#[derive(Debug, Clone, PartialEq)]
+pub enum Sb3BlockMutation {
+    ProceduresCall {
+        procedure_code: String,
+        argument_ids: Vec<String>,
+        warp: bool,
+    },
+    ProceduresPrototype {
+        procedure_code: String,
+        argument_ids: Vec<String>,
+        warp: bool,
+        argument_names: Vec<String>,
+        argument_defaults: Vec<Value>,
+    },
+    ControlStop {
+        has_next: bool,
+    },
+}
+
+impl Serialize for Sb3BlockMutation {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        fn json_encode<S, T>(data: T) -> Result<String, S::Error>
+        where
+            S: serde::Serializer,
+            T: Serialize,
+        {
+            serde_json::to_string(&data)
+                .map_err(|_| serde::ser::Error::custom("could not encode to string"))
+        }
+        match self {
+            Sb3BlockMutation::ProceduresCall {
+                procedure_code,
+                argument_ids,
+                warp,
+            } => {
+                let mut map = serializer.serialize_map(Some(5))?;
+                map.serialize_entry("tagName", "mutation")?;
+                map.serialize_entry::<str, [(); 0]>("children", &[])?;
+                map.serialize_entry("proccode", procedure_code)?;
+                map.serialize_entry("argumentids", &json_encode::<S, _>(argument_ids)?)?;
+                map.serialize_entry("warp", warp)?;
+                map.end()
+            }
+            Sb3BlockMutation::ProceduresPrototype {
+                procedure_code,
+                argument_ids,
+                warp,
+                argument_names,
+                argument_defaults,
+            } => {
+                let mut map = serializer.serialize_map(Some(7))?;
+                map.serialize_entry("tagName", "mutation")?;
+                map.serialize_entry::<str, [()]>("children", &[])?;
+                map.serialize_entry("proccode", procedure_code)?;
+                map.serialize_entry("argumentids", &json_encode::<S, _>(argument_ids)?)?;
+                map.serialize_entry("warp", warp)?;
+                map.serialize_entry("argumentnames", &json_encode::<S, _>(argument_names)?)?;
+                map.serialize_entry("argumentdefaults", &json_encode::<S, _>(argument_defaults)?)?;
+                map.end()
+            }
+            Sb3BlockMutation::ControlStop { has_next } => {
+                let mut map = serializer.serialize_map(Some(3))?;
+                map.serialize_entry("tagName", "mutation")?;
+                map.serialize_entry::<str, [()]>("children", &[])?;
+                map.serialize_entry("hasnext", &json_encode::<S, _>(has_next)?)?;
+                map.end()
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Sb3BlockMutation {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Sb3BlockMutationVisitor;
+
+        impl<'de> Visitor<'de> for Sb3BlockMutationVisitor {
+            type Value = Sb3BlockMutation;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a block mutation")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                let mut tag_name = None::<&str>;
+                let mut children = None::<[(); 0]>;
+                let mut procedure_code = None::<String>;
+                let mut argument_ids = None::<Vec<String>>;
+                let mut warp = None::<bool>;
+                let mut argument_names = None::<Vec<String>>;
+                let mut argument_defaults = None::<Vec<Value>>;
+                let mut has_next = None::<bool>;
+                let mut entry_count = 0;
+                loop {
+                    if entry_count > 7 {
+                        return Err(de::Error::invalid_length(entry_count, &"3, 5 or 7"));
+                    }
+                    if let Some(key) = map.next_key::<&str>()? {
+                        entry_count += 1;
+                        match key {
+                            "tagName" => {
+                                tag_name = map.next_value()?;
+                            }
+                            "children" => {
+                                children = map.next_value()?;
+                            }
+                            "proccode" => {
+                                procedure_code = map.next_value()?;
+                            }
+                            "argumentids" => {
+                                argument_ids = serde_json::from_str(&map.next_value::<String>()?)
+                                    .map_err(|_| {
+                                    de::Error::custom("argumentids was not a list of strings")
+                                })?;
+                            }
+                            "warp" => {
+                                warp = serde_json::from_str(&map.next_value::<String>()?)
+                                    .map_err(|_| de::Error::custom("warp was not a bool"))?;
+                            }
+                            "argumentnames" => {
+                                argument_names = serde_json::from_str(&map.next_value::<String>()?)
+                                    .map_err(|_| {
+                                        de::Error::custom("argumentnames was not a list of strings")
+                                    })?;
+                            }
+                            "argumentdefaults" => {
+                                argument_defaults = serde_json::from_str(
+                                    &map.next_value::<String>()?,
+                                )
+                                .map_err(|_| {
+                                    de::Error::custom("argumentdefaults was not a list of strings")
+                                })?;
+                            }
+                            "hasnext" => {
+                                has_next = serde_json::from_str(&map.next_value::<String>()?)
+                                    .map_err(|_| de::Error::custom("hasnext was not a bool"))?;
+                            }
+                            _ => {
+                                return Err(de::Error::invalid_value(
+                                    de::Unexpected::Map,
+                                    &"a block mutation key",
+                                ));
+                            }
+                        }
+                    } else {
+                        if !matches!(entry_count, 3 | 5 | 7) {
+                            return Err(de::Error::invalid_length(entry_count, &"3, 5 or 7"));
+                        }
+                        match (tag_name, children) {
+                            (Some("mutation"), Some([])) => (),
+                            _ => {
+                                return Err(de::Error::invalid_value(
+                                    de::Unexpected::Other(
+                                        "block mutation without tagName or children set to the correct values",
+                                    ),
+                                    &"a valid block mutation",
+                                ));
+                            }
+                        }
+                        if let Some(has_next) = has_next {
+                            if entry_count != 3 {
+                                return Err(de::Error::invalid_value(
+                                    de::Unexpected::Other(
+                                        "control stop block mutation with more than three entries",
+                                    ),
+                                    &"a valid control stop block mutation",
+                                ));
+                            }
+                            return Ok(Sb3BlockMutation::ControlStop { has_next });
+                        }
+                        if let (Some(argument_names), Some(argument_defaults)) =
+                            (argument_names, argument_defaults)
+                        {
+                            if entry_count != 7 {
+                                return Err(de::Error::invalid_value(
+                                    de::Unexpected::Other(
+                                        "procedures prototype block mutation with less than 7 entries",
+                                    ),
+                                    &"a valid procedures prototype block mutation",
+                                ));
+                            }
+                            let (procedure_code, argument_ids, warp) = match (
+                                procedure_code,
+                                argument_ids,
+                                warp,
+                            ) {
+                                (Some(val_1), Some(val_2), Some(val_3)) => (val_1, val_2, val_3),
+                                _ => {
+                                    return Err(de::Error::invalid_value(
+                                        de::Unexpected::Other(
+                                            "procedures prototype block mutation without proccode, argumentids or warp set",
+                                        ),
+                                        &"a valid procedures prototype block mutation",
+                                    ));
+                                }
+                            };
+                            return Ok(Sb3BlockMutation::ProceduresPrototype {
+                                procedure_code,
+                                argument_ids,
+                                warp,
+                                argument_names,
+                                argument_defaults,
+                            });
+                        }
+                        if entry_count != 5 {
+                            return Err(de::Error::invalid_value(
+                                de::Unexpected::Other(
+                                    "procedures call block mutation with anything other than 5 entries",
+                                ),
+                                &"a valid procedures call block mutation",
+                            ));
+                        }
+                        let (procedure_code, argument_ids, warp) = match (
+                            procedure_code,
+                            argument_ids,
+                            warp,
+                        ) {
+                            (Some(val_1), Some(val_2), Some(val_3)) => (val_1, val_2, val_3),
+                            _ => {
+                                return Err(de::Error::invalid_value(
+                                    de::Unexpected::Other(
+                                        "procedures call block mutation without proccode, argumentids or warp set",
+                                    ),
+                                    &"a valid procedures call block mutation",
+                                ));
+                            }
+                        };
+                        return Ok(Sb3BlockMutation::ProceduresCall {
+                            procedure_code,
+                            argument_ids,
+                            warp,
+                        });
+                    }
+                }
+            }
+        }
+        deserializer.deserialize_map(Sb3BlockMutationVisitor)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -743,8 +994,8 @@ pub struct Sb3Monitor {
     pub mode: Sb3MonitorMode,
     pub opcode: String,
     pub params: HashMap<String, Value>,
-    pub sprite_name: String,
-    pub value: Sb3Primitive,
+    pub sprite_name: Option<String>,
+    pub value: Sb3MonitorValue,
     pub width: f64,
     pub height: f64,
     pub x: f64,
@@ -757,7 +1008,142 @@ pub struct Sb3Monitor {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slider_max: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub is_discrete: Option<f64>,
+    pub is_discrete: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Sb3MonitorValue {
+    List(Vec<Sb3Primitive>),
+    Primitive(Sb3Primitive),
+}
+
+impl Serialize for Sb3MonitorValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Sb3MonitorValue::List(sb3_primitives) => sb3_primitives.serialize(serializer),
+            Sb3MonitorValue::Primitive(sb3_primitive) => sb3_primitive.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Sb3MonitorValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Sb3MonitorValueVisitor;
+
+        impl<'de> Visitor<'de> for Sb3MonitorValueVisitor {
+            type Value = Sb3MonitorValue;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a monitor value")
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(Sb3MonitorValue::List(Vec::<Sb3Primitive>::deserialize(
+                    serde::de::value::SeqAccessDeserializer::new(seq),
+                )?))
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_str(v)?,
+                ))
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_string(v)?,
+                ))
+            }
+
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_i64(v)?,
+                ))
+            }
+
+            fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_i128(v)?,
+                ))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_u64(v)?,
+                ))
+            }
+
+            fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_u128(v)?,
+                ))
+            }
+
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_f64(v)?,
+                ))
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_bool(v)?,
+                ))
+            }
+
+            fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: de::Deserializer<'de>,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_some(deserializer)?,
+                ))
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3MonitorValue::Primitive(
+                    sb3_primitive::Sb3PrimitiveVisitor.visit_none()?,
+                ))
+            }
+        }
+        deserializer.deserialize_any(Sb3MonitorValueVisitor)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
