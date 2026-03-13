@@ -1,5 +1,5 @@
 pub mod ast;
-pub mod internal;
+pub mod parser;
 pub mod parse_context;
 
-pub use internal::parse_graze_program;
+pub use parser::parse_graze_program;
