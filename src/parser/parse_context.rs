@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::ast::Literal;
 
-pub type IDString = IString;
+pub type IdString = IString;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Primitive {
@@ -19,23 +19,28 @@ pub enum Primitive {
 pub struct VarDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IDString>,
+    pub id: Option<IdString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ListDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IDString>,
+    pub id: Option<IdString>,
 }
 
-type CustomBlockDescriptor = ();
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CustomBlockDescriptor {
+    pub name: IString,
+    pub canonical_name: Option<IString>,
+    pub proccode: Option<IdString>,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CostumeDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IDString>,
+    pub id: Option<IdString>,
     pub source: Literal,
 }
 
@@ -43,7 +48,7 @@ pub struct CostumeDescriptor {
 pub struct BackdropDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IDString>,
+    pub id: Option<IdString>,
     pub source: Literal,
 }
 
@@ -51,7 +56,7 @@ pub struct BackdropDescriptor {
 pub struct SoundDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IDString>,
+    pub id: Option<IdString>,
     pub source: Literal,
 }
 
@@ -61,7 +66,7 @@ type TopLevelSymbol = ();
 pub struct BroadcastDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IDString>,
+    pub id: Option<IdString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,7 +80,7 @@ pub enum TargetSymbolDescriptor {
 }
 
 impl TargetSymbolDescriptor {
-    pub fn assign_id(&mut self, new_id: Option<IDString>) {
+    pub fn assign_id(&mut self, new_id: Option<IdString>) {
         match self {
             TargetSymbolDescriptor::Var(descriptor) => {
                 descriptor.id = new_id;
@@ -84,8 +89,7 @@ impl TargetSymbolDescriptor {
                 descriptor.id = new_id;
             }
             TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) => {
-
-                // TODO
+                descriptor.proccode = new_id;
             }
             TargetSymbolDescriptor::Costume(descriptor) => {
                 descriptor.id = new_id;
@@ -99,23 +103,24 @@ impl TargetSymbolDescriptor {
         }
     }
 
-    pub fn compute_hash(path: IString) -> IDString {
+    pub fn compute_hash(path: IString) -> IdString {
         todo!()
     }
-    
-    pub fn derive_id_if_asset(&self) -> Option<IDString> {
+
+    pub fn derive_id_if_possible(&self) -> Option<IdString> {
+        if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = self {
+            return descriptor
+                .canonical_name
+                .clone()
+                .or_else(|| Some(descriptor.name.clone()));
+        }
         match self {
-            TargetSymbolDescriptor::Costume(descriptor) => {
-                Some(&descriptor.source)
-            }
-            TargetSymbolDescriptor::Backdrop(descriptor) => {
-                Some(&descriptor.source)
-            }
-            TargetSymbolDescriptor::Sound(descriptor) => {
-                Some(&descriptor.source)
-            }
-            _ => None
-        }.map(|value| Self::compute_hash(value.cast_to_string()))
+            TargetSymbolDescriptor::Costume(descriptor) => Some(&descriptor.source),
+            TargetSymbolDescriptor::Backdrop(descriptor) => Some(&descriptor.source),
+            TargetSymbolDescriptor::Sound(descriptor) => Some(&descriptor.source),
+            _ => None,
+        }
+        .map(|value| Self::compute_hash(value.cast_to_string()))
     }
 }
 
@@ -133,9 +138,9 @@ pub enum Target {
 
 impl Target {
     #[inline]
-    pub fn borrow_symbols_mut<'a>(
-        &'a mut self,
-    ) -> &'a mut HashMap<IString, TargetSymbolDescriptor> {
+    pub fn borrow_symbols_mut(
+        &mut self,
+    ) -> &mut HashMap<IString, TargetSymbolDescriptor> {
         match self {
             Target::Sprite {
                 name: _,

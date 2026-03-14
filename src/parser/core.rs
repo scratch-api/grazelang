@@ -270,7 +270,7 @@ pub fn parse_graze_program(
 ) -> ParseOut<GrazeProgram> {
     let mut statements = Vec::<TopLevelStatement>::new();
     loop {
-        if peek_token!(token_stream => Option) == None {
+        if peek_token!(token_stream => Option).is_none() {
             break;
         }
         statements.push(parse_top_level_statement(token_stream, context)?);
@@ -315,13 +315,13 @@ pub fn parse_full_identifier(
             None => break,
         } {
             Token::ScopeResolution => {
-                if let Some(_) = scope {
+                if scope.is_some() {
                     skip_token!(token_stream);
                     emit_unexpected_token!(token_stream, "Expected a dot.", "a dot");
                 }
             }
             Token::Dot => {
-                if let None = scope {
+                if scope.is_none() {
                     scope = Some(names);
                     names = Vec::new();
                 }
@@ -336,7 +336,7 @@ pub fn parse_full_identifier(
             "an identifier"
         ));
     }
-    if names.len() > 1 && scope == None {
+    if names.len() > 1 && scope.is_none() {
         scope = Some(names);
         names = Vec::new();
     }
@@ -361,13 +361,13 @@ pub fn parse_full_identifier_starting_with(
             None => break,
         } {
             Token::ScopeResolution => {
-                if let Some(_) = scope {
+                if scope.is_some() {
                     skip_token!(token_stream);
                     emit_unexpected_token!(token_stream, "Expected a dot.", "a dot");
                 }
             }
             Token::Dot => {
-                if let None = scope {
+                if scope.is_none() {
                     scope = Some(names);
                     names = Vec::new();
                 }
@@ -382,7 +382,7 @@ pub fn parse_full_identifier_starting_with(
             "an identifier"
         ));
     }
-    if names.len() > 1 && scope == None {
+    if names.len() > 1 && scope.is_none() {
         scope = Some(names);
         names = Vec::new();
     }
@@ -583,14 +583,14 @@ pub mod statement {
             let dec_type = match peek_token!(token_stream) {
                 Token::VarKeyword => {
                     skip_token!(token_stream);
-                    if start_pos == None {
+                    if start_pos.is_none() {
                         start_pos = Some(get_token_start!(token_stream));
                     }
                     from_stream_pos!(token_stream => SingleDataDeclarationType::Var)
                 }
                 Token::ListKeyword => {
                     skip_token!(token_stream);
-                    if start_pos == None {
+                    if start_pos.is_none() {
                         start_pos = Some(get_token_start!(token_stream));
                     }
                     from_stream_pos!(token_stream => SingleDataDeclarationType::List)
@@ -599,7 +599,7 @@ pub mod statement {
             };
             let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => {
                 let value = value.clone();
-                if start_pos == None {
+                if start_pos.is_none() {
                     start_pos = Some(get_token_start!(token_stream));
                 }
                 CanonicalIdentifier {
@@ -608,7 +608,7 @@ pub mod statement {
                 }
             });
             let identifier = if let Token::Identifier(value) = next_token!(token_stream) {
-                if start_pos == None {
+                if start_pos.is_none() {
                     start_pos = Some(get_token_start!(token_stream));
                 }
                 Identifier {
@@ -718,11 +718,14 @@ pub mod statement {
             };
             with_mut_next_target_or_stage!(
                 context,
-                match (default_scope, &scope) {
-                    (DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset) => true,
-                    (_, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) => true,
-                    _ => false,
-                },
+                matches!(
+                    (default_scope, &scope),
+                    (
+                        DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset
+                    ) | (
+                        _, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)
+                    )
+                ),
                 target => {
                     // TODO: warn about shadowing
                     let name = &identifier.names[0].0;
@@ -869,14 +872,14 @@ pub mod statement {
         let dec_type = match peek_token!(token_stream) {
             Token::VarKeyword => {
                 skip_token!(token_stream);
-                if start_pos == None {
+                if start_pos.is_none() {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
                 from_stream_pos!(token_stream => SingleDataDeclarationType::Var)
             }
             Token::ListKeyword => {
                 skip_token!(token_stream);
-                if start_pos == None {
+                if start_pos.is_none() {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
                 from_stream_pos!(token_stream => SingleDataDeclarationType::List)
@@ -884,7 +887,7 @@ pub mod statement {
             Token::VarsKeyword => {
                 skip_token!(token_stream);
                 let vars_keyword = from_stream_pos!(token_stream => VarsKeyword);
-                if start_pos == None {
+                if start_pos.is_none() {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
                 let left_brace = expect_token!(
@@ -922,7 +925,7 @@ pub mod statement {
             Token::ListsKeyword => {
                 skip_token!(token_stream);
                 let lists_keyword = from_stream_pos!(token_stream => ListsKeyword);
-                if start_pos == None {
+                if start_pos.is_none() {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
                 let left_brace = expect_token!(
@@ -960,7 +963,7 @@ pub mod statement {
             Token::LeftParens => {
                 skip_token!(token_stream);
                 let left_parens = from_stream_pos!(token_stream => LeftParens);
-                if start_pos == None {
+                if start_pos.is_none() {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
                 let declarations = parse_inner_single_declarations(
@@ -991,7 +994,7 @@ pub mod statement {
         };
         let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => {
             let value = value.clone();
-            if start_pos == None {
+            if start_pos.is_none() {
                 start_pos = from_stream_pos!(token_stream => Some);
             }
             CanonicalIdentifier {
@@ -1000,7 +1003,7 @@ pub mod statement {
             }
         });
         let identifier = if let Token::Identifier(value) = next_token!(token_stream) {
-            if start_pos == None {
+            if start_pos.is_none() {
                 start_pos = from_stream_pos!(token_stream => Some);
             }
             Identifier {
@@ -1172,7 +1175,7 @@ pub mod statement {
         };
         Ok((
             LetKeyword(let_keyword_position),
-            DataDeclaration::Single(declaration),
+            DataDeclaration::Single(declaration.into()),
             (let_keyword_position.0, get_token_end!(token_stream)),
         ))
     }
@@ -1315,7 +1318,7 @@ pub mod statement {
                     ))
                 }
                 1 => {
-                    if expressions[0].1 != None {
+                    if expressions[0].1.is_some() {
                         return Ok(Statement::MultiInputControl(
                             identifier,
                             left_parens,
@@ -1751,7 +1754,11 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             "Expected ';'.",
             "';'"
         ))),
-        _ => todo!(),
+        _ => emit_unexpected_token!(
+            token_stream,
+            "Expected ';', \"let\" or an identifier.",
+            "';', \"let\" or an identifier"
+        ),
     }
 }
 
@@ -1838,7 +1845,7 @@ pub fn parse_sprite_statement(
                             start_pos,
                         );
                     }
-                    if expressions.len() == 1 && expressions[0].1 == None {
+                    if expressions.len() == 1 && expressions[0].1.is_none() {
                         let pos_range = (left_parens.0.0, right_parens.0.1);
                         return parse_sprite_rest_of_single_input_control(
                             token_stream,
@@ -1874,6 +1881,15 @@ pub fn parse_sprite_statement(
                     )
                 }
             }
+        }
+        Token::LeftBrace => {
+            let code_block = parse_code_block(token_stream, context)?;
+            let start_pos = code_block.pos_range.0;
+            Ok(SpriteStatement::IsolatedBlock(
+                code_block,
+                consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
+                (start_pos, get_token_end!(token_stream)),
+            ))
         }
         _ => emit_unexpected_token!(
             token_stream,
@@ -1966,7 +1982,7 @@ pub fn parse_stage_statement(
                             start_pos,
                         );
                     }
-                    if expressions.len() == 1 && expressions[0].1 == None {
+                    if expressions.len() == 1 && expressions[0].1.is_none() {
                         let pos_range = (left_parens.0.0, right_parens.0.1);
                         return parse_stage_rest_of_single_input_control(
                             token_stream,
@@ -2002,6 +2018,15 @@ pub fn parse_stage_statement(
                     )
                 }
             }
+        }
+        Token::LeftBrace => {
+            let code_block = parse_code_block(token_stream, context)?;
+            let start_pos = code_block.pos_range.0;
+            Ok(StageStatement::IsolatedBlock(
+                code_block,
+                consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
+                (start_pos, get_token_end!(token_stream)),
+            ))
         }
         _ => emit_unexpected_token!(
             token_stream,

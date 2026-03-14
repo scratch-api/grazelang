@@ -1,6 +1,7 @@
 local_tests.rs
 debug_out.txt
 std
+data.json
 # Added by cargo
 
 /target

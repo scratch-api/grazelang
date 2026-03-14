@@ -187,7 +187,7 @@ fn end_regex_continuation() -> &'static Regex {
 }
 
 pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
-    if lex.extras.1 <= 0 {
+    if lex.extras.1 == 0 {
         return Some(LexedRightBrace::Normal);
     }
     let remainder = lex.remainder();
@@ -211,7 +211,7 @@ pub fn parse_middle_format_string(slice: &str) -> Option<IString> {
 }
 
 pub fn parse_right_format_string(slice: &str) -> Option<IString> {
-    let json = String::from("\"") + &slice[..];
+    let json = String::from("\"") + slice;
     json_from_str::<'_, IString>(&json).ok()
 }
 

@@ -6,7 +6,7 @@ use serde::{
 use serde_json::Value;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Sb3Root {
     pub targets: Vec<Sb3Target>,
@@ -108,9 +108,9 @@ impl<'de> Deserialize<'de> for Sb3VariableDeclaration {
                     .ok_or_else(|| de::Error::invalid_length(1, &"2 to 3"))?;
                 let is_cloud = seq.next_element::<bool>()?.unwrap_or(false);
                 Ok(Sb3VariableDeclaration {
-                    name: name,
-                    value: value,
-                    is_cloud: is_cloud,
+                    name,
+                    value,
+                    is_cloud,
                 })
             }
         }
@@ -506,22 +506,22 @@ impl Serialize for Sb3PrimitiveBlock {
                 seq.end()
             } // tag: 11
             Sb3PrimitiveBlock::Variable { name, id, x, y } => {
-                let mut seq = serializer.serialize_seq(Some(if x == &None { 3 } else { 5 }))?;
+                let mut seq = serializer.serialize_seq(Some(if x.is_none() { 3 } else { 5 }))?;
                 seq.serialize_element(&12_u8)?;
                 seq.serialize_element(name)?;
                 seq.serialize_element(id)?;
-                if x != &None {
+                if x.is_some() {
                     seq.serialize_element(x)?;
                     seq.serialize_element(y)?;
                 }
                 seq.end()
             } // tag: 12
             Sb3PrimitiveBlock::List { name, id, x, y } => {
-                let mut seq = serializer.serialize_seq(Some(if x == &None { 3 } else { 5 }))?;
+                let mut seq = serializer.serialize_seq(Some(if x.is_none() { 3 } else { 5 }))?;
                 seq.serialize_element(&13_u8)?;
                 seq.serialize_element(name)?;
                 seq.serialize_element(id)?;
-                if x != &None {
+                if x.is_some() {
                     seq.serialize_element(x)?;
                     seq.serialize_element(y)?;
                 }
@@ -1163,4 +1163,16 @@ pub struct Sb3Meta {
     pub agent: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub origin: Option<String>,
+}
+
+impl Default for Sb3Meta {
+    fn default() -> Self {
+        Self {
+            semver: "3.0.0".into(),
+            vm: "12.6.4".into(),
+            agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36".into(),
+            // ^ not my user agent
+            origin: None,
+        }
+    }
 }

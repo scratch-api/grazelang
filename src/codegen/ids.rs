@@ -1,5 +1,5 @@
 use crate::parser::parse_context;
-use parse_context::{IDString, ParseContext};
+use parse_context::{IdString, ParseContext};
 use rand::{
     Rng, SeedableRng,
     distr::{Distribution, Uniform},
@@ -19,9 +19,12 @@ pub struct IdCounter {
     pub index: usize,
 }
 
-impl Iterator for IdCounter {
-    type Item = IDString;
-    fn next(&mut self) -> Option<Self::Item> {
+impl IdCounter {
+    pub fn new() -> Self {
+        Self { index: 0 }
+    }
+
+    pub fn get_new_id(&mut self) -> <Self as Iterator>::Item {
         // yea i prematurely optimized it a bit
         let mut n = self.index;
         self.index += 1;
@@ -35,7 +38,20 @@ impl Iterator for IdCounter {
                 break;
             }
         }
-        Some(str::from_utf8(&string[cursor..]).unwrap().into())
+        str::from_utf8(&string[cursor..]).unwrap().into()
+    }
+}
+
+impl Default for IdCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Iterator for IdCounter {
+    type Item = IdString;
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.get_new_id())
     }
 }
 
@@ -43,7 +59,7 @@ const ID_SOUP: &[u8] =
     b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%()*+,-./:;=?@[]^_`{|}~";
 const ID_LENGTH: usize = 20;
 
-pub fn generate_random_id<T: Rng>(rng: &mut T) -> IDString {
+pub fn generate_random_id<T: Rng>(rng: &mut T) -> IdString {
     static UNIFORM_LOCK: OnceLock<Uniform<usize>> = OnceLock::new();
     let uniform = UNIFORM_LOCK.get_or_init(|| Uniform::new(0, ID_SOUP.len()).unwrap());
     let mut id = String::with_capacity(ID_LENGTH);
@@ -58,7 +74,7 @@ pub fn generate_ids_for_context<T: Rng>(context: &mut ParseContext, rng: &mut T)
         for descriptor in target.borrow_symbols_mut().values_mut() {
             descriptor.assign_id(Some(
                 descriptor
-                    .derive_id_if_asset()
+                    .derive_id_if_possible()
                     .unwrap_or_else(|| generate_random_id(rng)),
             ));
         }

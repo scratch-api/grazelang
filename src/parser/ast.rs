@@ -1,11 +1,10 @@
-use crate::{lexer::PosRange};
+use crate::lexer::PosRange;
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
 
 pub trait GetPos {
-    fn get_position<'a>(&'a self) -> &'a PosRange;
+    fn get_position(&self) -> &PosRange;
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GrazeProgram(pub Vec<TopLevelStatement>);
@@ -13,14 +12,27 @@ pub struct GrazeProgram(pub Vec<TopLevelStatement>);
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TopLevelStatement {
     Stage(StageKeyword, StageCodeBlock, Option<Semicolon>, PosRange),
-    Sprite(SpriteKeyword, Option<CanonicalIdentifier>, Identifier, SpriteCodeBlock, Option<Semicolon>, PosRange),
-    BroadcastDeclaration(BroadcastKeyword, Option<CanonicalIdentifier>, Identifier, Semicolon, PosRange),
+    Sprite(
+        SpriteKeyword,
+        Option<CanonicalIdentifier>,
+        Identifier,
+        SpriteCodeBlock,
+        Option<Semicolon>,
+        PosRange,
+    ),
+    BroadcastDeclaration(
+        BroadcastKeyword,
+        Option<CanonicalIdentifier>,
+        Identifier,
+        Semicolon,
+        PosRange,
+    ),
     // Mod(),
     EmptyStatement(Semicolon),
 }
 
 impl GetPos for TopLevelStatement {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             TopLevelStatement::Stage(_, _, _, p) => p,
             TopLevelStatement::Sprite(_, _, _, _, _, p) => p,
@@ -35,7 +47,7 @@ pub struct SpriteKeyword(pub PosRange);
 
 impl GetPos for SpriteKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -45,7 +57,7 @@ pub struct StageKeyword(pub PosRange);
 
 impl GetPos for StageKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -55,7 +67,7 @@ pub struct CostumeKeyword(pub PosRange);
 
 impl GetPos for CostumeKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -65,7 +77,7 @@ pub struct BroadcastKeyword(pub PosRange);
 
 impl GetPos for BroadcastKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -75,7 +87,7 @@ pub struct BackdropKeyword(pub PosRange);
 
 impl GetPos for BackdropKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -85,7 +97,7 @@ pub struct SoundKeyword(pub PosRange);
 
 impl GetPos for SoundKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -111,18 +123,20 @@ pub enum StageStatement {
         Option<Semicolon>,
         PosRange,
     ),
+    IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
     // Mod(),
     EmptyStatement(Semicolon),
 }
 
 impl GetPos for StageStatement {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             StageStatement::DataDeclaration(_, _, _, p) => p,
             StageStatement::BackdropDeclaration(_, _, _, p) => p,
             StageStatement::SoundDeclaration(_, _, _, p) => p,
             StageStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
+            StageStatement::IsolatedBlock(_, _, p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
         }
     }
@@ -149,18 +163,20 @@ pub enum SpriteStatement {
         Option<Semicolon>,
         PosRange,
     ),
+    IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
     // Mod(),
     EmptyStatement(Semicolon),
 }
 
 impl GetPos for SpriteStatement {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             SpriteStatement::DataDeclaration(_, _, _, p) => p,
             SpriteStatement::CostumeDeclaration(_, _, _, p) => p,
             SpriteStatement::SoundDeclaration(_, _, _, p) => p,
             SpriteStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
+            SpriteStatement::IsolatedBlock(_, _, p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
         }
     }
@@ -178,7 +194,7 @@ pub enum AssetDeclaration {
 }
 
 impl GetPos for AssetDeclaration {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             AssetDeclaration::Multiple(_, _, _, p) => p,
             AssetDeclaration::Single(d) => d.get_position(),
@@ -198,7 +214,7 @@ pub struct SingleAssetDeclaration(
 
 impl GetPos for SingleAssetDeclaration {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.5
     }
 }
@@ -268,7 +284,7 @@ pub enum Statement {
 }
 
 impl GetPos for Statement {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             Statement::DataDeclaration(_, _, _, p) => p,
             Statement::Assignment(_, _, _, _, p) => p,
@@ -289,7 +305,7 @@ pub struct LetKeyword(pub PosRange);
 
 impl GetPos for LetKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -299,7 +315,7 @@ pub struct VarsKeyword(pub PosRange);
 
 impl GetPos for VarsKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -309,7 +325,7 @@ pub struct ListsKeyword(pub PosRange);
 
 impl GetPos for ListsKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -319,7 +335,7 @@ pub struct VarKeyword(pub PosRange);
 
 impl GetPos for VarKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -329,7 +345,7 @@ pub struct ListKeyword(pub PosRange);
 
 impl GetPos for ListKeyword {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -366,11 +382,11 @@ pub enum DataDeclaration {
         RightBrace,
         PosRange,
     ),
-    Single(SingleDataDeclaration),
+    Single(Box<SingleDataDeclaration>),
 }
 
 impl GetPos for DataDeclaration {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             DataDeclaration::Mixed(_, _, _, _, p) => p,
             DataDeclaration::Vars(_, _, _, _, _, p) => p,
@@ -393,7 +409,7 @@ pub struct NormalAssignmentOperator(pub PosRange);
 
 impl GetPos for NormalAssignmentOperator {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -405,7 +421,7 @@ pub enum ListEntry {
 }
 
 impl GetPos for ListEntry {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             ListEntry::Expression(l) => l.get_position(),
             ListEntry::Unwrap(_, p) => p,
@@ -452,7 +468,7 @@ pub enum SingleDataDeclaration {
 }
 
 impl GetPos for SingleDataDeclaration {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             SingleDataDeclaration::Variable(_, _, _, _, _, _, p) => p,
             SingleDataDeclaration::EmptyVariable(_, _, _, _, p) => p,
@@ -467,7 +483,7 @@ pub struct Comma(pub PosRange);
 
 impl GetPos for Comma {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -477,7 +493,7 @@ pub struct LeftBrace(pub PosRange);
 
 impl GetPos for LeftBrace {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -487,7 +503,7 @@ pub struct RightBrace(pub PosRange);
 
 impl GetPos for RightBrace {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -502,7 +518,7 @@ pub struct StageCodeBlock {
 
 impl GetPos for StageCodeBlock {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.pos_range
     }
 }
@@ -517,7 +533,7 @@ pub struct SpriteCodeBlock {
 
 impl GetPos for SpriteCodeBlock {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.pos_range
     }
 }
@@ -532,7 +548,7 @@ pub struct CodeBlock {
 
 impl GetPos for CodeBlock {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.pos_range
     }
 }
@@ -566,7 +582,7 @@ pub struct LeftParens(pub PosRange);
 
 impl GetPos for LeftParens {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -576,7 +592,7 @@ pub struct RightParens(pub PosRange);
 
 impl GetPos for RightParens {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -586,7 +602,7 @@ pub struct LeftBracket(pub PosRange);
 
 impl GetPos for LeftBracket {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -596,7 +612,7 @@ pub struct RightBracket(pub PosRange);
 
 impl GetPos for RightBracket {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
@@ -605,13 +621,13 @@ pub struct Semicolon(pub PosRange);
 
 impl GetPos for Semicolon {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.0
     }
 }
 
 impl GetPos for Expression {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             Expression::Literal(l) => l.get_position(),
             Expression::FormattedString(_, p) => p,
@@ -644,7 +660,7 @@ pub enum BinOp {
 }
 
 impl GetPos for BinOp {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             BinOp::Plus(p) => p,
             BinOp::Minus(p) => p,
@@ -701,7 +717,7 @@ pub enum UnOp {
 }
 
 impl GetPos for UnOp {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             UnOp::Minus(p) => p,
             UnOp::Not(p) => p,
@@ -737,7 +753,7 @@ impl Literal {
 }
 
 impl GetPos for Literal {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             Literal::String(_, p) => p,
             Literal::DecimalInt(_, p) => p,
@@ -757,7 +773,7 @@ pub enum FormattedStringContent {
 }
 
 impl GetPos for FormattedStringContent {
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         match self {
             FormattedStringContent::Expression(expression) => expression.get_position(),
             FormattedStringContent::String(_, p) => p,
@@ -779,7 +795,7 @@ pub struct Identifier {
 
 impl GetPos for Identifier {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.pos_range
     }
 }
@@ -804,7 +820,7 @@ pub struct CanonicalIdentifier {
 
 impl GetPos for CanonicalIdentifier {
     #[inline]
-    fn get_position<'a>(&'a self) -> &'a PosRange {
+    fn get_position(&self) -> &PosRange {
         &self.pos_range
     }
 }
