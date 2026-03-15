@@ -11,6 +11,7 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 - [ ] Syntax highlighting
 - [ ] Full LSP support
 - [ ] Preprocessing
+- [ ] Raw blocks
 
 ## Credits
 
