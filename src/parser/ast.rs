@@ -1,6 +1,7 @@
 use crate::lexer::PosRange;
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 pub trait GetPos {
     fn get_position(&self) -> &PosRange;
@@ -825,9 +826,12 @@ impl GetPos for CanonicalIdentifier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Error, Serialize, Deserialize)]
 pub enum ParseError {
-    UnexpectedEndOfInput(&'static str),
-    UnexpectedToken(&'static str, &'static str, &'static str, PosRange),
-    LexerStuck(&'static str, PosRange),
+    #[error("the lexer reached the end of input without the parser completing (context: {context})")]
+    UnexpectedEndOfInput { context: &'static str },
+    #[error("unexpected token at {pos_range:?}, expected {expected} (context: {context})")]
+    UnexpectedToken { expected: &'static str, message: &'static str, context: &'static str, pos_range: PosRange },
+    #[error("the lexer got stuck after the token at {pos_range:?} (context: {context})")]
+    LexerStuck { context: &'static str, pos_range: PosRange },
 }

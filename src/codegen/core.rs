@@ -1,57 +1,150 @@
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    hash::Hash,
+    iter,
+    rc::Rc,
+};
 
-use rand::rand_core::block;
+use arcstr::ArcStr as IString;
+use rand::{Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    codegen::{
-        ids::IdCounter,
-        project_json::{Sb3Block, Sb3BlockMutation, Sb3FieldValue, Sb3InputValue, Sb3Root},
+use super::{
+    ids::{self, IdCounter},
+    project_json::{
+        Sb3Block, Sb3BlockMutation, Sb3FieldValue, Sb3InputRepr, Sb3InputValue, Sb3PrimitiveBlock,
+        Sb3Root,
     },
-    parser::parse_context::{IdString, ParseContext},
-    visitor::{GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call, default_visit_expression_formatted_string, default_visit_expression_get_item, default_visit_expression_unary_operation},
+};
+
+use crate::{
+    parser::parse_context::{ActualSymbol, IdString, KnownBlock, ParseContext, Target},
+    visitor::{
+        GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call,
+        default_visit_expression_formatted_string, default_visit_expression_get_item,
+        default_visit_expression_unary_operation,
+    },
 };
 
 type GrazeSb3GeneratorError = ();
 
 pub struct GrazeSb3Generator;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GrazeSb3GeneratorContext {
     pub sb3: Sb3Root,
-    pub parse_context: ParseContext,
+    pub targets: Vec<Target>,
+    pub root_symbol: Rc<RefCell<ActualSymbol>>,
+    /*
+    pub parsed_targets: VecDeque<Target>,
+    pub broadcasts: HashMap<IString, BroadcastDescriptor>,
+    // pub root_symbol: ActualSymbol<'static>,
+    pub next_target: Option<Target>,
+    pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed, */
+    // pub parse_context: ParseContext,
     pub block_counter: IdCounter,
+    pub arg_stack: Vec<KnownBlock>,
     pub current_block_id: IdString,
     pub current_parent: Option<String>,
 }
 
+pub fn get_std_lib_size() -> usize {
+    todo!()
+}
+
 impl GrazeSb3GeneratorContext {
-    fn new(parse_context: ParseContext) -> Self {
+    fn new(mut parse_context: ParseContext) -> Self {
+        let mut rng = Xoshiro256StarStar::from_seed(parse_context.random_seed);
+        let mut targets: Vec<Target> = parse_context.parsed_targets.into();
+        let mut root_symbol =
+            ActualSymbol::Namespace(HashMap::with_capacity(targets.len() + get_std_lib_size()));
+        for target in &targets {
+            let target_symbol = ActualSymbol::KnownBlock(
+                KnownBlock::FieldValue {
+                    value: Sb3FieldValue::Normal(super::project_json::Sb3Primitive::String(
+                        target.get_field_name(),
+                    )),
+                },
+                Some(
+                    target
+                        .borrow_symbols()
+                        .iter()
+                        .map(|(key, value)| {
+                            (
+                                key.clone(),
+                                Rc::new(RefCell::new(value.derive_actual_symbol(&mut rng))),
+                            )
+                        })
+                        .collect(),
+                ),
+            );
+            for descriptor in target.borrow_symbols().values() {
+                let actual_symbol = descriptor.derive_actual_symbol(&mut rng);
+                todo!()
+            }
+        }
+        for descriptor in parse_context.broadcasts.values_mut() {
+            let id = ids::generate_random_id(&mut rng);
+            todo!()
+        }
         let mut block_counter = IdCounter::new();
         let next_block_id = block_counter.get_new_id();
         Self {
             sb3: Sb3Root::default(),
-            parse_context,
+            targets,
+            root_symbol: Rc::new(RefCell::new(root_symbol)),
+            // parse_context,
             block_counter,
+            arg_stack: Vec::new(),
             current_block_id: next_block_id,
             current_parent: None,
         }
     }
 
-    fn new_next_id(&mut self) -> Option<String> {
+    fn new_block(&mut self) {
         self.current_block_id = self.block_counter.get_new_id();
-        Some(self.get_current_id())
+        let cloned_current_block_id = self.get_current_block_id();
     }
 
-    fn get_current_id(&mut self) -> String {
-        self.current_block_id.as_str().into()
+    fn get_current_block_id(&mut self) -> IdString {
+        self.current_block_id.clone()
     }
+
+    fn push_block_ref(&mut self, block_arg: KnownBlock) {
+        self.arg_stack.push(block_arg);
+    }
+
+    /// Get the newest child's block id and
+    fn pop_block_ref(&mut self) -> Option<KnownBlock> {
+        self.arg_stack.pop()
+    }
+
+    // TODO:
+    // pub fn resolve_symbol(&self, identifier: &Identifier) -> Result<KnownBlock, ()> {
+    //     let mut queue = identifier
+    //         .scope
+    //         .iter()
+    //         .chain(identifier.names.iter())
+    //         .map(|value| &value.0)
+    //         .collect::<VecDeque<_>>();
+    //     let mut current = &self.root_symbol;
+    //     while let Some(value) = queue.pop_front() {
+    //         if let ActualSymbol::Sprites = current {
+    //             current = self.parsed_targets.get(value).ok_or(())?;
+    //         } else {
+    //             todo!()
+    //         }
+    //     }
+    //     todo!()
+    // }
 }
 
 pub fn make_block(
-    context: &mut GrazeSb3GeneratorContext,
+    context: &GrazeSb3GeneratorContext,
     opcode: String,
-    is_last: bool,
+    next: Option<String>,
     inputs: HashMap<String, Sb3InputValue>,
     fields: HashMap<String, Sb3FieldValue>,
     shadow: bool,
@@ -59,7 +152,7 @@ pub fn make_block(
 ) -> Sb3Block {
     Sb3Block {
         opcode,
-        next: if is_last { None } else { context.new_next_id() },
+        next,
         parent: context.current_parent.clone(),
         inputs,
         fields,
@@ -72,34 +165,63 @@ pub fn make_block(
 }
 
 pub fn make_top_level_block(
-    context: &mut GrazeSb3GeneratorContext,
+    context: &GrazeSb3GeneratorContext,
     opcode: String,
-    is_last: bool,
+    next: Option<String>,
     inputs: HashMap<String, Sb3InputValue>,
     fields: HashMap<String, Sb3FieldValue>,
     shadow: bool,
     mutation: Option<Sb3BlockMutation>,
-    x: f64,
-    y: f64,
+    pos: (f64, f64),
 ) -> Sb3Block {
     Sb3Block {
         opcode,
-        next: if is_last { None } else { context.new_next_id() },
+        next,
         parent: context.current_parent.clone(),
         inputs,
         fields,
         shadow,
         top_level: true,
         mutation,
-        x: Some(x),
-        y: Some(y),
+        x: Some(pos.0),
+        y: Some(pos.1),
+    }
+}
+
+impl KnownBlock {
+    #[inline]
+    fn from_id(id: IdString) -> Self {
+        Self::BlockRef { id }
+    }
+}
+
+impl From<IdString> for KnownBlock {
+    #[inline]
+    fn from(value: IdString) -> Self {
+        Self::from_id(value)
+    }
+}
+
+impl From<Sb3FieldValue> for KnownBlock {
+    #[inline]
+    fn from(value: Sb3FieldValue) -> Self {
+        Self::FieldValue { value }
+    }
+}
+
+impl From<Sb3PrimitiveBlock> for KnownBlock {
+    #[inline]
+    fn from(value: Sb3PrimitiveBlock) -> Self {
+        Self::PrimitiveBlock { value }
     }
 }
 
 macro_rules! wrap_in_parent {
-    ($context:expr, $action:expr) => {{
-        let block_id = $context.get_current_id();
-        let old_parent = $context.current_parent.replace(block_id);
+    ($context:expr, $identifier:pat => $action:expr) => {{
+        let block_id = $context.get_current_block_id();
+        let $identifier = block_id.clone();
+        let old_parent = $context.current_parent.replace(block_id.to_string());
+        $context.new_block();
         let out = $action;
         $context.current_parent = old_parent;
         out
@@ -117,60 +239,93 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_parent!(context, {
-            default_visit_expression_binary_operation(self, value, context)
-        })
+        wrap_in_parent!(context, this_id => {
+            context.push_block_ref(this_id.clone().into());
+            default_visit_expression_binary_operation(self, value, context)?;
+            let (op_b_id, op_a_id) = (context.pop_block_ref().unwrap(), context.pop_block_ref().unwrap());
+        });
+        Ok(())
     }
 
     fn visit_expression_call(
-            &self,
-            value: (
-                &crate::parser::ast::Identifier,
-                &crate::parser::ast::LeftParens,
-                &Vec<(crate::parser::ast::Expression, Option<crate::parser::ast::Comma>)>,
-                &crate::parser::ast::RightParens,
-                &crate::lexer::PosRange,
-            ),
-            context: &mut GrazeSb3GeneratorContext,
-        ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_parent!(context, {
-            default_visit_expression_call(self, value, context)
-        })
+        &self,
+        value: (
+            &crate::parser::ast::Identifier,
+            &crate::parser::ast::LeftParens,
+            &Vec<(
+                crate::parser::ast::Expression,
+                Option<crate::parser::ast::Comma>,
+            )>,
+            &crate::parser::ast::RightParens,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_parent!(context, this_id => {
+            context.push_block_ref(this_id.clone().into());
+            default_visit_expression_call(self, value, context)?;
+            let args = iter::repeat_with(|| context.pop_block_ref().unwrap())
+                .take(value.2.len())
+                .collect::<Vec<_>>();
+        });
+        Ok(())
     }
 
     fn visit_expression_formatted_string(
-            &self,
-            value: (&Vec<crate::parser::ast::FormattedStringContent>, &crate::lexer::PosRange),
-            context: &mut GrazeSb3GeneratorContext,
-        ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_parent!(context, {
-            default_visit_expression_formatted_string(self, value, context)
-        })
+        &self,
+        value: (
+            &Vec<crate::parser::ast::FormattedStringContent>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_parent!(context, this_id => {
+            context.push_block_ref(this_id.clone().into());
+            default_visit_expression_formatted_string(self, value, context)?;
+        });
+        Ok(())
     }
 
     fn visit_expression_get_item(
-            &self,
-            value: (
-                &crate::parser::ast::Identifier,
-                &crate::parser::ast::LeftBracket,
-                &Box<crate::parser::ast::Expression>,
-                &crate::parser::ast::RightBracket,
-                &crate::lexer::PosRange,
-            ),
-            context: &mut GrazeSb3GeneratorContext,
-        ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_parent!(context, {
-            default_visit_expression_get_item(self, value, context)
-        })
+        &self,
+        value: (
+            &crate::parser::ast::Identifier,
+            &crate::parser::ast::LeftBracket,
+            &Box<crate::parser::ast::Expression>,
+            &crate::parser::ast::RightBracket,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_parent!(context, this_id => {
+            context.push_block_ref(this_id.clone().into());
+            default_visit_expression_get_item(self, value, context)?;
+        });
+        Ok(())
     }
 
     fn visit_expression_unary_operation(
-            &self,
-            value: (&crate::parser::ast::UnOp, &Box<crate::parser::ast::Expression>, &crate::lexer::PosRange),
-            context: &mut GrazeSb3GeneratorContext,
-        ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_parent!(context, {
-            default_visit_expression_unary_operation(self, value, context)
-        })
+        &self,
+        value: (
+            &crate::parser::ast::UnOp,
+            &Box<crate::parser::ast::Expression>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_parent!(context, this_id => {
+            context.push_block_ref(this_id.clone().into());
+            default_visit_expression_unary_operation(self, value, context)?;
+        });
+        Ok(())
+    }
+
+    fn visit_expression_identifier(
+        &self,
+        value: &crate::parser::ast::Identifier,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        // context.push_block_ref();
+        todo!()
     }
 }

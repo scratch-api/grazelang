@@ -657,8 +657,9 @@ impl Serialize for Sb3FieldValue {
     {
         match self {
             Sb3FieldValue::Normal(sb3_primitive) => {
-                let mut seq = serializer.serialize_seq(Some(1))?;
+                let mut seq = serializer.serialize_seq(Some(2))?;
                 seq.serialize_element(sb3_primitive)?;
+                seq.serialize_element(&None::<String>);
                 seq.end()
             }
             Sb3FieldValue::WithId { value, id } => {

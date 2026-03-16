@@ -102,23 +102,27 @@ macro_rules! peek_token {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return {
-                    Err(ParseError::LexerStuck(
-                        static_current_context!(),
-                        get_token_position!($token_stream),
-                    ))
+                    Err(ParseError::LexerStuck {
+                        context: static_current_context!(),
+                        pos_range: get_token_position!($token_stream),
+                    })
                 }
             }
-            None => return Err(ParseError::UnexpectedEndOfInput(static_current_context!())),
+            None => {
+                return Err(ParseError::UnexpectedEndOfInput {
+                    context: static_current_context!(),
+                })
+            }
         }
     };
     (optional $token_stream:expr) => {
         match $token_stream.0.peek() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
-                return Err(ParseError::LexerStuck(
-                    static_current_context!(),
-                    get_token_position!($token_stream),
-                ))
+                return Err(ParseError::LexerStuck {
+                    context: static_current_context!(),
+                    pos_range: get_token_position!($token_stream),
+                })
             }
             None => return Ok(None),
         }
@@ -127,10 +131,10 @@ macro_rules! peek_token {
         match $token_stream.0.peek() {
             Some(Ok(value)) => Some(value),
             Some(Err(_)) => {
-                return Err(ParseError::LexerStuck(
-                    static_current_context!(),
-                    get_token_position!($token_stream),
-                ))
+                return Err(ParseError::LexerStuck {
+                    context: static_current_context!(),
+                    pos_range: get_token_position!($token_stream),
+                })
             }
             None => None,
         }
@@ -143,12 +147,16 @@ macro_rules! next_token {
         match $token_stream.0.next() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
-                return Err(ParseError::LexerStuck(
-                    static_current_context!(),
-                    get_token_position!($token_stream),
-                ));
+                return Err(ParseError::LexerStuck {
+                    context: static_current_context!(),
+                    pos_range: get_token_position!($token_stream),
+                });
             }
-            None => return Err(ParseError::UnexpectedEndOfInput(static_current_context!())),
+            None => {
+                return Err(ParseError::UnexpectedEndOfInput {
+                    context: static_current_context!(),
+                });
+            }
         }
     }};
     (optional $token_stream:expr) => {{
@@ -183,10 +191,10 @@ macro_rules! skip_token {
     ($token_stream:expr) => {{
         $token_stream.1.next();
         if let Some(Err(_)) = $token_stream.0.next() {
-            return Err(ParseError::LexerStuck(
-                static_current_context!(),
-                get_token_position!($token_stream),
-            ));
+            return Err(ParseError::LexerStuck {
+                context: static_current_context!(),
+                pos_range: get_token_position!($token_stream),
+            });
         }
     }};
 }
@@ -211,12 +219,12 @@ macro_rules! get_token_end {
 
 macro_rules! emit_unexpected_token {
     ($token_stream:expr, $msg_1:expr, $msg_2:expr) => {
-        return Err(ParseError::UnexpectedToken(
-            $msg_1,
-            $msg_2,
-            static_current_context!(),
-            get_token_position!($token_stream),
-        ))
+        return Err(ParseError::UnexpectedToken {
+            expected: $msg_1,
+            message: $msg_2,
+            context: static_current_context!(),
+            pos_range: get_token_position!($token_stream),
+        })
     };
 }
 
@@ -738,13 +746,11 @@ pub mod statement {
                             parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                                id: None,
                             })
                         } else {
                             parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                                id: None,
                             })
                         }
                     );
@@ -1106,13 +1112,11 @@ pub mod statement {
                         parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                            id: None,
                         })
                     } else {
                         parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                            id: None,
                         })
                     }
                 );
@@ -1571,7 +1575,6 @@ pub mod statement {
                                     CostumeDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        id: None,
                                         source: literal.clone(),
                                     }
                                 ),
@@ -1579,7 +1582,6 @@ pub mod statement {
                                     BackdropDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        id: None,
                                         source: literal.clone(),
                                     }
                                 ),
@@ -1587,7 +1589,6 @@ pub mod statement {
                                     SoundDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        id: None,
                                         source: literal.clone(),
                                     }
                                 ),
@@ -1659,15 +1660,15 @@ pub mod statement {
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
-                                CostumeDescriptor { name: name.clone(), canonical_name, id: None,
+                                CostumeDescriptor { name: name.clone(), canonical_name,
                                     source: literal.clone(), }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
-                                BackdropDescriptor { name: name.clone(), canonical_name, id: None,
+                                BackdropDescriptor { name: name.clone(), canonical_name,
                                     source: literal.clone(), }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
-                                SoundDescriptor { name: name.clone(), canonical_name, id: None,
+                                SoundDescriptor { name: name.clone(), canonical_name,
                                     source: literal.clone(), }
                             ),
                         }
@@ -1708,15 +1709,15 @@ pub mod statement {
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
-                                CostumeDescriptor { name: name.clone(), canonical_name, id: None,
+                                CostumeDescriptor { name: name.clone(), canonical_name,
                                     source: literal.clone(), }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
-                                BackdropDescriptor { name: name.clone(), canonical_name, id: None,
+                                BackdropDescriptor { name: name.clone(), canonical_name,
                                     source: literal.clone(), }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
-                                SoundDescriptor { name: name.clone(), canonical_name, id: None,
+                                SoundDescriptor { name: name.clone(), canonical_name,
                                     source: literal.clone(), }
                             ),
                         }
@@ -2066,13 +2067,12 @@ pub fn parse_top_level_statement(
                 }
             );
             let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
-            context.next_target = Some(parse_context::Target::Sprite {
-                name: identifier.names[0].0.clone(),
-                canonical_name: canonical_identifier
+            context.next_target = Some(parse_context::Target::new_sprite(
+                identifier.names[0].0.clone(),
+                canonical_identifier
                     .as_ref()
                     .map(|value| value.name.clone()),
-                symbols: Default::default(),
-            });
+            ));
             let return_val = Ok(TopLevelStatement::Sprite(
                 sprite_keyword,
                 canonical_identifier,
@@ -2105,7 +2105,7 @@ pub fn parse_top_level_statement(
                 BroadcastDescriptor {
                     name: name.clone(),
                     canonical_name,
-                    id: None,
+                    known_block: None,
                 },
             );
             let return_val = Ok(TopLevelStatement::BroadcastDeclaration(

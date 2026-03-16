@@ -1,11 +1,20 @@
-use std::collections::{HashMap, VecDeque};
+use core::hash;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    hint,
+    rc::Rc,
+};
 
-use arcstr::ArcStr as IString;
-use rand::SeedableRng;
+use arcstr::{ArcStr as IString, literal};
+use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
-use crate::parser::ast::Literal;
+use crate::{
+    codegen,
+    parser::ast::{Identifier, Literal},
+};
 
 pub type IdString = IString;
 
@@ -19,28 +28,24 @@ pub enum Primitive {
 pub struct VarDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IdString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ListDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IdString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub proccode: Option<IdString>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CostumeDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IdString>,
     pub source: Literal,
 }
 
@@ -48,7 +53,6 @@ pub struct CostumeDescriptor {
 pub struct BackdropDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IdString>,
     pub source: Literal,
 }
 
@@ -56,17 +60,188 @@ pub struct BackdropDescriptor {
 pub struct SoundDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IdString>,
     pub source: Literal,
 }
 
-type TopLevelSymbol = ();
-
+/// Resolved symbols or primitive expressions like strings for usage in inputs or fields
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum KnownBlock {
+    Variable {
+        canonical_name: IString,
+        id: IdString,
+    },
+    List {
+        canonical_name: IString,
+        id: IdString,
+    },
+    /// Cannot be used for variables in the context of an input
+    FieldValue {
+        value: codegen::project_json::Sb3FieldValue,
+    },
+    BlockRef {
+        id: IdString,
+    },
+    /// Intended for primitive expressions like strings but can be used variables etc aswell
+    PrimitiveBlock {
+        value: codegen::project_json::Sb3PrimitiveBlock,
+    },
+} // TODO: Implement menus and calling known blocks
+
+impl KnownBlock {
+    pub fn resolve_for_input(
+        &self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> codegen::project_json::Sb3InputRepr {
+        use codegen::project_json::{Sb3InputRepr, Sb3PrimitiveBlock};
+        match self {
+            KnownBlock::Variable { canonical_name, id } => {
+                // TODO: possibly set x and y
+                Sb3InputRepr::PrimitiveBlock(Sb3PrimitiveBlock::Variable {
+                    name: canonical_name.to_string(),
+                    id: id.to_string(),
+                    x: None,
+                    y: None,
+                })
+            }
+            KnownBlock::List { canonical_name, id } => {
+                // TODO: possibly set x and y
+                Sb3InputRepr::PrimitiveBlock(Sb3PrimitiveBlock::List {
+                    name: canonical_name.to_string(),
+                    id: id.to_string(),
+                    x: None,
+                    y: None,
+                })
+            }
+            KnownBlock::FieldValue { value } => {
+                // TODO: warn user about possibly incorrect usage
+                Sb3InputRepr::PrimitiveBlock(Sb3PrimitiveBlock::String(
+                    match value {
+                        codegen::project_json::Sb3FieldValue::Normal(sb3_primitive) => {
+                            sb3_primitive
+                        }
+                        codegen::project_json::Sb3FieldValue::WithId { value, id } => value,
+                    }
+                    .clone(),
+                ))
+            }
+            KnownBlock::BlockRef { id } => Sb3InputRepr::Reference(id.to_string()),
+            KnownBlock::PrimitiveBlock { value } => Sb3InputRepr::PrimitiveBlock(value.clone()),
+        }
+    }
+
+    pub fn resolve_for_field(
+        &self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> codegen::project_json::Sb3FieldValue {
+        use codegen::project_json::{Sb3FieldValue, Sb3Primitive};
+        match self {
+            KnownBlock::Variable { canonical_name, id } => Sb3FieldValue::WithId {
+                value: Sb3Primitive::String(canonical_name.to_string()),
+                id: id.to_string(),
+            },
+            KnownBlock::List { canonical_name, id } => Sb3FieldValue::WithId {
+                value: Sb3Primitive::String(canonical_name.to_string()),
+                id: id.to_string(),
+            },
+            KnownBlock::FieldValue { value } => value.clone(),
+            KnownBlock::BlockRef { id } => {
+                // TODO: warn user about possibly incorrect usage
+                Sb3FieldValue::Normal(Sb3Primitive::String(id.to_string()))
+            }
+            KnownBlock::PrimitiveBlock { value } => {
+                // TODO: warn user about possibly incorrect usage
+                match value {
+                    codegen::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
+                    | codegen::project_json::Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
+                    | codegen::project_json::Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
+                    | codegen::project_json::Sb3PrimitiveBlock::Integer(sb3_primitive)
+                    | codegen::project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
+                    | codegen::project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
+                    | codegen::project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
+                        Sb3FieldValue::Normal(sb3_primitive.clone())
+                    }
+                    codegen::project_json::Sb3PrimitiveBlock::Broadcast { name, id }
+                    | codegen::project_json::Sb3PrimitiveBlock::Variable {
+                        name,
+                        id,
+                        x: _,
+                        y: _,
+                    }
+                    | codegen::project_json::Sb3PrimitiveBlock::List {
+                        name,
+                        id,
+                        x: _,
+                        y: _,
+                    } => Sb3FieldValue::WithId {
+                        value: Sb3Primitive::String(name.clone()),
+                        id: id.clone(),
+                    },
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActualSymbol {
+    Namespace(HashMap<IString, Rc<RefCell<ActualSymbol>>>),
+    KnownBlock(
+        KnownBlock,
+        Option<HashMap<IString, Rc<RefCell<ActualSymbol>>>>,
+    ),
+    Sprites,
+    Alias(Rc<RefCell<ActualSymbol>>),
+}
+
+impl ActualSymbol {
+    fn get_block(&self) -> Option<&KnownBlock> {
+        match self {
+            ActualSymbol::KnownBlock(known_block, _hash_map) => Some(known_block),
+            ActualSymbol::Namespace(_) | ActualSymbol::Sprites | ActualSymbol::Alias(_) => None,
+        }
+    }
+
+    fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<ActualSymbol>>> {
+        match self {
+            ActualSymbol::Namespace(hash_map) => {
+                hash_map.get(child_name).map(|value| value.clone())
+            }
+            ActualSymbol::KnownBlock(_, hash_map) => hash_map
+                .as_ref()
+                .and_then(|value| value.get(child_name).map(|value| value.clone())),
+            ActualSymbol::Alias(alias) => alias
+                .borrow()
+                .get_child(child_name)
+                .map(|value| value.clone()),
+            ActualSymbol::Sprites => None,
+        }
+    }
+
+    fn insert_child(
+        &mut self,
+        child_name: IString,
+        child: Rc<RefCell<ActualSymbol>>,
+    ) -> Option<Rc<RefCell<ActualSymbol>>> {
+        match self {
+            ActualSymbol::Namespace(hash_map) => hash_map.insert(child_name, child),
+            ActualSymbol::KnownBlock(_, hash_map) => {
+                hash_map.get_or_insert_default().insert(child_name, child)
+            }
+            ActualSymbol::Alias(alias) => alias.borrow_mut().insert_child(child_name, child),
+            ActualSymbol::Sprites => None,
+        }
+    }
+
+    fn is_dependent(&self) -> bool {
+        matches!(self, ActualSymbol::Alias(_) | ActualSymbol::Sprites)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct BroadcastDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub id: Option<IdString>,
+    pub known_block: Option<Rc<RefCell<ActualSymbol>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -80,39 +255,17 @@ pub enum TargetSymbolDescriptor {
 }
 
 impl TargetSymbolDescriptor {
-    pub fn assign_id(&mut self, new_id: Option<IdString>) {
-        match self {
-            TargetSymbolDescriptor::Var(descriptor) => {
-                descriptor.id = new_id;
-            }
-            TargetSymbolDescriptor::List(descriptor) => {
-                descriptor.id = new_id;
-            }
-            TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) => {
-                descriptor.proccode = new_id;
-            }
-            TargetSymbolDescriptor::Costume(descriptor) => {
-                descriptor.id = new_id;
-            }
-            TargetSymbolDescriptor::Backdrop(descriptor) => {
-                descriptor.id = new_id;
-            }
-            TargetSymbolDescriptor::Sound(descriptor) => {
-                descriptor.id = new_id;
-            }
-        }
-    }
-
     pub fn compute_hash(path: IString) -> IdString {
         todo!()
     }
 
-    pub fn derive_id_if_possible(&self) -> Option<IdString> {
+    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualSymbol {
         if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = self {
-            return descriptor
+            let id = descriptor
                 .canonical_name
                 .clone()
-                .or_else(|| Some(descriptor.name.clone()));
+                .unwrap_or_else(|| descriptor.name.clone()); // TODO: use arguments
+            return todo!(); // TODO: implement custom block actual symbol
         }
         match self {
             TargetSymbolDescriptor::Costume(descriptor) => Some(&descriptor.source),
@@ -121,10 +274,40 @@ impl TargetSymbolDescriptor {
             _ => None,
         }
         .map(|value| Self::compute_hash(value.cast_to_string()))
+        .map(|value| {
+            ActualSymbol::KnownBlock(
+                match self {
+                    TargetSymbolDescriptor::Costume(_) => {
+                        todo!() // TODO: implement costume known blocks
+                    }
+                    TargetSymbolDescriptor::Backdrop(_) => {
+                        todo!() // TODO: implement backdrop known blocks
+                    }
+                    TargetSymbolDescriptor::Sound(_) => {
+                        todo!() // TODO: implement sound known blocks
+                    }
+                    _ => unsafe { std::hint::unreachable_unchecked() },
+                },
+                None,
+            )
+        })
+        .unwrap_or_else(|| {
+            let id = codegen::ids::generate_random_id(rng);
+            match self {
+                TargetSymbolDescriptor::Var(var_descriptor) => {
+                    ActualSymbol::KnownBlock(todo!(), None)
+                }
+                TargetSymbolDescriptor::List(list_descriptor) => todo!(),
+                TargetSymbolDescriptor::CustomBlockDescriptor(custom_block_descriptor) => todo!(),
+                TargetSymbolDescriptor::Costume(_)
+                | TargetSymbolDescriptor::Backdrop(_)
+                | TargetSymbolDescriptor::Sound(_) => unsafe { hint::unreachable_unchecked() },
+            }
+        })
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Target {
     Sprite {
         name: IString,
@@ -137,36 +320,54 @@ pub enum Target {
 }
 
 impl Target {
-    #[inline]
-    pub fn borrow_symbols_mut(
-        &mut self,
-    ) -> &mut HashMap<IString, TargetSymbolDescriptor> {
+    pub fn new_sprite(name: IString, canonical_name: Option<IString>) -> Self {
+        Self::Sprite {
+            name,
+            canonical_name,
+            symbols: Default::default(),
+        }
+    }
+
+    pub fn borrow_symbols_mut(&mut self) -> &mut HashMap<IString, TargetSymbolDescriptor> {
         match self {
             Target::Sprite {
                 name: _,
                 canonical_name: _,
                 symbols,
-            } => symbols,
-            Target::Stage { symbols } => symbols,
+            }
+            | Target::Stage { symbols } => symbols,
+        }
+    }
+
+    pub fn borrow_symbols(&self) -> &HashMap<IString, TargetSymbolDescriptor> {
+        match self {
+            Target::Sprite {
+                name: _,
+                canonical_name: _,
+                symbols,
+            }
+            | Target::Stage { symbols } => symbols,
+        }
+    }
+
+    pub fn get_field_name(&self) -> String {
+        match self {
+            Target::Sprite {
+                name,
+                canonical_name,
+                symbols,
+            } => name.to_string(),
+            Target::Stage { symbols } => "_stage_".to_string(), // TODO: check whether this is correct
         }
     }
 }
 
-impl From<Target> for RawTarget {
-    fn from(value: Target) -> Self {
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RawTarget {}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParseContext {
     // If stage is in this, it must be the first element
     pub parsed_targets: VecDeque<Target>,
     pub broadcasts: HashMap<IString, BroadcastDescriptor>,
-    pub top_level_symbols: HashMap<IString, TopLevelSymbol>,
+    // pub root_symbol: ActualSymbol<'static>,
     pub next_target: Option<Target>,
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
 }
@@ -178,16 +379,25 @@ impl ParseContext {
                 symbols: HashMap::new(),
             }]),
             broadcasts: HashMap::new(),
-            top_level_symbols: HashMap::new(),
+            // root_symbol: ActualSymbol::Namespace(HashMap::from([(
+            //     literal!("sprites"),
+            //     Rc::new(RefCell::new(ActualSymbol::Sprites)),
+            // )])),
             next_target: None,
             random_seed: Default::default(),
         }
     }
 
-    pub fn get_stage_mut<'a>(&'a mut self) -> &'a mut Target {
+    pub fn get_stage_mut(&mut self) -> &mut Target {
         if matches!(self.next_target, Some(Target::Stage { symbols: _ })) {
             return self.next_target.as_mut().unwrap();
         }
         &mut self.parsed_targets[0]
+    }
+}
+
+impl Default for ParseContext {
+    fn default() -> Self {
+        Self::new()
     }
 }

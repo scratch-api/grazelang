@@ -1,18 +1,11 @@
 use crate::parser::parse_context;
-use parse_context::{IdString, ParseContext};
+use parse_context::{IdString};
 use rand::{
-    Rng, SeedableRng,
+    Rng,
     distr::{Distribution, Uniform},
 };
-use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-
-impl From<ParseContext> for Xoshiro256StarStar {
-    fn from(value: ParseContext) -> Self {
-        Self::from_seed(value.random_seed)
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct IdCounter {
@@ -69,17 +62,3 @@ pub fn generate_random_id<T: Rng>(rng: &mut T) -> IdString {
     id.into()
 }
 
-pub fn generate_ids_for_context<T: Rng>(context: &mut ParseContext, rng: &mut T) {
-    for target in context.parsed_targets.iter_mut() {
-        for descriptor in target.borrow_symbols_mut().values_mut() {
-            descriptor.assign_id(Some(
-                descriptor
-                    .derive_id_if_possible()
-                    .unwrap_or_else(|| generate_random_id(rng)),
-            ));
-        }
-    }
-    for descriptor in context.broadcasts.values_mut() {
-        descriptor.id = Some(generate_random_id(rng));
-    }
-}
