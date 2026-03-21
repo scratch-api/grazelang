@@ -3,7 +3,7 @@ use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
     hint,
-    rc::Rc,
+    rc::{Rc, Weak},
 };
 
 use arcstr::{ArcStr as IString, literal};
@@ -182,66 +182,95 @@ impl KnownBlock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum ActualSymbol {
-    Namespace(HashMap<IString, Rc<RefCell<ActualSymbol>>>),
+    Namespace(
+        HashMap<IString, Rc<RefCell<ActualSymbol>>>,
+        Weak<RefCell<ActualSymbol>>,
+    ),
     KnownBlock(
         KnownBlock,
         Option<HashMap<IString, Rc<RefCell<ActualSymbol>>>>,
+        Weak<RefCell<ActualSymbol>>,
     ),
-    Sprites,
-    Alias(Rc<RefCell<ActualSymbol>>),
+    Sprites(Weak<RefCell<ActualSymbol>>),
+    Alias(Rc<RefCell<ActualSymbol>>, Weak<RefCell<ActualSymbol>>),
 }
 
 impl ActualSymbol {
-    fn get_block(&self) -> Option<&KnownBlock> {
+    pub fn new_namespace() -> Self {
+        Self::Namespace(HashMap::new(), Weak::new())
+    }
+
+    pub fn get_block(&self) -> Option<&KnownBlock> {
         match self {
-            ActualSymbol::KnownBlock(known_block, _hash_map) => Some(known_block),
-            ActualSymbol::Namespace(_) | ActualSymbol::Sprites | ActualSymbol::Alias(_) => None,
+            ActualSymbol::KnownBlock(known_block, ..) => Some(known_block),
+            ActualSymbol::Namespace(..) | ActualSymbol::Sprites(..) | ActualSymbol::Alias(..) => {
+                None
+            }
         }
     }
 
-    fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<ActualSymbol>>> {
+    pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<ActualSymbol>>> {
         match self {
-            ActualSymbol::Namespace(hash_map) => {
+            ActualSymbol::Namespace(hash_map, ..) => {
                 hash_map.get(child_name).map(|value| value.clone())
             }
-            ActualSymbol::KnownBlock(_, hash_map) => hash_map
+            ActualSymbol::KnownBlock(_, hash_map, ..) => hash_map
                 .as_ref()
                 .and_then(|value| value.get(child_name).map(|value| value.clone())),
-            ActualSymbol::Alias(alias) => alias
+            ActualSymbol::Alias(alias, ..) => alias
                 .borrow()
                 .get_child(child_name)
                 .map(|value| value.clone()),
-            ActualSymbol::Sprites => None,
+            ActualSymbol::Sprites(..) => None,
         }
     }
 
-    fn insert_child(
+    pub fn replace_parent(
         &mut self,
+        parent: Weak<RefCell<ActualSymbol>>,
+    ) -> Weak<RefCell<ActualSymbol>> {
+        match self {
+            ActualSymbol::Namespace(_, parent_ref)
+            | ActualSymbol::KnownBlock(_, _, parent_ref)
+            | ActualSymbol::Sprites(parent_ref)
+            | ActualSymbol::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
+        }
+    }
+
+    pub fn insert_child(
+        this: &Rc<RefCell<Self>>,
         child_name: IString,
         child: Rc<RefCell<ActualSymbol>>,
     ) -> Option<Rc<RefCell<ActualSymbol>>> {
-        match self {
-            ActualSymbol::Namespace(hash_map) => hash_map.insert(child_name, child),
-            ActualSymbol::KnownBlock(_, hash_map) => {
+        child.borrow_mut().replace_parent(Rc::downgrade(this));
+        match &mut *this.borrow_mut() {
+            ActualSymbol::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
+            ActualSymbol::KnownBlock(_, hash_map, ..) => {
                 hash_map.get_or_insert_default().insert(child_name, child)
             }
-            ActualSymbol::Alias(alias) => alias.borrow_mut().insert_child(child_name, child),
-            ActualSymbol::Sprites => None,
+            ActualSymbol::Alias(alias, ..) => Self::insert_child(alias, child_name, child),
+            ActualSymbol::Sprites(..) => None,
         }
     }
 
-    fn is_dependent(&self) -> bool {
-        matches!(self, ActualSymbol::Alias(_) | ActualSymbol::Sprites)
+    pub fn is_dependent(&self) -> bool {
+        matches!(self, ActualSymbol::Alias(..) | ActualSymbol::Sprites(..))
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct BroadcastDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
     pub known_block: Option<Rc<RefCell<ActualSymbol>>>,
+}
+
+impl BroadcastDescriptor {
+    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualSymbol {
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -289,13 +318,14 @@ impl TargetSymbolDescriptor {
                     _ => unsafe { std::hint::unreachable_unchecked() },
                 },
                 None,
+                Weak::new()
             )
         })
         .unwrap_or_else(|| {
             let id = codegen::ids::generate_random_id(rng);
             match self {
                 TargetSymbolDescriptor::Var(var_descriptor) => {
-                    ActualSymbol::KnownBlock(todo!(), None)
+                    ActualSymbol::KnownBlock(todo!(), None, Weak::new())
                 }
                 TargetSymbolDescriptor::List(list_descriptor) => todo!(),
                 TargetSymbolDescriptor::CustomBlockDescriptor(custom_block_descriptor) => todo!(),
@@ -354,21 +384,33 @@ impl Target {
         match self {
             Target::Sprite {
                 name,
-                canonical_name,
-                symbols,
+                canonical_name: _,
+                symbols: _,
             } => name.to_string(),
-            Target::Stage { symbols } => "_stage_".to_string(), // TODO: check whether this is correct
+            Target::Stage { symbols: _ } => "_stage_".to_string(), // TODO: check whether this is correct
+        }
+    }
+
+    pub fn get_namespace_name(&self) -> IString {
+        match self {
+            Target::Sprite {
+                name,
+                canonical_name: _,
+                symbols: _,
+            } => name.clone(),
+            Target::Stage { symbols: _ } => literal!("stage"),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ParseContext {
-    // If stage is in this, it must be the first element
+    // If stage is in this, it should be the first element
     pub parsed_targets: VecDeque<Target>,
     pub broadcasts: HashMap<IString, BroadcastDescriptor>,
     // pub root_symbol: ActualSymbol<'static>,
     pub next_target: Option<Target>,
+    pub global_symbols: HashMap<IString, TargetSymbolDescriptor>,
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
 }
 
@@ -383,17 +425,18 @@ impl ParseContext {
             //     literal!("sprites"),
             //     Rc::new(RefCell::new(ActualSymbol::Sprites)),
             // )])),
+            global_symbols: HashMap::new(),
             next_target: None,
             random_seed: Default::default(),
         }
     }
 
-    pub fn get_stage_mut(&mut self) -> &mut Target {
-        if matches!(self.next_target, Some(Target::Stage { symbols: _ })) {
-            return self.next_target.as_mut().unwrap();
-        }
-        &mut self.parsed_targets[0]
-    }
+    // pub fn get_stage_mut(&mut self) -> &mut Target {
+    //     if matches!(self.next_target, Some(Target::Stage { symbols: _ })) {
+    //         return self.next_target.as_mut().unwrap();
+    //     }
+    //     &mut self.parsed_targets[0]
+    // }
 }
 
 impl Default for ParseContext {

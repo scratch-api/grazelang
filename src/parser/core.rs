@@ -242,12 +242,15 @@ macro_rules! with_mut_next_target {
     };
 }
 
-macro_rules! with_mut_next_target_or_stage {
+macro_rules! with_mut_target_scope_or_global_scope {
     ($context:expr, $stage:expr, $var:ident => $body:expr) => {
         if let Some($var) = if $stage {
-            Some($context.get_stage_mut())
+            Some(&mut $context.global_symbols)
         } else {
-            $context.next_target.as_mut()
+            $context
+                .next_target
+                .as_mut()
+                .map(|value| value.borrow_symbols_mut())
         } {
             $body
         }
@@ -724,7 +727,7 @@ pub mod statement {
                     "',', '=', '{', '}' or ')'"
                 ),
             };
-            with_mut_next_target_or_stage!(
+            with_mut_target_scope_or_global_scope!(
                 context,
                 matches!(
                     (default_scope, &scope),
@@ -734,10 +737,10 @@ pub mod statement {
                         _, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)
                     )
                 ),
-                target => {
+                symbols => {
                     // TODO: warn about shadowing
                     let name = &identifier.names[0].0;
-                    target.borrow_symbols_mut().insert(
+                    symbols.insert(
                         name.clone(),
                         if (
                             matches!(dec_type, SingleDataDeclarationType::List(_)) ||
@@ -1100,13 +1103,13 @@ pub mod statement {
                 emit_unexpected_token!(token_stream, "Expected '=', '{' or ';'", "'=', '{' or ';'");
             }
         };
-        with_mut_next_target_or_stage!(
+        with_mut_target_scope_or_global_scope!(
             context,
             matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)),
-            target => {
+            symbols => {
                 // TODO: warn about shadowing
                 let name = &identifier.names[0].0;
-                target.borrow_symbols_mut().insert(
+                symbols.insert(
                     name.clone(),
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
                         parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
