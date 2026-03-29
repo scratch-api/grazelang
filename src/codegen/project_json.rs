@@ -128,6 +128,24 @@ pub enum Sb3Primitive {
     Null,
 }
 
+impl From<String> for Sb3Primitive {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&arcstr::ArcStr> for Sb3Primitive {
+    fn from(value: &arcstr::ArcStr) -> Self {
+        value.to_string().into()
+    }
+}
+
+impl From<&'static str> for Sb3Primitive {
+    fn from(value: &'static str) -> Self {
+        value.to_string().into()
+    }
+}
+
 impl Serialize for Sb3Primitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -425,29 +443,55 @@ impl<'de> Deserialize<'de> for Sb3InputRepr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sb3PrimitiveBlock {
-    Number(Sb3Primitive),          // tag: 4
-    PositiveNumber(Sb3Primitive),  // tag: 5
-    PositiveInteger(Sb3Primitive), // tag: 6
-    Integer(Sb3Primitive),         // tag: 7
-    Angle(Sb3Primitive),           // tag: 8
-    Color(Sb3Primitive),           // tag: 9
-    String(Sb3Primitive),          // tag: 10
-    Broadcast {
-        name: String,
-        id: String,
-    }, // tag: 11
+    /// tag: 4
+    Number(Sb3Primitive),
+    /// tag: 5
+    PositiveNumber(Sb3Primitive),
+    /// tag: 6
+    PositiveInteger(Sb3Primitive),
+    /// tag: 7
+    Integer(Sb3Primitive),
+    /// tag: 8
+    Angle(Sb3Primitive),
+    /// tag: 9
+    Color(Sb3Primitive),
+    /// tag: 10
+    String(Sb3Primitive),
+    /// tag: 11
+    Broadcast { name: String, id: String },
+    /// tag: 12
     Variable {
         name: String,
         id: String,
         x: Option<f64>,
         y: Option<f64>,
-    }, // tag: 12
+    },
+    /// tag: 13
     List {
         name: String,
         id: String,
         x: Option<f64>,
         y: Option<f64>,
-    }, // tag: 13
+    },
+}
+
+
+impl From<String> for Sb3PrimitiveBlock {
+    fn from(value: String) -> Self {
+        Self::String(value.into())
+    }
+}
+
+impl From<&arcstr::ArcStr> for Sb3PrimitiveBlock {
+    fn from(value: &arcstr::ArcStr) -> Self {
+        value.to_string().into()
+    }
+}
+
+impl From<&'static str> for Sb3PrimitiveBlock {
+    fn from(value: &'static str) -> Self {
+        value.to_string().into()
+    }
 }
 
 impl Serialize for Sb3PrimitiveBlock {

@@ -802,13 +802,7 @@ impl GetPos for Identifier {
 }
 
 impl Identifier {
-    pub fn is_forever(&self) -> bool {
-        todo!()
-    }
     pub fn is_if(&self) -> bool {
-        todo!()
-    }
-    pub fn is_else(&self) -> bool {
         todo!()
     }
 }

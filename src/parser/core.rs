@@ -1246,13 +1246,6 @@ pub mod statement {
                     Token::Semicolon => break None,
                     Token::Identifier(_) => {
                         let else_identifier = parse_full_identifier(token_stream, context)?;
-                        if !else_identifier.is_else() {
-                            emit_unexpected_token!(
-                                token_stream,
-                                "Expected \"else\" identifier.",
-                                "\"else\" identifier"
-                            );
-                        }
                         if matches!(peek_token!(token_stream), Token::Identifier(_)) {
                             let if_identifier = parse_full_identifier(token_stream, context)?;
                             if !if_identifier.is_if() {
@@ -1410,10 +1403,6 @@ pub mod statement {
             Token::Assign => parse_assignment(token_stream, context, identifier),
             Token::LeftParens => parse_call_or_control(token_stream, context, identifier),
             Token::LeftBrace => {
-                if !identifier.is_forever() {
-                    skip_token!(token_stream);
-                    emit_unexpected_token!(token_stream, "Expected '=' or '('.", "'=' or '('");
-                }
                 parse_forever(token_stream, context, identifier)
             }
             Token::LeftBracket => {
@@ -1748,6 +1737,7 @@ pub mod statement {
 pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Statement> {
     match peek_token!(token_stream) {
         Token::LetKeyword => statement::parse_data_declaration_fully(token_stream, context),
+        // TODO: Prevent users from naming variables "super" or possibly "root"
         Token::Identifier(_) => {
             let identifier = parse_full_identifier(token_stream, context)?;
             statement::parse_statement_after_identifier(token_stream, context, identifier)

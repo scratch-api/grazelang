@@ -1,5 +1,5 @@
-use core::hash;
 use std::{
+    borrow::Cow,
     cell::RefCell,
     collections::{HashMap, VecDeque},
     hint,
@@ -11,10 +11,7 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    codegen,
-    parser::ast::{Identifier, Literal},
-};
+use crate::{codegen, parser::ast::Literal};
 
 pub type IdString = IString;
 
@@ -85,18 +82,71 @@ pub enum KnownBlock {
     PrimitiveBlock {
         value: codegen::project_json::Sb3PrimitiveBlock,
     },
-} // TODO: Implement menus and calling known blocks
+    Callable(IString, Vec<CallBlockParam>),
+    PartialCallable(
+        IString,
+        Vec<(CallBlockParam, KnownBlock)>,
+        Vec<CallBlockParam>,
+    ),
+    /// Reporter block without any inputs or fields e.g. direction
+    SingletonReporter {
+        opcode: IString,
+        params: Vec<(CallBlockParam, KnownBlock)>,
+        field: Option<codegen::project_json::Sb3FieldValue>,
+        assign: Option<SimpleCallableKnownBlockSignature>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum KnownBlockInput<'a> {
+    PrimitiveInput(codegen::project_json::Sb3PrimitiveBlock),
+    BlockRef(IdString),
+    SimpleBlock(&'a IString, &'a Vec<(CallBlockParam, KnownBlock)>),
+    Menu(codegen::project_json::Sb3FieldValue),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CallableKnownBlockSignature<'a>(
+    &'a IString,
+    &'a Vec<CallBlockParam>,
+    Option<&'a Vec<(CallBlockParam, KnownBlock)>>,
+);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SimpleCallableKnownBlockSignature(
+    IString,
+    CallBlockParam,
+    Option<Vec<(CallBlockParam, KnownBlock)>>,
+);
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum CallBlockParamKind {
+    Input {
+        default: Option<codegen::project_json::Sb3PrimitiveBlock>,
+    },
+    Field,
+    MenuInput {
+        opcode: IString,
+        default: codegen::project_json::Sb3FieldValue,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CallBlockParam {
+    pub kind: CallBlockParamKind,
+    pub name: IString,
+}
 
 impl KnownBlock {
-    pub fn resolve_for_input(
-        &self,
+    pub fn resolve_for_input<'a>(
+        &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> codegen::project_json::Sb3InputRepr {
-        use codegen::project_json::{Sb3InputRepr, Sb3PrimitiveBlock};
+    ) -> KnownBlockInput<'a> {
+        use codegen::project_json::Sb3PrimitiveBlock;
         match self {
             KnownBlock::Variable { canonical_name, id } => {
                 // TODO: possibly set x and y
-                Sb3InputRepr::PrimitiveBlock(Sb3PrimitiveBlock::Variable {
+                KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::Variable {
                     name: canonical_name.to_string(),
                     id: id.to_string(),
                     x: None,
@@ -105,7 +155,7 @@ impl KnownBlock {
             }
             KnownBlock::List { canonical_name, id } => {
                 // TODO: possibly set x and y
-                Sb3InputRepr::PrimitiveBlock(Sb3PrimitiveBlock::List {
+                KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::List {
                     name: canonical_name.to_string(),
                     id: id.to_string(),
                     x: None,
@@ -113,19 +163,21 @@ impl KnownBlock {
                 })
             }
             KnownBlock::FieldValue { value } => {
-                // TODO: warn user about possibly incorrect usage
-                Sb3InputRepr::PrimitiveBlock(Sb3PrimitiveBlock::String(
-                    match value {
-                        codegen::project_json::Sb3FieldValue::Normal(sb3_primitive) => {
-                            sb3_primitive
-                        }
-                        codegen::project_json::Sb3FieldValue::WithId { value, id } => value,
-                    }
-                    .clone(),
-                ))
+                // TODO: warn user about possibly incorrect usage in some cases
+                KnownBlockInput::Menu(value.clone())
             }
-            KnownBlock::BlockRef { id } => Sb3InputRepr::Reference(id.to_string()),
-            KnownBlock::PrimitiveBlock { value } => Sb3InputRepr::PrimitiveBlock(value.clone()),
+            KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
+            KnownBlock::PrimitiveBlock { value } => KnownBlockInput::PrimitiveInput(value.clone()),
+            KnownBlock::Callable(..) | KnownBlock::PartialCallable(..) => {
+                // TODO: warn user about probably incorrect usage
+                KnownBlockInput::PrimitiveInput("".into())
+            }
+            KnownBlock::SingletonReporter {
+                opcode,
+                params,
+                field: _,
+                assign: _,
+            } => KnownBlockInput::SimpleBlock(opcode, params),
         }
     }
 
@@ -145,8 +197,7 @@ impl KnownBlock {
             },
             KnownBlock::FieldValue { value } => value.clone(),
             KnownBlock::BlockRef { id } => {
-                // TODO: warn user about possibly incorrect usage
-                Sb3FieldValue::Normal(Sb3Primitive::String(id.to_string()))
+                Sb3FieldValue::Normal(id.into()) // TODO: warn user about probably incorrect usage.
             }
             KnownBlock::PrimitiveBlock { value } => {
                 // TODO: warn user about possibly incorrect usage
@@ -178,85 +229,169 @@ impl KnownBlock {
                     },
                 }
             }
+            KnownBlock::Callable(..) | KnownBlock::PartialCallable(..) => {
+                // TODO: warn user about probably incorrect usage
+                Sb3FieldValue::Normal(Sb3Primitive::Null)
+            }
+            KnownBlock::SingletonReporter {
+                opcode: _,
+                params: _,
+                field,
+                assign: _,
+            } => {
+                // TODO: warn user about incorrect usage if no field supplied
+                field
+                    .clone()
+                    .unwrap_or_else(|| codegen::project_json::Sb3FieldValue::Normal("".into()))
+            }
         }
+    }
+
+    pub fn resolve_for_call_block<'a>(
+        &'a self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> CallableKnownBlockSignature<'a> {
+        match self {
+            KnownBlock::Callable(opcode, params) => {
+                CallableKnownBlockSignature(opcode, params, None)
+            }
+            KnownBlock::PartialCallable(opcode, values, params) => {
+                CallableKnownBlockSignature(opcode, params, Some(values))
+            }
+            KnownBlock::Variable { .. }
+            | KnownBlock::List { .. }
+            | KnownBlock::FieldValue { .. }
+            | KnownBlock::BlockRef { .. }
+            | KnownBlock::PrimitiveBlock { .. }
+            | KnownBlock::SingletonReporter { .. } => todo!(), // warn user about incorrect usage
+        }
+    }
+
+    pub fn resolve_for_assignment<'a>(
+        &'a self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> Cow<'a, SimpleCallableKnownBlockSignature> {
+        // TODO: is cow actually the right choice here?
+        match self {
+            KnownBlock::Variable { canonical_name, id } => {
+                Cow::Owned(SimpleCallableKnownBlockSignature(
+                    literal!("data_setvariableto"),
+                    CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some("0".into()),
+                        },
+                        name: literal!("VALUE"),
+                    },
+                    Some(vec![(
+                        CallBlockParam {
+                            kind: CallBlockParamKind::Field,
+                            name: literal!("VARIABLE"),
+                        },
+                        KnownBlock::FieldValue {
+                            value: codegen::project_json::Sb3FieldValue::WithId {
+                                value: canonical_name.into(),
+                                id: id.to_string(),
+                            },
+                        },
+                    )]),
+                ))
+            }
+            KnownBlock::SingletonReporter {
+                opcode: _,
+                params: _,
+                field: _,
+                assign: Some(assign),
+            } => Cow::Borrowed(assign),
+            KnownBlock::List { .. }
+            | KnownBlock::FieldValue { .. }
+            | KnownBlock::BlockRef { .. }
+            | KnownBlock::PrimitiveBlock { .. }
+            | KnownBlock::Callable(..)
+            | KnownBlock::PartialCallable(..)
+            | KnownBlock::SingletonReporter { .. } => todo!(), // warn user about incorrect usage
+        } // TODO: Implement assignment of x, y etc
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum ActualSymbol {
+pub enum ActualIdentifier {
     Namespace(
-        HashMap<IString, Rc<RefCell<ActualSymbol>>>,
-        Weak<RefCell<ActualSymbol>>,
+        HashMap<IString, Rc<RefCell<ActualIdentifier>>>,
+        Weak<RefCell<ActualIdentifier>>,
     ),
     KnownBlock(
-        KnownBlock,
-        Option<HashMap<IString, Rc<RefCell<ActualSymbol>>>>,
-        Weak<RefCell<ActualSymbol>>,
+        Box<KnownBlock>,
+        Option<HashMap<IString, Rc<RefCell<ActualIdentifier>>>>,
+        Weak<RefCell<ActualIdentifier>>,
     ),
-    Sprites(Weak<RefCell<ActualSymbol>>),
-    Alias(Rc<RefCell<ActualSymbol>>, Weak<RefCell<ActualSymbol>>),
+    Sprites(Weak<RefCell<ActualIdentifier>>),
+    Alias(Rc<RefCell<ActualIdentifier>>, Weak<RefCell<ActualIdentifier>>),
 }
 
-impl ActualSymbol {
+impl ActualIdentifier {
     pub fn new_namespace() -> Self {
         Self::Namespace(HashMap::new(), Weak::new())
     }
 
     pub fn get_block(&self) -> Option<&KnownBlock> {
         match self {
-            ActualSymbol::KnownBlock(known_block, ..) => Some(known_block),
-            ActualSymbol::Namespace(..) | ActualSymbol::Sprites(..) | ActualSymbol::Alias(..) => {
+            ActualIdentifier::KnownBlock(known_block, ..) => Some(known_block),
+            ActualIdentifier::Namespace(..) | ActualIdentifier::Sprites(..) | ActualIdentifier::Alias(..) => {
                 None
             }
         }
     }
 
-    pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<ActualSymbol>>> {
+    pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<ActualIdentifier>>> {
         match self {
-            ActualSymbol::Namespace(hash_map, ..) => {
-                hash_map.get(child_name).map(|value| value.clone())
-            }
-            ActualSymbol::KnownBlock(_, hash_map, ..) => hash_map
+            ActualIdentifier::Namespace(hash_map, ..) => hash_map.get(child_name).cloned(),
+            ActualIdentifier::KnownBlock(_, hash_map, ..) => hash_map
                 .as_ref()
-                .and_then(|value| value.get(child_name).map(|value| value.clone())),
-            ActualSymbol::Alias(alias, ..) => alias
-                .borrow()
-                .get_child(child_name)
-                .map(|value| value.clone()),
-            ActualSymbol::Sprites(..) => None,
+                .and_then(|value| value.get(child_name).cloned()),
+            ActualIdentifier::Alias(alias, ..) => alias.borrow().get_child(child_name),
+            ActualIdentifier::Sprites(..) => None,
+        }
+    }
+
+    pub fn get_parent(&self) -> &Weak<RefCell<ActualIdentifier>> {
+        match self {
+            ActualIdentifier::Namespace(_, parent_ref)
+            | ActualIdentifier::KnownBlock(_, _, parent_ref)
+            | ActualIdentifier::Sprites(parent_ref)
+            | ActualIdentifier::Alias(_, parent_ref) => parent_ref,
         }
     }
 
     pub fn replace_parent(
         &mut self,
-        parent: Weak<RefCell<ActualSymbol>>,
-    ) -> Weak<RefCell<ActualSymbol>> {
+        parent: Weak<RefCell<ActualIdentifier>>,
+    ) -> Weak<RefCell<ActualIdentifier>> {
         match self {
-            ActualSymbol::Namespace(_, parent_ref)
-            | ActualSymbol::KnownBlock(_, _, parent_ref)
-            | ActualSymbol::Sprites(parent_ref)
-            | ActualSymbol::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
+            ActualIdentifier::Namespace(_, parent_ref)
+            | ActualIdentifier::KnownBlock(_, _, parent_ref)
+            | ActualIdentifier::Sprites(parent_ref)
+            | ActualIdentifier::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
         }
     }
 
     pub fn insert_child(
         this: &Rc<RefCell<Self>>,
         child_name: IString,
-        child: Rc<RefCell<ActualSymbol>>,
-    ) -> Option<Rc<RefCell<ActualSymbol>>> {
+        child: Rc<RefCell<ActualIdentifier>>,
+    ) -> Option<Rc<RefCell<ActualIdentifier>>> {
         child.borrow_mut().replace_parent(Rc::downgrade(this));
         match &mut *this.borrow_mut() {
-            ActualSymbol::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
-            ActualSymbol::KnownBlock(_, hash_map, ..) => {
+            ActualIdentifier::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
+            ActualIdentifier::KnownBlock(_, hash_map, ..) => {
                 hash_map.get_or_insert_default().insert(child_name, child)
             }
-            ActualSymbol::Alias(alias, ..) => Self::insert_child(alias, child_name, child),
-            ActualSymbol::Sprites(..) => None,
+            ActualIdentifier::Alias(alias, ..) => Self::insert_child(alias, child_name, child),
+            ActualIdentifier::Sprites(..) => None,
         }
     }
 
     pub fn is_dependent(&self) -> bool {
-        matches!(self, ActualSymbol::Alias(..) | ActualSymbol::Sprites(..))
+        matches!(self, ActualIdentifier::Alias(..) | ActualIdentifier::Sprites(..))
     }
 }
 
@@ -264,11 +399,11 @@ impl ActualSymbol {
 pub struct BroadcastDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub known_block: Option<Rc<RefCell<ActualSymbol>>>,
+    pub known_block: Option<Rc<RefCell<ActualIdentifier>>>,
 }
 
 impl BroadcastDescriptor {
-    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualSymbol {
+    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualIdentifier {
         todo!()
     }
 }
@@ -288,7 +423,7 @@ impl TargetSymbolDescriptor {
         todo!()
     }
 
-    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualSymbol {
+    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualIdentifier {
         if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = self {
             let id = descriptor
                 .canonical_name
@@ -304,7 +439,7 @@ impl TargetSymbolDescriptor {
         }
         .map(|value| Self::compute_hash(value.cast_to_string()))
         .map(|value| {
-            ActualSymbol::KnownBlock(
+            ActualIdentifier::KnownBlock(
                 match self {
                     TargetSymbolDescriptor::Costume(_) => {
                         todo!() // TODO: implement costume known blocks
@@ -318,14 +453,14 @@ impl TargetSymbolDescriptor {
                     _ => unsafe { std::hint::unreachable_unchecked() },
                 },
                 None,
-                Weak::new()
+                Weak::new(),
             )
         })
         .unwrap_or_else(|| {
             let id = codegen::ids::generate_random_id(rng);
             match self {
                 TargetSymbolDescriptor::Var(var_descriptor) => {
-                    ActualSymbol::KnownBlock(todo!(), None, Weak::new())
+                    ActualIdentifier::KnownBlock(todo!(), None, Weak::new())
                 }
                 TargetSymbolDescriptor::List(list_descriptor) => todo!(),
                 TargetSymbolDescriptor::CustomBlockDescriptor(custom_block_descriptor) => todo!(),
