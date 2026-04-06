@@ -41,7 +41,7 @@ pub struct Sb3Target {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub video_state: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub text_to_speech_language: Option<String>,
+    pub text_to_speech_language: Option<String>, // Can seemingly be absent or null
 
     // Sprite
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -58,6 +58,36 @@ pub struct Sb3Target {
     pub draggable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotation_style: Option<String>,
+}
+
+impl Sb3Target {
+    pub fn new_stage() -> Self {
+        Sb3Target {
+            is_stage: true,
+            name: "Stage".to_string(),
+            variables: HashMap::new(),
+            lists: HashMap::new(),
+            broadcasts: HashMap::new(),
+            blocks: HashMap::new(),
+            comments: HashMap::new(),
+            current_costume: 0,
+            costumes: Vec::new(),
+            sounds: Vec::new(),
+            volume: 100.0,
+            layer_order: 0,
+            tempo: Some(60.0),
+            video_transparency: Some(50.0),
+            video_state: Some("on".to_string()),
+            text_to_speech_language: None,
+            visible: None,
+            x: None,
+            y: None,
+            size: None,
+            direction: None,
+            draggable: None,
+            rotation_style: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

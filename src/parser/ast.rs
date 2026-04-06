@@ -687,6 +687,13 @@ pub enum Associativity {
     NotLeft,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BinOpDescriptor {
+    pub opcode: String, // TODO: Should these be [String] or [IString]
+    pub operand_a_input_name: String,
+    pub operand_b_input_name: String,
+}
+
 impl BinOp {
     pub fn get_precedence(&self) -> (u8, Associativity) {
         use Associativity::Left as L;
@@ -706,6 +713,10 @@ impl BinOp {
             BinOp::LessThanOrEqual(_) => (1, L),
             BinOp::GreaterThanOrEqual(_) => (1, L),
         }
+    }
+
+    pub fn get_descriptor(&self) -> BinOpDescriptor {
+        todo!()
     }
 }
 

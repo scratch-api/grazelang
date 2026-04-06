@@ -107,16 +107,16 @@ pub enum KnownBlockInput<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CallableKnownBlockSignature<'a>(
-    &'a IString,
-    &'a Vec<CallBlockParam>,
-    Option<&'a Vec<(CallBlockParam, KnownBlock)>>,
+    pub &'a IString,
+    pub &'a Vec<CallBlockParam>,
+    pub &'a Vec<(CallBlockParam, KnownBlock)>,
 );
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SimpleCallableKnownBlockSignature(
-    IString,
-    CallBlockParam,
-    Option<Vec<(CallBlockParam, KnownBlock)>>,
+    pub IString,
+    pub CallBlockParam,
+    pub Option<Vec<(CallBlockParam, KnownBlock)>>,
 );
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -127,6 +127,7 @@ pub enum CallBlockParamKind {
     Field,
     MenuInput {
         opcode: IString,
+        field_name: IString,
         default: codegen::project_json::Sb3FieldValue,
     },
 }
@@ -251,12 +252,13 @@ impl KnownBlock {
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> CallableKnownBlockSignature<'a> {
+        const EMPTY_KNOWN_PARAM_VEC: &Vec<(CallBlockParam, KnownBlock)> = &Vec::new();
         match self {
             KnownBlock::Callable(opcode, params) => {
-                CallableKnownBlockSignature(opcode, params, None)
+                CallableKnownBlockSignature(opcode, params, EMPTY_KNOWN_PARAM_VEC)
             }
             KnownBlock::PartialCallable(opcode, values, params) => {
-                CallableKnownBlockSignature(opcode, params, Some(values))
+                CallableKnownBlockSignature(opcode, params, values)
             }
             KnownBlock::Variable { .. }
             | KnownBlock::List { .. }
@@ -325,7 +327,10 @@ pub enum ActualIdentifier {
         Weak<RefCell<ActualIdentifier>>,
     ),
     Sprites(Weak<RefCell<ActualIdentifier>>),
-    Alias(Rc<RefCell<ActualIdentifier>>, Weak<RefCell<ActualIdentifier>>),
+    Alias(
+        Rc<RefCell<ActualIdentifier>>,
+        Weak<RefCell<ActualIdentifier>>,
+    ),
 }
 
 impl ActualIdentifier {
@@ -336,9 +341,9 @@ impl ActualIdentifier {
     pub fn get_block(&self) -> Option<&KnownBlock> {
         match self {
             ActualIdentifier::KnownBlock(known_block, ..) => Some(known_block),
-            ActualIdentifier::Namespace(..) | ActualIdentifier::Sprites(..) | ActualIdentifier::Alias(..) => {
-                None
-            }
+            ActualIdentifier::Namespace(..)
+            | ActualIdentifier::Sprites(..)
+            | ActualIdentifier::Alias(..) => None,
         }
     }
 
@@ -391,7 +396,10 @@ impl ActualIdentifier {
     }
 
     pub fn is_dependent(&self) -> bool {
-        matches!(self, ActualIdentifier::Alias(..) | ActualIdentifier::Sprites(..))
+        matches!(
+            self,
+            ActualIdentifier::Alias(..) | ActualIdentifier::Sprites(..)
+        )
     }
 }
 
