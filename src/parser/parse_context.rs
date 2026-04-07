@@ -2,7 +2,6 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{HashMap, VecDeque},
-    hint,
     rc::{Rc, Weak},
 };
 
@@ -11,7 +10,7 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
-use crate::{codegen, parser::ast::Literal};
+use crate::{codegen, names::Namespace, parser::ast::Literal};
 
 pub type IdString = IString;
 
@@ -64,11 +63,11 @@ pub struct SoundDescriptor {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum KnownBlock {
     Variable {
-        canonical_name: IString,
+        canonical_name: String,
         id: IdString,
     },
     List {
-        canonical_name: IString,
+        canonical_name: String,
         id: IdString,
     },
     /// Cannot be used for variables in the context of an input
@@ -78,7 +77,7 @@ pub enum KnownBlock {
     BlockRef {
         id: IdString,
     },
-    /// Intended for primitive expressions like strings but can be used variables etc aswell
+    /// Intended for primitive expressions like strings but can be used for variables etc aswell
     PrimitiveBlock {
         value: codegen::project_json::Sb3PrimitiveBlock,
     },
@@ -291,7 +290,7 @@ impl KnownBlock {
                         },
                         KnownBlock::FieldValue {
                             value: codegen::project_json::Sb3FieldValue::WithId {
-                                value: canonical_name.into(),
+                                value: (canonical_name as &str).into(),
                                 id: id.to_string(),
                             },
                         },
@@ -431,7 +430,11 @@ impl TargetSymbolDescriptor {
         todo!()
     }
 
-    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualIdentifier {
+    pub fn derive_actual_symbol<T: Rng>(
+        &self,
+        rng: &mut T,
+        namespace: &mut Namespace,
+    ) -> ActualIdentifier {
         if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = self {
             let id = descriptor
                 .canonical_name
@@ -467,14 +470,38 @@ impl TargetSymbolDescriptor {
         .unwrap_or_else(|| {
             let id = codegen::ids::generate_random_id(rng);
             match self {
-                TargetSymbolDescriptor::Var(var_descriptor) => {
-                    ActualIdentifier::KnownBlock(todo!(), None, Weak::new())
-                }
-                TargetSymbolDescriptor::List(list_descriptor) => todo!(),
+                TargetSymbolDescriptor::Var(var_descriptor) => ActualIdentifier::KnownBlock(
+                    Box::new(KnownBlock::Variable {
+                        canonical_name: namespace.introduce_new_symbol(
+                            var_descriptor
+                                .canonical_name
+                                .as_ref()
+                                .map(|value| value.to_string()),
+                            var_descriptor.name.clone(),
+                        ),
+                        id,
+                    }),
+                    None,
+                    Weak::new(),
+                ),
+                TargetSymbolDescriptor::List(list_descriptor) => ActualIdentifier::KnownBlock(
+                    Box::new(KnownBlock::List {
+                        canonical_name: namespace.introduce_new_symbol(
+                            list_descriptor
+                                .canonical_name
+                                .as_ref()
+                                .map(|value| value.to_string()),
+                            list_descriptor.name.clone(),
+                        ),
+                        id,
+                    }), // TODO: add list length as method
+                    None,
+                    Weak::new(),
+                ),
                 TargetSymbolDescriptor::CustomBlockDescriptor(custom_block_descriptor) => todo!(),
                 TargetSymbolDescriptor::Costume(_)
                 | TargetSymbolDescriptor::Backdrop(_)
-                | TargetSymbolDescriptor::Sound(_) => unsafe { hint::unreachable_unchecked() },
+                | TargetSymbolDescriptor::Sound(_) => unreachable!(),
             }
         })
     }

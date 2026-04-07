@@ -13,3 +13,9 @@ regex = "1.12.3"
 rand = "0.10.0"
 rand_xoshiro = "0.8.0"
 thiserror = "2.0.18"
+
+[features]
+default = []
+use_shadows_for_formatted_strings = []
+use_actual_defaults_for_formatted_strings = ["use_shadows_for_formatted_strings"]
+use_actual_defaults_everywhere = ["use_actual_defaults_for_formatted_strings"]

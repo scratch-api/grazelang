@@ -53,7 +53,7 @@ macro_rules! consume_and_use_if {
         if matches!(peek_token!($token_stream => Option), Some($pattern)) {
             match next_token!($token_stream) {
                 $pattern => Some($body),
-                _ => panic!(),
+                _ => unreachable!(),
             }
         } else {
             None
@@ -1100,7 +1100,7 @@ pub mod statement {
             Token::Semicolon => DeclarationValue::None,
             _ => {
                 skip_token!(token_stream);
-                emit_unexpected_token!(token_stream, "Expected '=', '{' or ';'", "'=', '{' or ';'");
+                emit_unexpected_token!(token_stream, "Expected '=' or ';'", "'=' or ';'");
             }
         };
         with_mut_target_scope_or_global_scope!(
@@ -1153,7 +1153,7 @@ pub mod statement {
                 match dec_type {
                     SingleDataDeclarationType::Unset => None,
                     SingleDataDeclarationType::Var(p) => Some(VarKeyword(p)),
-                    SingleDataDeclarationType::List(_) => panic!(),
+                    SingleDataDeclarationType::List(_) => unreachable!(),
                 },
                 scope,
                 canonical_identifier,
@@ -1166,7 +1166,7 @@ pub mod statement {
                 SingleDataDeclaration::List(
                     match dec_type {
                         SingleDataDeclarationType::Unset => None,
-                        SingleDataDeclarationType::Var(_) => panic!(),
+                        SingleDataDeclarationType::Var(_) => unreachable!(),
                         SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
                     },
                     scope,
@@ -1625,7 +1625,7 @@ pub mod statement {
                         name,
                         pos_range: get_token_position!(token_stream),
                     },
-                    _ => panic!(),
+                    _ => unreachable!(),
                 };
                 let start_pos = get_token_start!(token_stream);
                 let identifier = parse_single_identifier_as_identifier(token_stream, context)?;

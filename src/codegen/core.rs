@@ -19,19 +19,18 @@ use super::{
 };
 
 use crate::{
-    codegen::project_json::{Sb3InputRepr, Sb3Target},
-    parser::{
-        ast::{BinOpDescriptor, Identifier},
+    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target}, names::Namespace, parser::{
+        ast::{BinOpDescriptor, Expression, FormattedStringContent, Identifier},
         parse_context::{
             ActualIdentifier, CallBlockParam, CallableKnownBlockSignature, IdString, KnownBlock,
-            ParseContext, SimpleCallableKnownBlockSignature, Target, TargetSymbolDescriptor,
+            KnownBlockInput, ParseContext, SimpleCallableKnownBlockSignature, Target,
+            TargetSymbolDescriptor,
         },
-    },
-    visitor::{
+    }, visitor::{
         GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call,
         default_visit_expression_formatted_string, default_visit_expression_get_item,
-        default_visit_expression_unary_operation,
-    },
+        default_visit_expression_unary_operation, default_visit_formatted_string_content,
+    }
 };
 
 #[derive(Debug, Clone, Error)]
@@ -58,8 +57,22 @@ pub struct GrazeSb3GeneratorContext {
     pub current_block_id: IdString,
     pub current_parent: Option<String>,
     pub current_sb3_target: Sb3Target,
+    /// Is None while and after being initialized
     pub uninitialized_stage: Option<Sb3Target>,
     pub previous_block_stack: Vec<Option<IdString>>,
+    pub formatted_string_context: FormattedStringContext,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct FormattedStringContext {
+    pub ids: Vec<Option<String>>,
+    pub current_idx: usize,
+}
+
+impl FormattedStringContext {
+    fn new() -> Self {
+        Self::default()
+    }
 }
 
 /// Placeholder function, will be replaced/moved/implemented later
@@ -89,6 +102,7 @@ impl GrazeSb3GeneratorContext {
             Weak::new(),
         )));
         for target in &targets {
+            let mut namespace = Namespace::new();
             ActualIdentifier::insert_child(
                 &targets_symbol,
                 target.get_namespace_name(),
@@ -105,7 +119,7 @@ impl GrazeSb3GeneratorContext {
                             .map(|(key, value)| {
                                 (
                                     key.clone(),
-                                    Rc::new(RefCell::new(value.derive_actual_symbol(&mut rng))),
+                                    Rc::new(RefCell::new(value.derive_actual_symbol(&mut rng, &mut namespace))),
                                 )
                             })
                             .collect(),
@@ -134,20 +148,21 @@ impl GrazeSb3GeneratorContext {
         );
         let variables_symbol = Rc::new(RefCell::new(ActualIdentifier::new_namespace()));
         let lists_symbol = Rc::new(RefCell::new(ActualIdentifier::new_namespace()));
+        let mut global_namespace = Namespace::new();
         for (name, symbol) in parse_context.global_symbols.drain() {
             match &symbol {
                 TargetSymbolDescriptor::Var(_) => {
                     ActualIdentifier::insert_child(
                         &variables_symbol,
                         name,
-                        Rc::new(RefCell::new(symbol.derive_actual_symbol(&mut rng))),
+                        Rc::new(RefCell::new(symbol.derive_actual_symbol(&mut rng, &mut global_namespace))),
                     );
                 }
                 TargetSymbolDescriptor::List(_) => {
                     ActualIdentifier::insert_child(
                         &lists_symbol,
                         name,
-                        Rc::new(RefCell::new(symbol.derive_actual_symbol(&mut rng))),
+                        Rc::new(RefCell::new(symbol.derive_actual_symbol(&mut rng, &mut global_namespace))),
                     );
                 }
                 _ => (), // Handled just to be sure although it shouldn't happen
@@ -170,8 +185,9 @@ impl GrazeSb3GeneratorContext {
             current_block_id: next_block_id,
             current_parent: None,
             current_sb3_target: Sb3Target::new_stage(),
-            uninitialized_stage: None,
+            uninitialized_stage: None, // TODO: add stage here
             previous_block_stack: Vec::new(),
+            formatted_string_context: FormattedStringContext::default(),
         }
     }
 
@@ -401,16 +417,13 @@ pub fn add_param_to_params(
     let param_name = param.name.to_string();
     match &param.kind {
         crate::parser::parse_context::CallBlockParamKind::Input { default } => {
-            let input_repr = known_block_to_input_value_no_menu(value, context)?;
             inputs.insert(
                 param_name,
-                match default {
-                    Some(default) => Sb3InputValue::ObscuredShadow {
-                        value: input_repr,
-                        shadow: Sb3InputRepr::PrimitiveBlock(default.clone()),
-                    },
-                    None => Sb3InputValue::NoShadow(input_repr),
-                },
+                (
+                    known_block_to_input_repr_no_menu(value, context)?,
+                    default.as_ref(),
+                )
+                    .into(),
             );
         }
         crate::parser::parse_context::CallBlockParamKind::Field => {
@@ -488,35 +501,66 @@ pub fn introduce_input_simple_block(
     })
 }
 
-pub fn known_block_to_input_value_no_menu(
+pub fn known_block_to_input_repr_no_menu(
     known_block: &KnownBlock,
     context: &mut GrazeSb3GeneratorContext,
-) -> Result<Sb3InputRepr, GrazeSb3GeneratorError> {
-    match known_block.resolve_for_input(context) {
-        crate::parser::parse_context::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
-            Ok(Sb3InputRepr::PrimitiveBlock(sb3_primitive_block))
-        }
+) -> Result<(Sb3InputRepr, IsShadow), GrazeSb3GeneratorError> {
+    let known_block_input = known_block.resolve_for_input(context);
+    match known_block_input {
+        crate::parser::parse_context::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => Ok((
+            Sb3InputRepr::PrimitiveBlock(sb3_primitive_block),
+            IsShadow::Yes,
+        )),
         crate::parser::parse_context::KnownBlockInput::BlockRef(id) => {
-            Ok(Sb3InputRepr::Reference(id.to_string()))
+            Ok((Sb3InputRepr::Reference(id.to_string()), IsShadow::No))
         }
-        crate::parser::parse_context::KnownBlockInput::SimpleBlock(opcode, params) => {
-            Ok(Sb3InputRepr::Reference(
+        crate::parser::parse_context::KnownBlockInput::SimpleBlock(opcode, params) => Ok((
+            Sb3InputRepr::Reference(
                 introduce_input_simple_block(opcode, params, context)?.to_string(),
-            ))
-        }
+            ),
+            IsShadow::No,
+        )),
         crate::parser::parse_context::KnownBlockInput::Menu(input_menu_value) => {
             Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value })
         }
     }
 }
 
-pub fn param_to_input_value_no_menu(
+pub fn param_to_input_repr_no_menu(
     param: Param,
     context: &mut GrazeSb3GeneratorContext,
-) -> Result<Sb3InputRepr, GrazeSb3GeneratorError> {
+) -> Result<(Sb3InputRepr, IsShadow), GrazeSb3GeneratorError> {
     with_known_block!(param, context, value => {
-        known_block_to_input_value_no_menu(value, context)
+        known_block_to_input_repr_no_menu(value, context)
     })
+}
+
+impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
+    fn from(value: (Sb3InputRepr, IsShadow)) -> Self {
+        let (input_repr, is_shadow) = value;
+        if is_shadow == IsShadow::Yes {
+            Self::Shadow(input_repr)
+        } else {
+            Self::NoShadow(input_repr)
+        }
+    }
+}
+
+impl From<((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)> for Sb3InputValue {
+    fn from(value: ((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)) -> Self {
+        let ((input_repr, is_shadow), shadow) = value;
+        if is_shadow == IsShadow::Yes {
+            return Self::Shadow(input_repr);
+        }
+        if let Some(shadow) = shadow {
+            Self::ObscuredShadow {
+                value: input_repr,
+                shadow: Sb3InputRepr::PrimitiveBlock(shadow.clone()),
+            }
+        } else {
+            Self::NoShadow(input_repr)
+        }
+    }
 }
 
 pub fn add_reporter_block(context: &mut GrazeSb3GeneratorContext, id: &IdString, block: Sb3Block) {
@@ -538,7 +582,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_parent!(context, (parent: this_id) => {
-            context.push_param(Param::Owned(this_id.clone().into()));
             default_visit_expression_binary_operation(self, value, context)?;
             let (op_b_param, op_a_param) = (context.pop_param().unwrap(), context.pop_param().unwrap());
             let BinOpDescriptor {
@@ -547,8 +590,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 operand_b_input_name,
             } = value.1.get_descriptor();
             let inputs = HashMap::from([
-                (operand_a_input_name, Sb3InputValue::NoShadow(param_to_input_value_no_menu(op_a_param, context)?)),
-                (operand_b_input_name, Sb3InputValue::NoShadow(param_to_input_value_no_menu(op_b_param, context)?)),
+                (operand_a_input_name, param_to_input_repr_no_menu(op_a_param, context)?.into()),
+                (operand_b_input_name, param_to_input_repr_no_menu(op_b_param, context)?.into()),
             ]);
             add_reporter_block(
                 context,
@@ -562,6 +605,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     None,
                 ),
             );
+            context.push_param(Param::Owned(this_id.clone().into()));
         });
         Ok(())
     }
@@ -581,7 +625,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_parent!(context, (parent: this_id) => {
-            context.push_param(Param::Owned(this_id.clone().into()));
             default_visit_expression_call(self, value, context)?;
             let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
                 .take(value.2.len())
@@ -615,6 +658,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     None,
                 ),
             );
+            context.push_param(Param::Owned(this_id.clone().into()));
         });
         Ok(())
     }
@@ -627,11 +671,156 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_parent!(context, (parent: this_id) => {
-            context.push_param(Param::Owned(this_id.clone().into()));
-            default_visit_expression_formatted_string(self, value, context)?;
-        });
+        enum FormattedStringTree {
+            Expression,
+            String(String),
+            EmptyString,
+            Joined(
+                Box<FormattedStringTree>,
+                Box<FormattedStringTree>,
+                Option<String>,
+                IdString,
+            ),
+        }
+        fn join_recursively(
+            context: &mut GrazeSb3GeneratorContext,
+            value: &[FormattedStringContent],
+        ) -> FormattedStringTree {
+            match value.len() {
+                0 => FormattedStringTree::EmptyString,
+                1 => match &value[0] {
+                    FormattedStringContent::Expression(_) => FormattedStringTree::Expression,
+                    FormattedStringContent::String(arc_str, _) => {
+                        FormattedStringTree::String(arc_str.to_string())
+                    }
+                },
+                _ => {
+                    let mid = value.len() / 2;
+                    wrap_in_parent!(context, (parent: this_id) => {
+                        let parent = context.formatted_string_context.ids.pop().flatten().or(parent);
+                        context.formatted_string_context.ids.push(Some(this_id.to_string()));
+                        let left = Box::new(join_recursively(context, &value[..mid]));
+                        context.formatted_string_context.ids.push(Some(this_id.to_string()));
+                        let right = Box::new(join_recursively(context, &value[mid..]));
+                        FormattedStringTree::Joined(left, right, parent, this_id)
+                    })
+                }
+            }
+        }
+        fn make_join(
+            parent: Option<String>,
+            left: Sb3InputValue,
+            right: Sb3InputValue,
+        ) -> Sb3Block {
+            make_block(
+                parent,
+                "operator_join".to_string(),
+                HashMap::from([
+                    ("STRING1".to_string(), left),
+                    ("STRING2".to_string(), right),
+                ]),
+                HashMap::new(),
+                false,
+                None,
+            )
+        }
+        fn convert_into_block_tree(
+            context: &mut GrazeSb3GeneratorContext,
+            value: FormattedStringTree,
+        ) -> Result<Param, GrazeSb3GeneratorError> {
+            match value {
+                FormattedStringTree::Expression => Ok(context.pop_param().unwrap()),
+                FormattedStringTree::String(string) => {
+                    Ok(Param::Owned(KnownBlock::PrimitiveBlock {
+                        value: string.into(),
+                    }))
+                }
+                FormattedStringTree::EmptyString => Ok(Param::Owned(KnownBlock::PrimitiveBlock {
+                    value: "".into(),
+                })),
+                FormattedStringTree::Joined(left, right, parent, this_id) => {
+                    // right comes first because a stack is LIFO
+                    let right = convert_into_block_tree(context, *right)?;
+                    let left = convert_into_block_tree(context, *left)?;
+                    let left = param_to_input_repr_no_menu(left, context)?;
+                    let right = param_to_input_repr_no_menu(right, context)?;
+                    #[cfg(feature = "use_shadows_for_formatted_strings")]
+                    let left = (
+                        left,
+                        Some(&Sb3PrimitiveBlock::String(
+                            #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
+                            "apple ".into(),
+                            #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
+                            "".into(),
+                        )),
+                    );
+                    #[cfg(feature = "use_shadows_for_formatted_strings")]
+                    let right = (
+                        right,
+                        Some(&Sb3PrimitiveBlock::String(
+                            #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
+                            "banana".into(),
+                            #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
+                            "".into(),
+                        )),
+                    );
+                    add_reporter_block(
+                        context,
+                        &this_id,
+                        make_join(parent, left.into(), right.into()),
+                    );
+                    Ok(Param::Owned(KnownBlock::BlockRef { id: this_id }))
+                }
+            }
+        }
+        let section_count = value.0.len();
+        context.formatted_string_context = FormattedStringContext {
+            ids: if section_count == 1 {
+                vec![context.current_parent.clone()]
+            } else {
+                Vec::with_capacity(section_count)
+            },
+            current_idx: 0,
+        };
+        let formatted_string = join_recursively(context, value.0);
+        let formatted_string = match formatted_string {
+            FormattedStringTree::Expression => {
+                default_visit_expression_formatted_string(self, value, context)?;
+                return Ok(());
+            }
+            FormattedStringTree::String(string) => {
+                default_visit_expression_formatted_string(self, value, context)?;
+                context.push_param(Param::Owned(KnownBlock::PrimitiveBlock {
+                    value: string.into(),
+                }));
+                return Ok(());
+            }
+            FormattedStringTree::EmptyString => {
+                default_visit_expression_formatted_string(self, value, context)?;
+                context.push_param(Param::Owned(KnownBlock::PrimitiveBlock {
+                    value: "".into(),
+                }));
+                return Ok(());
+            }
+            FormattedStringTree::Joined(left, right, parent, this_id) => {
+                FormattedStringTree::Joined(left, right, parent, this_id)
+            }
+        };
+        default_visit_expression_formatted_string(self, value, context)?;
+        let param = convert_into_block_tree(context, formatted_string)?;
+        context.push_param(param);
+        // TODO: Check whether this actually works
         Ok(())
+    }
+
+    fn visit_formatted_string_content(
+        &self,
+        value: &FormattedStringContent,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        context.current_parent = context.formatted_string_context.ids[context.formatted_string_context.current_idx].clone();
+        context.formatted_string_context.current_idx += 1;
+        default_visit_formatted_string_content(self, value, context)
     }
 
     fn visit_expression_get_item(

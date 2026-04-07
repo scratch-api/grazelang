@@ -170,8 +170,8 @@ impl From<&arcstr::ArcStr> for Sb3Primitive {
     }
 }
 
-impl From<&'static str> for Sb3Primitive {
-    fn from(value: &'static str) -> Self {
+impl From<&str> for Sb3Primitive {
+    fn from(value: &str) -> Self {
         value.to_string().into()
     }
 }
@@ -505,7 +505,6 @@ pub enum Sb3PrimitiveBlock {
     },
 }
 
-
 impl From<String> for Sb3PrimitiveBlock {
     fn from(value: String) -> Self {
         Self::String(value.into())
@@ -518,8 +517,8 @@ impl From<&arcstr::ArcStr> for Sb3PrimitiveBlock {
     }
 }
 
-impl From<&'static str> for Sb3PrimitiveBlock {
-    fn from(value: &'static str) -> Self {
+impl From<&str> for Sb3PrimitiveBlock {
+    fn from(value: &str) -> Self {
         value.to_string().into()
     }
 }
@@ -1248,6 +1247,28 @@ impl Default for Sb3Meta {
             agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36".into(),
             // ^ not my user agent
             origin: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(from = "bool", into = "bool")]
+pub enum IsShadow {
+    Yes,
+    No,
+}
+
+impl From<bool> for IsShadow {
+    fn from(value: bool) -> Self {
+        if value { Self::Yes } else { Self::No }
+    }
+}
+
+impl From<IsShadow> for bool {
+    fn from(value: IsShadow) -> Self {
+        match value {
+            IsShadow::Yes => true,
+            IsShadow::No => false,
         }
     }
 }
