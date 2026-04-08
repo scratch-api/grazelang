@@ -11,7 +11,7 @@ use crate::{
         get_position as internal_get_position,
     },
     parser::{
-        ast::{GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
+        ast::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
         parse_context::{self, BroadcastDescriptor},
     },
 };
@@ -1402,9 +1402,7 @@ pub mod statement {
         match peek_token!(token_stream) {
             Token::Assign => parse_assignment(token_stream, context, identifier),
             Token::LeftParens => parse_call_or_control(token_stream, context, identifier),
-            Token::LeftBrace => {
-                parse_forever(token_stream, context, identifier)
-            }
+            Token::LeftBrace => parse_forever(token_stream, context, identifier),
             Token::LeftBracket => {
                 let start_pos = get_token_start!(token_stream);
                 skip_token!(token_stream);
@@ -2427,6 +2425,28 @@ pub fn parse_expression(token_stream: ParseIn, context: &mut ParseContext) -> Pa
     let mut binops = VecDeque::<BinOp>::new();
 
     loop {
+        while let Some(left_bracket) = consume_if!(token_stream, Token::LetterAccessLeftBracket => from_stream_pos!(token_stream => ast::LetterAccessLeftBracket))
+        {
+            let string_expression = expressions.pop_back().unwrap();
+            let inner_expression = parse_expression(token_stream, context)?;
+            let right_bracket = expect_token!(
+                token_stream,
+                Token::RightBracket => from_stream_pos!(token_stream => ast::RightBracket),
+                "Expected ']'.",
+                "']'"
+            );
+            let pos_range = (
+                string_expression.get_position().0,
+                get_token_end!(token_stream),
+            );
+            expressions.push_back(Expression::GetLetter(
+                Box::new(string_expression),
+                left_bracket,
+                Box::new(inner_expression),
+                right_bracket,
+                pos_range,
+            ));
+        }
         binops.push_back(match parse_binary_operation(token_stream, context)? {
             Some(value) => value,
             None => break,

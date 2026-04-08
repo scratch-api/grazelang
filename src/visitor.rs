@@ -6,10 +6,11 @@ use crate::{
         AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
         Comma, CostumeKeyword, DataDeclaration, DataDeclarationScope, Expression,
         FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens,
-        LetKeyword, ListEntry, ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator,
-        RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword,
-        SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword,
-        StageStatement, Statement, TopLevelStatement, UnOp, VarKeyword, VarsKeyword,
+        LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
+        NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon,
+        SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement,
+        StageCodeBlock, StageKeyword, StageStatement, Statement, TopLevelStatement, UnOp,
+        VarKeyword, VarsKeyword,
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -485,6 +486,20 @@ pub trait GrazeVisitor<C, E> {
         default_visit_expression_get_item(self, value, context)
     }
 
+    fn visit_expression_get_letter(
+        &self,
+        value: (
+            &Box<Expression>,
+            &LetterAccessLeftBracket,
+            &Box<Expression>,
+            &RightBracket,
+            &PosRange,
+        ),
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_expression_get_letter(self, value, context)
+    }
+
     fn visit_expression_parentheses(
         &self,
         value: (&LeftParens, &Box<Expression>, &RightParens, &PosRange),
@@ -700,7 +715,12 @@ where
                 context,
             )?;
         }
-        StageStatement::SoundDeclaration(sound_keyword, asset_declaration, semicolon, pos_range) => {
+        StageStatement::SoundDeclaration(
+            sound_keyword,
+            asset_declaration,
+            semicolon,
+            pos_range,
+        ) => {
             visitor.visit_sound_declaration(
                 (sound_keyword, asset_declaration, semicolon, pos_range),
                 context,
@@ -1045,13 +1065,7 @@ where
                 context,
             )?;
         }
-        Statement::SingleInputControl(
-            identifier,
-            expression,
-            code_block,
-            semicolon,
-            pos_range,
-        ) => {
+        Statement::SingleInputControl(identifier, expression, code_block, semicolon, pos_range) => {
             visitor.visit_statement_single_input_control(
                 (identifier, expression, code_block, semicolon, pos_range),
                 context,
@@ -1080,10 +1094,8 @@ where
             )?;
         }
         Statement::Forever(identifier, code_block, semicolon, pos_range) => {
-            visitor.visit_statement_forever(
-                (identifier, code_block, semicolon, pos_range),
-                context,
-            )?;
+            visitor
+                .visit_statement_forever((identifier, code_block, semicolon, pos_range), context)?;
         }
         Statement::IfElse(start_branch, branches, else_branch, semicolon, pos_range) => {
             visitor.visit_statement_if_else(
@@ -1307,6 +1319,24 @@ where
                 (
                     identifier,
                     left_bracket,
+                    expression,
+                    right_bracket,
+                    pos_range,
+                ),
+                context,
+            )?;
+        }
+        Expression::GetLetter(
+            string_expression,
+            letter_access_left_bracket,
+            expression,
+            right_bracket,
+            pos_range,
+        ) => {
+            visitor.visit_expression_get_letter(
+                (
+                    string_expression,
+                    letter_access_left_bracket,
                     expression,
                     right_bracket,
                     pos_range,
@@ -1745,6 +1775,25 @@ pub fn default_visit_expression_get_item<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
+    visitor.visit_expression(value.2.deref(), context)?;
+    Ok(())
+}
+
+pub fn default_visit_expression_get_letter<V, C, E>(
+    visitor: &V,
+    value: (
+        &Box<Expression>,
+        &LetterAccessLeftBracket,
+        &Box<Expression>,
+        &RightBracket,
+        &PosRange,
+    ),
+    context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    visitor.visit_expression(value.0.deref(), context)?;
     visitor.visit_expression(value.2.deref(), context)?;
     Ok(())
 }

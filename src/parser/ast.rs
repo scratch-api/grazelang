@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::lexer::PosRange;
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
@@ -575,6 +577,13 @@ pub enum Expression {
         RightBracket,
         PosRange,
     ),
+    GetLetter(
+        Box<Expression>,
+        LetterAccessLeftBracket,
+        Box<Expression>,
+        RightBracket,
+        PosRange,
+    ),
     Parentheses(LeftParens, Box<Expression>, RightParens, PosRange),
 }
 
@@ -617,6 +626,17 @@ impl GetPos for RightBracket {
         &self.0
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LetterAccessLeftBracket(pub PosRange);
+
+impl GetPos for LetterAccessLeftBracket {
+    #[inline]
+    fn get_position(&self) -> &PosRange {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Semicolon(pub PosRange);
 
@@ -637,6 +657,7 @@ impl GetPos for Expression {
             Expression::Identifier(i) => i.get_position(),
             Expression::Call(_, _, _, _, p) => p,
             Expression::GetItem(_, _, _, _, p) => p,
+            Expression::GetLetter(_, _, _, _, p) => p,
             Expression::Parentheses(_, _, _, p) => p,
         }
     }
@@ -689,7 +710,7 @@ pub enum Associativity {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BinOpDescriptor {
-    pub opcode: String, // TODO: Should these be [String] or [IString]
+    pub opcode: String,
     pub operand_a_input_name: String,
     pub operand_b_input_name: String,
 }
@@ -736,6 +757,20 @@ impl GetPos for UnOp {
             UnOp::Exp(p) => p,
             UnOp::Pow(p) => p,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UnOpDescriptor {
+    pub opcode: String,
+    pub operand_input_name: String,
+    pub field_values: HashMap<String, crate::codegen::project_json::Sb3FieldValue>,
+    pub default: Option<crate::codegen::project_json::Sb3PrimitiveBlock>,
+}
+
+impl UnOp {
+    pub fn get_descriptor(&self) -> UnOpDescriptor {
+        todo!()
     }
 }
 
@@ -833,10 +868,20 @@ impl GetPos for CanonicalIdentifier {
 
 #[derive(Debug, Clone, PartialEq, Error, Serialize, Deserialize)]
 pub enum ParseError {
-    #[error("the lexer reached the end of input without the parser completing (context: {context})")]
+    #[error(
+        "the lexer reached the end of input without the parser completing (context: {context})"
+    )]
     UnexpectedEndOfInput { context: &'static str },
     #[error("unexpected token at {pos_range:?}, expected {expected} (context: {context})")]
-    UnexpectedToken { expected: &'static str, message: &'static str, context: &'static str, pos_range: PosRange },
+    UnexpectedToken {
+        expected: &'static str,
+        message: &'static str,
+        context: &'static str,
+        pos_range: PosRange,
+    },
     #[error("the lexer got stuck after the token at {pos_range:?} (context: {context})")]
-    LexerStuck { context: &'static str, pos_range: PosRange },
+    LexerStuck {
+        context: &'static str,
+        pos_range: PosRange,
+    },
 }

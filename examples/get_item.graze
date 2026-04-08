@@ -1,0 +1,11 @@
+// list-only get item:
+
+data.item_of_list(list, expression)
+// or better:
+list[expression]
+
+// str-only get item:
+
+operator.letter_of(expression, expression)
+// or better:
+expression@[expression]

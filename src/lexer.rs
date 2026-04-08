@@ -61,6 +61,8 @@ pub enum Token {
     LeftBracket,
     #[token("]")]
     RightBracket,
+    #[token("@[")]
+    LetterAccessLeftBracket,
     #[token(";")]
     Semicolon,
     #[token(",")]
