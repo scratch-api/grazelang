@@ -481,26 +481,22 @@ pub mod statement {
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<(
-        LeftBrace,
+        LeftBracket,
         Vec<(ast::ListEntry, Option<ast::Comma>)>,
-        RightBrace,
+        RightBracket,
     )> {
         let mut entries = Vec::<(ast::ListEntry, Option<ast::Comma>)>::new();
-        let left_brace = expect_token!(
+        let left_bracket = expect_token!(
             token_stream,
-            Token::LeftBrace => from_stream_pos!(token_stream => LeftBrace),
-            "Expected '{'.",
-            "'{'"
+            Token::LeftBracket => from_stream_pos!(token_stream => LeftBracket),
+            "Expected '['.",
+            "'['"
         );
-        let right_brace = loop {
-            if peek_token!(token_stream) == &Token::RightBrace(lexer::LexedRightBrace::Normal) {
-                skip_token!(token_stream);
-                break from_stream_pos!(token_stream => RightBrace);
-            }
+        let right_bracket = loop {
             let list_entry = match peek_token!(token_stream) {
-                Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+                Token::RightBracket => {
                     skip_token!(token_stream);
-                    break from_stream_pos!(token_stream => RightBrace);
+                    break from_stream_pos!(token_stream => RightBracket);
                 }
                 Token::Unwrap => {
                     skip_token!(token_stream);
@@ -520,7 +516,7 @@ pub mod statement {
             entries.push((
                 list_entry,
                 match peek_token!(token_stream) {
-                    Token::RightBrace(lexer::LexedRightBrace::Normal) => None,
+                    Token::RightBracket => None,
                     Token::Comma => {
                         skip_token!(token_stream);
                         Some(from_stream_pos!(token_stream => ast::Comma))
@@ -528,14 +524,14 @@ pub mod statement {
                     _ => {
                         emit_unexpected_token!(
                             token_stream,
-                            "Expected a comma or '}'.",
-                            "a comma or '}'"
+                            "Expected a comma or ']'.",
+                            "a comma or ']'"
                         );
                     }
                 },
             ));
         };
-        Ok((left_brace, entries, right_brace))
+        Ok((left_bracket, entries, right_bracket))
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -549,9 +545,9 @@ pub mod statement {
         None,
         List(
             NormalAssignmentOperator,
-            LeftBrace,
+            LeftBracket,
             Vec<(ast::ListEntry, Option<ast::Comma>)>,
-            RightBrace,
+            RightBracket,
         ),
         Var(NormalAssignmentOperator, Expression),
     }

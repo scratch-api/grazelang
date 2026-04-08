@@ -235,9 +235,9 @@ pub enum Statement {
     ListAssignment(
         Identifier,
         NormalAssignmentOperator,
-        LeftBrace,
+        LeftBracket,
         Vec<(ListEntry, Option<Comma>)>,
-        RightBrace,
+        RightBracket,
         Semicolon,
         PosRange,
     ),
@@ -456,9 +456,9 @@ pub enum SingleDataDeclaration {
         Option<CanonicalIdentifier>,
         Identifier,
         NormalAssignmentOperator,
-        LeftBrace,
+        LeftBracket,
         Vec<(ListEntry, Option<Comma>)>,
-        RightBrace,
+        RightBracket,
         PosRange,
     ),
     EmptyList(
