@@ -13,6 +13,8 @@ regex = "1.12.3"
 rand = "0.10.0"
 rand_xoshiro = "0.8.0"
 thiserror = "2.0.18"
+grazelang_library_parser = { path = "../grazelang_library_parser" }
+md5 = "0.8.0"
 
 [features]
 default = []

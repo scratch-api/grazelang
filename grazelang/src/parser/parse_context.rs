@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{HashMap, VecDeque},
+    io::Read,
     rc::{Rc, Weak},
 };
 
@@ -231,7 +232,7 @@ impl KnownBlock {
             }
             KnownBlock::Callable(..) | KnownBlock::PartialCallable(..) => {
                 // TODO: warn user about probably incorrect usage
-                Sb3FieldValue::Normal(Sb3Primitive::Null)
+                Sb3FieldValue::Normal("".into())
             }
             KnownBlock::SingletonReporter {
                 opcode: _,
@@ -315,90 +316,80 @@ impl KnownBlock {
 }
 
 #[derive(Debug, Clone)]
-pub enum ActualIdentifier {
-    Namespace(
-        HashMap<IString, Rc<RefCell<ActualIdentifier>>>,
-        Weak<RefCell<ActualIdentifier>>,
-    ),
+pub enum Symbol {
+    Namespace(HashMap<IString, Rc<RefCell<Symbol>>>, Weak<RefCell<Symbol>>),
     KnownBlock(
         Box<KnownBlock>,
-        Option<HashMap<IString, Rc<RefCell<ActualIdentifier>>>>,
-        Weak<RefCell<ActualIdentifier>>,
+        Option<HashMap<IString, Rc<RefCell<Symbol>>>>,
+        Weak<RefCell<Symbol>>,
     ),
-    Sprites(Weak<RefCell<ActualIdentifier>>),
-    Alias(
-        Rc<RefCell<ActualIdentifier>>,
-        Weak<RefCell<ActualIdentifier>>,
-    ),
+    Sprites(Weak<RefCell<Symbol>>),
+    Alias(Weak<RefCell<Symbol>>, Weak<RefCell<Symbol>>), // TODO: use Weak for Alias
 }
 
-impl ActualIdentifier {
+impl Symbol {
     pub fn new_namespace() -> Self {
         Self::Namespace(HashMap::new(), Weak::new())
     }
 
     pub fn get_block(&self) -> Option<&KnownBlock> {
         match self {
-            ActualIdentifier::KnownBlock(known_block, ..) => Some(known_block),
-            ActualIdentifier::Namespace(..)
-            | ActualIdentifier::Sprites(..)
-            | ActualIdentifier::Alias(..) => None,
+            Symbol::KnownBlock(known_block, ..) => Some(known_block),
+            Symbol::Namespace(..) | Symbol::Sprites(..) | Symbol::Alias(..) => None,
         }
     }
 
-    pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<ActualIdentifier>>> {
+    pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<Symbol>>> {
         match self {
-            ActualIdentifier::Namespace(hash_map, ..) => hash_map.get(child_name).cloned(),
-            ActualIdentifier::KnownBlock(_, hash_map, ..) => hash_map
+            Symbol::Namespace(hash_map, ..) => hash_map.get(child_name).cloned(),
+            Symbol::KnownBlock(_, hash_map, ..) => hash_map
                 .as_ref()
                 .and_then(|value| value.get(child_name).cloned()),
-            ActualIdentifier::Alias(alias, ..) => alias.borrow().get_child(child_name),
-            ActualIdentifier::Sprites(..) => None,
+            Symbol::Alias(alias, ..) => alias
+                .upgrade()
+                .and_then(|value| value.borrow().get_child(child_name)),
+            Symbol::Sprites(..) => None,
         }
     }
 
-    pub fn get_parent(&self) -> &Weak<RefCell<ActualIdentifier>> {
+    pub fn get_parent(&self) -> &Weak<RefCell<Symbol>> {
         match self {
-            ActualIdentifier::Namespace(_, parent_ref)
-            | ActualIdentifier::KnownBlock(_, _, parent_ref)
-            | ActualIdentifier::Sprites(parent_ref)
-            | ActualIdentifier::Alias(_, parent_ref) => parent_ref,
+            Symbol::Namespace(_, parent_ref)
+            | Symbol::KnownBlock(_, _, parent_ref)
+            | Symbol::Sprites(parent_ref)
+            | Symbol::Alias(_, parent_ref) => parent_ref,
         }
     }
 
-    pub fn replace_parent(
-        &mut self,
-        parent: Weak<RefCell<ActualIdentifier>>,
-    ) -> Weak<RefCell<ActualIdentifier>> {
+    pub fn replace_parent(&mut self, parent: Weak<RefCell<Symbol>>) -> Weak<RefCell<Symbol>> {
         match self {
-            ActualIdentifier::Namespace(_, parent_ref)
-            | ActualIdentifier::KnownBlock(_, _, parent_ref)
-            | ActualIdentifier::Sprites(parent_ref)
-            | ActualIdentifier::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
+            Symbol::Namespace(_, parent_ref)
+            | Symbol::KnownBlock(_, _, parent_ref)
+            | Symbol::Sprites(parent_ref)
+            | Symbol::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
         }
     }
 
     pub fn insert_child(
         this: &Rc<RefCell<Self>>,
         child_name: IString,
-        child: Rc<RefCell<ActualIdentifier>>,
-    ) -> Option<Rc<RefCell<ActualIdentifier>>> {
+        child: Rc<RefCell<Symbol>>,
+    ) -> Option<Rc<RefCell<Symbol>>> {
         child.borrow_mut().replace_parent(Rc::downgrade(this));
         match &mut *this.borrow_mut() {
-            ActualIdentifier::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
-            ActualIdentifier::KnownBlock(_, hash_map, ..) => {
+            Symbol::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
+            Symbol::KnownBlock(_, hash_map, ..) => {
                 hash_map.get_or_insert_default().insert(child_name, child)
             }
-            ActualIdentifier::Alias(alias, ..) => Self::insert_child(alias, child_name, child),
-            ActualIdentifier::Sprites(..) => None,
+            Symbol::Alias(alias, ..) => alias
+                .upgrade()
+                .and_then(|value| Self::insert_child(&value, child_name, child)),
+            Symbol::Sprites(..) => None,
         }
     }
 
     pub fn is_dependent(&self) -> bool {
-        matches!(
-            self,
-            ActualIdentifier::Alias(..) | ActualIdentifier::Sprites(..)
-        )
+        matches!(self, Symbol::Alias(..) | Symbol::Sprites(..))
     }
 }
 
@@ -406,11 +397,11 @@ impl ActualIdentifier {
 pub struct BroadcastDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub known_block: Option<Rc<RefCell<ActualIdentifier>>>,
+    pub known_block: Option<Rc<RefCell<Symbol>>>,
 }
 
 impl BroadcastDescriptor {
-    pub fn derive_actual_symbol<T: Rng>(&self, rng: &mut T) -> ActualIdentifier {
+    pub fn derive_symbol<T: Rng>(&self, rng: &mut T) -> Symbol {
         todo!()
     }
 }
@@ -426,15 +417,21 @@ pub enum TargetSymbolDescriptor {
 }
 
 impl TargetSymbolDescriptor {
-    pub fn compute_hash(path: IString) -> IdString {
-        todo!()
+    pub fn compute_hash(path: IString) -> Result<String, std::io::Error> {
+        use std::fs::File;
+        let mut file = File::open(path.to_string())?;
+        let mut data: Vec<u8> = Vec::new();
+        file.read_to_end(&mut data)?;
+        let digest = md5::compute(data);
+        let hex_digest = format!("{:x}", digest);
+        Ok(hex_digest)
     }
 
-    pub fn derive_actual_symbol<T: Rng>(
+    pub fn derive_symbol<T: Rng>(
         &self,
         rng: &mut T,
         namespace: &mut Namespace,
-    ) -> ActualIdentifier {
+    ) -> Result<Symbol, std::io::Error> {
         if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = self {
             let id = descriptor
                 .canonical_name
@@ -442,27 +439,25 @@ impl TargetSymbolDescriptor {
                 .unwrap_or_else(|| descriptor.name.clone()); // TODO: use arguments
             return todo!(); // TODO: implement custom block actual symbol
         }
-        match self {
+        Ok(match self {
             TargetSymbolDescriptor::Costume(descriptor) => Some(&descriptor.source),
             TargetSymbolDescriptor::Backdrop(descriptor) => Some(&descriptor.source),
             TargetSymbolDescriptor::Sound(descriptor) => Some(&descriptor.source),
             _ => None,
         }
         .map(|value| Self::compute_hash(value.cast_to_string()))
+        .transpose()?
         .map(|value| {
-            ActualIdentifier::KnownBlock(
-                match self {
-                    TargetSymbolDescriptor::Costume(_) => {
-                        todo!() // TODO: implement costume known blocks
-                    }
-                    TargetSymbolDescriptor::Backdrop(_) => {
-                        todo!() // TODO: implement backdrop known blocks
-                    }
-                    TargetSymbolDescriptor::Sound(_) => {
-                        todo!() // TODO: implement sound known blocks
-                    }
-                    _ => unsafe { std::hint::unreachable_unchecked() },
-                },
+            Symbol::KnownBlock(
+                Box::new(match self {
+                    // TODO: implement specific known blocks here
+                    TargetSymbolDescriptor::Costume(..)
+                    | TargetSymbolDescriptor::Backdrop(..)
+                    | TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
+                        value: codegen::project_json::Sb3FieldValue::Normal(codegen::project_json::Sb3Primitive::String(value)),
+                    },
+                    _ => unreachable!(),
+                }),
                 None,
                 Weak::new(),
             )
@@ -470,7 +465,7 @@ impl TargetSymbolDescriptor {
         .unwrap_or_else(|| {
             let id = codegen::ids::generate_random_id(rng);
             match self {
-                TargetSymbolDescriptor::Var(var_descriptor) => ActualIdentifier::KnownBlock(
+                TargetSymbolDescriptor::Var(var_descriptor) => Symbol::KnownBlock(
                     Box::new(KnownBlock::Variable {
                         canonical_name: namespace.introduce_new_symbol(
                             var_descriptor
@@ -484,7 +479,7 @@ impl TargetSymbolDescriptor {
                     None,
                     Weak::new(),
                 ),
-                TargetSymbolDescriptor::List(list_descriptor) => ActualIdentifier::KnownBlock(
+                TargetSymbolDescriptor::List(list_descriptor) => Symbol::KnownBlock(
                     Box::new(KnownBlock::List {
                         canonical_name: namespace.introduce_new_symbol(
                             list_descriptor
@@ -503,7 +498,7 @@ impl TargetSymbolDescriptor {
                 | TargetSymbolDescriptor::Backdrop(_)
                 | TargetSymbolDescriptor::Sound(_) => unreachable!(),
             }
-        })
+        }))
     }
 }
 

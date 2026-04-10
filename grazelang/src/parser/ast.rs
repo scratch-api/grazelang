@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::lexer::PosRange;
+use crate::{codegen::project_json::{Sb3Primitive, Sb3PrimitiveBlock}, lexer::PosRange};
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -737,7 +737,67 @@ impl BinOp {
     }
 
     pub fn get_descriptor(&self) -> BinOpDescriptor {
-        todo!()
+        match self {
+            BinOp::Plus(_) => BinOpDescriptor {
+                opcode: "operator_add".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+            },
+            BinOp::Minus(_) => BinOpDescriptor {
+                opcode: "operator_subtract".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+            },
+            BinOp::Times(_) => BinOpDescriptor {
+                opcode: "operator_multiply".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+            },
+            BinOp::Div(_) => BinOpDescriptor {
+                opcode: "operator_divide".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+            },
+            BinOp::Mod(_) => BinOpDescriptor {
+                opcode: "operator_mod".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+            },
+            BinOp::Join(_) => BinOpDescriptor {
+                opcode: "operator_join".to_string(),
+                operand_a_input_name: "STRING1".to_string(),
+                operand_b_input_name: "STRING2".to_string(),
+            },
+            BinOp::And(_) => BinOpDescriptor {
+                opcode: "operator_and".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+            },
+            BinOp::Or(_) => BinOpDescriptor {
+                opcode: "operator_or".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+            },
+            BinOp::Equals(_) => BinOpDescriptor {
+                opcode: "operator_equals".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+            },
+            BinOp::LessThan(_) => BinOpDescriptor {
+                opcode: "operator_lt".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+            },
+            BinOp::GreaterThan(_) => BinOpDescriptor {
+                opcode: "operator_gt".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+            },
+            // TODO: Add another data structure for these
+            BinOp::NotEquals(_) => todo!(),
+            BinOp::LessThanOrEqual(_) => todo!(),
+            BinOp::GreaterThanOrEqual(_) => todo!(),
+        }
     }
 }
 
@@ -785,7 +845,20 @@ pub enum Literal {
     EmptyExpression(LeftParens, RightParens, PosRange),
 }
 
+const EMPTY_ISTRING_REF: &IString = &arcstr::literal!("");
+
 impl Literal {
+    pub fn get_string_value(&self) -> &IString {
+        match self {
+            Literal::String(value, _) => value,
+            Literal::DecimalInt(value, _) => value,
+            Literal::DecimalFloat(value, _) => value,
+            Literal::HexadecimalInt(value, _) => value,
+            Literal::OctalInt(value, _) => value,
+            Literal::BinaryInt(value, _) => value,
+            Literal::EmptyExpression(_, _, _) => EMPTY_ISTRING_REF,
+        }
+    } 
     pub fn cast_to_string(&self) -> IString {
         match self {
             Literal::String(value, _) => value.clone(),
@@ -796,6 +869,18 @@ impl Literal {
             Literal::BinaryInt(value, _) => value.clone(),
             Literal::EmptyExpression(_, _, _) => arcstr::literal!(""),
         }
+    }
+}
+
+impl From<&Literal> for Sb3Primitive {
+    fn from(value: &Literal) -> Self {
+        value.get_string_value().into()
+    }
+}
+
+impl From<&Literal> for Sb3PrimitiveBlock {
+    fn from(value: &Literal) -> Self {
+        Sb3PrimitiveBlock::String(value.into())
     }
 }
 

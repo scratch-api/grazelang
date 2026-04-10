@@ -101,7 +101,9 @@ name = "grazelang"
 version = "0.1.0"
 dependencies = [
  "arcstr",
+ "grazelang_library_parser",
  "logos",
+ "md5",
  "rand",
  "rand_xoshiro",
  "regex",
@@ -109,6 +111,16 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "thiserror",
+]
+
+[[package]]
+name = "grazelang_library_parser"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
 ]
 
 [[package]]
@@ -207,6 +219,12 @@ checksum = "d151b2ae667f69e10b8738f5cac0c746faa22b2e15ea7e83b55476afec3767dc"
 dependencies = [
  "logos-codegen",
 ]
+
+[[package]]
+name = "md5"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae960838283323069879657ca3de837e9f7bbb4c7bf6ea7f1b290d5e9476d2e0"
 
 [[package]]
 name = "memchr"

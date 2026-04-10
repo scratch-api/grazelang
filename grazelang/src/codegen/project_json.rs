@@ -154,8 +154,8 @@ pub enum Sb3Primitive {
     Int128(i128),
     Int(i64),
     Float(f64), // f128 is not stable i guess
-    Bool(bool),
-    Null,
+    // Bool(bool),
+    // Null,
 }
 
 impl From<String> for Sb3Primitive {
@@ -186,8 +186,8 @@ impl Serialize for Sb3Primitive {
             Sb3Primitive::Int128(i) => serializer.serialize_i128(*i),
             Sb3Primitive::Int(i) => serializer.serialize_i64(*i),
             Sb3Primitive::Float(f) => serializer.serialize_f64(*f),
-            Sb3Primitive::Bool(b) => serializer.serialize_bool(*b),
-            Sb3Primitive::Null => serializer.serialize_none(),
+            // Sb3Primitive::Bool(b) => serializer.serialize_bool(*b),
+            // Sb3Primitive::Null => serializer.serialize_none(),
         }
     }
 }
@@ -259,12 +259,12 @@ mod sb3_primitive {
             Ok(Sb3Primitive::Float(v))
         }
 
-        fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(Sb3Primitive::Bool(v))
-        }
+        // fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+        // where
+        //     E: de::Error,
+        // {
+        //     Ok(Sb3Primitive::Bool(v))
+        // }
 
         fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
@@ -273,12 +273,12 @@ mod sb3_primitive {
             deserializer.deserialize_any(self)
         }
 
-        fn visit_none<E>(self) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(Sb3Primitive::Null)
-        }
+        // fn visit_none<E>(self) -> Result<Self::Value, E>
+        // where
+        //     E: de::Error,
+        // {
+        //     Ok(Sb3Primitive::Null)
+        // }
     }
 }
 
@@ -1271,4 +1271,11 @@ impl From<IsShadow> for bool {
             IsShadow::No => false,
         }
     }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Asset {
+    Costume(Sb3Costume),
+    Sound(Sb3Sound),
 }

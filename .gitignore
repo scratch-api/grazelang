@@ -3,10 +3,7 @@ debug_out.txt
 std
 data.json
 temps
-raw_scratch_standard_library_schema.jsonc
-raw_scratch_standard_toolbox_schema.jsonc
-raw_scratch_standard_toolbox_schema.xml
-scratch_standard_library_schema.jsonc
+grazelang/schemas
 # Added by cargo
 
 /target

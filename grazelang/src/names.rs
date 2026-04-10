@@ -47,7 +47,7 @@ impl Namespace {
         name
     }
     pub fn introduce_new_name(&mut self, original_name: OriginalName) -> ActualName {
-        let mut converted_name = original_name.to_string();
+        let converted_name = original_name.to_string();
         if !self.used_names.contains_key(&converted_name) {
             return self.assign_name_for(original_name, converted_name);
         }
