@@ -19,7 +19,7 @@ use super::{
 };
 
 use crate::{
-    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target},
+    codegen::project_json::{Asset, IsShadow, Sb3InputRepr, Sb3Target},
     names::Namespace,
     parser::{
         ast::{BinOpDescriptor, Expression, FormattedStringContent, Identifier, UnOpDescriptor},
@@ -34,6 +34,7 @@ use crate::{
         default_visit_expression_get_letter, default_visit_expression_identifier,
         default_visit_expression_literal, default_visit_expression_unary_operation,
         default_visit_formatted_string_content, default_visit_sprite_statement_costume_declaration,
+        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
     },
 };
 
@@ -49,6 +50,8 @@ pub enum GrazeSb3GeneratorError {
     IncorrectParamCount { unexpected: usize, expected: usize },
     #[error("tried to get a list item for a non list, {known_block:?}")]
     ListAccessForNonLists { known_block: Box<KnownBlock> },
+    #[error("cannot initialize stage multiple times")]
+    RepeatedStageInitialization,
 }
 
 pub struct GrazeSb3Generator;
@@ -62,11 +65,12 @@ pub struct GrazeSb3GeneratorContext {
     pub arg_stack: Vec<Param>,
     pub current_block_id: IdString,
     pub current_parent: Option<String>,
-    pub current_sb3_target: Sb3Target,
-    /// Is None while and after being initialized and before any targets are entered by the visitor
+    pub current_sb3_target: Option<Sb3Target>,
+    /// Is None while and after being initialized
     pub uninitialized_stage: Option<Sb3Target>,
     pub previous_block_stack: Vec<Option<IdString>>,
     pub formatted_string_context: FormattedStringContext,
+    pub target_assets: HashMap<IString, Vec<Asset>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -107,6 +111,7 @@ impl GrazeSb3GeneratorContext {
             HashMap::with_capacity(targets.len()),
             Weak::new(),
         )));
+        let mut target_assets = HashMap::with_capacity(targets.len());
         for target in &targets {
             let mut namespace = Namespace::new();
             Symbol::insert_child(
@@ -118,22 +123,32 @@ impl GrazeSb3GeneratorContext {
                             target.get_field_name(),
                         )),
                     }),
-                    Some(
-                        target
+                    Some({
+                        let symbol_count = target.borrow_symbols().len();
+                        let (symbols, assets) = target
                             .borrow_symbols()
                             .iter()
                             .map(|(key, value)| {
-                                value.derive_symbol(&mut rng, &mut namespace).map( |value|
-                                    (
-                                        key.clone(),
-                                        Rc::new(RefCell::new(
-                                            value,
-                                        )),
-                                    )
+                                value.derive_symbol_and_asset(&mut rng, &mut namespace).map(
+                                    |(symbol, asset)| {
+                                        ((key.clone(), Rc::new(RefCell::new(symbol))), asset)
+                                    },
                                 )
                             })
-                            .collect::<Result<_, _>>()?,
-                    ),
+                            .try_fold::<_, _, Result<_, std::io::Error>>(
+                                (HashMap::with_capacity(symbol_count), Vec::new()),
+                                |(mut symbols, mut assets), item| {
+                                    let ((key, symbol), asset) = item?;
+                                    symbols.insert(key, symbol);
+                                    if let Some(asset) = asset {
+                                        assets.push(asset);
+                                    }
+                                    Ok((symbols, assets))
+                                },
+                            )?;
+                        target_assets.insert(target.get_namespace_name(), assets);
+                        symbols
+                    }),
                     Weak::new(),
                 ))),
             );
@@ -166,7 +181,10 @@ impl GrazeSb3GeneratorContext {
                         &variables_symbol,
                         name,
                         Rc::new(RefCell::new(
-                            symbol.derive_symbol(&mut rng, &mut global_namespace).unwrap(),
+                            symbol
+                                .derive_symbol_and_asset(&mut rng, &mut global_namespace)
+                                .unwrap()
+                                .0,
                         )),
                     );
                 }
@@ -175,7 +193,10 @@ impl GrazeSb3GeneratorContext {
                         &lists_symbol,
                         name,
                         Rc::new(RefCell::new(
-                            symbol.derive_symbol(&mut rng, &mut global_namespace).unwrap(),
+                            symbol
+                                .derive_symbol_and_asset(&mut rng, &mut global_namespace)
+                                .unwrap()
+                                .0,
                         )),
                     );
                 }
@@ -198,10 +219,11 @@ impl GrazeSb3GeneratorContext {
             arg_stack: Vec::new(),
             current_block_id: next_block_id,
             current_parent: None,
-            current_sb3_target: Sb3Target::new_stage(),
-            uninitialized_stage: None, // TODO: add stage here
+            current_sb3_target: None,
+            uninitialized_stage: Some(Sb3Target::new_stage()),
             previous_block_stack: Vec::new(),
             formatted_string_context: FormattedStringContext::new(),
+            target_assets,
         })
     }
 
@@ -228,7 +250,6 @@ impl GrazeSb3GeneratorContext {
             .chain(identifier.names.iter())
             .try_fold(self.root_symbol.clone(), |current, (next, _)| {
                 if next == &literal!("super") {
-                    // TODO: Reason about whether there should be a "root" option.
                     current.borrow().get_parent().upgrade()
                 } else {
                     current.borrow().get_child(next)
@@ -555,6 +576,8 @@ impl From<((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)> for Sb3InputVa
 pub fn add_reporter_block(context: &mut GrazeSb3GeneratorContext, id: &IdString, block: Sb3Block) {
     context
         .current_sb3_target
+        .as_mut()
+        .unwrap() // the visitor should always guarantee there is a target when blocks are added
         .blocks
         .insert(id.to_string(), block);
 }
@@ -987,6 +1010,34 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     // Assets:
 
+    fn visit_top_level_statement_stage(
+        &self,
+        value: (
+            &crate::parser::ast::StageKeyword,
+            &crate::parser::ast::StageCodeBlock,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        let mut stage = context
+            .uninitialized_stage
+            .take()
+            .ok_or(GrazeSb3GeneratorError::RepeatedStageInitialization)?;
+        let target_name = literal!("stage");
+        let assets = context.target_assets.remove(&target_name).unwrap();
+        for asset in assets {
+            match asset {
+                Asset::Costume(costume) => stage.costumes.push(costume),
+                Asset::Sound(sound) => stage.sounds.push(sound),
+            }
+        }
+        context.current_sb3_target.replace(stage);
+        default_visit_top_level_statement_stage(self, value, context)?;
+        context.sb3.targets.push(context.current_sb3_target.take().unwrap());
+        Ok(())
+    }
+
     fn visit_top_level_statement_sprite(
         &self,
         value: (
@@ -999,6 +1050,23 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        todo!() // Get assets from symbols
+        let target_name = value
+            .1
+            .as_ref()
+            .map(|value| value.name.clone())
+            .unwrap_or_else(|| value.2.names.last().unwrap().0.clone());
+        // TODO: explicitly error when multiple sprites have the same name
+        let assets = context.target_assets.remove(&target_name).unwrap();
+        let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
+        for asset in assets {
+            match asset {
+                Asset::Costume(costume) => new_sprite.costumes.push(costume),
+                Asset::Sound(sound) => new_sprite.sounds.push(sound),
+            }
+        }
+        context.current_sb3_target.replace(new_sprite);
+        default_visit_top_level_statement_sprite(self, value, context)?;
+        context.sb3.targets.push(context.current_sb3_target.take().unwrap());
+        Ok(())
     }
 }

@@ -220,8 +220,8 @@ macro_rules! get_token_end {
 macro_rules! emit_unexpected_token {
     ($token_stream:expr, $msg_1:expr, $msg_2:expr) => {
         return Err(ParseError::UnexpectedToken {
-            expected: $msg_1,
-            message: $msg_2,
+            message: $msg_1,
+            expected: $msg_2,
             context: static_current_context!(),
             pos_range: get_token_position!($token_stream),
         })

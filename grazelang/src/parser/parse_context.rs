@@ -146,7 +146,7 @@ impl KnownBlock {
         use codegen::project_json::Sb3PrimitiveBlock;
         match self {
             KnownBlock::Variable { canonical_name, id } => {
-                // TODO: possibly set x and y
+                // f: possibly set x and y
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::Variable {
                     name: canonical_name.to_string(),
                     id: id.to_string(),
@@ -427,11 +427,39 @@ impl TargetSymbolDescriptor {
         Ok(hex_digest)
     }
 
-    pub fn derive_symbol<T: Rng>(
+    pub fn derive_symbol_and_asset<T: Rng>(
         &self,
         rng: &mut T,
         namespace: &mut Namespace,
-    ) -> Result<Symbol, std::io::Error> {
+    ) -> Result<(Symbol, Option<codegen::project_json::Asset>), std::io::Error> {
+        pub fn get_file_extension_unwrapped(this: &TargetSymbolDescriptor) -> &str {
+            match this {
+                TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                    name: _,
+                    canonical_name: _,
+                    source,
+                })
+                | TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                    name: _,
+                    canonical_name: _,
+                    source,
+                })
+                | TargetSymbolDescriptor::Sound(SoundDescriptor {
+                    name: _,
+                    canonical_name: _,
+                    source,
+                }) => {
+                    // TODO: better ext detections
+                    source
+                        .get_string_value()
+                        .as_str()
+                        .split('.')
+                        .next_back()
+                        .unwrap()
+                }
+                _ => unreachable!(),
+            }
+        }
         if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = self {
             let id = descriptor
                 .canonical_name
@@ -439,7 +467,7 @@ impl TargetSymbolDescriptor {
                 .unwrap_or_else(|| descriptor.name.clone()); // TODO: use arguments
             return todo!(); // TODO: implement custom block actual symbol
         }
-        Ok(match self {
+        match self {
             TargetSymbolDescriptor::Costume(descriptor) => Some(&descriptor.source),
             TargetSymbolDescriptor::Backdrop(descriptor) => Some(&descriptor.source),
             TargetSymbolDescriptor::Sound(descriptor) => Some(&descriptor.source),
@@ -448,57 +476,110 @@ impl TargetSymbolDescriptor {
         .map(|value| Self::compute_hash(value.cast_to_string()))
         .transpose()?
         .map(|value| {
-            Symbol::KnownBlock(
-                Box::new(match self {
-                    // TODO: implement specific known blocks here
-                    TargetSymbolDescriptor::Costume(..)
-                    | TargetSymbolDescriptor::Backdrop(..)
-                    | TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
-                        value: codegen::project_json::Sb3FieldValue::Normal(codegen::project_json::Sb3Primitive::String(value)),
-                    },
-                    _ => unreachable!(),
-                }),
-                None,
-                Weak::new(),
-            )
-        })
-        .unwrap_or_else(|| {
-            let id = codegen::ids::generate_random_id(rng);
-            match self {
-                TargetSymbolDescriptor::Var(var_descriptor) => Symbol::KnownBlock(
-                    Box::new(KnownBlock::Variable {
-                        canonical_name: namespace.introduce_new_symbol(
-                            var_descriptor
-                                .canonical_name
-                                .as_ref()
-                                .map(|value| value.to_string()),
-                            var_descriptor.name.clone(),
-                        ),
-                        id,
+            let file_ext = get_file_extension_unwrapped(self);
+            Ok((
+                Symbol::KnownBlock(
+                    Box::new(match self {
+                        // TODO: implement specific known blocks here
+                        TargetSymbolDescriptor::Costume(..)
+                        | TargetSymbolDescriptor::Backdrop(..)
+                        | TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
+                            value: codegen::project_json::Sb3FieldValue::Normal(
+                                codegen::project_json::Sb3Primitive::String(value.clone()),
+                            ),
+                        },
+                        _ => unreachable!(),
                     }),
                     None,
                     Weak::new(),
                 ),
-                TargetSymbolDescriptor::List(list_descriptor) => Symbol::KnownBlock(
-                    Box::new(KnownBlock::List {
-                        canonical_name: namespace.introduce_new_symbol(
-                            list_descriptor
-                                .canonical_name
-                                .as_ref()
-                                .map(|value| value.to_string()),
-                            list_descriptor.name.clone(),
-                        ),
-                        id,
-                    }), // TODO: add list length as method
+                match self {
+                    // TODO: implement specific known blocks here
+                    TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                        name,
+                        canonical_name,
+                        source: _,
+                    })
+                    | TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                        name,
+                        canonical_name,
+                        source: _,
+                    }) => {
+                        Some(codegen::project_json::Asset::Costume(
+                            codegen::project_json::Sb3Costume {
+                                asset_id: value.clone(),
+                                name: canonical_name.as_ref().unwrap_or(name).to_string(),
+                                md5ext: format!("{}.{}", value, file_ext),
+                                data_format: file_ext.to_string(),
+                                bitmap_resolution: Some(1.0), // TODO: better default and more control
+                                rotation_center_x: 0.0,
+                                rotation_center_y: 0.0,
+                            },
+                        ))
+                    }
+                    TargetSymbolDescriptor::Sound(SoundDescriptor {
+                        name,
+                        canonical_name,
+                        source,
+                    }) => {
+                        Some(codegen::project_json::Asset::Sound(
+                            codegen::project_json::Sb3Sound {
+                                asset_id: value.clone(),
+                                name: canonical_name.as_ref().unwrap_or(name).to_string(),
+                                md5ext: format!("{}.{}", value, file_ext),
+                                data_format: file_ext.to_string(),
+                                rate: 48000.0, // TODO: better default and more control
+                                sample_count: 1124,
+                            },
+                        ))
+                    }
+                    _ => unreachable!(),
+                }, // TODO: add asset
+            ))
+        })
+        .unwrap_or_else(|| {
+            let id = codegen::ids::generate_random_id(rng);
+            match self {
+                TargetSymbolDescriptor::Var(var_descriptor) => Ok((
+                    Symbol::KnownBlock(
+                        Box::new(KnownBlock::Variable {
+                            canonical_name: namespace.introduce_new_symbol(
+                                var_descriptor
+                                    .canonical_name
+                                    .as_ref()
+                                    .map(|value| value.to_string()),
+                                var_descriptor.name.clone(),
+                            ),
+                            id,
+                        }),
+                        None,
+                        Weak::new(),
+                    ),
                     None,
-                    Weak::new(),
-                ),
+                )),
+                TargetSymbolDescriptor::List(list_descriptor) => Ok((
+                    Symbol::KnownBlock(
+                        Box::new(KnownBlock::List {
+                            canonical_name: namespace.introduce_new_symbol(
+                                list_descriptor
+                                    .canonical_name
+                                    .as_ref()
+                                    .map(|value| value.to_string()),
+                                list_descriptor.name.clone(),
+                            ),
+                            id,
+                        }), // TODO: add list length as method
+                        None,
+                        Weak::new(),
+                    ),
+                    None,
+                )),
                 TargetSymbolDescriptor::CustomBlockDescriptor(custom_block_descriptor) => todo!(),
                 TargetSymbolDescriptor::Costume(_)
                 | TargetSymbolDescriptor::Backdrop(_)
                 | TargetSymbolDescriptor::Sound(_) => unreachable!(),
             }
-        }))
+        })
     }
 }
 

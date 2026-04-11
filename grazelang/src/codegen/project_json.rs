@@ -88,6 +88,34 @@ impl Sb3Target {
             rotation_style: None,
         }
     }
+
+    pub fn new_sprite(name: String) -> Self {
+        Sb3Target {
+            is_stage: false,
+            name,
+            variables: HashMap::new(),
+            lists: HashMap::new(),
+            broadcasts: HashMap::new(),
+            blocks: HashMap::new(),
+            comments: HashMap::new(),
+            current_costume: 0,
+            costumes: Vec::new(),
+            sounds: Vec::new(),
+            volume: 100.0,
+            layer_order: 0,
+            tempo: None,
+            video_transparency: None,
+            video_state: None,
+            text_to_speech_language: None,
+            visible: Some(true),
+            x: Some(0.0),
+            y: Some(0.0),
+            size: Some(100.0),
+            direction: Some(90.0),
+            draggable: Some(false),
+            rotation_style: Some("all around".to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -154,8 +182,8 @@ pub enum Sb3Primitive {
     Int128(i128),
     Int(i64),
     Float(f64), // f128 is not stable i guess
-    // Bool(bool),
-    // Null,
+                // Bool(bool),
+                // Null,
 }
 
 impl From<String> for Sb3Primitive {
@@ -1272,7 +1300,6 @@ impl From<IsShadow> for bool {
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Asset {
