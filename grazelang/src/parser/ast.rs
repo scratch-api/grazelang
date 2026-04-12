@@ -933,8 +933,8 @@ impl GetPos for Identifier {
 }
 
 impl Identifier {
-    pub fn is_if(&self) -> bool {
-        todo!()
+    pub fn is_syntactic_if(&self) -> bool {
+        todo!() // TODO: change if else logic to only allow `if` and `else`
     }
 }
 
@@ -962,6 +962,7 @@ pub enum ParseError {
         expected: &'static str,
         message: &'static str,
         context: &'static str,
+        found: crate::lexer::Token,
         pos_range: PosRange,
     },
     #[error("the lexer got stuck after the token at {pos_range:?} (context: {context})")]

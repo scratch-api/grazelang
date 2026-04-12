@@ -101,6 +101,7 @@ name = "grazelang"
 version = "0.1.0"
 dependencies = [
  "arcstr",
+ "grazelang_library",
  "grazelang_library_parser",
  "logos",
  "md5",
@@ -114,9 +115,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "grazelang_library"
+version = "0.1.0"
+dependencies = [
+ "arcstr",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "grazelang_library_parser"
 version = "0.1.0"
 dependencies = [
+ "grazelang_library",
  "quote",
  "serde",
  "serde_json",

@@ -25,13 +25,13 @@ pub struct Sb3Target {
     pub broadcasts: HashMap<String, String>,
     pub blocks: HashMap<String, Sb3Block>,
     pub comments: HashMap<String, Sb3Comment>,
-    pub current_costume: i32,
+    pub current_costume: usize,
     pub costumes: Vec<Sb3Costume>,
     pub sounds: Vec<Sb3Sound>,
     #[serde(default)]
     pub volume: f64,
     #[serde(default)]
-    pub layer_order: i32,
+    pub layer_order: usize,
 
     // Stage
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1305,4 +1305,39 @@ impl From<IsShadow> for bool {
 pub enum Asset {
     Costume(Sb3Costume),
     Sound(Sb3Sound),
+}
+
+impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
+    fn from(value: (Sb3InputRepr, IsShadow)) -> Self {
+        let (input_repr, is_shadow) = value;
+        if is_shadow == IsShadow::Yes {
+            Self::Shadow(input_repr)
+        } else {
+            Self::NoShadow(input_repr)
+        }
+    }
+}
+
+impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputValue {
+    fn from(value: ((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)) -> Self {
+        (value.0, value.1.as_ref()).into()
+    }
+}
+
+impl From<((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)> for Sb3InputValue {
+    fn from(value: ((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)) -> Self {
+        // TODO: Implement primitive block conversion (if default is a positive integer, so would a literal value be)
+        let ((input_repr, is_shadow), shadow) = value;
+        if is_shadow == IsShadow::Yes {
+            return Self::Shadow(input_repr);
+        }
+        if let Some(shadow) = shadow {
+            Self::ObscuredShadow {
+                value: input_repr,
+                shadow: Sb3InputRepr::PrimitiveBlock(shadow.clone()),
+            }
+        } else {
+            Self::NoShadow(input_repr)
+        }
+    }
 }

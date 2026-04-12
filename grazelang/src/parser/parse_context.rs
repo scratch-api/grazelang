@@ -7,9 +7,11 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
+use grazelang_library::{CallBlockParam, CallableKnownBlockSignature, KnownBlockInput, SimpleCallableKnownBlockSignature};
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
+pub use grazelang_library::KnownBlock;
 
 use crate::{codegen, names::Namespace, parser::ast::Literal};
 
@@ -60,92 +62,40 @@ pub struct SoundDescriptor {
     pub source: Literal,
 }
 
-/// Resolved symbols or primitive expressions like strings for usage in inputs or fields
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum KnownBlock {
-    Variable {
-        canonical_name: String,
-        id: IdString,
-    },
-    List {
-        canonical_name: String,
-        id: IdString,
-    },
-    /// Cannot be used for variables in the context of an input
-    FieldValue {
-        value: codegen::project_json::Sb3FieldValue,
-    },
-    BlockRef {
-        id: IdString,
-    },
-    /// Intended for primitive expressions like strings but can be used for variables etc aswell
-    PrimitiveBlock {
-        value: codegen::project_json::Sb3PrimitiveBlock,
-    },
-    Callable(IString, Vec<CallBlockParam>),
-    PartialCallable(
-        IString,
-        Vec<(CallBlockParam, KnownBlock)>,
-        Vec<CallBlockParam>,
-    ),
-    /// Reporter block without any inputs or fields e.g. direction
-    SingletonReporter {
-        opcode: IString,
-        params: Vec<(CallBlockParam, KnownBlock)>,
-        field: Option<codegen::project_json::Sb3FieldValue>,
-        assign: Option<SimpleCallableKnownBlockSignature>,
-    },
+pub trait ResolveKnownBlock {
+    fn resolve_for_input<'a>(
+        &'a self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> KnownBlockInput<'a>;
+
+    fn resolve_for_field(
+        &self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> codegen::project_json::Sb3FieldValue;
+
+    fn resolve_for_call_block<'a>(
+        &'a self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> CallableKnownBlockSignature<'a>;
+
+    fn resolve_for_assignment<'a>(
+        &'a self,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> &'a SimpleCallableKnownBlockSignature;
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum KnownBlockInput<'a> {
-    PrimitiveInput(codegen::project_json::Sb3PrimitiveBlock),
-    BlockRef(IdString),
-    SimpleBlock(&'a IString, &'a Vec<(CallBlockParam, KnownBlock)>),
-    Menu(codegen::project_json::Sb3FieldValue),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CallableKnownBlockSignature<'a>(
-    pub &'a IString,
-    pub &'a Vec<CallBlockParam>,
-    pub &'a Vec<(CallBlockParam, KnownBlock)>,
-);
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SimpleCallableKnownBlockSignature(
-    pub IString,
-    pub CallBlockParam,
-    pub Option<Vec<(CallBlockParam, KnownBlock)>>,
-);
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum CallBlockParamKind {
-    Input {
-        default: Option<codegen::project_json::Sb3PrimitiveBlock>,
-    },
-    Field,
-    MenuInput {
-        opcode: IString,
-        field_name: IString,
-        default: codegen::project_json::Sb3FieldValue,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CallBlockParam {
-    pub kind: CallBlockParamKind,
-    pub name: IString,
-}
-
-impl KnownBlock {
-    pub fn resolve_for_input<'a>(
+impl ResolveKnownBlock for KnownBlock { // TODO: add c blocks
+    fn resolve_for_input<'a>(
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a> {
         use codegen::project_json::Sb3PrimitiveBlock;
         match self {
-            KnownBlock::Variable { canonical_name, id } => {
+            KnownBlock::Variable {
+                canonical_name,
+                id,
+                assign: _,
+            } => {
                 // f: possibly set x and y
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::Variable {
                     name: canonical_name.to_string(),
@@ -182,13 +132,17 @@ impl KnownBlock {
         }
     }
 
-    pub fn resolve_for_field(
+    fn resolve_for_field(
         &self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> codegen::project_json::Sb3FieldValue {
         use codegen::project_json::{Sb3FieldValue, Sb3Primitive};
         match self {
-            KnownBlock::Variable { canonical_name, id } => Sb3FieldValue::WithId {
+            KnownBlock::Variable {
+                canonical_name,
+                id,
+                assign: _,
+            } => Sb3FieldValue::WithId {
                 value: Sb3Primitive::String(canonical_name.to_string()),
                 id: id.to_string(),
             },
@@ -248,7 +202,7 @@ impl KnownBlock {
         }
     }
 
-    pub fn resolve_for_call_block<'a>(
+    fn resolve_for_call_block<'a>(
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> CallableKnownBlockSignature<'a> {
@@ -269,41 +223,22 @@ impl KnownBlock {
         }
     }
 
-    pub fn resolve_for_assignment<'a>(
+    fn resolve_for_assignment<'a>(
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> Cow<'a, SimpleCallableKnownBlockSignature> {
-        // TODO: is cow actually the right choice here?
+    ) -> &'a SimpleCallableKnownBlockSignature {
         match self {
-            KnownBlock::Variable { canonical_name, id } => {
-                Cow::Owned(SimpleCallableKnownBlockSignature(
-                    literal!("data_setvariableto"),
-                    CallBlockParam {
-                        kind: CallBlockParamKind::Input {
-                            default: Some("0".into()),
-                        },
-                        name: literal!("VALUE"),
-                    },
-                    Some(vec![(
-                        CallBlockParam {
-                            kind: CallBlockParamKind::Field,
-                            name: literal!("VARIABLE"),
-                        },
-                        KnownBlock::FieldValue {
-                            value: codegen::project_json::Sb3FieldValue::WithId {
-                                value: (canonical_name as &str).into(),
-                                id: id.to_string(),
-                            },
-                        },
-                    )]),
-                ))
+            KnownBlock::Variable {
+                canonical_name: _,
+                id: _,
+                assign,
             }
-            KnownBlock::SingletonReporter {
+            | KnownBlock::SingletonReporter {
                 opcode: _,
                 params: _,
                 field: _,
                 assign: Some(assign),
-            } => Cow::Borrowed(assign),
+            } => assign,
             KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
@@ -542,8 +477,8 @@ impl TargetSymbolDescriptor {
             match self {
                 TargetSymbolDescriptor::Var(var_descriptor) => Ok((
                     Symbol::KnownBlock(
-                        Box::new(KnownBlock::Variable {
-                            canonical_name: namespace.introduce_new_symbol(
+                        Box::new(KnownBlock::new_variable(
+                            namespace.introduce_new_symbol(
                                 var_descriptor
                                     .canonical_name
                                     .as_ref()
@@ -551,7 +486,7 @@ impl TargetSymbolDescriptor {
                                 var_descriptor.name.clone(),
                             ),
                             id,
-                        }),
+                        )),
                         None,
                         Weak::new(),
                     ),

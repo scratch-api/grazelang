@@ -1,3 +1,3 @@
 pub mod ids;
 pub mod core;
-pub mod project_json;
+pub use grazelang_library::project_json;

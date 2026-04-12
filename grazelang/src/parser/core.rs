@@ -15,7 +15,7 @@ use crate::{
         parse_context::{self, BroadcastDescriptor},
     },
 };
-use arcstr::ArcStr as IString;
+use arcstr::{ArcStr as IString, literal};
 use logos::Lexer;
 use std::{collections::VecDeque, iter::Peekable, vec};
 
@@ -33,15 +33,16 @@ macro_rules! static_current_context {
 }
 
 macro_rules! expect_token {
-    ($token_stream:expr, $pattern:expr => (), $msg1:expr, $msg2:expr) => {
-        if next_token!($token_stream) != $pattern {
-            emit_unexpected_token!($token_stream, $msg1, $msg2)
+    ($token_stream:expr, $pattern:pat => (), $msg1:expr, $msg2:expr) => {{
+        let token = next_token!($token_stream);
+        if !matches!(token, $pattern) {
+            emit_unexpected_token!($token_stream, $msg1, $msg2, token)
         }
-    };
+    }};
     ($token_stream:expr, $pattern:pat => $value:expr, $msg1:expr, $msg2:expr) => {{
         match next_token!($token_stream) {
             $pattern => $value,
-            _ => emit_unexpected_token!($token_stream, $msg1, $msg2),
+            token => emit_unexpected_token!($token_stream, $msg1, $msg2, token),
         }
     }};
 }
@@ -218,11 +219,12 @@ macro_rules! get_token_end {
 }
 
 macro_rules! emit_unexpected_token {
-    ($token_stream:expr, $msg_1:expr, $msg_2:expr) => {
+    ($token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
         return Err(ParseError::UnexpectedToken {
             message: $msg_1,
             expected: $msg_2,
             context: static_current_context!(),
+            found: $found,
             pos_range: get_token_position!($token_stream),
         })
     };
@@ -327,8 +329,12 @@ pub fn parse_full_identifier(
         } {
             Token::ScopeResolution => {
                 if scope.is_some() {
-                    skip_token!(token_stream);
-                    emit_unexpected_token!(token_stream, "Expected a dot.", "a dot");
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected a dot.",
+                        "a dot",
+                        next_token!(token_stream)
+                    );
                 }
             }
             Token::Dot => {
@@ -340,12 +346,18 @@ pub fn parse_full_identifier(
             _ => break,
         }
         skip_token!(token_stream);
-        names.push(expect_token!(
-            token_stream,
-            Token::Identifier(value) => (value, get_token_position!(token_stream)),
-            "Expected an identifier.",
-            "an identifier"
-        ));
+        names.push({
+            match next_token!(token_stream) {
+                Token::Identifier(value) => (value, get_token_position!(token_stream)),
+                Token::StageKeyword => (literal!("stage"), get_token_position!(token_stream)),
+                token => emit_unexpected_token!(
+                    token_stream,
+                    "Expected an identifier.",
+                    "an identifier",
+                    token
+                ),
+            }
+        });
     }
     if names.len() > 1 && scope.is_none() {
         scope = Some(names);
@@ -373,8 +385,12 @@ pub fn parse_full_identifier_starting_with(
         } {
             Token::ScopeResolution => {
                 if scope.is_some() {
-                    skip_token!(token_stream);
-                    emit_unexpected_token!(token_stream, "Expected a dot.", "a dot");
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected a dot.",
+                        "a dot",
+                        next_token!(token_stream)
+                    );
                 }
             }
             Token::Dot => {
@@ -471,8 +487,8 @@ pub mod statement {
                 );
                 Ok(value)
             }
-            _ => {
-                emit_unexpected_token!(token_stream, "Expected a literal.", "a literal");
+            token => {
+                emit_unexpected_token!(token_stream, "Expected a literal.", "a literal", token);
             }
         }
     }
@@ -525,7 +541,8 @@ pub mod statement {
                         emit_unexpected_token!(
                             token_stream,
                             "Expected a comma or ']'.",
-                            "a comma or ']'"
+                            "a comma or ']'",
+                            next_token!(token_stream)
                         );
                     }
                 },
@@ -614,42 +631,51 @@ pub mod statement {
                     pos_range: get_token_position!(token_stream),
                 }
             });
-            let identifier = if let Token::Identifier(value) = next_token!(token_stream) {
-                if start_pos.is_none() {
-                    start_pos = Some(get_token_start!(token_stream));
+            let identifier = match next_token!(token_stream) {
+                Token::Identifier(value) => {
+                    if start_pos.is_none() {
+                        start_pos = Some(get_token_start!(token_stream));
+                    }
+                    Identifier {
+                        scope: Vec::new(),
+                        names: vec![(value, get_token_position!(token_stream))],
+                        pos_range: get_token_position!(token_stream),
+                    }
                 }
-                Identifier {
-                    scope: Vec::new(),
-                    names: vec![(value, get_token_position!(token_stream))],
-                    pos_range: get_token_position!(token_stream),
-                }
-            } else {
-                match (scope, dec_type, canonical_identifier) {
+                token => match (scope, dec_type, canonical_identifier) {
                     (DataDeclarationScope::Unset, SingleDataDeclarationType::Unset, None) => {
                         emit_unexpected_token!(
                             token_stream,
                             "Expected scope modifer, declaration type, canonical identifier or identifier.",
-                            "scope modifer, declaration type, canonical identifier or identifier"
+                            "scope modifer, declaration type, canonical identifier or identifier",
+                            token
                         );
                     }
                     (_, SingleDataDeclarationType::Unset, None) => {
                         emit_unexpected_token!(
                             token_stream,
                             "Expected declaration type, canonical identifier or identifier.",
-                            "declaration type, canonical identifier or identifier"
+                            "declaration type, canonical identifier or identifier",
+                            token
                         );
                     }
                     (_, _, None) => {
                         emit_unexpected_token!(
                             token_stream,
                             "Expected canonical identifier or identifier.",
-                            "canonical identifier or identifier"
+                            "canonical identifier or identifier",
+                            token
                         );
                     }
                     (_, _, _) => {
-                        emit_unexpected_token!(token_stream, "Expected identifier.", "identifier");
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected identifier.",
+                            "identifier",
+                            token
+                        );
                     }
-                }
+                },
             };
             let value = match peek_token!(token_stream) {
                 // Token::LeftBrace => {
@@ -689,7 +715,8 @@ pub mod statement {
                                 emit_unexpected_token!(
                                     token_stream,
                                     "Expected an expression.",
-                                    "an expression"
+                                    "an expression",
+                                    next_token!(token_stream)
                                 );
                             }
                             _ => (),
@@ -706,7 +733,12 @@ pub mod statement {
                         if default_type == DefaultDataDeclarationType::List
                             && !matches!(dec_type, SingleDataDeclarationType::Var(_))
                         {
-                            emit_unexpected_token!(token_stream, "Expected '{'.", "'{'");
+                            emit_unexpected_token!(
+                                token_stream,
+                                "Expected '{'.",
+                                "'{'",
+                                next_token!(token_stream)
+                            );
                         }
                         DeclarationValue::Var(
                             assignment_operator,
@@ -720,7 +752,8 @@ pub mod statement {
                 _ => emit_unexpected_token!(
                     token_stream,
                     "Expected ',', '=', '{', '}' or ')'",
-                    "',', '=', '{', '}' or ')'"
+                    "',', '=', '{', '}' or ')'",
+                    next_token!(token_stream)
                 ),
             };
             with_mut_target_scope_or_global_scope!(
@@ -831,11 +864,11 @@ pub mod statement {
                     Token::RightBrace(lexer::LexedRightBrace::Normal) => None,
                     Token::RightParens => None,
                     _ => {
-                        skip_token!(token_stream);
                         emit_unexpected_token!(
                             token_stream,
                             "Expected ',', ')' or '}'.",
-                            "',', ')' or '}'"
+                            "',', ')' or '}'",
+                            next_token!(token_stream)
                         )
                     }
                 },
@@ -1007,42 +1040,51 @@ pub mod statement {
                 pos_range: get_token_position!(token_stream),
             }
         });
-        let identifier = if let Token::Identifier(value) = next_token!(token_stream) {
-            if start_pos.is_none() {
-                start_pos = from_stream_pos!(token_stream => Some);
+        let identifier = match next_token!(token_stream) {
+            Token::Identifier(value) => {
+                if start_pos.is_none() {
+                    start_pos = from_stream_pos!(token_stream => Some);
+                }
+                Identifier {
+                    scope: Vec::new(),
+                    names: vec![(value, get_token_position!(token_stream))],
+                    pos_range: get_token_position!(token_stream),
+                }
             }
-            Identifier {
-                scope: Vec::new(),
-                names: vec![(value, get_token_position!(token_stream))],
-                pos_range: get_token_position!(token_stream),
-            }
-        } else {
-            match (scope, dec_type, canonical_identifier) {
+            token => match (scope, dec_type, canonical_identifier) {
                 (DataDeclarationScope::Unset, SingleDataDeclarationType::Unset, None) => {
                     emit_unexpected_token!(
                         token_stream,
                         "Expected scope modifer, declaration type, canonical identifier or identifier.",
-                        "scope modifer, declaration type, canonical identifier or identifier"
+                        "scope modifer, declaration type, canonical identifier or identifier",
+                        token
                     );
                 }
                 (_, SingleDataDeclarationType::Unset, None) => {
                     emit_unexpected_token!(
                         token_stream,
                         "Expected declaration type, canonical identifier or identifier.",
-                        "declaration type, canonical identifier or identifier"
+                        "declaration type, canonical identifier or identifier",
+                        token
                     );
                 }
                 (_, _, None) => {
                     emit_unexpected_token!(
                         token_stream,
                         "Expected canonical identifier or identifier.",
-                        "canonical identifier or identifier"
+                        "canonical identifier or identifier",
+                        token
                     );
                 }
                 (_, _, Some(_)) => {
-                    emit_unexpected_token!(token_stream, "Expected identifier.", "identifier");
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected identifier.",
+                        "identifier",
+                        token
+                    );
                 }
-            }
+            },
         };
         let value = match peek_token!(token_stream) {
             // Token::LeftBrace => {
@@ -1072,7 +1114,8 @@ pub mod statement {
                         emit_unexpected_token!(
                             token_stream,
                             "Expected an expression.",
-                            "an expression"
+                            "an expression",
+                            next_token!(token_stream)
                         );
                     }
                     let (left_brace, list_content, right_brace) =
@@ -1085,7 +1128,12 @@ pub mod statement {
                     )
                 } else {
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
-                        emit_unexpected_token!(token_stream, "Expected '{'.", "'{'");
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected '{'.",
+                            "'{'",
+                            next_token!(token_stream)
+                        );
                     }
                     DeclarationValue::Var(
                         assignment_operator,
@@ -1095,8 +1143,12 @@ pub mod statement {
             }
             Token::Semicolon => DeclarationValue::None,
             _ => {
-                skip_token!(token_stream);
-                emit_unexpected_token!(token_stream, "Expected '=' or ';'", "'=' or ';'");
+                emit_unexpected_token!(
+                    token_stream,
+                    "Expected '=' or ';'",
+                    "'=' or ';'",
+                    next_token!(token_stream)
+                );
             }
         };
         with_mut_target_scope_or_global_scope!(
@@ -1231,7 +1283,7 @@ pub mod statement {
         start_pos: (usize, usize),
     ) -> ParseOut<Statement> {
         let code_block = parse_code_block(token_stream, context)?;
-        if identifier.is_if() {
+        if identifier.is_syntactic_if() {
             let initial_code_block = (identifier, expression, code_block);
             let mut code_blocks = Vec::<(Identifier, Identifier, Expression, CodeBlock)>::new();
             let final_code_block = loop {
@@ -1244,11 +1296,20 @@ pub mod statement {
                         let else_identifier = parse_full_identifier(token_stream, context)?;
                         if matches!(peek_token!(token_stream), Token::Identifier(_)) {
                             let if_identifier = parse_full_identifier(token_stream, context)?;
-                            if !if_identifier.is_if() {
+                            if !if_identifier.is_syntactic_if() {
                                 emit_unexpected_token!(
                                     token_stream,
                                     "Expected \"if\" identifier.",
-                                    "\"if\" identifier"
+                                    "\"if\" identifier",
+                                    Token::Identifier(
+                                        if_identifier
+                                            .names
+                                            .last()
+                                            .or_else(|| if_identifier.scope.last())
+                                            .unwrap()
+                                            .0
+                                            .clone()
+                                    )
                                 );
                             }
                             code_blocks.push((
@@ -1378,7 +1439,12 @@ pub mod statement {
     ) -> ParseOut<Statement> {
         let start_pos = get_token_start!(token_stream);
         if peek_token!(token_stream) != &Token::LeftBrace {
-            emit_unexpected_token!(token_stream, "Expected '{'", "'{'");
+            emit_unexpected_token!(
+                token_stream,
+                "Expected '{'",
+                "'{'",
+                next_token!(token_stream)
+            );
         }
         let code_block = parse_code_block(token_stream, context)?;
         Ok(Statement::Forever(
@@ -1434,8 +1500,12 @@ pub mod statement {
                 ))
             }
             _ => {
-                skip_token!(token_stream);
-                emit_unexpected_token!(token_stream, "Expected '=' or '('.", "'=' or '('");
+                emit_unexpected_token!(
+                    token_stream,
+                    "Expected '=' or '('.",
+                    "'=' or '('",
+                    next_token!(token_stream)
+                );
             }
         }
     }
@@ -1600,7 +1670,8 @@ pub mod statement {
                                 _ => emit_unexpected_token!(
                                     token_stream,
                                     "Expected ',' or ')'.",
-                                    "',' or ')'"
+                                    "',' or ')'",
+                                    next_token!(token_stream)
                                 ),
                             }
                         },
@@ -1721,7 +1792,8 @@ pub mod statement {
             _ => emit_unexpected_token!(
                 token_stream,
                 "Expected canonical identifier, identifier or '('.",
-                "canonical identifier, identifier or '('"
+                "canonical identifier, identifier or '('",
+                next_token!(token_stream)
             ),
         }
     }
@@ -1745,7 +1817,8 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
         _ => emit_unexpected_token!(
             token_stream,
             "Expected ';', \"let\" or an identifier.",
-            "';', \"let\" or an identifier"
+            "';', \"let\" or an identifier",
+            next_token!(token_stream)
         ),
     }
 }
@@ -1882,7 +1955,8 @@ pub fn parse_sprite_statement(
         _ => emit_unexpected_token!(
             token_stream,
             "Expected hat statement, \"let\", \"sound\" or \"costume\".",
-            "hat statement, \"let\", \"sound\" or \"costume\""
+            "hat statement, \"let\", \"sound\" or \"costume\"",
+            next_token!(token_stream)
         ),
     }
 }
@@ -1892,7 +1966,7 @@ pub fn parse_stage_statement(
     context: &mut ParseContext,
 ) -> ParseOut<StageStatement> {
     match peek_token!(token_stream) {
-        Token::CostumeKeyword => {
+        Token::CostumeKeyword | Token::BackdropKeyword => {
             skip_token!(token_stream);
             let backdrop_keyword = from_stream_pos!(token_stream => ast::BackdropKeyword);
             let start_pos = get_token_start!(token_stream);
@@ -2018,8 +2092,9 @@ pub fn parse_stage_statement(
         }
         _ => emit_unexpected_token!(
             token_stream,
-            "Expected hat statement, \"let\", \"sound\" or \"costume\".",
-            "hat statement, \"let\", \"sound\" or \"costume\""
+            "Expected hat statement, \"let\", \"sound\", \"backdrop\" or \"costume\".",
+            "hat statement, \"let\", \"sound\", \"backdrop\" or \"costume\"",
+            next_token!(token_stream)
         ),
     }
 }
@@ -2113,10 +2188,11 @@ pub fn parse_top_level_statement(
         Token::Semicolon => Ok(TopLevelStatement::EmptyStatement(
             from_stream_pos!(token_stream => ast::Semicolon),
         )),
-        _ => emit_unexpected_token!(
+        token => emit_unexpected_token!(
             token_stream,
             "Expected \"stage\", \"sprite\" or ';'.",
-            "\"stage\", \"sprite\" or ';'"
+            "\"stage\", \"sprite\" or ';'",
+            token
         ),
     }
 }
@@ -2331,8 +2407,8 @@ pub mod expression {
                             }
                             break;
                         }
-                        _ => {
-                            emit_unexpected_token!(token_stream, "Expected '}'.", "'}'");
+                        token => {
+                            emit_unexpected_token!(token_stream, "Expected '}'.", "'}'", token);
                         }
                     }
                 }
@@ -2341,7 +2417,12 @@ pub mod expression {
                     (token_position.0, get_token_end!(token_stream)),
                 ))
             }
-            _ => emit_unexpected_token!(token_stream, "Expected an expression.", "an expression"),
+            token => emit_unexpected_token!(
+                token_stream,
+                "Expected an expression.",
+                "an expression",
+                token
+            ),
         }
     }
 
@@ -2473,11 +2554,12 @@ pub fn parse_expression_list(
             match next_token!(token_stream) {
                 Token::Comma => Some(ast::Comma(get_token_position!(token_stream))),
                 Token::RightParens => None,
-                _ => {
+                token => {
                     emit_unexpected_token!(
                         token_stream,
                         "Expected a comma or ')'.",
-                        "a comma or ')'"
+                        "a comma or ')'",
+                        token
                     );
                 }
             },
