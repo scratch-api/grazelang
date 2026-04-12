@@ -485,6 +485,12 @@ pub fn add_param_to_params(
                 },
             );
         }
+        CallBlockParamKind::BlockStack => {
+            inputs.insert(
+                param_name,
+                known_block_to_input_repr_no_menu(value, context)?.into(),
+            );
+        }
     }
     Ok(())
 }

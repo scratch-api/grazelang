@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use grazelang_library::{
     CallBlockParam, CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue,
+    SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
 use serde::{Deserialize, Serialize};
@@ -30,16 +31,13 @@ pub enum BlockArg {
         name: String,
         field_type: String,
         value: Option<Sb3Primitive>,
-        #[serde(default)]
         options: Option<Vec<MenuOption>>,
     },
     #[serde(rename_all = "camelCase")]
     Input {
         name: String,
         input_type: InputType,
-        #[serde(default)]
-        check: Option<serde_json::Value>,
-        #[serde(default)]
+        check: Option<Sb3Primitive>,
         shadow: Option<ShadowData>,
     },
 }
@@ -56,7 +54,6 @@ pub struct ShadowData {
     #[serde(rename = "type")]
     pub shadow_type: String,
     pub default_value: Option<String>,
-    #[serde(default)]
     pub options: Option<Vec<MenuOption>>,
 }
 
@@ -146,10 +143,10 @@ impl BlockEntry {
                 }
                 BlockArg::Input {
                     name,
-                    input_type: _,
+                    input_type,
                     check: _,
                     shadow,
-                } => CallBlockParam { // TODO: implement c blocks
+                } => CallBlockParam {
                     kind: match shadow {
                         Some(ShadowData {
                             shadow_type,
@@ -179,7 +176,10 @@ impl BlockEntry {
                                 }
                             }
                         }
-                        None => CallBlockParamKind::Input { default: None },
+                        None => match input_type {
+                            InputType::Value => CallBlockParamKind::Input { default: None },
+                            InputType::Statement => CallBlockParamKind::BlockStack,
+                        },
                     },
                     name: name.into(),
                 },
@@ -231,6 +231,33 @@ impl From<ToolboxCategory> for (String, LibraryItem) {
                 }
             }
             namespace.insert(name, item);
+        }
+        for (name, (field_value, _opcodes)) in associated_items {
+            // TODO: use opcodes
+            if let Some(current) = namespace.get_mut(&name) {
+                if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
+                    && let KnownBlock::SingletonReporter {
+                        opcode: _,
+                        params: _,
+                        field,
+                        assign: _,
+                    } = known_block.as_mut()
+                {
+                    field.replace(field_value);
+                } else {
+                    todo!() // TODO: warn about overlap
+                }
+            } else {
+                namespace.insert(
+                    name,
+                    LibraryItem {
+                        namespace: HashMap::new(),
+                        value: Some(LibraryItemValue::KnownBlock(Box::new(
+                            KnownBlock::FieldValue { value: field_value },
+                        ))),
+                    },
+                );
+            }
         }
         (
             id,

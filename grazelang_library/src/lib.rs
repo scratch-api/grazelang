@@ -3,6 +3,7 @@ pub mod project_json;
 use std::collections::HashMap;
 
 use arcstr::{ArcStr as IString, literal};
+use quote::ToTokens;
 use serde::{Deserialize, Serialize};
 
 use crate::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
@@ -80,6 +81,7 @@ pub enum CallBlockParamKind {
         field_name: IString,
         default: project_json::Sb3FieldValue,
     },
+    BlockStack,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
