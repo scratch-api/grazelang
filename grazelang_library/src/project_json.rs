@@ -1,3 +1,4 @@
+use quote::{ToTokens, TokenStreamExt, quote};
 use serde::{
     Deserialize, Serialize,
     de::{self, Visitor},
@@ -316,6 +317,23 @@ impl<'de> Deserialize<'de> for Sb3Primitive {
         D: de::Deserializer<'de>,
     {
         deserializer.deserialize_any(sb3_primitive::Sb3PrimitiveVisitor)
+    }
+}
+
+impl ToTokens for Sb3Primitive {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            Sb3Primitive::String(s) => tokens.append_all(
+                quote!(::grazelang_library::project_json::Sb3Primitive::String(#s.to_string())),
+            ),
+            Sb3Primitive::Int128(i) => tokens
+                .append_all(quote!(::grazelang_library::project_json::Sb3Primitive::Int128(#i))),
+            Sb3Primitive::Int(i) => {
+                tokens.append_all(quote!(::grazelang_library::project_json::Sb3Primitive::Int(#i)))
+            }
+            Sb3Primitive::Float(f) => tokens
+                .append_all(quote!(::grazelang_library::project_json::Sb3Primitive::Float(#f))),
+        }
     }
 }
 
@@ -745,6 +763,50 @@ impl<'de> Deserialize<'de> for Sb3PrimitiveBlock {
     }
 }
 
+impl ToTokens for Sb3PrimitiveBlock {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let prefix = quote!(::grazelang_library::project_json::Sb3PrimitiveBlock);
+        match self {
+            Sb3PrimitiveBlock::Number(p) => tokens.append_all(quote!(#prefix::Number(#p))),
+            Sb3PrimitiveBlock::PositiveNumber(p) => {
+                tokens.append_all(quote!(#prefix::PositiveNumber(#p)))
+            }
+            Sb3PrimitiveBlock::PositiveInteger(p) => {
+                tokens.append_all(quote!(#prefix::PositiveInteger(#p)))
+            }
+            Sb3PrimitiveBlock::Integer(p) => tokens.append_all(quote!(#prefix::Integer(#p))),
+            Sb3PrimitiveBlock::Angle(p) => tokens.append_all(quote!(#prefix::Angle(#p))),
+            Sb3PrimitiveBlock::Color(p) => tokens.append_all(quote!(#prefix::Color(#p))),
+            Sb3PrimitiveBlock::String(p) => tokens.append_all(quote!(#prefix::String(#p))),
+            Sb3PrimitiveBlock::Broadcast { name, id } => tokens.append_all(
+                quote!(#prefix::Broadcast { name: #name.to_string(), id: #id.to_string() }),
+            ),
+            Sb3PrimitiveBlock::Variable { name, id, x, y } => {
+                let x = match x {
+                    Some(v) => quote!(Some(#v)),
+                    None => quote!(None),
+                };
+                let y = match y {
+                    Some(v) => quote!(Some(#v)),
+                    None => quote!(None),
+                };
+                tokens.append_all(quote!(#prefix::Variable { name: #name.to_string(), id: #id.to_string(), x: #x, y: #y }))
+            }
+            Sb3PrimitiveBlock::List { name, id, x, y } => {
+                let x = match x {
+                    Some(v) => quote!(Some(#v)),
+                    None => quote!(None),
+                };
+                let y = match y {
+                    Some(v) => quote!(Some(#v)),
+                    None => quote!(None),
+                };
+                tokens.append_all(quote!(#prefix::List { name: #name.to_string(), id: #id.to_string(), x: #x, y: #y }))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sb3FieldValue {
     Normal(Sb3Primitive),
@@ -802,6 +864,18 @@ impl<'de> Deserialize<'de> for Sb3FieldValue {
             }
         }
         deserializer.deserialize_seq(Sb3FieldValueVisitor)
+    }
+}
+
+impl ToTokens for Sb3FieldValue {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let prefix = quote!(::grazelang_library::project_json::Sb3FieldValue);
+        match self {
+            Sb3FieldValue::Normal(p) => tokens.append_all(quote!(#prefix::Normal(#p))),
+            Sb3FieldValue::WithId { value, id } => {
+                tokens.append_all(quote!(#prefix::WithId { value: #value, id: #id.to_string() }))
+            }
+        }
     }
 }
 

@@ -1,9 +1,10 @@
 pub mod project_json;
 
+use proc_macro2::TokenStream;
 use std::collections::HashMap;
 
 use arcstr::{ArcStr as IString, literal};
-use quote::ToTokens;
+use quote::{ToTokens, TokenStreamExt, quote};
 use serde::{Deserialize, Serialize};
 
 use crate::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
@@ -68,6 +69,22 @@ pub struct SimpleCallableKnownBlockSignature(
     pub Vec<(CallBlockParam, KnownBlock)>,
 );
 
+impl ToTokens for SimpleCallableKnownBlockSignature {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let SimpleCallableKnownBlockSignature(opcode, param, known_params) = self;
+        let opcode = opcode.as_str();
+        let (keys, values): (Vec<_>, Vec<_>) = known_params.iter().map(|(a, b)| (a, b)).unzip();
+
+        tokens.append_all(quote! {
+            ::grazelang_library::SimpleCallableKnownBlockSignature(
+                ::arcstr::literal!(#opcode),
+                #param,
+                ::std::vec![#( (#keys, #values) ),*]
+            )
+        });
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CallBlockParamKind {
     Input {
@@ -84,10 +101,62 @@ pub enum CallBlockParamKind {
     BlockStack,
 }
 
+impl ToTokens for CallBlockParamKind {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let prefix = quote!(::grazelang_library::CallBlockParamKind);
+        match self {
+            CallBlockParamKind::Input { default } => {
+                let default = match default {
+                    Some(d) => quote!(::std::option::Option::Some(#d)),
+                    None => quote!(::std::option::Option::None),
+                };
+                tokens.append_all(quote!(#prefix::Input { default: #default }));
+            }
+            CallBlockParamKind::Field { default } => {
+                let default = match default {
+                    Some(d) => quote!(::std::option::Option::Some(#d)),
+                    None => quote!(::std::option::Option::None),
+                };
+                tokens.append_all(quote!(#prefix::Field { default: #default }));
+            }
+            CallBlockParamKind::MenuInput {
+                opcode,
+                field_name,
+                default,
+            } => {
+                let opcode = opcode.as_str();
+                let field_name = field_name.as_str();
+                tokens.append_all(quote! {
+                    #prefix::MenuInput {
+                        opcode: ::arcstr::literal!(#opcode),
+                        field_name: ::arcstr::literal!(#field_name),
+                        default: #default,
+                    }
+                });
+            }
+            CallBlockParamKind::BlockStack => tokens.append_all(quote!(#prefix::BlockStack)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CallBlockParam {
     pub kind: CallBlockParamKind,
     pub name: IString,
+}
+
+impl ToTokens for CallBlockParam {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let CallBlockParam { kind, name } = self;
+        let name = name.as_str();
+
+        tokens.append_all(quote! {
+            ::grazelang_library::CallBlockParam {
+                kind: #kind,
+                name: ::arcstr::literal!(#name)
+            }
+        });
+    }
 }
 
 impl KnownBlock {
@@ -142,10 +211,96 @@ impl From<Sb3PrimitiveBlock> for KnownBlock {
     }
 }
 
+impl ToTokens for KnownBlock {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let prefix = quote!(::grazelang_library::KnownBlock);
+        match self {
+            KnownBlock::Variable {
+                canonical_name,
+                id,
+                assign,
+            } => {
+                let id = id.as_str();
+                tokens.append_all(quote! {
+                    #prefix::Variable {
+                        canonical_name: #canonical_name.to_string(),
+                        id: ::arcstr::literal!(#id),
+                        assign: #assign,
+                    }
+                });
+            }
+            KnownBlock::List { canonical_name, id } => {
+                let id = id.as_str();
+                tokens.append_all(quote! {
+                    #prefix::List {
+                        canonical_name: #canonical_name.to_string(),
+                        id: ::arcstr::literal!(#id),
+                    }
+                });
+            }
+            KnownBlock::FieldValue { value } => {
+                tokens.append_all(quote!(#prefix::FieldValue { value: #value }))
+            }
+            KnownBlock::BlockRef { id } => {
+                let id = id.as_str();
+                tokens.append_all(quote!(#prefix::BlockRef { id: ::arcstr::literal!(#id) }))
+            }
+            KnownBlock::PrimitiveBlock { value } => {
+                tokens.append_all(quote!(#prefix::PrimitiveBlock { value: #value }))
+            }
+            KnownBlock::Callable(opcode, params) => {
+                let opcode = opcode.as_str();
+                tokens.append_all(quote!(#prefix::Callable(::arcstr::literal!(#opcode), ::std::vec![#( #params ),*])));
+            }
+            KnownBlock::PartialCallable(opcode, known, params) => {
+                let opcode = opcode.as_str();
+                let (keys, values): (Vec<_>, Vec<_>) = known.iter().map(|(k, v)| (k, v)).unzip();
+                tokens.append_all(quote! {
+                    #prefix::PartialCallable(
+                        ::arcstr::literal!(#opcode),
+                        ::std::vec![#( (#keys, #values) ),*],
+                        ::std::vec![#( #params ),*]
+                    )
+                });
+            }
+            KnownBlock::SingletonReporter {
+                opcode,
+                params,
+                field,
+                assign,
+            } => {
+                let opcode = opcode.as_str();
+                let (keys, values): (Vec<_>, Vec<_>) = params.iter().map(|(k, v)| (k, v)).unzip();
+                tokens.append_all(quote! {
+                    #prefix::SingletonReporter {
+                        opcode: ::arcstr::literal!(#opcode),
+                        params: ::std::vec![#( (#keys, #values) ),*],
+                        field: #field,
+                        assign: #assign,
+                    }
+                });
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AliasSegment {
     Super,
     Child(String),
+}
+
+impl ToTokens for AliasSegment {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            AliasSegment::Super => {
+                tokens.append_all(quote!(::grazelang_library::AliasSegment::Super))
+            }
+            AliasSegment::Child(s) => {
+                tokens.append_all(quote!(::grazelang_library::AliasSegment::Child(#s.to_string())))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -154,8 +309,42 @@ pub enum LibraryItemValue {
     Alias(Vec<AliasSegment>),
 }
 
+impl ToTokens for LibraryItemValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            LibraryItemValue::KnownBlock(known_block) => {
+                let known_block = known_block.as_ref();
+                tokens.append_all(quote! {
+                    ::grazelang_library::LibraryItemValue::KnownBlock(::std::boxed::Box::new(#known_block))
+                })
+            }
+            LibraryItemValue::Alias(alias_segments) => {
+                let alias_segments = alias_segments.iter();
+                tokens.append_all(quote! {
+                    ::grazelang_library::LibraryItemValue::Alias(vec![#( #alias_segments ),*])
+                })
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LibraryItem {
     pub namespace: HashMap<String, LibraryItem>,
     pub value: Option<LibraryItemValue>,
+}
+
+impl ToTokens for LibraryItem {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let LibraryItem { namespace, value } = self;
+        let keys = namespace.keys();
+        let values = namespace.values();
+
+        tokens.append_all(quote! {
+            ::grazelang_library::LibraryItem {
+                namespace: ::std::collections::HashMap::from([#( (#keys.to_string(), #values) ),*]),
+                value: #value,
+            }
+        });
+    }
 }
