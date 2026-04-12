@@ -16,6 +16,8 @@ name = "grazelang_library"
 version = "0.1.0"
 dependencies = [
  "arcstr",
+ "proc-macro2",
+ "quote",
  "serde",
  "serde_json",
 ]

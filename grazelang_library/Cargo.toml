@@ -7,3 +7,5 @@ edition = "2024"
 arcstr = { version = "1.2.0", features = ["serde"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+quote = "1.0.45"
+proc-macro2 = "1.0.106"
