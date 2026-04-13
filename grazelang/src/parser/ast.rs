@@ -280,9 +280,9 @@ pub enum Statement {
     ),
     Forever(Identifier, CodeBlock, Option<Semicolon>, PosRange),
     IfElse(
-        (Identifier, Expression, CodeBlock),
-        Vec<(Identifier, Identifier, Expression, CodeBlock)>,
-        Option<(Identifier, CodeBlock)>,
+        (SyntacticIf, Expression, CodeBlock),
+        Vec<(SyntacticElse, SyntacticIf, Expression, CodeBlock)>,
+        Option<(SyntacticElse, CodeBlock)>,
         Option<Semicolon>,
         PosRange,
     ),
@@ -936,8 +936,42 @@ impl GetPos for Identifier {
 }
 
 impl Identifier {
-    pub fn is_syntactic_if(&self) -> bool {
-        todo!() // TODO: change if else logic to only allow `if` and `else`
+    pub fn to_syntactic_if(&self) -> Option<SyntacticIf> {
+        if self.names.len() != 1 || !self.scope.is_empty() {
+            return None;
+        }
+        self.names.first().and_then(|(value, pos_range)| {
+            (value.as_str() == "if").then_some(SyntacticIf(*pos_range))
+        })
+    }
+
+    pub fn to_syntactic_else(&self) -> Option<SyntacticElse> {
+        if self.names.len() != 1 || !self.scope.is_empty() {
+            return None;
+        }
+        self.names.first().and_then(|(value, pos_range)| {
+            (value.as_str() == "else").then_some(SyntacticElse(*pos_range))
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SyntacticIf(pub PosRange);
+
+impl GetPos for SyntacticIf {
+    #[inline]
+    fn get_position(&self) -> &PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SyntacticElse(pub PosRange);
+
+impl GetPos for SyntacticElse {
+    #[inline]
+    fn get_position(&self) -> &PosRange {
+        &self.0
     }
 }
 

@@ -9,8 +9,8 @@ use crate::{
         LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
         NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon,
         SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement,
-        StageCodeBlock, StageKeyword, StageStatement, Statement, TopLevelStatement, UnOp,
-        VarKeyword, VarsKeyword,
+        StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf,
+        TopLevelStatement, UnOp, VarKeyword, VarsKeyword,
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -285,9 +285,9 @@ pub trait GrazeVisitor<C, E> {
     fn visit_statement_if_else(
         &self,
         value: (
-            &(Identifier, Expression, CodeBlock),
-            &Vec<(Identifier, Identifier, Expression, CodeBlock)>,
-            &Option<(Identifier, CodeBlock)>,
+            &(SyntacticIf, Expression, CodeBlock),
+            &Vec<(SyntacticElse, SyntacticIf, Expression, CodeBlock)>,
+            &Option<(SyntacticElse, CodeBlock)>,
             &Option<Semicolon>,
             &PosRange,
         ),
@@ -1257,9 +1257,9 @@ where
 pub fn default_visit_statement_if_else<V, C, E>(
     visitor: &V,
     value: (
-        &(Identifier, Expression, CodeBlock),
-        &Vec<(Identifier, Identifier, Expression, CodeBlock)>,
-        &Option<(Identifier, CodeBlock)>,
+        &(SyntacticIf, Expression, CodeBlock),
+        &Vec<(SyntacticElse, SyntacticIf, Expression, CodeBlock)>,
+        &Option<(SyntacticElse, CodeBlock)>,
         &Option<Semicolon>,
         &PosRange,
     ),

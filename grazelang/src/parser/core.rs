@@ -432,8 +432,8 @@ pub mod statement {
             AssetDeclaration, CanonicalIdentifier, Comma, DataDeclaration, DataDeclarationScope,
             LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
             NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon,
-            SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType, VarKeyword,
-            VarsKeyword,
+            SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
+            SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword,
         },
     };
 
@@ -1283,9 +1283,9 @@ pub mod statement {
         start_pos: (usize, usize),
     ) -> ParseOut<Statement> {
         let code_block = parse_code_block(token_stream, context)?;
-        if identifier.is_syntactic_if() {
-            let initial_code_block = (identifier, expression, code_block);
-            let mut code_blocks = Vec::<(Identifier, Identifier, Expression, CodeBlock)>::new();
+        if let Some(syntactic_if) = identifier.to_syntactic_if() {
+            let initial_code_block = (syntactic_if, expression, code_block);
+            let mut code_blocks = Vec::<(SyntacticElse, SyntacticIf, Expression, CodeBlock)>::new();
             let final_code_block = loop {
                 match match peek_token!(token_stream => Option) {
                     Some(value) => value,
@@ -1294,13 +1294,35 @@ pub mod statement {
                     Token::Semicolon => break None,
                     Token::Identifier(_) => {
                         let else_identifier = parse_full_identifier(token_stream, context)?;
-                        if matches!(peek_token!(token_stream), Token::Identifier(_)) {
-                            let if_identifier = parse_full_identifier(token_stream, context)?;
-                            if !if_identifier.is_syntactic_if() {
+                        let syntactic_else =
+                            if let Some(value) = else_identifier.to_syntactic_else() {
+                                value
+                            } else {
                                 emit_unexpected_token!(
                                     token_stream,
-                                    "Expected \"if\" identifier.",
-                                    "\"if\" identifier",
+                                    "Expected \"else\".",
+                                    "\"else\"",
+                                    Token::Identifier(
+                                        else_identifier
+                                            .names
+                                            .last()
+                                            .or_else(|| else_identifier.scope.last())
+                                            .unwrap()
+                                            .0
+                                            .clone()
+                                    )
+                                );
+                            };
+                        if matches!(peek_token!(token_stream), Token::Identifier(_)) {
+                            let if_identifier = parse_full_identifier(token_stream, context)?;
+                            let syntactic_if = if let Some(value) = if_identifier.to_syntactic_if()
+                            {
+                                value
+                            } else {
+                                emit_unexpected_token!(
+                                    token_stream,
+                                    "Expected \"if\".",
+                                    "\"if\"",
                                     Token::Identifier(
                                         if_identifier
                                             .names
@@ -1311,18 +1333,15 @@ pub mod statement {
                                             .clone()
                                     )
                                 );
-                            }
+                            };
                             code_blocks.push((
-                                else_identifier,
-                                if_identifier,
+                                syntactic_else,
+                                syntactic_if,
                                 parse_expression(token_stream, context)?,
                                 parse_code_block(token_stream, context)?,
                             ));
                         } else {
-                            break Some((
-                                else_identifier,
-                                parse_code_block(token_stream, context)?,
-                            ));
+                            break Some((syntactic_else, parse_code_block(token_stream, context)?));
                         }
                     }
                     _ => break None,
