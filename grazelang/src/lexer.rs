@@ -198,13 +198,17 @@ pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
     if let Some(mat) = middle_regex_continuation().find(remainder) {
         let match_len = mat.end();
         lex.bump(match_len);
-        return Some(LexedRightBrace::MiddleFormattedString(parse_middle_format_string( mat.as_str())?));
+        return Some(LexedRightBrace::MiddleFormattedString(
+            parse_middle_format_string(mat.as_str())?,
+        ));
     }
     if let Some(mat) = end_regex_continuation().find(remainder) {
         let match_len = mat.end();
         lex.bump(match_len);
         lex.extras.1 -= 1;
-        return Some(LexedRightBrace::RightFormattedString(parse_right_format_string(mat.as_str())?));
+        return Some(LexedRightBrace::RightFormattedString(
+            parse_right_format_string(mat.as_str())?,
+        ));
     }
     None
 }
@@ -247,4 +251,3 @@ pub fn get_pos_range(lex: &Lexer<Token>, character_range: Range<usize>) -> PosRa
 pub fn create_lexer<'a>(input: &'a str) -> Lexer<'a, Token> {
     Token::lexer(input)
 }
-

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use grazelang_library::{
     CallBlockParam, CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue,
-    SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
 use serde::{Deserialize, Serialize};
@@ -13,6 +12,7 @@ pub struct ToolboxCategory {
     pub category: String,
     pub id: String,
     pub blocks: Vec<BlockEntry>,
+    pub alt_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -21,6 +21,7 @@ pub struct BlockEntry {
     #[serde(rename = "type")]
     pub opcode: String,
     pub args: Vec<BlockArg>,
+    pub alt_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -46,6 +47,7 @@ pub enum BlockArg {
 pub struct MenuOption {
     pub label: String,
     pub value: String,
+    pub alt_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -90,7 +92,7 @@ pub fn primitive_opcode_to_sb3_primitive_block(
         "math_angle" => Some(Sb3PrimitiveBlock::Angle(value)),
         "colour_picker" => Some(Sb3PrimitiveBlock::Color(value)),
         "text" => Some(Sb3PrimitiveBlock::String(value)),
-        // "event_broadcast_menu" => Some(Sb3PrimitiveBlock::Broadcast(value)),
+        // "event_broadcast_menu" => Some(Sb3PrimitiveBlock::Broadcast(value)), // TODO: implement these
         // "data_variable" => Some(Sb3PrimitiveBlock::Variable(value)),
         // "data_listcontents" => Some(Sb3PrimitiveBlock::List(value)),
         _ => None,
@@ -99,10 +101,14 @@ pub fn primitive_opcode_to_sb3_primitive_block(
 
 impl BlockEntry {
     fn process(self) -> ProcessedBlockEntry {
-        let BlockEntry { opcode, args } = self;
+        let BlockEntry {
+            opcode,
+            args,
+            alt_name,
+        } = self;
         if args.is_empty() {
             return ProcessedBlockEntry {
-                name: opcode.split_once('_').unwrap().1.to_string(),
+                name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
                 opcode: opcode.clone(),
                 library_item: LibraryItem {
                     namespace: HashMap::new(),
@@ -110,7 +116,7 @@ impl BlockEntry {
                         KnownBlock::SingletonReporter {
                             opcode: opcode.into(),
                             params: Vec::new(),
-                            field: None, // TODO: Merge singleton and associated library item when name matches
+                            field: None,
                             assign: None,
                         },
                     ))),
@@ -130,7 +136,7 @@ impl BlockEntry {
                 } => {
                     options.iter().flatten().for_each(|value| {
                         associated_items.push(AssociatedLibraryItem {
-                            name: value.label.clone(),
+                            name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
                             field_value: Sb3FieldValue::Normal(value.value.clone().into()),
                         })
                     });
@@ -155,7 +161,7 @@ impl BlockEntry {
                         }) => {
                             options.iter().flatten().for_each(|value| {
                                 associated_items.push(AssociatedLibraryItem {
-                                    name: value.label.clone(),
+                                    name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
                                     field_value: Sb3FieldValue::Normal(value.value.clone().into()),
                                 })
                             });
@@ -205,6 +211,7 @@ impl From<ToolboxCategory> for (String, LibraryItem) {
             category: _,
             id,
             blocks,
+            alt_name,
         } = value;
         let mut associated_items = HashMap::<String, (Sb3FieldValue, Vec<String>)>::new();
         let mut namespace = HashMap::<String, LibraryItem>::with_capacity(blocks.len());
@@ -260,11 +267,17 @@ impl From<ToolboxCategory> for (String, LibraryItem) {
             }
         }
         (
-            id,
+            alt_name.unwrap_or(id),
             LibraryItem {
                 namespace,
                 value: None,
             },
         )
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LibraryCache {
+    pub hash: String,
+    pub value: String,
 }

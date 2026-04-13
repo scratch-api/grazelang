@@ -106,17 +106,11 @@ impl ToTokens for CallBlockParamKind {
         let prefix = quote!(::grazelang_library::CallBlockParamKind);
         match self {
             CallBlockParamKind::Input { default } => {
-                let default = match default {
-                    Some(d) => quote!(::std::option::Option::Some(#d)),
-                    None => quote!(::std::option::Option::None),
-                };
+                let default = quote_option(default.as_ref());
                 tokens.append_all(quote!(#prefix::Input { default: #default }));
             }
             CallBlockParamKind::Field { default } => {
-                let default = match default {
-                    Some(d) => quote!(::std::option::Option::Some(#d)),
-                    None => quote!(::std::option::Option::None),
-                };
+                let default = quote_option(default.as_ref());
                 tokens.append_all(quote!(#prefix::Field { default: #default }));
             }
             CallBlockParamKind::MenuInput {
@@ -271,6 +265,8 @@ impl ToTokens for KnownBlock {
             } => {
                 let opcode = opcode.as_str();
                 let (keys, values): (Vec<_>, Vec<_>) = params.iter().map(|(k, v)| (k, v)).unzip();
+                let field = quote_option(field.as_ref());
+                let assign = quote_option(assign.as_ref());
                 tokens.append_all(quote! {
                     #prefix::SingletonReporter {
                         opcode: ::arcstr::literal!(#opcode),
@@ -334,11 +330,22 @@ pub struct LibraryItem {
     pub value: Option<LibraryItemValue>,
 }
 
+pub fn quote_option<T>(value: Option<&T>) -> TokenStream
+where
+    T: ToTokens,
+{
+    match value {
+        Some(v) => quote!(::std::option::Option::Some(#v)),
+        None => quote!(::std::option::Option::None),
+    }
+}
+
 impl ToTokens for LibraryItem {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let LibraryItem { namespace, value } = self;
         let keys = namespace.keys();
         let values = namespace.values();
+        let value = quote_option(value.as_ref());
 
         tokens.append_all(quote! {
             ::grazelang_library::LibraryItem {

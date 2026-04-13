@@ -7,11 +7,13 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
-use grazelang_library::{CallBlockParam, CallableKnownBlockSignature, KnownBlockInput, SimpleCallableKnownBlockSignature};
+pub use grazelang_library::KnownBlock;
+use grazelang_library::{
+    CallBlockParam, CallableKnownBlockSignature, KnownBlockInput, SimpleCallableKnownBlockSignature,
+};
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
-pub use grazelang_library::KnownBlock;
 
 use crate::{codegen, names::Namespace, parser::ast::Literal};
 
@@ -84,7 +86,8 @@ pub trait ResolveKnownBlock {
     ) -> &'a SimpleCallableKnownBlockSignature;
 }
 
-impl ResolveKnownBlock for KnownBlock { // TODO: add c blocks
+impl ResolveKnownBlock for KnownBlock {
+    // TODO: add c blocks
     fn resolve_for_input<'a>(
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,

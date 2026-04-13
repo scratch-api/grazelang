@@ -12,3 +12,5 @@ serde_json = "1.0.149"
 serde = { version = "1.0.228", features = ["derive"] }
 quote = "1.0.45"
 grazelang_library = { path = "../grazelang_library" }
+sha3 = "0.11.0"
+base16ct = { version = "1.0.0", features = ["alloc"] }

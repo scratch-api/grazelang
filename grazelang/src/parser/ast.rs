@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{codegen::project_json::{Sb3Primitive, Sb3PrimitiveBlock}, lexer::PosRange};
+use crate::{
+    codegen::project_json::{Sb3Primitive, Sb3PrimitiveBlock},
+    lexer::PosRange,
+};
 use arcstr::ArcStr as IString; // Immutable string
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -858,7 +861,7 @@ impl Literal {
             Literal::BinaryInt(value, _) => value,
             Literal::EmptyExpression(_, _, _) => EMPTY_ISTRING_REF,
         }
-    } 
+    }
     pub fn cast_to_string(&self) -> IString {
         match self {
             Literal::String(value, _) => value.clone(),

@@ -7,6 +7,8 @@ use serde::{
 use serde_json::Value;
 use std::collections::HashMap;
 
+use crate::quote_option;
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Sb3Root {
@@ -782,25 +784,13 @@ impl ToTokens for Sb3PrimitiveBlock {
                 quote!(#prefix::Broadcast { name: #name.to_string(), id: #id.to_string() }),
             ),
             Sb3PrimitiveBlock::Variable { name, id, x, y } => {
-                let x = match x {
-                    Some(v) => quote!(Some(#v)),
-                    None => quote!(None),
-                };
-                let y = match y {
-                    Some(v) => quote!(Some(#v)),
-                    None => quote!(None),
-                };
+                let x = quote_option(x.as_ref());
+                let y = quote_option(y.as_ref());
                 tokens.append_all(quote!(#prefix::Variable { name: #name.to_string(), id: #id.to_string(), x: #x, y: #y }))
             }
             Sb3PrimitiveBlock::List { name, id, x, y } => {
-                let x = match x {
-                    Some(v) => quote!(Some(#v)),
-                    None => quote!(None),
-                };
-                let y = match y {
-                    Some(v) => quote!(Some(#v)),
-                    None => quote!(None),
-                };
+                let x = quote_option(x.as_ref());
+                let y = quote_option(y.as_ref());
                 tokens.append_all(quote!(#prefix::List { name: #name.to_string(), id: #id.to_string(), x: #x, y: #y }))
             }
         }

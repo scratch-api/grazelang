@@ -1,5 +1,5 @@
 use crate::parser::parse_context;
-use parse_context::{IdString};
+use parse_context::IdString;
 use rand::{
     Rng,
     distr::{Distribution, Uniform},
@@ -61,4 +61,3 @@ pub fn generate_random_id<T: Rng>(rng: &mut T) -> IdString {
     }
     id.into()
 }
-
