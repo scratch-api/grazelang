@@ -33,12 +33,7 @@ use crate::{
         },
     },
     visitor::{
-        GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call,
-        default_visit_expression_formatted_string, default_visit_expression_get_item,
-        default_visit_expression_get_letter, default_visit_expression_identifier,
-        default_visit_expression_literal, default_visit_expression_unary_operation,
-        default_visit_formatted_string_content, default_visit_statement_assignment,
-        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
+        GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call, default_visit_expression_formatted_string, default_visit_expression_get_item, default_visit_expression_get_letter, default_visit_expression_identifier, default_visit_expression_literal, default_visit_expression_unary_operation, default_visit_formatted_string_content, default_visit_statement_assignment, default_visit_statement_multi_input_control, default_visit_statement_single_input_control, default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage
     },
 };
 
@@ -47,15 +42,19 @@ pub enum GrazeSb3GeneratorError {
     #[error("the identifier {identifier:?} was not found")]
     UnknownIdentifier { identifier: Identifier },
     #[error("the identifier {identifier:?} is not a block")]
-    IdentifierIsNotABlock { identifier: Symbol },
+    IdentifierIsNotABlock { identifier: Identifier },
     #[error("in this context, no menu input was expected, found {input_menu_value:?}")]
     UnexpectedInputMenu { input_menu_value: Sb3FieldValue },
     #[error("the amount of parameters for this block was {unexpected:?}, expected {expected:?}")]
     IncorrectParamCount { unexpected: usize, expected: usize },
-    #[error("tried to get a list item for a non list, {known_block:?}")]
-    ListAccessForNonLists { known_block: Box<KnownBlock> },
+    #[error("tried to get a list item for a non list, {identifier:?}")]
+    ListAccessForNonLists { identifier: Identifier },
     #[error("cannot initialize stage multiple times")]
     RepeatedStageInitialization,
+    #[error("tried to call the identifier {identifier:?} as a c block when it was not possible")]
+    BlockIsNotCBlock { identifier: Identifier },
+    #[error("tried to pass normal parameter {param:?} as a block stack")]
+    PassedNormalParamAsBlockStack { param: Param },
 }
 
 pub struct GrazeSb3Generator;
@@ -266,6 +265,7 @@ impl GrazeSb3GeneratorContext {
 pub enum Param {
     Owned(KnownBlock),
     LazyIdentifier(Identifier),
+    BlockStack(String),
 }
 
 pub fn make_block(
@@ -345,9 +345,7 @@ where
             .next = Some(block_id.to_string());
     } else if old_parent.is_some() {
         // First statement in block stack is used in STACK argument of parent or similar
-        context.push_param(Param::Owned(KnownBlock::BlockRef {
-            id: block_id.clone(),
-        }));
+        context.push_param(Param::BlockStack(block_id.to_string()));
     }
     let out = action(context, old_parent.clone(), block_id.clone());
     context.current_parent = old_parent;
@@ -368,10 +366,13 @@ macro_rules! with_known_block {
                 let actual_identifier = rc.borrow();
                 let $known_block = actual_identifier.get_block().ok_or_else(|| {
                     GrazeSb3GeneratorError::IdentifierIsNotABlock {
-                        identifier: actual_identifier.clone(),
+                        identifier: value.clone(),
                     }
                 })?;
                 $action
+            }
+            Param::BlockStack(_) => {
+                todo!() // TODO: warn user about incorrect usage
             }
         }
     };
@@ -390,10 +391,10 @@ macro_rules! get_actual_identifier {
 }
 
 macro_rules! get_known_block {
-    ($actual_identifier_ref:expr) => {{
+    ($actual_identifier_ref:expr, $identifier:expr) => {{
         $actual_identifier_ref.get_block().ok_or_else(|| {
             GrazeSb3GeneratorError::IdentifierIsNotABlock {
-                identifier: $actual_identifier_ref.clone(),
+                identifier: $identifier.clone(),
             }
         })
     }};
@@ -486,10 +487,7 @@ pub fn add_param_to_params(
             );
         }
         CallBlockParamKind::BlockStack => {
-            inputs.insert(
-                param_name,
-                known_block_to_input_repr_no_menu(value, context)?.into(),
-            );
+            todo!() // TODO: warn user about incorrect usage
         }
     }
     Ok(())
@@ -644,7 +642,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 .collect::<Vec<_>>();
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref)?;
+            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
             let CallableKnownBlockSignature(opcode, params, known_params) =
                 known_block.resolve_for_call_block(context);
             let mut fields = HashMap::new();
@@ -865,12 +863,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             );
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref)?;
+            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
             let (canonical_name, id) = match known_block {
                 KnownBlock::List { canonical_name, id } => (canonical_name, id),
                 _ => {
                     return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
-                        known_block: Box::new(known_block.clone()),
+                        identifier: value.0.clone(),
                     });
                 }
             };
@@ -1015,7 +1013,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             default_visit_statement_assignment(self, value, context)?;
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref)?;
+            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
             let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
                 known_block.resolve_for_assignment(context);
             let assignment_value = context.pop_param().unwrap();
@@ -1025,6 +1023,138 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             with_known_block!(context, assignment_value, known_block => {
                 add_param_to_params(context, param, known_block, &mut inputs, &mut fields)?;
             });
+            add_block(
+                context,
+                &this_id,
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+            );
+            Ok(())
+        })
+    }
+
+    fn visit_statement_multi_input_control(
+        &self,
+        value: (
+            &Identifier,
+            &crate::parser::ast::LeftParens,
+            &Vec<(Expression, Option<crate::parser::ast::Comma>)>,
+            &crate::parser::ast::RightParens,
+            &crate::parser::ast::CodeBlock,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_statement(context, |context, parent, this_id| {
+            default_visit_statement_multi_input_control(self, value, context)?;
+            let substack = context.pop_param().unwrap();
+            let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
+                .take(value.2.len())
+                .collect::<Vec<_>>();
+            let actual_identifier = get_actual_identifier!(context, value.0)?;
+            let actual_identifier_ref = actual_identifier.borrow();
+            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+            let CallableKnownBlockSignature(opcode, params, known_params) =
+                known_block.resolve_for_call_block(context);
+            let mut fields = HashMap::new();
+            let mut inputs = HashMap::new();
+            add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+            if params.len() - 1 != reversed_args.len() {
+                return Err(GrazeSb3GeneratorError::IncorrectParamCount {
+                    unexpected: reversed_args.len(),
+                    expected: params.len() - 1,
+                });
+            }
+            let substack_input_name = if let CallBlockParam {
+                kind: CallBlockParamKind::BlockStack,
+                name,
+            } = params.last().unwrap()
+            {
+                name
+            } else {
+                return Err(GrazeSb3GeneratorError::BlockIsNotCBlock {
+                    identifier: value.0.clone(),
+                });
+            };
+            let substack = if let Param::BlockStack(block_ref) = substack {
+                block_ref
+            } else {
+                return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+                    param: substack,
+                });
+            };
+            for (param, value) in zip(params.iter(), reversed_args.into_iter().rev()) {
+                with_known_block!(context, value, value => {
+                    add_param_to_params(context, param, value, &mut inputs, &mut fields)?;
+                });
+            }
+            inputs.insert(
+                substack_input_name.to_string(),
+                Sb3InputValue::NoShadow(Sb3InputRepr::Reference(substack)),
+            );
+            add_block(
+                context,
+                &this_id,
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+            );
+            Ok(())
+        })
+    }
+
+    fn visit_statement_single_input_control(
+        &self,
+        value: (
+            &Identifier,
+            &Expression,
+            &crate::parser::ast::CodeBlock,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_statement(context, |context, parent, this_id| {
+            default_visit_statement_single_input_control(self, value, context)?;
+            let substack = context.pop_param().unwrap();
+            let arg = context.pop_param().unwrap();
+            let actual_identifier = get_actual_identifier!(context, value.0)?;
+            let actual_identifier_ref = actual_identifier.borrow();
+            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+            let CallableKnownBlockSignature(opcode, params, known_params) =
+                known_block.resolve_for_call_block(context);
+            let mut fields = HashMap::new();
+            let mut inputs = HashMap::new();
+            add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+            if params.len() - 1 != 1 {
+                return Err(GrazeSb3GeneratorError::IncorrectParamCount {
+                    unexpected: 1,
+                    expected: params.len() - 1,
+                });
+            }
+            let substack_input_name = if let CallBlockParam {
+                kind: CallBlockParamKind::BlockStack,
+                name,
+            } = params.last().unwrap()
+            {
+                name
+            } else {
+                return Err(GrazeSb3GeneratorError::BlockIsNotCBlock {
+                    identifier: value.0.clone(),
+                });
+            };
+            let substack = if let Param::BlockStack(block_ref) = substack {
+                block_ref
+            } else {
+                return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+                    param: substack,
+                });
+            };
+            with_known_block!(context, arg, value => {
+                add_param_to_params(context, params.first().unwrap(), value, &mut inputs, &mut fields)?;
+            });
+            inputs.insert(
+                substack_input_name.to_string(),
+                Sb3InputValue::NoShadow(Sb3InputRepr::Reference(substack)),
+            );
             add_block(
                 context,
                 &this_id,
