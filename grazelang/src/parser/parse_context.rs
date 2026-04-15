@@ -258,11 +258,11 @@ pub enum Symbol {
     Namespace(HashMap<IString, Rc<RefCell<Symbol>>>, Weak<RefCell<Symbol>>),
     KnownBlock(
         Box<KnownBlock>,
-        Option<HashMap<IString, Rc<RefCell<Symbol>>>>,
+        Option<HashMap<IString, Rc<RefCell<Symbol>>>>, // TODO: remove Option
         Weak<RefCell<Symbol>>,
     ),
     Sprites(Weak<RefCell<Symbol>>),
-    Alias(Weak<RefCell<Symbol>>, Weak<RefCell<Symbol>>), // TODO: use Weak for Alias
+    Alias(Weak<RefCell<Symbol>>, Weak<RefCell<Symbol>>),
 }
 
 impl Symbol {

@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -24,6 +25,7 @@ use super::{
 
 use crate::{
     codegen::project_json::{Asset, IsShadow, Sb3InputRepr, Sb3Target},
+    library,
     names::Namespace,
     parser::{
         ast::{BinOpDescriptor, Expression, FormattedStringContent, Identifier, UnOpDescriptor},
@@ -33,7 +35,13 @@ use crate::{
         },
     },
     visitor::{
-        GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call, default_visit_expression_formatted_string, default_visit_expression_get_item, default_visit_expression_get_letter, default_visit_expression_identifier, default_visit_expression_literal, default_visit_expression_unary_operation, default_visit_formatted_string_content, default_visit_statement_assignment, default_visit_statement_multi_input_control, default_visit_statement_single_input_control, default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage
+        GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call,
+        default_visit_expression_formatted_string, default_visit_expression_get_item,
+        default_visit_expression_get_letter, default_visit_expression_identifier,
+        default_visit_expression_literal, default_visit_expression_unary_operation,
+        default_visit_formatted_string_content, default_visit_statement_assignment,
+        default_visit_statement_multi_input_control, default_visit_statement_single_input_control,
+        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
     },
 };
 
@@ -88,23 +96,21 @@ impl FormattedStringContext {
     }
 }
 
-/// Placeholder function, will be replaced/moved/implemented later
-pub fn get_std_lib_namespace_count() -> usize {
-    0 //todo!()
-}
-
-/// Placeholder function, will be replaced/moved/implemented later
-pub fn get_std_lib_namespaces() -> Vec<(IString, Symbol)> {
-    Vec::new() //todo!()
-}
-
 impl GrazeSb3GeneratorContext {
-    pub fn new(mut parse_context: ParseContext) -> Result<Self, std::io::Error> {
+    pub fn new(parse_context: ParseContext) -> Result<Self, std::io::Error> {
+        let mut this = Self::without_standard_namespaces(parse_context)?;
+        this.add_namespace_refs(library::get_standard_library_namespaces());
+        Ok(this)
+    }
+
+    pub fn without_standard_namespaces(
+        mut parse_context: ParseContext,
+    ) -> Result<Self, std::io::Error> {
         let mut rng = Xoshiro256StarStar::from_seed(parse_context.random_seed);
         let targets: Vec<Target> = parse_context.parsed_targets.into();
         let root_symbol = Rc::new_cyclic(|me| {
             RefCell::new(Symbol::Namespace(
-                HashMap::with_capacity(get_std_lib_namespace_count() + 4),
+                HashMap::with_capacity(library::get_standard_library_namespace_count() + 4),
                 // ^ extensions + sprites + broadcasts + global variables + global lists
                 me.clone(),
             ))
@@ -209,9 +215,6 @@ impl GrazeSb3GeneratorContext {
         Symbol::insert_child(&root_symbol, literal!("variables"), variables_symbol);
 
         Symbol::insert_child(&root_symbol, literal!("lists"), lists_symbol);
-        for (name, symbol) in get_std_lib_namespaces() {
-            Symbol::insert_child(&root_symbol, name, Rc::new(RefCell::new(symbol)));
-        }
         let mut block_counter = IdCounter::new();
         let next_block_id = block_counter.get_new_id();
         Ok(Self {
@@ -228,6 +231,22 @@ impl GrazeSb3GeneratorContext {
             formatted_string_context: FormattedStringContext::new(),
             target_assets,
         })
+    }
+
+    pub fn add_namespaces<I>(&mut self, namespaces: I)
+    where
+        I: Iterator<Item = (IString, Symbol)>,
+    {
+        self.add_namespace_refs(namespaces.map(|(key, value)| (key, Rc::new(RefCell::new(value)))));
+    }
+
+    pub fn add_namespace_refs<I>(&mut self, namespaces: I)
+    where
+        I: Iterator<Item = (IString, Rc<RefCell<Symbol>>)>,
+    {
+        for (name, symbol) in namespaces {
+            Symbol::insert_child(&self.root_symbol, name, symbol);
+        }
     }
 
     fn new_block(&mut self) {
@@ -422,6 +441,7 @@ pub fn introduce_input_menu(
         this_id
     })
 }
+
 
 pub fn add_param_to_params(
     context: &mut GrazeSb3GeneratorContext,
