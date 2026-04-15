@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use grazelang_library::{
     CallBlockParam, CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue,
+    SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,21 @@ pub struct BlockEntry {
     pub opcode: String,
     pub args: Vec<BlockArg>,
     pub alt_name: Option<String>,
+    pub assign: Option<AssignmentDescriptor>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssignmentDescriptor {
+    pub opcode: String,
+    pub value: BlockArg,
+    pub known_params: Vec<KnownParam>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct KnownParam {
+    pub param: BlockArg,
+    pub value: Sb3FieldValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -37,6 +53,7 @@ pub enum BlockArg {
     #[serde(rename_all = "camelCase")]
     Input {
         name: String,
+        menu_field_name: Option<String>,
         input_type: InputType,
         check: Option<Sb3Primitive>,
         shadow: Option<ShadowData>,
@@ -101,45 +118,25 @@ pub fn primitive_opcode_to_sb3_primitive_block(
 
 impl BlockEntry {
     fn process(self) -> ProcessedBlockEntry {
-        let BlockEntry {
-            opcode,
-            args,
-            alt_name,
-        } = self;
-        if args.is_empty() {
-            return ProcessedBlockEntry {
-                name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
-                opcode: opcode.clone(),
-                library_item: LibraryItem {
-                    namespace: HashMap::new(),
-                    value: Some(LibraryItemValue::KnownBlock(Box::new(
-                        KnownBlock::SingletonReporter {
-                            opcode: opcode.into(),
-                            params: Vec::new(),
-                            field: None,
-                            assign: None,
-                        },
-                    ))),
-                },
-                associated_items: Vec::new(),
-            };
-        }
-        let mut associated_items = Vec::<AssociatedLibraryItem>::new();
-        let known_block_args = args
-            .into_iter()
-            .map(|arg| match arg {
+        pub fn convert_block_arg_into_call_block_param(
+            arg: BlockArg,
+            associated_items: Option<&mut Vec<AssociatedLibraryItem>>,
+        ) -> CallBlockParam {
+            match arg {
                 BlockArg::Field {
                     name,
                     field_type: _, // TODO: Should this be used somehow?
                     value,
                     options,
                 } => {
-                    options.iter().flatten().for_each(|value| {
-                        associated_items.push(AssociatedLibraryItem {
-                            name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
-                            field_value: Sb3FieldValue::Normal(value.value.clone().into()),
+                    if let Some(associated_items) = associated_items {
+                        options.iter().flatten().for_each(|value| {
+                            associated_items.push(AssociatedLibraryItem {
+                                name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
+                                field_value: Sb3FieldValue::Normal(value.value.clone().into()),
+                            })
                         })
-                    });
+                    }
                     CallBlockParam {
                         kind: CallBlockParamKind::Field {
                             default: value.map(Sb3FieldValue::Normal),
@@ -149,6 +146,7 @@ impl BlockEntry {
                 }
                 BlockArg::Input {
                     name,
+                    menu_field_name,
                     input_type,
                     check: _,
                     shadow,
@@ -159,12 +157,20 @@ impl BlockEntry {
                             default_value,
                             options,
                         }) => {
-                            options.iter().flatten().for_each(|value| {
-                                associated_items.push(AssociatedLibraryItem {
-                                    name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
-                                    field_value: Sb3FieldValue::Normal(value.value.clone().into()),
+                            if let Some(associated_items) = associated_items {
+                                options.iter().flatten().for_each(|value| {
+                                    associated_items.push(AssociatedLibraryItem {
+                                        name: value
+                                            .alt_name
+                                            .as_ref()
+                                            .unwrap_or(&value.label)
+                                            .clone(),
+                                        field_value: Sb3FieldValue::Normal(
+                                            value.value.clone().into(),
+                                        ),
+                                    })
                                 })
-                            });
+                            }
                             if let Some(primitive_block) = primitive_opcode_to_sb3_primitive_block(
                                 &shadow_type,
                                 Sb3Primitive::String(default_value.clone().unwrap_or_default()),
@@ -175,7 +181,9 @@ impl BlockEntry {
                             } else {
                                 CallBlockParamKind::MenuInput {
                                     opcode: shadow_type.into(),
-                                    field_name: name.as_str().into(), // TODO: add differentiation of input name and menu field name for pen extension
+                                    field_name: menu_field_name
+                                        .map(|value| value.as_str().into())
+                                        .unwrap_or_else(|| name.as_str().into()),
                                     default: Sb3FieldValue::Normal(
                                         default_value.unwrap_or_default().into(),
                                     ),
@@ -189,7 +197,58 @@ impl BlockEntry {
                     },
                     name: name.into(),
                 },
-            })
+            }
+        }
+        let BlockEntry {
+            opcode,
+            args,
+            alt_name,
+            assign,
+        } = self;
+        if args.is_empty() {
+            return ProcessedBlockEntry {
+                name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
+                opcode: opcode.clone(),
+                library_item: LibraryItem {
+                    namespace: HashMap::new(),
+                    value: Some(LibraryItemValue::KnownBlock(Box::new(
+                        KnownBlock::SingletonReporter {
+                            opcode: opcode.into(),
+                            params: Vec::new(),
+                            field: None,
+                            assign: assign.map(
+                                |AssignmentDescriptor {
+                                     opcode,
+                                     value,
+                                     known_params,
+                                 }| {
+                                    SimpleCallableKnownBlockSignature(
+                                        opcode.into(),
+                                        convert_block_arg_into_call_block_param(value, None),
+                                        known_params
+                                            .into_iter()
+                                            .map(|KnownParam { param, value }| {
+                                                (
+                                                    convert_block_arg_into_call_block_param(
+                                                        param, None,
+                                                    ),
+                                                    KnownBlock::FieldValue { value },
+                                                )
+                                            })
+                                            .collect(),
+                                    )
+                                },
+                            ),
+                        },
+                    ))),
+                },
+                associated_items: Vec::new(),
+            };
+        }
+        let mut associated_items = Vec::<AssociatedLibraryItem>::new();
+        let known_block_args = args
+            .into_iter()
+            .map(|arg| convert_block_arg_into_call_block_param(arg, Some(&mut associated_items)))
             .collect::<Vec<_>>();
         ProcessedBlockEntry {
             name: opcode.split_once('_').unwrap().1.to_string(),
