@@ -716,6 +716,7 @@ pub struct BinOpDescriptor {
     pub opcode: String,
     pub operand_a_input_name: String,
     pub operand_b_input_name: String,
+    pub is_negated: bool,
 }
 
 impl BinOp {
@@ -745,61 +746,86 @@ impl BinOp {
                 opcode: "operator_add".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
+                is_negated: false,
             },
             BinOp::Minus(_) => BinOpDescriptor {
                 opcode: "operator_subtract".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
+                is_negated: false,
             },
             BinOp::Times(_) => BinOpDescriptor {
                 opcode: "operator_multiply".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
+                is_negated: false,
             },
             BinOp::Div(_) => BinOpDescriptor {
                 opcode: "operator_divide".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
+                is_negated: false,
             },
             BinOp::Mod(_) => BinOpDescriptor {
                 opcode: "operator_mod".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
+                is_negated: false,
             },
             BinOp::Join(_) => BinOpDescriptor {
                 opcode: "operator_join".to_string(),
                 operand_a_input_name: "STRING1".to_string(),
                 operand_b_input_name: "STRING2".to_string(),
+                is_negated: false,
             },
             BinOp::And(_) => BinOpDescriptor {
                 opcode: "operator_and".to_string(),
                 operand_a_input_name: "OPERAND1".to_string(),
                 operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: false,
             },
             BinOp::Or(_) => BinOpDescriptor {
                 opcode: "operator_or".to_string(),
                 operand_a_input_name: "OPERAND1".to_string(),
                 operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: false,
             },
             BinOp::Equals(_) => BinOpDescriptor {
                 opcode: "operator_equals".to_string(),
                 operand_a_input_name: "OPERAND1".to_string(),
                 operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: false,
+            },
+            BinOp::NotEquals(_) => BinOpDescriptor {
+                opcode: "operator_equals".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: true,
             },
             BinOp::LessThan(_) => BinOpDescriptor {
                 opcode: "operator_lt".to_string(),
                 operand_a_input_name: "OPERAND1".to_string(),
                 operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: false,
+            },
+            BinOp::GreaterThanOrEqual(_) => BinOpDescriptor {
+                opcode: "operator_lt".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: true,
             },
             BinOp::GreaterThan(_) => BinOpDescriptor {
                 opcode: "operator_gt".to_string(),
                 operand_a_input_name: "OPERAND1".to_string(),
                 operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: false,
             },
-            // TODO: Add another data structure for these
-            BinOp::NotEquals(_) => todo!(),
-            BinOp::LessThanOrEqual(_) => todo!(),
-            BinOp::GreaterThanOrEqual(_) => todo!(),
+            BinOp::LessThanOrEqual(_) => BinOpDescriptor {
+                opcode: "operator_gt".to_string(),
+                operand_a_input_name: "OPERAND1".to_string(),
+                operand_b_input_name: "OPERAND2".to_string(),
+                is_negated: true,
+            },
         }
     }
 }

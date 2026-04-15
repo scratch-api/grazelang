@@ -442,7 +442,6 @@ pub fn introduce_input_menu(
     })
 }
 
-
 pub fn add_param_to_params(
     context: &mut GrazeSb3GeneratorContext,
     param: &CallBlockParam,
@@ -613,7 +612,54 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 opcode,
                 operand_a_input_name,
                 operand_b_input_name,
+                is_negated,
             } = value.1.get_descriptor();
+            if is_negated {
+                let inner_reporter_id = wrap_in_reporter(context, |context, parent, this_id| {
+                    let inputs = HashMap::from([
+                        (
+                            operand_a_input_name,
+                            param_to_input_repr_no_menu(op_a_param, context)?.into(),
+                        ),
+                        (
+                            operand_b_input_name,
+                            param_to_input_repr_no_menu(op_b_param, context)?.into(),
+                        ),
+                    ]);
+                    add_block(
+                        context,
+                        &this_id,
+                        make_block(
+                            parent,
+                            opcode.to_string(),
+                            inputs,
+                            HashMap::new(),
+                            false,
+                            None,
+                        ),
+                    );
+                    Ok(this_id)
+                })?;
+                add_block(
+                    context,
+                    &this_id,
+                    make_block(
+                        parent,
+                        "operator_not".to_string(),
+                        HashMap::from([(
+                            "OPERAND".to_string(),
+                            Sb3InputValue::NoShadow(Sb3InputRepr::Reference(
+                                inner_reporter_id.to_string(),
+                            )),
+                        )]),
+                        HashMap::new(),
+                        false,
+                        None,
+                    ),
+                );
+                context.push_param(Param::Owned(this_id.into()));
+                return Ok(());
+            }
             let inputs = HashMap::from([
                 (
                     operand_a_input_name,
@@ -636,7 +682,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     None,
                 ),
             );
-            context.push_param(Param::Owned(this_id.clone().into()));
+            context.push_param(Param::Owned(this_id.into()));
             Ok(())
         })
     }
