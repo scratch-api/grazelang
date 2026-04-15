@@ -15,6 +15,4 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 
 ## Credits
 
-@aspizu created a wonderful project called [`goboscript`](https://github.com/aspizu/goboscript). When I saw it, I was impressed. While it is a truly marvelous technical achievement, I somehow disliked the syntax of goboscript. Because of that, I started working on an alternative. Another reason for creating graze was to address the fact that goboscript could not fully map to all Vanilla Scratch projects. 
-
-I used rust to create graze and was also inspired by rust for graze's syntax.
+Inspired by @aspizu's impressive work on [goboscript](https://github.com/aspizu/goboscript), I began work on graze. While goboscript is a remarkable technical achievement, I wanted to explore a different syntax and address its limitations in fully mapping to all vanilla Scratch projects. Written in Rust and heavily inspired by its syntax, graze aims for broader compatibility.
