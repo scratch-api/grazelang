@@ -1,11 +1,12 @@
-use std::{fs, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
 use proc_macro::TokenStream;
 use quote::quote;
 use sha3::{Digest, Sha3_256};
 use syn::{LitStr, parse_macro_input};
+use grazelang_library::LibraryItem;
 
-use crate::parser::LibraryCache;
+use crate::parser::{LibraryCache, process_toolbox_category};
 mod parser;
 
 macro_rules! implement_generate_library {
@@ -32,10 +33,21 @@ macro_rules! implement_generate_library {
         let v: Vec<crate::parser::ToolboxCategory> =
             serde_json::from_str(&json_str).expect("Failed to parse JSON");
 
-        let library: ::std::collections::HashMap<
-            ::std::string::String,
-            ::grazelang_library::LibraryItem,
-        > = v.into_iter().map(|value| value.into()).collect();
+        let mut library = HashMap::with_capacity(10);
+        let mut menus = HashMap::new();
+
+        for namespace in v {
+            let (category_name, category, associated_menus) = process_toolbox_category(namespace);
+            for (key, value) in associated_menus {
+                menus.insert(key, value);
+            }
+            library.insert(category_name, category);
+        }
+        
+        library.insert("menus".to_string(), LibraryItem {
+            namespace: menus,
+            value: None,
+        });
 
         let library_keys = library.keys();
         let library_values = library.values();
@@ -57,7 +69,7 @@ macro_rules! implement_create_hash_and_cache_path {
                 let hash = Sha3_256::digest($json_str.as_bytes());
                 base16ct::lower::encode_string(hash.as_slice())
             },
-            Path::new(&$dir).join(&($rel_path + ".out_cached")),
+            Path::new(&$dir).join(&($rel_path + ".out_cached.json")),
         )
     };
     ($dir:expr, $rel_path:expr, $json_str:expr, no_use_cache, no_create_cache) => {

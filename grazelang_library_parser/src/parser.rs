@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use grazelang_library::{
-    CallBlockParam, CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue,
+    AliasSegment, CallBlockParam, CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue,
     SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
@@ -61,6 +61,7 @@ pub enum BlockArg {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MenuOption {
     pub label: String,
     pub value: String,
@@ -251,7 +252,7 @@ impl BlockEntry {
             .map(|arg| convert_block_arg_into_call_block_param(arg, Some(&mut associated_items)))
             .collect::<Vec<_>>();
         ProcessedBlockEntry {
-            name: opcode.split_once('_').unwrap().1.to_string(),
+            name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
             library_item: LibraryItem {
                 namespace: HashMap::new(),
                 value: Some(LibraryItemValue::KnownBlock(Box::new(
@@ -264,75 +265,89 @@ impl BlockEntry {
     }
 }
 
-impl From<ToolboxCategory> for (String, LibraryItem) {
-    fn from(value: ToolboxCategory) -> Self {
-        let ToolboxCategory {
-            category: _,
-            id,
-            blocks,
-            alt_name,
-        } = value;
-        let mut associated_items = HashMap::<String, (Sb3FieldValue, Vec<String>)>::new();
-        let mut namespace = HashMap::<String, LibraryItem>::with_capacity(blocks.len());
-        for block in blocks {
-            let ProcessedBlockEntry {
-                name,
-                opcode,
-                library_item: item,
-                associated_items: new_associated_items,
-            } = block.process();
-            for AssociatedLibraryItem {
-                name: associated_item_name,
-                field_value: associated_item_field_value,
-            } in new_associated_items
-            {
-                if let Some(current) = associated_items.get_mut(&associated_item_name) {
-                    assert_eq!(&current.0, &associated_item_field_value);
-                    current.1.push(opcode.clone());
-                } else {
-                    associated_items.insert(
-                        associated_item_name,
-                        (associated_item_field_value, vec![opcode.clone()]),
-                    );
-                }
-            }
-            namespace.insert(name, item);
-        }
-        for (name, (field_value, _opcodes)) in associated_items {
-            // TODO: use opcodes
-            if let Some(current) = namespace.get_mut(&name) {
-                if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
-                    && let KnownBlock::SingletonReporter {
-                        opcode: _,
-                        params: _,
-                        field,
-                        assign: _,
-                    } = known_block.as_mut()
-                {
-                    field.replace(field_value);
-                } else {
-                    todo!() // TODO: warn about overlap
-                }
+pub fn process_toolbox_category(
+    value: ToolboxCategory,
+) -> (String, LibraryItem, Vec<(String, LibraryItem)>) {
+    let ToolboxCategory {
+        category: _,
+        id,
+        blocks,
+        alt_name,
+    } = value;
+    let mut associated_items = HashMap::<String, (Sb3FieldValue, Vec<String>)>::new();
+    let mut namespace = HashMap::<String, LibraryItem>::with_capacity(blocks.len());
+    for block in blocks {
+        let ProcessedBlockEntry {
+            name,
+            opcode,
+            library_item: item,
+            associated_items: new_associated_items,
+        } = block.process();
+        for AssociatedLibraryItem {
+            name: associated_item_name,
+            field_value: associated_item_field_value,
+        } in new_associated_items
+        {
+            if let Some(current) = associated_items.get_mut(&associated_item_name) {
+                assert_eq!(&current.0, &associated_item_field_value);
+                current.1.push(opcode.clone());
             } else {
-                namespace.insert(
-                    name,
-                    LibraryItem {
-                        namespace: HashMap::new(),
-                        value: Some(LibraryItemValue::KnownBlock(Box::new(
-                            KnownBlock::FieldValue { value: field_value },
-                        ))),
-                    },
+                associated_items.insert(
+                    associated_item_name,
+                    (associated_item_field_value, vec![opcode.clone()]),
                 );
             }
         }
-        (
-            alt_name.unwrap_or(id),
-            LibraryItem {
-                namespace,
-                value: None,
-            },
-        )
+        namespace.insert(name, item);
     }
+    let mut processed_associated_items =
+        Vec::<(String, LibraryItem)>::with_capacity(associated_items.len());
+    for (name, (field_value, _opcodes)) in associated_items {
+        // TODO: use opcodes
+        if let Some(current) = namespace.get_mut(&name) {
+            if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
+                && let KnownBlock::SingletonReporter {
+                    opcode: _,
+                    params: _,
+                    field,
+                    assign: _,
+                } = known_block.as_mut()
+            {
+                field.replace(field_value.clone());
+            } else {
+                todo!() // TODO: warn about overlap
+            }
+        } else {
+            namespace.insert(
+                name.clone(),
+                LibraryItem {
+                    namespace: HashMap::new(),
+                    value: Some(LibraryItemValue::Alias(vec![
+                        AliasSegment::Super,
+                        AliasSegment::Child("menus".to_string()),
+                        AliasSegment::Child(name.clone()),
+                    ])),
+                },
+            );
+        }
+        processed_associated_items.push((
+            name,
+            LibraryItem {
+                namespace: HashMap::new(),
+                value: Some(LibraryItemValue::KnownBlock(Box::new(
+                    KnownBlock::FieldValue { value: field_value },
+                ))),
+            },
+        ));
+    }
+    (
+        alt_name.unwrap_or(id),
+        LibraryItem {
+            namespace,
+            value: None,
+        },
+        processed_associated_items,
+    )
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

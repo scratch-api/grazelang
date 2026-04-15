@@ -7,7 +7,7 @@ use grazelang_library_parser::generate_library;
 use crate::parser::parse_context::Symbol;
 
 pub fn get_generated_library() -> HashMap<String, LibraryItem> {
-    generate_library!("schemas/test_schema.json")
+    generate_library!("schemas/toolbox_schema.json")
 }
 
 pub fn convert_generated_library(
@@ -59,7 +59,7 @@ pub fn convert_generated_library(
 
 /// Output is not guaranteed to be correct
 pub fn get_standard_library_namespace_count() -> usize {
-    9
+    10
 }
 
 pub fn get_standard_library_namespaces() -> impl Iterator<Item = (IString, Rc<RefCell<Symbol>>)> {
