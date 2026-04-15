@@ -362,10 +362,12 @@ pub struct Sb3Block {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sb3InputValue {
-    Shadow(Sb3InputRepr),   // tag: 1
-    NoShadow(Sb3InputRepr), // tag: 2
+    /// tag: 1
+    Shadow(Sb3InputRepr),
+    /// tag: 2
+    NoShadow(Sb3InputRepr),
+    /// tag: 3
     ObscuredShadow {
-        // tag: 3
         value: Sb3InputRepr,
         shadow: Sb3InputRepr,
     },

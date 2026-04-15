@@ -40,8 +40,9 @@ use crate::{
         default_visit_expression_get_letter, default_visit_expression_identifier,
         default_visit_expression_literal, default_visit_expression_unary_operation,
         default_visit_formatted_string_content, default_visit_statement_assignment,
-        default_visit_statement_multi_input_control, default_visit_statement_single_input_control,
-        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
+        default_visit_statement_call, default_visit_statement_multi_input_control,
+        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
+        default_visit_top_level_statement_stage,
     },
 };
 
@@ -1226,6 +1227,52 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 &this_id,
                 make_block(parent, opcode.to_string(), inputs, fields, false, None),
             );
+            Ok(())
+        })
+    }
+
+    fn visit_statement_call(
+        &self,
+        value: (
+            &Identifier,
+            &crate::parser::ast::LeftParens,
+            &Vec<(Expression, Option<crate::parser::ast::Comma>)>,
+            &crate::parser::ast::RightParens,
+            &crate::parser::ast::Semicolon,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_statement(context, |context, parent, this_id| {
+            default_visit_statement_call(self, value, context)?;
+            let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
+                .take(value.2.len())
+                .collect::<Vec<_>>();
+            let actual_identifier = get_actual_identifier!(context, value.0)?;
+            let actual_identifier_ref = actual_identifier.borrow();
+            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+            let CallableKnownBlockSignature(opcode, params, known_params) =
+                known_block.resolve_for_call_block(context);
+            let mut fields = HashMap::new();
+            let mut inputs = HashMap::new();
+            add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+            if params.len() != reversed_args.len() {
+                return Err(GrazeSb3GeneratorError::IncorrectParamCount {
+                    unexpected: reversed_args.len(),
+                    expected: params.len(),
+                });
+            }
+            for (param, value) in zip(params.iter(), reversed_args.into_iter().rev()) {
+                with_known_block!(context, value, value => {
+                    add_param_to_params(context, param, value, &mut inputs, &mut fields)?;
+                });
+            }
+            add_block(
+                context,
+                &this_id,
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+            );
+            context.push_param(Param::Owned(this_id.into()));
             Ok(())
         })
     }
