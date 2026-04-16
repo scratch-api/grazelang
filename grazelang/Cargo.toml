@@ -4,13 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-logos = "0.16.0"
+logos = "0.16.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_repr = "0.1.20"
 arcstr = { version = "1.2.0", features = ["serde"] }
 regex = "1.12.3"
-rand = "0.10.0"
+rand = "0.10.1"
 rand_xoshiro = "0.8.0"
 thiserror = "2.0.18"
 grazelang_library_parser = { path = "../grazelang_library_parser" }
