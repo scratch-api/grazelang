@@ -18,7 +18,7 @@ grazelang_library = { path = "../grazelang_library" }
 md5 = "0.8.0"
 
 [features]
-default = []
+default = ["use_actual_defaults_everywhere"]
 use_shadows_for_formatted_strings = []
 use_actual_defaults_for_formatted_strings = ["use_shadows_for_formatted_strings"]
 use_actual_defaults_everywhere = ["use_actual_defaults_for_formatted_strings"]

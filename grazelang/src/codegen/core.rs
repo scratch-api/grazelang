@@ -9,7 +9,7 @@ use std::{
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
     CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature,
-    SimpleCallableKnownBlockSignature,
+    SimpleCallableKnownBlockSignature, project_json::Sb3Primitive,
 };
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
@@ -41,8 +41,9 @@ use crate::{
         default_visit_expression_literal, default_visit_expression_unary_operation,
         default_visit_formatted_string_content, default_visit_statement_assignment,
         default_visit_statement_call, default_visit_statement_forever,
-        default_visit_statement_multi_input_control, default_visit_statement_single_input_control,
-        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
+        default_visit_statement_multi_input_control, default_visit_statement_set_item,
+        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
+        default_visit_top_level_statement_stage,
     },
 };
 
@@ -213,7 +214,7 @@ impl GrazeSb3GeneratorContext {
                 _ => (), // Handled just to be sure although it shouldn't happen
             }
         }
-        Symbol::insert_child(&root_symbol, literal!("variables"), variables_symbol);
+        Symbol::insert_child(&root_symbol, literal!("vars"), variables_symbol);
 
         Symbol::insert_child(&root_symbol, literal!("lists"), lists_symbol);
         let mut block_counter = IdCounter::new();
@@ -295,8 +296,8 @@ pub fn make_block(
     fields: HashMap<String, Sb3FieldValue>,
     shadow: bool,
     mutation: Option<Sb3BlockMutation>,
-    top_level: bool,
 ) -> Sb3Block {
+    let top_level = parent.is_none();
     Sb3Block {
         opcode,
         next: None,
@@ -336,12 +337,12 @@ pub fn make_top_level_block(
 pub fn wrap_in_reporter<F, O>(context: &mut GrazeSb3GeneratorContext, action: F) -> O
 where
     O: Sized,
-    F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString, bool) -> O,
+    F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString) -> O,
 {
     let block_id = context.get_current_block_id();
     let old_parent = context.current_parent.replace(block_id.to_string());
     context.new_block();
-    let out = action(context, old_parent.clone(), block_id, old_parent.is_none());
+    let out = action(context, old_parent.clone(), block_id);
     context.current_parent = old_parent;
     out
 }
@@ -349,12 +350,12 @@ where
 pub fn wrap_in_statement<F, O>(context: &mut GrazeSb3GeneratorContext, action: F) -> O
 where
     O: Sized,
-    F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString, bool) -> O,
+    F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString) -> O,
 {
     let block_id = context.get_current_block_id();
     let old_parent = context.current_parent.replace(block_id.to_string());
     context.new_block();
-    let top_level = if let Some(previous) = context.current_previous_block.take() {
+    if let Some(previous) = context.current_previous_block.take() {
         context
             .current_sb3_target
             .as_mut()
@@ -363,16 +364,12 @@ where
             .get_mut(previous.as_str())
             .unwrap()
             .next = Some(block_id.to_string());
-        false
     } else if old_parent.is_some() {
         // First statement in block stack is used in STACK argument of parent or similar
         context.push_param(Param::BlockStack(block_id.to_string()));
-        false
-    } else {
-        true
-    };
-    let out = action(context, old_parent.clone(), block_id.clone(), top_level);
-    context.current_parent = old_parent;
+    }
+    let out = action(context, old_parent.clone(), block_id.clone());
+    context.current_parent = Some(block_id.to_string());
     context.current_previous_block = Some(block_id);
     out
 }
@@ -430,7 +427,7 @@ pub fn introduce_input_menu(
     value: Sb3FieldValue,
     context: &mut GrazeSb3GeneratorContext,
 ) -> IdString {
-    wrap_in_reporter(context, |context, parent, this_id, top_level| {
+    wrap_in_reporter(context, |context, parent, this_id| {
         add_block(
             context,
             &this_id,
@@ -441,7 +438,6 @@ pub fn introduce_input_menu(
                 HashMap::from([(field_name.to_string(), value)]),
                 true,
                 None,
-                top_level,
             ),
         );
         this_id
@@ -541,22 +537,14 @@ pub fn introduce_input_simple_block<'a, I>(
 where
     I: Iterator<Item = &'a (CallBlockParam, KnownBlock)>,
 {
-    wrap_in_reporter(context, |context, parent, this_id, top_level| {
+    wrap_in_reporter(context, |context, parent, this_id| {
         let mut fields = HashMap::new();
         let mut inputs = HashMap::new();
         add_params(context, params, &mut inputs, &mut fields)?;
         add_block(
             context,
             &this_id,
-            make_block(
-                parent,
-                opcode.to_string(),
-                inputs,
-                fields,
-                false,
-                None,
-                top_level,
-            ),
+            make_block(parent, opcode.to_string(), inputs, fields, false, None),
         );
         Ok(this_id)
     })
@@ -613,7 +601,6 @@ pub fn create_control_block<I>(
     substack: Param,
     parent: Option<String>,
     this_id: IString,
-    top_level: bool,
 ) -> Result<(), GrazeSb3GeneratorError>
 where
     I: Iterator<Item = Param>,
@@ -660,15 +647,7 @@ where
     add_block(
         context,
         &this_id,
-        make_block(
-            parent,
-            opcode.to_string(),
-            inputs,
-            fields,
-            false,
-            None,
-            top_level,
-        ),
+        make_block(parent, opcode.to_string(), inputs, fields, false, None),
     );
     Ok(())
 }
@@ -686,7 +665,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_reporter(context, |context, parent, this_id, top_level| {
+        wrap_in_reporter(context, |context, parent, this_id| {
             default_visit_expression_binary_operation(self, value, context)?;
             let (op_b_param, op_a_param) =
                 (context.pop_param().unwrap(), context.pop_param().unwrap());
@@ -717,23 +696,21 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 ),
             ]);
             if is_negated {
-                let inner_reporter_id =
-                    wrap_in_reporter(context, |context, parent, this_id, top_level| {
-                        add_block(
-                            context,
-                            &this_id,
-                            make_block(
-                                parent,
-                                opcode.to_string(),
-                                inputs,
-                                HashMap::new(),
-                                false,
-                                None,
-                                top_level,
-                            ),
-                        );
-                        Ok(this_id)
-                    })?;
+                let inner_reporter_id = wrap_in_reporter(context, |context, parent, this_id| {
+                    add_block(
+                        context,
+                        &this_id,
+                        make_block(
+                            parent,
+                            opcode.to_string(),
+                            inputs,
+                            HashMap::new(),
+                            false,
+                            None,
+                        ),
+                    );
+                    Ok(this_id)
+                })?;
                 add_block(
                     context,
                     &this_id,
@@ -749,7 +726,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         HashMap::new(),
                         false,
                         None,
-                        top_level,
                     ),
                 );
                 context.push_param(Param::Owned(this_id.into()));
@@ -766,7 +742,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     HashMap::new(),
                     false,
                     None,
-                    top_level,
                 ),
             );
             context.push_param(Param::Owned(this_id.into()));
@@ -788,7 +763,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_reporter(context, |context, parent, this_id, top_level| {
+        wrap_in_reporter(context, |context, parent, this_id| {
             default_visit_expression_call(self, value, context)?;
             let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
                 .take(value.2.len())
@@ -815,15 +790,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             add_block(
                 context,
                 &this_id,
-                make_block(
-                    parent,
-                    opcode.to_string(),
-                    inputs,
-                    fields,
-                    false,
-                    None,
-                    top_level,
-                ),
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
             );
             context.push_param(Param::Owned(this_id.into()));
             Ok(())
@@ -852,20 +819,18 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         fn join_recursively(
             context: &mut GrazeSb3GeneratorContext,
             value: &[FormattedStringContent],
-        ) -> (FormattedStringTree, bool) {
+        ) -> FormattedStringTree {
             match value.len() {
-                0 => (FormattedStringTree::EmptyString, false),
+                0 => FormattedStringTree::EmptyString,
                 1 => match &value[0] {
-                    FormattedStringContent::Expression(_) => {
-                        (FormattedStringTree::Expression, false)
-                    }
+                    FormattedStringContent::Expression(_) => FormattedStringTree::Expression,
                     FormattedStringContent::String(arc_str, _) => {
-                        (FormattedStringTree::String(arc_str.to_string()), false)
+                        FormattedStringTree::String(arc_str.to_string())
                     }
                 },
                 _ => {
                     let mid = value.len() / 2;
-                    wrap_in_reporter(context, |context, parent, this_id, top_level| {
+                    wrap_in_reporter(context, |context, parent, this_id| {
                         let parent = context
                             .formatted_string_context
                             .ids
@@ -876,16 +841,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             .formatted_string_context
                             .ids
                             .push(Some(this_id.to_string()));
-                        let left = Box::new(join_recursively(context, &value[..mid]).0);
+                        let left = Box::new(join_recursively(context, &value[..mid]));
                         context
                             .formatted_string_context
                             .ids
                             .push(Some(this_id.to_string()));
-                        let right = Box::new(join_recursively(context, &value[mid..]).0);
-                        (
-                            FormattedStringTree::Joined(left, right, parent, this_id),
-                            top_level,
-                        )
+                        let right = Box::new(join_recursively(context, &value[mid..]));
+                        FormattedStringTree::Joined(left, right, parent, this_id)
                     })
                 }
             }
@@ -894,7 +856,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             parent: Option<String>,
             left: Sb3InputValue,
             right: Sb3InputValue,
-            top_level: bool,
         ) -> Sb3Block {
             make_block(
                 parent,
@@ -906,13 +867,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 HashMap::new(),
                 false,
                 None,
-                top_level,
             )
         }
         fn convert_into_block_tree(
             context: &mut GrazeSb3GeneratorContext,
             value: FormattedStringTree,
-            top_level: bool,
         ) -> Result<Param, GrazeSb3GeneratorError> {
             match value {
                 FormattedStringTree::Expression => Ok(context.pop_param().unwrap()),
@@ -926,8 +885,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 })),
                 FormattedStringTree::Joined(left, right, parent, this_id) => {
                     // right comes first because a stack is LIFO
-                    let right = convert_into_block_tree(context, *right, false)?;
-                    let left = convert_into_block_tree(context, *left, false)?;
+                    let right = convert_into_block_tree(context, *right)?;
+                    let left = convert_into_block_tree(context, *left)?;
                     let left = param_to_input_repr_no_menu(left, context)?;
                     let right = param_to_input_repr_no_menu(right, context)?;
                     #[cfg(feature = "use_shadows_for_formatted_strings")]
@@ -953,7 +912,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     add_block(
                         context,
                         &this_id,
-                        make_join(parent, left.into(), right.into(), top_level),
+                        make_join(parent, left.into(), right.into()),
                     );
                     Ok(Param::Owned(KnownBlock::BlockRef { id: this_id }))
                 }
@@ -968,8 +927,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             },
             current_idx: 0,
         };
-        let (formatted_string, top_level): (FormattedStringTree, bool) =
-            join_recursively(context, value.0);
+        let formatted_string = join_recursively(context, value.0);
         let formatted_string = match formatted_string {
             FormattedStringTree::Expression => {
                 default_visit_expression_formatted_string(self, value, context)?;
@@ -994,7 +952,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
         };
         default_visit_expression_formatted_string(self, value, context)?;
-        let param = convert_into_block_tree(context, formatted_string, top_level)?;
+        let param = convert_into_block_tree(context, formatted_string)?;
         context.push_param(param);
         Ok(())
     }
@@ -1022,14 +980,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_reporter(context, |context, parent, this_id, top_level| {
+        wrap_in_reporter(context, |context, parent, this_id| {
             default_visit_expression_get_item(self, value, context)?;
             let index = context.pop_param().unwrap();
             let index_input_value = (
                 param_to_input_repr_no_menu(index, context)?,
-                Some(Sb3PrimitiveBlock::Integer(
-                    super::project_json::Sb3Primitive::Int128(1),
-                )),
+                Some(Sb3PrimitiveBlock::Integer(Sb3Primitive::Int128(1))),
             );
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
@@ -1056,7 +1012,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     HashMap::from([("LIST".to_string(), list_field_value)]),
                     false,
                     None,
-                    top_level,
                 ),
             );
             context.push_param(Param::Owned(this_id.into()));
@@ -1075,7 +1030,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_reporter(context, |context, parent, this_id, top_level| {
+        wrap_in_reporter(context, |context, parent, this_id| {
             default_visit_expression_get_letter(self, value, context)?;
             let string = context.pop_param().unwrap();
             let string_input_value: (_, Option<Sb3PrimitiveBlock>) = (
@@ -1102,7 +1057,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     HashMap::new(),
                     false,
                     None,
-                    top_level,
                 ),
             );
             context.push_param(Param::Owned(this_id.into()));
@@ -1119,7 +1073,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_reporter(context, |context, parent, this_id, top_level| {
+        wrap_in_reporter(context, |context, parent, this_id| {
             default_visit_expression_unary_operation(self, value, context)?;
             let operand = context.pop_param().unwrap();
             let UnOpDescriptor {
@@ -1139,7 +1093,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     field_values,
                     false,
                     None,
-                    top_level,
                 ),
             );
             context.push_param(Param::Owned(this_id.into()));
@@ -1182,7 +1135,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_statement(context, |context, parent, this_id, top_level| {
+        wrap_in_statement(context, |context, parent, this_id| {
             default_visit_statement_assignment(self, value, context)?;
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
@@ -1199,15 +1152,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             add_block(
                 context,
                 &this_id,
-                make_block(
-                    parent,
-                    opcode.to_string(),
-                    inputs,
-                    fields,
-                    false,
-                    None,
-                    top_level,
-                ),
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
             );
             Ok(())
         })
@@ -1226,7 +1171,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_statement(context, |context, parent, this_id, top_level| {
+        wrap_in_statement(context, |context, parent, this_id| {
             default_visit_statement_multi_input_control(self, value, context)?;
             let substack = context.pop_param().unwrap();
             let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
@@ -1241,7 +1186,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 substack,
                 parent,
                 this_id,
-                top_level,
             )
         })
     }
@@ -1257,7 +1201,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_statement(context, |context, parent, this_id, top_level| {
+        wrap_in_statement(context, |context, parent, this_id| {
             default_visit_statement_single_input_control(self, value, context)?;
             let substack = context.pop_param().unwrap();
             let arg = context.pop_param().unwrap();
@@ -1269,7 +1213,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 substack,
                 parent,
                 this_id,
-                top_level,
             )
         })
     }
@@ -1286,7 +1229,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_statement(context, |context, parent, this_id, top_level| {
+        wrap_in_statement(context, |context, parent, this_id| {
             default_visit_statement_call(self, value, context)?;
             let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
                 .take(value.2.len())
@@ -1313,17 +1256,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             add_block(
                 context,
                 &this_id,
-                make_block(
-                    parent,
-                    opcode.to_string(),
-                    inputs,
-                    fields,
-                    false,
-                    None,
-                    top_level,
-                ),
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
             );
-            context.push_param(Param::Owned(this_id.into()));
             Ok(())
         })
     }
@@ -1338,7 +1272,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        wrap_in_statement(context, |context, parent, this_id, top_level| {
+        wrap_in_statement(context, |context, parent, this_id| {
             default_visit_statement_forever(self, value, context)?;
             let substack = context.pop_param().unwrap();
             create_control_block(
@@ -1349,8 +1283,67 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 substack,
                 parent,
                 this_id,
-                top_level,
             )
+        })
+    }
+
+    fn visit_statement_set_item(
+        &self,
+        value: (
+            &Identifier,
+            &crate::parser::ast::LeftBracket,
+            &Expression,
+            &crate::parser::ast::RightBracket,
+            &crate::parser::ast::NormalAssignmentOperator,
+            &Expression,
+            &crate::parser::ast::Semicolon,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_statement(context, |context, parent, this_id| {
+            default_visit_statement_set_item(self, value, context)?;
+            let item_value = context.pop_param().unwrap();
+            let item_value_input_value = (
+                param_to_input_repr_no_menu(item_value, context)?,
+                Some(Sb3PrimitiveBlock::String("thing".into())),
+            );
+            let index = context.pop_param().unwrap();
+            let index_input_value = (
+                param_to_input_repr_no_menu(index, context)?,
+                Some(Sb3PrimitiveBlock::Integer(Sb3Primitive::Int128(1))),
+            );
+            let actual_identifier = get_actual_identifier!(context, value.0)?;
+            let actual_identifier_ref = actual_identifier.borrow();
+            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+            let (canonical_name, id) = match known_block {
+                KnownBlock::List { canonical_name, id } => (canonical_name, id),
+                _ => {
+                    return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
+                        identifier: value.0.clone(),
+                    });
+                }
+            };
+            let list_field_value = Sb3FieldValue::WithId {
+                value: (canonical_name as &str).into(),
+                id: id.to_string(),
+            };
+            add_block(
+                context,
+                &this_id,
+                make_block(
+                    parent,
+                    "data_replaceitemoflist".to_string(),
+                    HashMap::from([
+                        ("INDEX".to_string(), index_input_value.into()),
+                        ("ITEM".to_string(), item_value_input_value.into()),
+                    ]),
+                    HashMap::from([("LIST".to_string(), list_field_value)]),
+                    false,
+                    None,
+                ),
+            );
+            Ok(())
         })
     }
 

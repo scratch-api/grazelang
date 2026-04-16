@@ -1197,6 +1197,9 @@ pub fn default_visit_statement_call<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
+    for item in value.2 {
+        visitor.visit_expression(&item.0, context)?;
+    }
     Ok(())
 }
 

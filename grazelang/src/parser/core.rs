@@ -295,7 +295,18 @@ pub fn parse_single_identifier(
     token_stream: ParseIn,
     context: &mut ParseContext,
 ) -> ParseOut<IString> {
-    expect_token!(token_stream, Token::Identifier(value) => Ok(value), "Expected an identifier.", "an identifier")
+    Ok(match next_token!(token_stream) {
+        Token::Identifier(value) => value,
+        Token::StageKeyword => literal!("stage"),
+        Token::VarsKeyword => literal!("vars"),
+        Token::ListsKeyword => literal!("lists"),
+        token => emit_unexpected_token!(
+            token_stream,
+            "Expected an identifier.",
+            "an identifier",
+            token
+        ),
+    })
 }
 
 pub fn parse_single_identifier_as_identifier(
@@ -350,6 +361,8 @@ pub fn parse_full_identifier(
             match next_token!(token_stream) {
                 Token::Identifier(value) => (value, get_token_position!(token_stream)),
                 Token::StageKeyword => (literal!("stage"), get_token_position!(token_stream)),
+                Token::VarsKeyword => (literal!("vars"), get_token_position!(token_stream)),
+                Token::ListsKeyword => (literal!("lists"), get_token_position!(token_stream)),
                 token => emit_unexpected_token!(
                     token_stream,
                     "Expected an identifier.",
@@ -402,12 +415,20 @@ pub fn parse_full_identifier_starting_with(
             _ => break,
         }
         skip_token!(token_stream);
-        names.push(expect_token!(
-            token_stream,
-            Token::Identifier(value) => (value, get_token_position!(token_stream)),
-            "Expected an identifier.",
-            "an identifier"
-        ));
+        names.push({
+            match next_token!(token_stream) {
+                Token::Identifier(value) => (value, get_token_position!(token_stream)),
+                Token::StageKeyword => (literal!("stage"), get_token_position!(token_stream)),
+                Token::VarsKeyword => (literal!("vars"), get_token_position!(token_stream)),
+                Token::ListsKeyword => (literal!("lists"), get_token_position!(token_stream)),
+                token => emit_unexpected_token!(
+                    token_stream,
+                    "Expected an identifier.",
+                    "an identifier",
+                    token
+                ),
+            }
+        });
     }
     if names.len() > 1 && scope.is_none() {
         scope = Some(names);
@@ -442,7 +463,6 @@ pub mod statement {
         context: &mut ParseContext,
     ) -> ParseOut<ast::Literal> {
         let token = next_token!(token_stream);
-        use Expression::Literal as ELiteral;
         use ast::Literal as LLiteral;
         match token {
             Token::SimpleString(value) => {
@@ -469,21 +489,18 @@ pub mod statement {
             )),
             Token::LeftParens => {
                 let left_parens_position = get_token_position!(token_stream);
-                consume_then_never_if!(token_stream, Token::RightParens =>
-                    return Ok(LLiteral::EmptyExpression(
-                        LeftParens(left_parens_position),
-                        from_stream_pos!(token_stream => RightParens),
-                        (left_parens_position.0, get_token_end!(token_stream)),
-                    ))
-                );
-                let value = parse_literal(token_stream, context)?;
                 expect_token!(
                     token_stream,
-                    Token::RightParens => (),
+                    Token::RightParens => {
+                        Ok(LLiteral::EmptyExpression(
+                            LeftParens(left_parens_position),
+                            from_stream_pos!(token_stream => RightParens),
+                            (left_parens_position.0, get_token_end!(token_stream)),
+                        ))
+                    },
                     "Expected ')'.",
                     "')'"
-                );
-                Ok(value)
+                )
             }
             token => {
                 emit_unexpected_token!(token_stream, "Expected a literal.", "a literal", token);
@@ -1290,7 +1307,10 @@ pub mod statement {
                     None => break None,
                 } {
                     Token::Semicolon => break None,
-                    Token::Identifier(_) => {
+                    Token::Identifier(_)
+                    | Token::StageKeyword
+                    | Token::VarsKeyword
+                    | Token::ListsKeyword => {
                         let else_identifier = parse_full_identifier(token_stream, context)?;
                         let syntactic_else =
                             if let Some(value) = else_identifier.to_syntactic_else() {
@@ -1814,7 +1834,7 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
     match peek_token!(token_stream) {
         Token::LetKeyword => statement::parse_data_declaration_fully(token_stream, context),
         // TODO: Prevent users from naming variables "super" or possibly "root"
-        Token::Identifier(_) => {
+        Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
             let identifier = parse_full_identifier(token_stream, context)?;
             statement::parse_statement_after_identifier(token_stream, context, identifier)
         }
@@ -2290,6 +2310,41 @@ pub mod expression {
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<Expression> {
+        pub fn parse_expression_after_identifier(
+            token_stream: ParseIn,
+            context: &mut ParseContext,
+            value: IString,
+            token_position: ((usize, usize), (usize, usize)),
+        ) -> ParseOut<Expression> {
+            let identifier = parse_full_identifier_starting_with(token_stream, context, value)?;
+            match peek_token!(token_stream => Option) {
+                Some(Token::LeftParens) => {
+                    let (left_parens, expressions, right_parens) =
+                        parse_expression_list(token_stream, context)?;
+                    Ok(Expression::Call(
+                        identifier,
+                        left_parens,
+                        expressions,
+                        right_parens,
+                        (token_position.0, get_token_end!(token_stream)),
+                    ))
+                }
+                Some(Token::LeftBracket) => {
+                    skip_token!(token_stream);
+                    Ok(Expression::GetItem(
+                        identifier,
+                        from_stream_pos!(token_stream => LeftBracket),
+                        Box::new(parse_expression(token_stream, context)?),
+                        {
+                            expect_token!(token_stream, Token::RightBracket => (), "Expected ']'.", "']'");
+                            from_stream_pos!(token_stream => RightBracket)
+                        },
+                        (token_position.0, get_token_end!(token_stream)),
+                    ))
+                }
+                _ => Ok(Expression::Identifier(identifier)),
+            }
+        }
         let token = next_token!(token_stream);
         let token_position = get_token_position!(token_stream);
         use super::super::ast::Literal as LLiteral;
@@ -2339,34 +2394,19 @@ pub mod expression {
                 (token_position.0, get_token_end!(token_stream)),
             )),
             Token::Identifier(value) => {
-                let identifier = parse_full_identifier_starting_with(token_stream, context, value)?;
-                match peek_token!(token_stream => Option) {
-                    Some(Token::LeftParens) => {
-                        let (left_parens, expressions, right_parens) =
-                            parse_expression_list(token_stream, context)?;
-                        Ok(Expression::Call(
-                            identifier,
-                            left_parens,
-                            expressions,
-                            right_parens,
-                            (token_position.0, get_token_end!(token_stream)),
-                        ))
-                    }
-                    Some(Token::LeftBracket) => {
-                        skip_token!(token_stream);
-                        Ok(Expression::GetItem(
-                            identifier,
-                            from_stream_pos!(token_stream => LeftBracket),
-                            Box::new(parse_expression(token_stream, context)?),
-                            {
-                                expect_token!(token_stream, Token::RightBracket => (), "Expected ']'.", "']'");
-                                from_stream_pos!(token_stream => RightBracket)
-                            },
-                            (token_position.0, get_token_end!(token_stream)),
-                        ))
-                    }
-                    _ => Ok(Expression::Identifier(identifier)),
-                }
+                parse_expression_after_identifier(token_stream, context, value, token_position)
+            }
+            Token::StageKeyword => {
+                let value = literal!("stage");
+                parse_expression_after_identifier(token_stream, context, value, token_position)
+            }
+            Token::VarsKeyword => {
+                let value = literal!("vars");
+                parse_expression_after_identifier(token_stream, context, value, token_position)
+            }
+            Token::ListsKeyword => {
+                let value = literal!("lists");
+                parse_expression_after_identifier(token_stream, context, value, token_position)
             }
             Token::LeftParens => {
                 let left_parens = LeftParens(token_position);
