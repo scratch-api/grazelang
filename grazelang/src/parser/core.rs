@@ -422,8 +422,6 @@ pub fn parse_full_identifier_starting_with(
 
 // Statements *do* include semicolons.
 pub mod statement {
-    use core::panic;
-
     use serde::{Deserialize, Serialize};
 
     use crate::{
@@ -1518,14 +1516,7 @@ pub mod statement {
                     (start_pos, get_token_end!(token_stream)),
                 ))
             }
-            _ => {
-                emit_unexpected_token!(
-                    token_stream,
-                    "Expected '=' or '('.",
-                    "'=' or '('",
-                    next_token!(token_stream)
-                );
-            }
+            _ => parse_call_or_control(token_stream, context, identifier),
         }
     }
 
@@ -2570,15 +2561,18 @@ pub fn parse_expression_list(
         });
         expressions.push((
             parse_expression(token_stream, context)?,
-            match next_token!(token_stream) {
-                Token::Comma => Some(ast::Comma(get_token_position!(token_stream))),
+            match peek_token!(token_stream) {
+                Token::Comma => {
+                    skip_token!(token_stream);
+                    Some(ast::Comma(get_token_position!(token_stream)))
+                }
                 Token::RightParens => None,
-                token => {
+                _ => {
                     emit_unexpected_token!(
                         token_stream,
                         "Expected a comma or ')'.",
                         "a comma or ')'",
-                        token
+                        next_token!(token_stream)
                     );
                 }
             },

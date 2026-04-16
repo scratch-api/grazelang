@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     cell::RefCell,
     collections::{HashMap, VecDeque},
     io::Read,
@@ -258,7 +257,7 @@ pub enum Symbol {
     Namespace(HashMap<IString, Rc<RefCell<Symbol>>>, Weak<RefCell<Symbol>>),
     KnownBlock(
         Box<KnownBlock>,
-        Option<HashMap<IString, Rc<RefCell<Symbol>>>>, // TODO: remove Option
+        HashMap<IString, Rc<RefCell<Symbol>>>, // TODO: remove Option
         Weak<RefCell<Symbol>>,
     ),
     Sprites(Weak<RefCell<Symbol>>),
@@ -279,14 +278,28 @@ impl Symbol {
 
     pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<Symbol>>> {
         match self {
-            Symbol::Namespace(hash_map, ..) => hash_map.get(child_name).cloned(),
-            Symbol::KnownBlock(_, hash_map, ..) => hash_map
-                .as_ref()
-                .and_then(|value| value.get(child_name).cloned()),
+            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
+                hash_map.get(child_name).cloned()
+            }
             Symbol::Alias(alias, ..) => alias
                 .upgrade()
                 .and_then(|value| value.borrow().get_child(child_name)),
             Symbol::Sprites(..) => None,
+        }
+    }
+
+    /// Expensive
+    pub fn get_children_cloned(&self) -> Vec<Rc<RefCell<Symbol>>> {
+        match self {
+            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => hash_map
+                .values()
+                .cloned()
+                .collect(),
+            Symbol::Alias(alias, ..) => alias
+                .upgrade()
+                .map(|value| value.borrow().get_children_cloned())
+                .unwrap_or_default(),
+            Symbol::Sprites(..) => Vec::new(),
         }
     }
 
@@ -316,9 +329,7 @@ impl Symbol {
         child.borrow_mut().replace_parent(Rc::downgrade(this));
         match &mut *this.borrow_mut() {
             Symbol::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
-            Symbol::KnownBlock(_, hash_map, ..) => {
-                hash_map.get_or_insert_default().insert(child_name, child)
-            }
+            Symbol::KnownBlock(_, hash_map, ..) => hash_map.insert(child_name, child),
             Symbol::Alias(alias, ..) => alias
                 .upgrade()
                 .and_then(|value| Self::insert_child(&value, child_name, child)),
@@ -428,7 +439,7 @@ impl TargetSymbolDescriptor {
                         },
                         _ => unreachable!(),
                     }),
-                    None,
+                    HashMap::new(),
                     Weak::new(),
                 ),
                 match self {
@@ -490,7 +501,7 @@ impl TargetSymbolDescriptor {
                             ),
                             id,
                         )),
-                        None,
+                        HashMap::new(),
                         Weak::new(),
                     ),
                     None,
@@ -507,7 +518,7 @@ impl TargetSymbolDescriptor {
                             ),
                             id,
                         }), // TODO: add list length as method
-                        None,
+                        HashMap::new(),
                         Weak::new(),
                     ),
                     None,

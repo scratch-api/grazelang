@@ -555,6 +555,22 @@ pub enum Sb3PrimitiveBlock {
     },
 }
 
+impl Sb3PrimitiveBlock {
+    pub fn is_shadow(&self) -> IsShadow {
+        match self {
+            Sb3PrimitiveBlock::Number(..)
+            | Sb3PrimitiveBlock::PositiveNumber(..)
+            | Sb3PrimitiveBlock::PositiveInteger(..)
+            | Sb3PrimitiveBlock::Integer(..)
+            | Sb3PrimitiveBlock::Angle(..)
+            | Sb3PrimitiveBlock::Color(..)
+            | Sb3PrimitiveBlock::String(..)
+            | Sb3PrimitiveBlock::Broadcast { .. } => IsShadow::Yes,
+            Sb3PrimitiveBlock::Variable { .. } | Sb3PrimitiveBlock::List { .. } => IsShadow::No,
+        }
+    }
+}
+
 impl From<String> for Sb3PrimitiveBlock {
     fn from(value: String) -> Self {
         Self::String(value.into())

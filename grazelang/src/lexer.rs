@@ -12,8 +12,8 @@ use serde_json::from_str as json_from_str;
 #[logos(extras = (Vec<usize>, usize))]
 #[logos(skip r"[ \t\f]+")]
 #[logos(skip(r"\n|\r\n?", register_newline))]
-#[logos(skip r"//.*")]
-#[logos(skip r"/\*(?:[^*]|(?:\*[^/]))*\*/")]
+#[logos(skip(r"//[^\n]*", allow_greedy = true))]
+#[logos(skip r"/\*(?:[^*]|(?:\*[^/]))*?\*/")]
 pub enum Token {
     #[token("sprite")]
     SpriteKeyword,
