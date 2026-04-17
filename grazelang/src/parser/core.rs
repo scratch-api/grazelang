@@ -745,15 +745,24 @@ pub mod statement {
                             right_bracket,
                         )
                     } else {
-                        if default_type == DefaultDataDeclarationType::List
-                            && !matches!(dec_type, SingleDataDeclarationType::Var(_))
-                        {
-                            emit_unexpected_token!(
-                                token_stream,
-                                "Expected '{'.",
-                                "'{'",
-                                next_token!(token_stream)
-                            );
+                        match (&default_type, &dec_type) {
+                            (
+                                DefaultDataDeclarationType::List,
+                                SingleDataDeclarationType::Var(_),
+                            ) => (),
+                            (DefaultDataDeclarationType::List, _)
+                            | (
+                                DefaultDataDeclarationType::Var,
+                                SingleDataDeclarationType::List(_),
+                            ) => {
+                                emit_unexpected_token!(
+                                    token_stream,
+                                    "Expected '['.",
+                                    "'['",
+                                    next_token!(token_stream)
+                                );
+                            }
+                            _ => (),
                         }
                         DeclarationValue::Var(
                             assignment_operator,
@@ -766,8 +775,8 @@ pub mod statement {
                 Token::RightParens => DeclarationValue::None,
                 _ => emit_unexpected_token!(
                     token_stream,
-                    "Expected ',', '=', '{', '}' or ')'",
-                    "',', '=', '{', '}' or ')'",
+                    "Expected ',', '=', '}' or ')'",
+                    "',', '=', '}' or ')'",
                     next_token!(token_stream)
                 ),
             };
@@ -793,11 +802,44 @@ pub mod statement {
                             parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                                value: match &value {
+                                    DeclarationValue::List(_, _, value, _) => {
+                                        let mut expressions = Vec::with_capacity(value.len());
+                                        for (entry, _) in value {
+                                            match entry {
+                                                ListEntry::Expression(expression) => expressions.push(expression.calculate_value()),
+                                                ListEntry::Unwrap(literal, _) => literal
+                                                    .get_string_value()
+                                                    .as_str()
+                                                    .chars()
+                                                    .for_each(|c| expressions.push(
+                                                        grazelang_library::project_json::Sb3Primitive::String(c.to_string())
+                                                    )),
+                                            }
+                                        }
+                                        expressions
+                                    },
+                                    DeclarationValue::None => Vec::new(),
+                                    DeclarationValue::Var(..) => unreachable!()
+                                }
                             })
                         } else {
                             parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                                value: match &value {
+                                    DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
+                                    DeclarationValue::Var(_, value) => {
+                                        value.calculate_value()
+                                    },
+                                    DeclarationValue::List(..) => unreachable!()
+                                },
+                                is_cloud: matches!((default_scope, &scope),
+                                (
+                                    DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset
+                                ) | (
+                                    _, DataDeclarationScope::Cloud(_)
+                                ))
                             })
                         }
                     );
@@ -1145,8 +1187,8 @@ pub mod statement {
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
                         emit_unexpected_token!(
                             token_stream,
-                            "Expected '{'.",
-                            "'{'",
+                            "Expected '['.",
+                            "'['",
                             next_token!(token_stream)
                         );
                     }
@@ -1178,11 +1220,39 @@ pub mod statement {
                         parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                            value: match &value {
+                                DeclarationValue::List(_, _, value, _) => {
+                                    let mut expressions = Vec::with_capacity(value.len());
+                                    for (entry, _) in value {
+                                        match entry {
+                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value()),
+                                            ListEntry::Unwrap(literal, _) => literal
+                                                .get_string_value()
+                                                .as_str()
+                                                .chars()
+                                                .for_each(|c| expressions.push(
+                                                    grazelang_library::project_json::Sb3Primitive::String(c.to_string())
+                                                )),
+                                        }
+                                    }
+                                    expressions
+                                },
+                                DeclarationValue::None => Vec::new(),
+                                DeclarationValue::Var(..) => unreachable!()
+                            }
                         })
                     } else {
                         parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                            value: match &value {
+                                DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
+                                DeclarationValue::Var(_, value) => {
+                                    value.calculate_value()
+                                },
+                                DeclarationValue::List(..) => unreachable!()
+                            },
+                            is_cloud: matches!(scope, DataDeclarationScope::Cloud(_))
                         })
                     }
                 );

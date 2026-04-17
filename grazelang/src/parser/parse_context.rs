@@ -8,7 +8,9 @@ use std::{
 use arcstr::{ArcStr as IString, literal};
 pub use grazelang_library::KnownBlock;
 use grazelang_library::{
-    CallBlockParam, CallableKnownBlockSignature, KnownBlockInput, SimpleCallableKnownBlockSignature,
+    CallBlockParam, CallableKnownBlockSignature, KnownBlockInput,
+    SimpleCallableKnownBlockSignature,
+    project_json::{Sb3ListDeclaration, Sb3Primitive, Sb3VariableDeclaration},
 };
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -28,12 +30,15 @@ pub enum Primitive {
 pub struct VarDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
+    pub value: Sb3Primitive,
+    pub is_cloud: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ListDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
+    pub value: Vec<Sb3Primitive>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -291,10 +296,9 @@ impl Symbol {
     /// Expensive
     pub fn get_children_cloned(&self) -> Vec<Rc<RefCell<Symbol>>> {
         match self {
-            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => hash_map
-                .values()
-                .cloned()
-                .collect(),
+            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
+                hash_map.values().cloned().collect()
+            }
             Symbol::Alias(alias, ..) => alias
                 .upgrade()
                 .map(|value| value.borrow().get_children_cloned())
@@ -376,11 +380,11 @@ impl TargetSymbolDescriptor {
         Ok(hex_digest)
     }
 
-    pub fn derive_symbol_and_asset<T: Rng>(
+    pub fn derive_symbol_and_attachment<T: Rng>(
         &self,
         rng: &mut T,
         namespace: &mut Namespace,
-    ) -> Result<(Symbol, Option<codegen::project_json::Asset>), std::io::Error> {
+    ) -> Result<(Symbol, Option<codegen::project_json::TargetAttachment>), std::io::Error> {
         pub fn get_file_extension_unwrapped(this: &TargetSymbolDescriptor) -> &str {
             match this {
                 TargetSymbolDescriptor::Costume(CostumeDescriptor {
@@ -454,7 +458,7 @@ impl TargetSymbolDescriptor {
                         canonical_name,
                         source: _,
                     }) => {
-                        Some(codegen::project_json::Asset::Costume(
+                        Some(codegen::project_json::TargetAttachment::Costume(
                             codegen::project_json::Sb3Costume {
                                 asset_id: value.clone(),
                                 name: canonical_name.as_ref().unwrap_or(name).to_string(),
@@ -469,9 +473,9 @@ impl TargetSymbolDescriptor {
                     TargetSymbolDescriptor::Sound(SoundDescriptor {
                         name,
                         canonical_name,
-                        source,
+                        source: _,
                     }) => {
-                        Some(codegen::project_json::Asset::Sound(
+                        Some(codegen::project_json::TargetAttachment::Sound(
                             codegen::project_json::Sb3Sound {
                                 asset_id: value.clone(),
                                 name: canonical_name.as_ref().unwrap_or(name).to_string(),
@@ -489,40 +493,58 @@ impl TargetSymbolDescriptor {
         .unwrap_or_else(|| {
             let id = codegen::ids::generate_random_id(rng);
             match self {
-                TargetSymbolDescriptor::Var(var_descriptor) => Ok((
-                    Symbol::KnownBlock(
-                        Box::new(KnownBlock::new_variable(
-                            namespace.introduce_new_symbol(
-                                var_descriptor
-                                    .canonical_name
-                                    .as_ref()
-                                    .map(|value| value.to_string()),
-                                var_descriptor.name.clone(),
-                            ),
-                            id,
+                TargetSymbolDescriptor::Var(var_descriptor) => {
+                    let canonical_name = namespace.introduce_new_symbol(
+                        var_descriptor
+                            .canonical_name
+                            .as_ref()
+                            .map(|value| value.to_string()),
+                        var_descriptor.name.clone(),
+                    );
+                    let id_string = id.to_string();
+                    Ok((
+                        Symbol::KnownBlock(
+                            Box::new(KnownBlock::new_variable(canonical_name.clone(), id)),
+                            HashMap::new(),
+                            Weak::new(),
+                        ),
+                        Some(grazelang_library::project_json::TargetAttachment::Var(
+                            id_string,
+                            Sb3VariableDeclaration {
+                                name: canonical_name,
+                                value: var_descriptor.value.clone(),
+                                is_cloud: var_descriptor.is_cloud,
+                            },
                         )),
-                        HashMap::new(),
-                        Weak::new(),
-                    ),
-                    None,
-                )),
-                TargetSymbolDescriptor::List(list_descriptor) => Ok((
-                    Symbol::KnownBlock(
-                        Box::new(KnownBlock::List {
-                            canonical_name: namespace.introduce_new_symbol(
-                                list_descriptor
-                                    .canonical_name
-                                    .as_ref()
-                                    .map(|value| value.to_string()),
-                                list_descriptor.name.clone(),
+                    ))
+                }
+                TargetSymbolDescriptor::List(list_descriptor) => {
+                    let canonical_name = namespace.introduce_new_symbol(
+                        list_descriptor
+                            .canonical_name
+                            .as_ref()
+                            .map(|value| value.to_string()),
+                        list_descriptor.name.clone(),
+                    );
+                    let id_string = id.to_string();
+                    Ok((
+                        Symbol::KnownBlock(
+                            Box::new(KnownBlock::List {
+                                canonical_name: canonical_name.clone(),
+                                id,
+                            }), // TODO: add list length as method
+                            HashMap::new(),
+                            Weak::new(),
+                        ),
+                        Some(grazelang_library::project_json::TargetAttachment::List(
+                            id_string,
+                            Sb3ListDeclaration(
+                                canonical_name.clone(),
+                                list_descriptor.value.clone(),
                             ),
-                            id,
-                        }), // TODO: add list length as method
-                        HashMap::new(),
-                        Weak::new(),
-                    ),
-                    None,
-                )),
+                        )),
+                    ))
+                }
                 TargetSymbolDescriptor::CustomBlockDescriptor(custom_block_descriptor) => todo!(),
                 TargetSymbolDescriptor::Costume(_)
                 | TargetSymbolDescriptor::Backdrop(_)

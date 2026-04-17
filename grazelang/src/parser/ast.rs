@@ -130,7 +130,13 @@ pub enum StageStatement {
         PosRange,
     ),
     IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
-    IsolatedExpression(LeftParens, Expression, RightParens, Option<Semicolon>, PosRange),
+    IsolatedExpression(
+        LeftParens,
+        Expression,
+        RightParens,
+        Option<Semicolon>,
+        PosRange,
+    ),
     // Mod(),
     EmptyStatement(Semicolon),
 }
@@ -172,7 +178,13 @@ pub enum SpriteStatement {
         PosRange,
     ),
     IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
-    IsolatedExpression(LeftParens, Expression, RightParens, Option<Semicolon>, PosRange),
+    IsolatedExpression(
+        LeftParens,
+        Expression,
+        RightParens,
+        Option<Semicolon>,
+        PosRange,
+    ),
     // Mod(),
     EmptyStatement(Semicolon),
 }
@@ -592,6 +604,18 @@ pub enum Expression {
         PosRange,
     ),
     Parentheses(LeftParens, Box<Expression>, RightParens, PosRange),
+}
+
+impl Expression {
+    pub fn calculate_value(&self) -> Sb3Primitive {
+        match self {
+            Expression::Literal(literal) => {
+                Sb3Primitive::String(literal.get_string_value().to_string())
+            }
+            // TODO: try to calculate the value or warn the user
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

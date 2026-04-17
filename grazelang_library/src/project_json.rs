@@ -1384,9 +1384,11 @@ impl From<IsShadow> for bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Asset {
+pub enum TargetAttachment {
     Costume(Sb3Costume),
     Sound(Sb3Sound),
+    Var(String, Sb3VariableDeclaration),
+    List(String, Sb3ListDeclaration),
 }
 
 impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {

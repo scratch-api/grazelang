@@ -24,7 +24,7 @@ use super::{
 };
 
 use crate::{
-    codegen::project_json::{Asset, IsShadow, Sb3InputRepr, Sb3Target},
+    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment},
     library,
     names::Namespace,
     parser::{
@@ -84,7 +84,7 @@ pub struct GrazeSb3GeneratorContext {
     pub uninitialized_stage: Option<Sb3Target>,
     pub current_previous_block: Option<IdString>,
     pub formatted_string_context: FormattedStringContext,
-    pub target_assets: HashMap<IString, Vec<Asset>>,
+    pub target_attachments: HashMap<IString, Vec<TargetAttachment>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -123,7 +123,7 @@ impl GrazeSb3GeneratorContext {
             HashMap::with_capacity(targets.len()),
             Weak::new(),
         )));
-        let mut target_assets = HashMap::with_capacity(targets.len());
+        let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
             let mut namespace = Namespace::new();
             Symbol::insert_child(
@@ -141,11 +141,11 @@ impl GrazeSb3GeneratorContext {
                             .borrow_symbols()
                             .iter()
                             .map(|(key, value)| {
-                                value.derive_symbol_and_asset(&mut rng, &mut namespace).map(
-                                    |(symbol, asset)| {
+                                value
+                                    .derive_symbol_and_attachment(&mut rng, &mut namespace)
+                                    .map(|(symbol, asset)| {
                                         ((key.clone(), Rc::new(RefCell::new(symbol))), asset)
-                                    },
-                                )
+                                    })
                             })
                             .try_fold::<_, _, Result<_, std::io::Error>>(
                                 (HashMap::with_capacity(symbol_count), Vec::new()),
@@ -158,7 +158,7 @@ impl GrazeSb3GeneratorContext {
                                     Ok((symbols, assets))
                                 },
                             )?;
-                        target_assets.insert(target.get_namespace_name(), assets);
+                        target_attachments.insert(target.get_namespace_name(), assets);
                         symbols
                     },
                     Weak::new(),
@@ -186,33 +186,34 @@ impl GrazeSb3GeneratorContext {
         let variables_symbol = Rc::new(RefCell::new(Symbol::new_namespace()));
         let lists_symbol = Rc::new(RefCell::new(Symbol::new_namespace()));
         let mut global_namespace = Namespace::new();
-        for (name, symbol) in parse_context.global_symbols.drain() {
-            match &symbol {
-                TargetSymbolDescriptor::Var(_) => {
-                    Symbol::insert_child(
-                        &variables_symbol,
-                        name,
-                        Rc::new(RefCell::new(
-                            symbol
-                                .derive_symbol_and_asset(&mut rng, &mut global_namespace)
-                                .unwrap()
-                                .0,
-                        )),
-                    );
+        {
+            let stage_target_attachments = target_attachments.get_mut("stage").unwrap();
+            for (name, symbol) in parse_context.global_symbols.drain() {
+                match &symbol {
+                    TargetSymbolDescriptor::Var(_) => {
+                        let (symbol, attachment) = symbol
+                            .derive_symbol_and_attachment(&mut rng, &mut global_namespace)
+                            .unwrap();
+                        if let Some(attachment) = attachment {
+                            stage_target_attachments.push(attachment);
+                        }
+                        Symbol::insert_child(
+                            &variables_symbol,
+                            name,
+                            Rc::new(RefCell::new(symbol)),
+                        );
+                    }
+                    TargetSymbolDescriptor::List(_) => {
+                        let (symbol, attachment) = symbol
+                            .derive_symbol_and_attachment(&mut rng, &mut global_namespace)
+                            .unwrap();
+                        if let Some(attachment) = attachment {
+                            stage_target_attachments.push(attachment);
+                        }
+                        Symbol::insert_child(&lists_symbol, name, Rc::new(RefCell::new(symbol)));
+                    }
+                    _ => (), // Handled just to be sure although it shouldn't happen
                 }
-                TargetSymbolDescriptor::List(_) => {
-                    Symbol::insert_child(
-                        &lists_symbol,
-                        name,
-                        Rc::new(RefCell::new(
-                            symbol
-                                .derive_symbol_and_asset(&mut rng, &mut global_namespace)
-                                .unwrap()
-                                .0,
-                        )),
-                    );
-                }
-                _ => (), // Handled just to be sure although it shouldn't happen
             }
         }
         Symbol::insert_child(&root_symbol, literal!("vars"), variables_symbol);
@@ -232,7 +233,7 @@ impl GrazeSb3GeneratorContext {
             uninitialized_stage: Some(Sb3Target::new_stage()),
             current_previous_block: None,
             formatted_string_context: FormattedStringContext::new(),
-            target_assets,
+            target_attachments,
         })
     }
 
@@ -1397,11 +1398,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .take()
             .ok_or(GrazeSb3GeneratorError::RepeatedStageInitialization)?;
         let target_name = literal!("stage");
-        let assets = context.target_assets.remove(&target_name).unwrap();
+        let assets = context.target_attachments.remove(&target_name).unwrap();
         for asset in assets {
             match asset {
-                Asset::Costume(costume) => stage.costumes.push(costume),
-                Asset::Sound(sound) => stage.sounds.push(sound),
+                TargetAttachment::Costume(costume) => stage.costumes.push(costume),
+                TargetAttachment::Sound(sound) => stage.sounds.push(sound),
+                TargetAttachment::Var(name, sb3_variable_declaration) => {
+                    stage.variables.insert(name, sb3_variable_declaration);
+                }
+                TargetAttachment::List(name, sb3_list_declaration) => {
+                    stage.lists.insert(name, sb3_list_declaration);
+                }
             }
         }
         context.current_sb3_target = Some(stage);
@@ -1431,12 +1438,18 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .map(|value| value.name.clone())
             .unwrap_or_else(|| value.2.names.last().unwrap().0.clone());
         // TODO: explicitly error when multiple sprites have the same name
-        let assets = context.target_assets.remove(&target_name).unwrap();
+        let assets = context.target_attachments.remove(&target_name).unwrap();
         let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
         for asset in assets {
             match asset {
-                Asset::Costume(costume) => new_sprite.costumes.push(costume),
-                Asset::Sound(sound) => new_sprite.sounds.push(sound),
+                TargetAttachment::Costume(costume) => new_sprite.costumes.push(costume),
+                TargetAttachment::Sound(sound) => new_sprite.sounds.push(sound),
+                TargetAttachment::Var(name, sb3_variable_declaration) => {
+                    new_sprite.variables.insert(name, sb3_variable_declaration);
+                }
+                TargetAttachment::List(name, sb3_list_declaration) => {
+                    new_sprite.lists.insert(name, sb3_list_declaration);
+                }
             }
         }
         new_sprite.layer_order = context.sb3.targets.len()
