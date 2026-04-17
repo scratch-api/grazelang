@@ -130,6 +130,7 @@ pub enum StageStatement {
         PosRange,
     ),
     IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
+    IsolatedExpression(LeftParens, Expression, RightParens, Option<Semicolon>, PosRange),
     // Mod(),
     EmptyStatement(Semicolon),
 }
@@ -143,6 +144,7 @@ impl GetPos for StageStatement {
             StageStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
             StageStatement::IsolatedBlock(_, _, p) => p,
+            StageStatement::IsolatedExpression(_, _, _, _, p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
         }
     }
@@ -170,6 +172,7 @@ pub enum SpriteStatement {
         PosRange,
     ),
     IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
+    IsolatedExpression(LeftParens, Expression, RightParens, Option<Semicolon>, PosRange),
     // Mod(),
     EmptyStatement(Semicolon),
 }
@@ -183,6 +186,7 @@ impl GetPos for SpriteStatement {
             SpriteStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
             SpriteStatement::IsolatedBlock(_, _, p) => p,
+            SpriteStatement::IsolatedExpression(_, _, _, _, p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
         }
     }

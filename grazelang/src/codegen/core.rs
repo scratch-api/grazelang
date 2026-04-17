@@ -39,7 +39,8 @@ use crate::{
         default_visit_expression_formatted_string, default_visit_expression_get_item,
         default_visit_expression_get_letter, default_visit_expression_identifier,
         default_visit_expression_literal, default_visit_expression_unary_operation,
-        default_visit_formatted_string_content, default_visit_statement_assignment,
+        default_visit_formatted_string_content, default_visit_isolated_block,
+        default_visit_isolated_expression, default_visit_statement_assignment,
         default_visit_statement_call, default_visit_statement_forever,
         default_visit_statement_multi_input_control, default_visit_statement_set_item,
         default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
@@ -1345,6 +1346,38 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             );
             Ok(())
         })
+    }
+
+    // Target statements:
+
+    fn visit_isolated_block(
+        &self,
+        value: (
+            &crate::parser::ast::CodeBlock,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        context.current_previous_block = None;
+        context.current_parent = None;
+        default_visit_isolated_block(self, value, context)
+    }
+
+    fn visit_isolated_expression(
+        &self,
+        value: (
+            &crate::parser::ast::LeftParens,
+            &Expression,
+            &crate::parser::ast::RightParens,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        context.current_previous_block = None;
+        context.current_parent = None;
+        default_visit_isolated_expression(self, value, context)
     }
 
     // Assets:

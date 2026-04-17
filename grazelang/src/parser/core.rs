@@ -716,7 +716,7 @@ pub mod statement {
                     skip_token!(token_stream);
                     let assignment_operator =
                         from_stream_pos!(token_stream => NormalAssignmentOperator);
-                    if let Token::LeftBrace = peek_token!(token_stream) {
+                    if let Token::LeftBracket = peek_token!(token_stream) {
                         match (&default_type, &dec_type) {
                             (
                                 DefaultDataDeclarationType::Var,
@@ -736,13 +736,13 @@ pub mod statement {
                             }
                             _ => (),
                         }
-                        let (left_brace, list_content, right_brace) =
+                        let (left_bracket, list_content, right_bracket) =
                             parse_list_content(token_stream, context)?;
                         DeclarationValue::List(
                             assignment_operator,
-                            left_brace,
+                            left_bracket,
                             list_content,
-                            right_brace,
+                            right_bracket,
                         )
                     } else {
                         if default_type == DefaultDataDeclarationType::List
@@ -1124,7 +1124,7 @@ pub mod statement {
                 let assignment_operator =
                     from_stream_pos!(token_stream => NormalAssignmentOperator);
 
-                if let Token::LeftBrace = peek_token!(token_stream) {
+                if let Token::LeftBracket = peek_token!(token_stream) {
                     if !matches!(dec_type, SingleDataDeclarationType::List(_)) {
                         emit_unexpected_token!(
                             token_stream,
@@ -1133,13 +1133,13 @@ pub mod statement {
                             next_token!(token_stream)
                         );
                     }
-                    let (left_brace, list_content, right_brace) =
+                    let (left_bracket, list_content, right_bracket) =
                         parse_list_content(token_stream, context)?;
                     DeclarationValue::List(
                         assignment_operator,
-                        left_brace,
+                        left_bracket,
                         list_content,
-                        right_brace,
+                        right_bracket,
                     )
                 } else {
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
@@ -1982,6 +1982,31 @@ pub fn parse_sprite_statement(
                 (start_pos, get_token_end!(token_stream)),
             ))
         }
+        Token::LeftParens => {
+            skip_token!(token_stream);
+            let left_parens = from_stream_pos!(token_stream => ast::LeftParens);
+            let start_pos = get_token_start!(token_stream);
+            let expression = parse_expression(token_stream, context)?;
+            let right_parens = expect_token!(
+                token_stream,
+                Token::RightParens => from_stream_pos!(token_stream => ast::RightParens),
+                "Expected ')'.",
+                "')'"
+            );
+            Ok(SpriteStatement::IsolatedExpression(
+                left_parens,
+                expression,
+                right_parens,
+                consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
+                (start_pos, get_token_end!(token_stream)),
+            ))
+        }
+        Token::Semicolon => {
+            skip_token!(token_stream);
+            Ok(SpriteStatement::EmptyStatement(
+                from_stream_pos!(token_stream => ast::Semicolon),
+            ))
+        }
         _ => emit_unexpected_token!(
             token_stream,
             "Expected hat statement, \"let\", \"sound\" or \"costume\".",
@@ -2120,10 +2145,35 @@ pub fn parse_stage_statement(
                 (start_pos, get_token_end!(token_stream)),
             ))
         }
+        Token::LeftParens => {
+            skip_token!(token_stream);
+            let left_parens = from_stream_pos!(token_stream => ast::LeftParens);
+            let start_pos = get_token_start!(token_stream);
+            let expression = parse_expression(token_stream, context)?;
+            let right_parens = expect_token!(
+                token_stream,
+                Token::RightParens => from_stream_pos!(token_stream => ast::RightParens),
+                "Expected ')'.",
+                "')'"
+            );
+            Ok(StageStatement::IsolatedExpression(
+                left_parens,
+                expression,
+                right_parens,
+                consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
+                (start_pos, get_token_end!(token_stream)),
+            ))
+        }
+        Token::Semicolon => {
+            skip_token!(token_stream);
+            Ok(StageStatement::EmptyStatement(
+                from_stream_pos!(token_stream => ast::Semicolon),
+            ))
+        }
         _ => emit_unexpected_token!(
             token_stream,
-            "Expected hat statement, \"let\", \"sound\", \"backdrop\" or \"costume\".",
-            "hat statement, \"let\", \"sound\", \"backdrop\" or \"costume\"",
+            "Expected hat statement, '{', '(', ';', \"let\", \"sound\", \"backdrop\" or \"costume\".",
+            "hat statement, '{', '(', ';', \"let\", \"sound\", \"backdrop\" or \"costume\"",
             next_token!(token_stream)
         ),
     }

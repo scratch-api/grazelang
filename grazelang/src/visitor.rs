@@ -150,6 +150,20 @@ pub trait GrazeVisitor<C, E> {
         default_visit_isolated_block(self, value, context)
     }
 
+    fn visit_isolated_expression(
+        &self,
+        value: (
+            &LeftParens,
+            &Expression,
+            &RightParens,
+            &Option<Semicolon>,
+            &PosRange,
+        ),
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_isolated_expression(self, value, context)
+    }
+
     fn visit_sprite_statement_data_declaration(
         &self,
         value: (&LetKeyword, &DataDeclaration, &Semicolon, &PosRange),
@@ -763,6 +777,18 @@ where
         StageStatement::IsolatedBlock(code_block, semicolon, pos_range) => {
             visitor.visit_isolated_block((code_block, semicolon, pos_range), context)?;
         }
+        StageStatement::IsolatedExpression(
+            left_parens,
+            expression,
+            right_parens,
+            semicolon,
+            pos_range,
+        ) => {
+            visitor.visit_isolated_expression(
+                (left_parens, expression, right_parens, semicolon, pos_range),
+                context,
+            )?;
+        }
         StageStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
@@ -843,6 +869,18 @@ where
         }
         SpriteStatement::IsolatedBlock(code_block, semicolon, pos_range) => {
             visitor.visit_isolated_block((code_block, semicolon, pos_range), context)?;
+        }
+        SpriteStatement::IsolatedExpression(
+            left_parens,
+            expression,
+            right_parens,
+            semicolon,
+            pos_range,
+        ) => {
+            visitor.visit_isolated_expression(
+                (left_parens, expression, right_parens, semicolon, pos_range),
+                context,
+            )?;
         }
         SpriteStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
@@ -933,6 +971,24 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     visitor.visit_code_block(value.0, context)?;
+    Ok(())
+}
+
+pub fn default_visit_isolated_expression<V, C, E>(
+    visitor: &V,
+    value: (
+        &LeftParens,
+        &Expression,
+        &RightParens,
+        &Option<Semicolon>,
+        &PosRange,
+    ),
+    context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    visitor.visit_expression(value.1, context)?;
     Ok(())
 }
 
