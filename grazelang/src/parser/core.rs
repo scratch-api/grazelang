@@ -1328,7 +1328,7 @@ pub mod statement {
         let start_pos = get_token_start!(token_stream);
         expect_token!(token_stream, Token::Assign => (), "Expected '='.", "'='");
         let assignment_operator = from_stream_pos!(token_stream => NormalAssignmentOperator);
-        if matches!(peek_token!(token_stream), Token::LeftBrace) {
+        if matches!(peek_token!(token_stream), Token::LeftBracket) {
             let (left_brace, expressions, right_brace) = parse_list_content(token_stream, context)?;
             return Ok(Statement::ListAssignment(
                 identifier,

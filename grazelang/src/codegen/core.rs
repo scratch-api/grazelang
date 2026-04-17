@@ -28,7 +28,10 @@ use crate::{
     library,
     names::Namespace,
     parser::{
-        ast::{BinOpDescriptor, Expression, FormattedStringContent, Identifier, UnOpDescriptor},
+        ast::{
+            BinOpDescriptor, Expression, FormattedStringContent, Identifier, ListEntry,
+            UnOpDescriptor,
+        },
         parse_context::{
             IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, Target,
             TargetSymbolDescriptor,
@@ -42,9 +45,9 @@ use crate::{
         default_visit_formatted_string_content, default_visit_isolated_block,
         default_visit_isolated_expression, default_visit_statement_assignment,
         default_visit_statement_call, default_visit_statement_forever,
-        default_visit_statement_multi_input_control, default_visit_statement_set_item,
-        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
-        default_visit_top_level_statement_stage,
+        default_visit_statement_list_assignment, default_visit_statement_multi_input_control,
+        default_visit_statement_set_item, default_visit_statement_single_input_control,
+        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
     },
 };
 
@@ -894,7 +897,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     #[cfg(feature = "use_shadows_for_formatted_strings")]
                     let left = (
                         left,
-                        Some(&Sb3PrimitiveBlock::String(
+                        Some(Sb3PrimitiveBlock::String(
                             #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
                             "apple ".into(),
                             #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
@@ -904,7 +907,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     #[cfg(feature = "use_shadows_for_formatted_strings")]
                     let right = (
                         right,
-                        Some(&Sb3PrimitiveBlock::String(
+                        Some(Sb3PrimitiveBlock::String(
                             #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
                             "banana".into(),
                             #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
@@ -1347,6 +1350,112 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             );
             Ok(())
         })
+    }
+
+    fn visit_statement_list_assignment(
+        &self,
+        value: (
+            &Identifier,
+            &crate::parser::ast::NormalAssignmentOperator,
+            &crate::parser::ast::LeftBracket,
+            &Vec<(
+                crate::parser::ast::ListEntry,
+                Option<crate::parser::ast::Comma>,
+            )>,
+            &crate::parser::ast::RightBracket,
+            &crate::parser::ast::Semicolon,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        let actual_identifier = get_actual_identifier!(context, value.0)?;
+        let actual_identifier_ref = actual_identifier.borrow();
+        let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+        let (canonical_name, id) = match known_block {
+            KnownBlock::List { canonical_name, id } => (canonical_name, id),
+            _ => {
+                return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
+                    identifier: value.0.clone(),
+                });
+            }
+        };
+        let list_field_value = Sb3FieldValue::WithId {
+            value: (canonical_name as &str).into(),
+            id: id.to_string(),
+        };
+        wrap_in_statement(context, |context, parent, this_id| {
+            add_block(
+                context,
+                &this_id,
+                make_block(
+                    parent,
+                    "data_deletealloflist".to_string(),
+                    HashMap::new(),
+                    HashMap::from([("LIST".to_string(), list_field_value.clone())]),
+                    false,
+                    None,
+                ),
+            );
+        });
+        for item in value.3 {
+            match &item.0 {
+                ListEntry::Expression(expression) => {
+                    wrap_in_statement(context, |context, parent, this_id| {
+                        self.visit_expression(expression, context)?;
+                        let param = context.pop_param().unwrap();
+                        let value = param_to_input_repr_no_menu(param, context)?;
+                        #[cfg(feature = "use_shadows_for_formatted_strings")]
+                        let value = (
+                            value,
+                            Some(Sb3PrimitiveBlock::String(
+                                #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
+                                "thing".into(),
+                                #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
+                                "".into(),
+                            )),
+                        );
+                        add_block(
+                            context,
+                            &this_id,
+                            make_block(
+                                parent,
+                                "data_addtolist".to_string(),
+                                HashMap::from([("ITEM".to_string(), value.into())]),
+                                HashMap::from([("LIST".to_string(), list_field_value.clone())]),
+                                false,
+                                None,
+                            ),
+                        );
+                        Ok(())
+                    })?;
+                }
+                ListEntry::Unwrap(literal, _) => {
+                    for c in literal.get_string_value().as_str().chars() {
+                        wrap_in_statement(context, |context, parent, this_id| {
+                            add_block(
+                                context,
+                                &this_id,
+                                make_block(
+                                    parent,
+                                    "data_addtolist".to_string(),
+                                    HashMap::from([(
+                                        "ITEM".to_string(),
+                                        Sb3InputValue::Shadow(Sb3InputRepr::PrimitiveBlock(
+                                            Sb3PrimitiveBlock::String(c.to_string().into()),
+                                        )),
+                                    )]),
+                                    HashMap::from([("LIST".to_string(), list_field_value.clone())]),
+                                    false,
+                                    None,
+                                ),
+                            );
+                            Ok(())
+                        })?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     // Target statements:
