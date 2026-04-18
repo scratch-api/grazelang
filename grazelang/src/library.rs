@@ -26,17 +26,15 @@ pub fn convert_generated_library(
         namespace: LibraryItem,
         aliases: &mut HashMap<usize, Vec<AliasSegment>>,
     ) -> Rc<RefCell<Symbol>> {
-        let mut alias_content = None::<Vec<AliasSegment>>;
-        let my_symbol = Rc::new(RefCell::new(match namespace.value {
+        let (my_symbol, alias_content) = match namespace.value {
             Some(LibraryItemValue::Alias(alias)) => {
-                alias_content.replace(alias);
-                Symbol::Alias(Weak::new(), Weak::new())
+                (Rc::new(RefCell::new(Symbol::Alias(Weak::new(), Weak::new()))), Some(alias))
             }
             Some(LibraryItemValue::KnownBlock(known_block)) => {
-                Symbol::KnownBlock(known_block, HashMap::new(), Weak::new())
+                (Rc::new(RefCell::new(Symbol::KnownBlock(known_block, HashMap::new(), Weak::new()))), None)
             }
-            None => Symbol::new_namespace(),
-        }));
+            None => (Rc::new(RefCell::new(Symbol::new_namespace())), None),
+        };
         if let Some(alias_content) = alias_content {
             aliases.insert(rc_as_usize(&my_symbol), alias_content);
         }
