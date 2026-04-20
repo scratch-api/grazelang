@@ -224,7 +224,6 @@ impl GrazeSb3GeneratorContext {
         Symbol::insert_child(&root_symbol, literal!("lists"), lists_symbol);
         let mut block_counter = IdCounter::new();
         let next_block_id = block_counter.get_new_id();
-        dbg!(&target_attachments);
         Ok(Self {
             sb3: Sb3Root::default(),
             targets,
