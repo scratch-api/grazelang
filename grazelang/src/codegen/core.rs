@@ -38,16 +38,16 @@ use crate::{
         },
     },
     visitor::{
-        GrazeVisitor, default_visit_expression_binary_operation, default_visit_expression_call,
-        default_visit_expression_formatted_string, default_visit_expression_get_item,
-        default_visit_expression_get_letter, default_visit_expression_identifier,
-        default_visit_expression_literal, default_visit_expression_unary_operation,
-        default_visit_formatted_string_content, default_visit_isolated_block,
-        default_visit_isolated_expression, default_visit_statement_assignment,
-        default_visit_statement_call, default_visit_statement_forever,
-        default_visit_statement_multi_input_control, default_visit_statement_set_item,
-        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
-        default_visit_top_level_statement_stage,
+        GrazeVisitor, default_visit_code_block, default_visit_expression_binary_operation,
+        default_visit_expression_call, default_visit_expression_formatted_string,
+        default_visit_expression_get_item, default_visit_expression_get_letter,
+        default_visit_expression_identifier, default_visit_expression_literal,
+        default_visit_expression_unary_operation, default_visit_formatted_string_content,
+        default_visit_isolated_block, default_visit_isolated_expression,
+        default_visit_statement_assignment, default_visit_statement_call,
+        default_visit_statement_forever, default_visit_statement_multi_input_control,
+        default_visit_statement_set_item, default_visit_statement_single_input_control,
+        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
     },
 };
 
@@ -291,7 +291,7 @@ impl GrazeSb3GeneratorContext {
 pub enum Param {
     Owned(KnownBlock),
     LazyIdentifier(Identifier),
-    BlockStack(String),
+    BlockStack(Option<String>),
 }
 
 pub fn make_block(
@@ -371,7 +371,8 @@ where
             .next = Some(block_id.to_string());
     } else if old_parent.is_some() {
         // First statement in block stack is used in STACK argument of parent or similar
-        context.push_param(Param::BlockStack(block_id.to_string()));
+        let value = Param::BlockStack(Some(block_id.to_string()));
+        context.push_param(value);
     }
     let out = action(context, old_parent.clone(), block_id.clone());
     context.current_parent = Some(block_id.to_string());
@@ -645,10 +646,12 @@ where
             add_param_to_params(context, param, value, &mut inputs, &mut fields)?;
         });
     }
-    inputs.insert(
-        substack_input_name.to_string(),
-        Sb3InputValue::NoShadow(Sb3InputRepr::Reference(substack)),
-    );
+    if let Some(substack) = substack {
+        inputs.insert(
+            substack_input_name.to_string(),
+            Sb3InputValue::NoShadow(Sb3InputRepr::Reference(substack)),
+        );
+    }
     add_block(
         context,
         &this_id,
@@ -1853,6 +1856,184 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         Ok(())
     }
 
+    fn visit_statement_if_else(
+        &self,
+        value: (
+            &(
+                crate::parser::ast::SyntacticIf,
+                Expression,
+                crate::parser::ast::CodeBlock,
+            ),
+            &Vec<(
+                crate::parser::ast::SyntacticElse,
+                crate::parser::ast::SyntacticIf,
+                Expression,
+                crate::parser::ast::CodeBlock,
+            )>,
+            &Option<(
+                crate::parser::ast::SyntacticElse,
+                crate::parser::ast::CodeBlock,
+            )>,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        pub fn make_if_else_recursively(
+            visitor: &GrazeSb3Generator,
+            context: &mut GrazeSb3GeneratorContext,
+            else_ifs: &[(
+                crate::parser::ast::SyntacticElse,
+                crate::parser::ast::SyntacticIf,
+                Expression,
+                crate::parser::ast::CodeBlock,
+            )],
+            else_value: &Option<(
+                crate::parser::ast::SyntacticElse,
+                crate::parser::ast::CodeBlock,
+            )>,
+        ) -> Result<IString, GrazeSb3GeneratorError> {
+            wrap_in_statement(context, |context, parent, this_id| {
+                let use_if_else = else_ifs.len() > 1 || else_value.is_some();
+                let opcode = if use_if_else {
+                    "control_if_else"
+                } else {
+                    "control_if"
+                };
+                let mut inputs = HashMap::with_capacity(if use_if_else { 3 } else { 2 });
+                visitor.visit_expression(&else_ifs[0].2, context)?;
+                let condition_value = context.pop_param().unwrap();
+                inputs.insert(
+                    "CONDITION".to_string(),
+                    param_to_input_repr_no_menu(condition_value, context)?.into(),
+                );
+                visitor.visit_code_block(&else_ifs[0].3, context)?;
+                let first_branch = context.pop_param().unwrap();
+                let first_branch = if let Param::BlockStack(block_ref) = first_branch {
+                    block_ref
+                } else {
+                    return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+                        param: first_branch,
+                    });
+                };
+                if let Some(first_branch) = first_branch {
+                    inputs.insert(
+                        "SUBSTACK".to_string(),
+                        Sb3InputValue::NoShadow(Sb3InputRepr::Reference(first_branch)),
+                    );
+                }
+                match (else_ifs.len() > 1, else_value) {
+                    (true, _) => {
+                        context.current_previous_block = None;
+                        let inner_id =
+                            make_if_else_recursively(visitor, context, &else_ifs[1..], else_value)?;
+                        inputs.insert(
+                            "SUBSTACK2".to_string(),
+                            Sb3InputValue::NoShadow(Sb3InputRepr::Reference(inner_id.to_string())),
+                        );
+                    }
+                    (false, Some(else_value)) => {
+                        context.current_previous_block = None;
+                        visitor.visit_code_block(&else_value.1, context)?;
+                        let else_branch = context.pop_param().unwrap();
+                        let else_branch = if let Param::BlockStack(block_ref) = else_branch {
+                            block_ref
+                        } else {
+                            return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+                                param: else_branch,
+                            });
+                        };
+                        if let Some(else_branch) = else_branch {
+                            inputs.insert(
+                                "SUBSTACK2".to_string(),
+                                Sb3InputValue::NoShadow(Sb3InputRepr::Reference(else_branch)),
+                            );
+                        }
+                    }
+                    (false, None) => (),
+                }
+                add_block(
+                    context,
+                    &this_id,
+                    make_block(
+                        parent,
+                        opcode.to_string(),
+                        inputs,
+                        HashMap::new(),
+                        false,
+                        None,
+                    ),
+                );
+                Ok(this_id)
+            })
+        }
+        wrap_in_statement(context, |context, parent, this_id| {
+            let use_if_else = !value.1.is_empty() || value.2.is_some();
+            let opcode = if use_if_else {
+                "control_if_else"
+            } else {
+                "control_if"
+            };
+            let mut inputs = HashMap::with_capacity(if use_if_else { 3 } else { 2 });
+            self.visit_expression(&value.0.1, context)?;
+            let condition_value = context.pop_param().unwrap();
+            inputs.insert(
+                "CONDITION".to_string(),
+                param_to_input_repr_no_menu(condition_value, context)?.into(),
+            );
+            self.visit_code_block(&value.0.2, context)?;
+            let first_branch = context.pop_param().unwrap();
+            let first_branch = if let Param::BlockStack(block_ref) = first_branch {
+                block_ref
+            } else {
+                return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+                    param: first_branch,
+                });
+            };
+            if let Some(first_branch) = first_branch {
+                inputs.insert(
+                    "SUBSTACK".to_string(),
+                    Sb3InputValue::NoShadow(Sb3InputRepr::Reference(first_branch)),
+                );
+            }
+            if use_if_else {
+                context.current_previous_block = None;
+                let inner_id = make_if_else_recursively(self, context, value.1, value.2)?;
+                inputs.insert(
+                    "SUBSTACK2".to_string(),
+                    Sb3InputValue::NoShadow(Sb3InputRepr::Reference(inner_id.to_string())),
+                );
+            }
+            add_block(
+                context,
+                &this_id,
+                make_block(
+                    parent,
+                    opcode.to_string(),
+                    inputs,
+                    HashMap::new(),
+                    false,
+                    None,
+                ),
+            );
+            Ok(())
+        })
+    }
+
+    // Helpers:
+
+    fn visit_code_block(
+        &self,
+        value: &crate::parser::ast::CodeBlock,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        default_visit_code_block(self, value, context)?;
+        if value.statements.is_empty() {
+            context.push_param(Param::BlockStack(None));
+        }
+        Ok(())
+    }
+
     // Target statements:
 
     fn visit_isolated_block(
@@ -1866,6 +2047,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
         context.current_parent = None;
+        context.arg_stack.clear();
         default_visit_isolated_block(self, value, context)
     }
 
@@ -1882,6 +2064,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
         context.current_parent = None;
+        context.arg_stack.clear();
         default_visit_isolated_expression(self, value, context)
     }
 

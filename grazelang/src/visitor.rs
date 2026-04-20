@@ -1327,8 +1327,10 @@ pub fn default_visit_statement_if_else<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
+    visitor.visit_expression(&value.0.1, context)?;
     visitor.visit_code_block(&value.0.2, context)?;
     for item in value.1 {
+        visitor.visit_expression(&item.2, context)?;
         visitor.visit_code_block(&item.3, context)?;
     }
     if let Some(value) = value.2 {
