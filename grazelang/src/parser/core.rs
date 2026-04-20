@@ -589,6 +589,7 @@ pub mod statement {
         context: &mut ParseContext,
         default_type: DefaultDataDeclarationType,
         default_scope: &DataDeclarationScope,
+        values_are_initial_values: bool,
     ) -> ParseOut<Vec<(SingleDataDeclaration, Option<Comma>)>> {
         let mut declarations = Vec::<(SingleDataDeclaration, Option<Comma>)>::new();
         loop {
@@ -802,6 +803,7 @@ pub mod statement {
                             parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                                value_is_initial_value: values_are_initial_values,
                                 value: match &value {
                                     DeclarationValue::List(_, _, value, _) => {
                                         let mut expressions = Vec::with_capacity(value.len());
@@ -827,6 +829,7 @@ pub mod statement {
                             parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                                value_is_initial_value: values_are_initial_values,
                                 value: match &value {
                                     DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
                                     DeclarationValue::Var(_, value) => {
@@ -937,6 +940,7 @@ pub mod statement {
     pub fn parse_data_declaration(
         token_stream: ParseIn,
         context: &mut ParseContext,
+        values_are_initial_values: bool,
     ) -> ParseOut<(LetKeyword, DataDeclaration, PosRange)> {
         expect_token!(
             token_stream,
@@ -996,6 +1000,7 @@ pub mod statement {
                     context,
                     DefaultDataDeclarationType::Var,
                     &scope,
+                    values_are_initial_values,
                 )?;
                 let right_brace = expect_token!(
                     token_stream,
@@ -1034,6 +1039,7 @@ pub mod statement {
                     context,
                     DefaultDataDeclarationType::List,
                     &scope,
+                    values_are_initial_values,
                 )?;
                 let right_brace = expect_token!(
                     token_stream,
@@ -1066,6 +1072,7 @@ pub mod statement {
                     context,
                     DefaultDataDeclarationType::Var,
                     &scope,
+                    values_are_initial_values,
                 )?;
                 let right_parens = expect_token!(
                     token_stream,
@@ -1220,6 +1227,7 @@ pub mod statement {
                         parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                            value_is_initial_value: values_are_initial_values,
                             value: match &value {
                                 DeclarationValue::List(_, _, value, _) => {
                                     let mut expressions = Vec::with_capacity(value.len());
@@ -1245,6 +1253,7 @@ pub mod statement {
                         parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
+                            value_is_initial_value: values_are_initial_values,
                             value: match &value {
                                 DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
                                 DeclarationValue::Var(_, value) => {
@@ -1611,12 +1620,12 @@ pub mod statement {
     }
 
     #[inline]
-    pub fn parse_data_declaration_fully(
+    pub fn parse_statement_data_declaration_fully(
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<Statement> {
         let (let_keyword, data_dec, pos_range) =
-            statement::parse_data_declaration(token_stream, context)?;
+            statement::parse_data_declaration(token_stream, context, false)?;
         Ok(Statement::DataDeclaration(
             let_keyword,
             data_dec,
@@ -1636,7 +1645,7 @@ pub mod statement {
         context: &mut ParseContext,
     ) -> ParseOut<SpriteStatement> {
         let (let_keyword, data_dec, pos_range) =
-            statement::parse_data_declaration(token_stream, context)?;
+            statement::parse_data_declaration(token_stream, context, true)?;
         Ok(SpriteStatement::DataDeclaration(
             let_keyword,
             data_dec,
@@ -1656,7 +1665,7 @@ pub mod statement {
         context: &mut ParseContext,
     ) -> ParseOut<StageStatement> {
         let (let_keyword, data_dec, pos_range) =
-            statement::parse_data_declaration(token_stream, context)?;
+            statement::parse_data_declaration(token_stream, context, true)?;
         Ok(StageStatement::DataDeclaration(
             let_keyword,
             data_dec,
@@ -1902,7 +1911,7 @@ pub mod statement {
 /// Statements do not include semicolons.
 pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Statement> {
     match peek_token!(token_stream) {
-        Token::LetKeyword => statement::parse_data_declaration_fully(token_stream, context),
+        Token::LetKeyword => statement::parse_statement_data_declaration_fully(token_stream, context),
         // TODO: Prevent users from naming variables "super" or possibly "root"
         Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
             let identifier = parse_full_identifier(token_stream, context)?;

@@ -32,6 +32,8 @@ pub struct VarDescriptor {
     pub canonical_name: Option<IString>,
     pub value: Sb3Primitive,
     pub is_cloud: bool,
+    /// vars declared as a normal statement are assigned to every time the statement is reached and their initial value is empty
+    pub value_is_initial_value: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,6 +41,8 @@ pub struct ListDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
     pub value: Vec<Sb3Primitive>,
+    /// lists declared as a normal statement are assigned to every time the statement is reached and their initial value is empty
+    pub value_is_initial_value: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -512,7 +516,11 @@ impl TargetSymbolDescriptor {
                             id_string,
                             Sb3VariableDeclaration {
                                 name: canonical_name,
-                                value: var_descriptor.value.clone(),
+                                value: if var_descriptor.value_is_initial_value {
+                                    var_descriptor.value.clone()
+                                } else {
+                                    "".into()
+                                },
                                 is_cloud: var_descriptor.is_cloud,
                             },
                         )),
@@ -540,13 +548,17 @@ impl TargetSymbolDescriptor {
                             id_string,
                             Sb3ListDeclaration(
                                 canonical_name.clone(),
-                                list_descriptor.value.clone(),
+                                if list_descriptor.value_is_initial_value {
+                                    list_descriptor.value.clone()
+                                } else {
+                                    Vec::new()
+                                },
                             ),
                         )),
                     ))
                 }
-                TargetSymbolDescriptor::CustomBlockDescriptor(custom_block_descriptor) => todo!(),
-                TargetSymbolDescriptor::Costume(_)
+                TargetSymbolDescriptor::CustomBlockDescriptor(_)
+                | TargetSymbolDescriptor::Costume(_)
                 | TargetSymbolDescriptor::Backdrop(_)
                 | TargetSymbolDescriptor::Sound(_) => unreachable!(),
             }

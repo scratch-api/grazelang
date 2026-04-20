@@ -1020,6 +1020,16 @@ impl GetPos for Identifier {
 }
 
 impl Identifier {
+    pub fn to_single(&self) -> Option<&(IString, PosRange)> {
+        match (self.scope.len(), self.names.len()) {
+            (0, 1) => self.names.first(),
+            (1, 0) => self.scope.first(),
+            _ => None,
+        }
+    }
+}
+
+impl Identifier {
     pub fn to_syntactic_if(&self) -> Option<SyntacticIf> {
         if self.names.len() != 1 || !self.scope.is_empty() {
             return None;

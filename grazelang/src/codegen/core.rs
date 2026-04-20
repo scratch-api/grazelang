@@ -29,8 +29,8 @@ use crate::{
     names::Namespace,
     parser::{
         ast::{
-            BinOpDescriptor, Expression, FormattedStringContent, Identifier, ListEntry,
-            UnOpDescriptor,
+            BinOpDescriptor, DataDeclarationScope, Expression, FormattedStringContent, Identifier,
+            ListEntry, UnOpDescriptor,
         },
         parse_context::{
             IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, Target,
@@ -45,9 +45,9 @@ use crate::{
         default_visit_formatted_string_content, default_visit_isolated_block,
         default_visit_isolated_expression, default_visit_statement_assignment,
         default_visit_statement_call, default_visit_statement_forever,
-        default_visit_statement_list_assignment, default_visit_statement_multi_input_control,
-        default_visit_statement_set_item, default_visit_statement_single_input_control,
-        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
+        default_visit_statement_multi_input_control, default_visit_statement_set_item,
+        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
+        default_visit_top_level_statement_stage,
     },
 };
 
@@ -224,6 +224,7 @@ impl GrazeSb3GeneratorContext {
         Symbol::insert_child(&root_symbol, literal!("lists"), lists_symbol);
         let mut block_counter = IdCounter::new();
         let next_block_id = block_counter.get_new_id();
+        dbg!(&target_attachments);
         Ok(Self {
             sb3: Sb3Root::default(),
             targets,
@@ -1404,13 +1405,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         self.visit_expression(expression, context)?;
                         let param = context.pop_param().unwrap();
                         let value = param_to_input_repr_no_menu(param, context)?;
-                        #[cfg(feature = "use_shadows_for_formatted_strings")]
+                        #[cfg(feature = "use_shadows_for_list_assignment")]
                         let value = (
                             value,
                             Some(Sb3PrimitiveBlock::String(
-                                #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
+                                #[cfg(feature = "use_actual_defaults_for_list_assignment")]
                                 "thing".into(),
-                                #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
+                                #[cfg(not(feature = "use_actual_defaults_for_list_assignment"))]
                                 "".into(),
                             )),
                         );
@@ -1430,7 +1431,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     })?;
                 }
                 ListEntry::Unwrap(literal, _) => {
-                    for c in literal.get_string_value().as_str().chars() {
+                    for c in literal.get_string_value().chars() {
                         wrap_in_statement(context, |context, parent, this_id| {
                             add_block(
                                 context,
@@ -1452,6 +1453,401 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             Ok(())
                         })?;
                     }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_statement_data_declaration(
+        &self,
+        value: (
+            &crate::parser::ast::LetKeyword,
+            &crate::parser::ast::DataDeclaration,
+            &crate::parser::ast::Semicolon,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        let stage_var_symbol = vec![(literal!("vars"), Default::default())];
+        let stage_list_symbol = vec![(literal!("lists"), Default::default())];
+        let (this_target_var_symbol, this_target_list_symbol) = {
+            let current_target = context.current_sb3_target.as_ref().unwrap();
+            if current_target.is_stage {
+                (stage_var_symbol.clone(), stage_list_symbol.clone())
+            } else {
+                let value = vec![
+                    (literal!("sprites"), Default::default()),
+                    (current_target.name.as_str().into(), Default::default()),
+                ];
+                (value.clone(), value)
+            }
+        };
+        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+        pub enum SingleAssignment {
+            List(Identifier, Vec<Sb3Primitive>),
+            Var(Identifier, Sb3Primitive),
+        }
+        let assignments: Vec<SingleAssignment> = match value.1 {
+            crate::parser::ast::DataDeclaration::Mixed(parent_scope, _, items, _, _)
+            | crate::parser::ast::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
+            | crate::parser::ast::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
+                .iter()
+                .map(|(value, _)| match value {
+                    crate::parser::ast::SingleDataDeclaration::Variable(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                        expression,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            stage_var_symbol.clone()
+                        } else {
+                            this_target_var_symbol.clone()
+                        };
+                        let var = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::Var(
+                            Identifier {
+                                scope: target,
+                                names: vec![(var, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            expression.calculate_value(),
+                        )
+                    }
+                    crate::parser::ast::SingleDataDeclaration::EmptyVariable(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            stage_var_symbol.clone()
+                        } else {
+                            this_target_var_symbol.clone()
+                        };
+                        let var = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::Var(
+                            Identifier {
+                                scope: target,
+                                names: vec![(var, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            "".into(),
+                        )
+                    }
+                    crate::parser::ast::SingleDataDeclaration::List(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                        _,
+                        items,
+                        _,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            stage_list_symbol.clone()
+                        } else {
+                            this_target_list_symbol.clone()
+                        };
+                        let list = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::List(
+                            Identifier {
+                                scope: target,
+                                names: vec![(list, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            {
+                                let mut values = Vec::with_capacity(items.len());
+                                for (value, _) in items {
+                                    match value {
+                                        ListEntry::Expression(expression) => {
+                                            values.push(expression.calculate_value());
+                                        }
+                                        ListEntry::Unwrap(literal, _) => {
+                                            for c in literal.get_string_value().chars() {
+                                                values.push(c.to_string().into());
+                                            }
+                                        }
+                                    }
+                                }
+                                values
+                            },
+                        )
+                    }
+                    crate::parser::ast::SingleDataDeclaration::EmptyList(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            stage_list_symbol.clone()
+                        } else {
+                            this_target_list_symbol.clone()
+                        };
+                        let list = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::List(
+                            Identifier {
+                                scope: target,
+                                names: vec![(list, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            Vec::new(),
+                        )
+                    }
+                })
+                .collect(),
+            crate::parser::ast::DataDeclaration::Single(single_data_declaration) => {
+                let single_data_declaration = single_data_declaration.as_ref();
+                let single_assignment = match single_data_declaration {
+                    crate::parser::ast::SingleDataDeclaration::Variable(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                        expression,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            my_scope,
+                            DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                        ) {
+                            stage_var_symbol.clone()
+                        } else {
+                            this_target_var_symbol.clone()
+                        };
+                        let var = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::Var(
+                            Identifier {
+                                scope: target,
+                                names: vec![(var, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            expression.calculate_value(),
+                        )
+                    }
+                    crate::parser::ast::SingleDataDeclaration::EmptyVariable(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            my_scope,
+                            DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                        ) {
+                            stage_var_symbol.clone()
+                        } else {
+                            this_target_var_symbol.clone()
+                        };
+                        let var = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::Var(
+                            Identifier {
+                                scope: target,
+                                names: vec![(var, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            "".into(),
+                        )
+                    }
+                    crate::parser::ast::SingleDataDeclaration::List(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                        _,
+                        items,
+                        _,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            my_scope,
+                            DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                        ) {
+                            stage_list_symbol.clone()
+                        } else {
+                            this_target_list_symbol.clone()
+                        };
+                        let list = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::List(
+                            Identifier {
+                                scope: target,
+                                names: vec![(list, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            {
+                                let mut values = Vec::with_capacity(items.len());
+                                for (value, _) in items {
+                                    match value {
+                                        ListEntry::Expression(expression) => {
+                                            values.push(expression.calculate_value());
+                                        }
+                                        ListEntry::Unwrap(literal, _) => {
+                                            for c in literal.get_string_value().chars() {
+                                                values.push(c.to_string().into());
+                                            }
+                                        }
+                                    }
+                                }
+                                values
+                            },
+                        )
+                    }
+                    crate::parser::ast::SingleDataDeclaration::EmptyList(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                    ) => {
+                        let target = if matches!(
+                            my_scope,
+                            DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                        ) {
+                            stage_list_symbol.clone()
+                        } else {
+                            this_target_list_symbol.clone()
+                        };
+                        let list = identifier.to_single().unwrap().0.clone();
+                        SingleAssignment::List(
+                            Identifier {
+                                scope: target,
+                                names: vec![(list, Default::default())],
+                                pos_range: Default::default(),
+                            },
+                            Vec::new(),
+                        )
+                    }
+                };
+                vec![single_assignment]
+            }
+        };
+        for assignment in assignments {
+            match assignment {
+                SingleAssignment::List(identifier, sb3_primitives) => {
+                    let actual_identifier = get_actual_identifier!(context, &identifier)?;
+                    let actual_identifier_ref = actual_identifier.borrow();
+                    let known_block = get_known_block!(actual_identifier_ref, &identifier)?;
+                    let (canonical_name, id) = match known_block {
+                        KnownBlock::List { canonical_name, id } => (canonical_name, id),
+                        _ => {
+                            return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
+                                identifier,
+                            });
+                        }
+                    };
+                    let list_field_value = Sb3FieldValue::WithId {
+                        value: (canonical_name as &str).into(),
+                        id: id.to_string(),
+                    };
+                    wrap_in_statement(context, |context, parent, this_id| {
+                        add_block(
+                            context,
+                            &this_id,
+                            make_block(
+                                parent,
+                                "data_deletealloflist".to_string(),
+                                HashMap::new(),
+                                HashMap::from([("LIST".to_string(), list_field_value.clone())]),
+                                false,
+                                None,
+                            ),
+                        );
+                    });
+                    for item in sb3_primitives {
+                        wrap_in_statement(context, |context, parent, this_id| {
+                            let value = Sb3InputValue::Shadow(Sb3InputRepr::PrimitiveBlock(
+                                Sb3PrimitiveBlock::String(item),
+                            ));
+                            add_block(
+                                context,
+                                &this_id,
+                                make_block(
+                                    parent,
+                                    "data_addtolist".to_string(),
+                                    HashMap::from([("ITEM".to_string(), value)]),
+                                    HashMap::from([("LIST".to_string(), list_field_value.clone())]),
+                                    false,
+                                    None,
+                                ),
+                            );
+                            Ok(())
+                        })?;
+                    }
+                }
+                SingleAssignment::Var(identifier, sb3_primitive) => {
+                    wrap_in_statement(context, |context, parent, this_id| {
+                        let actual_identifier = get_actual_identifier!(context, &identifier)?;
+                        let actual_identifier_ref = actual_identifier.borrow();
+                        let known_block = get_known_block!(actual_identifier_ref, &identifier)?;
+                        let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
+                            known_block.resolve_for_assignment(context);
+                        let mut fields = HashMap::new();
+                        let mut inputs = HashMap::new();
+                        add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+                        add_param_to_params(
+                            context,
+                            param,
+                            &KnownBlock::PrimitiveBlock {
+                                value: Sb3PrimitiveBlock::String(sb3_primitive),
+                            },
+                            &mut inputs,
+                            &mut fields,
+                        )?;
+                        add_block(
+                            context,
+                            &this_id,
+                            make_block(parent, opcode.to_string(), inputs, fields, false, None),
+                        );
+                        Ok(())
+                    })?;
                 }
             }
         }
