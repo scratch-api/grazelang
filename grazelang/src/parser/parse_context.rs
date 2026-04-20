@@ -410,9 +410,9 @@ impl TargetSymbolDescriptor {
                     source
                         .get_string_value()
                         .as_str()
-                        .split('.')
-                        .next_back()
+                        .rsplit_once('.')
                         .unwrap()
+                        .1
                 }
                 _ => unreachable!(),
             }
