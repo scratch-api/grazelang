@@ -15,28 +15,30 @@ pub fn get_generated_library() -> HashMap<String, LibraryItem> {
     generate_library!("schemas/toolbox_schema.json")
 }
 
-fn rc_as_usize<T>(rc: &Rc<T>) -> usize {
-    std::rc::Rc::<T>::as_ptr(rc) as usize
-}
-
 pub fn convert_generated_library(
     library: HashMap<String, LibraryItem>,
 ) -> impl Iterator<Item = (IString, Rc<RefCell<Symbol>>)> {
     pub fn recursively_convert(
         namespace: LibraryItem,
-        aliases: &mut HashMap<usize, Vec<AliasSegment>>,
+        aliases: &mut Vec<(Rc<RefCell<Symbol>>, Vec<AliasSegment>)>,
     ) -> Rc<RefCell<Symbol>> {
         let (my_symbol, alias_content) = match namespace.value {
-            Some(LibraryItemValue::Alias(alias)) => {
-                (Rc::new(RefCell::new(Symbol::Alias(Weak::new(), Weak::new()))), Some(alias))
-            }
-            Some(LibraryItemValue::KnownBlock(known_block)) => {
-                (Rc::new(RefCell::new(Symbol::KnownBlock(known_block, HashMap::new(), Weak::new()))), None)
-            }
+            Some(LibraryItemValue::Alias(alias)) => (
+                Rc::new(RefCell::new(Symbol::Alias(Weak::new(), Weak::new()))),
+                Some(alias),
+            ),
+            Some(LibraryItemValue::KnownBlock(known_block)) => (
+                Rc::new(RefCell::new(Symbol::KnownBlock(
+                    known_block,
+                    HashMap::new(),
+                    Weak::new(),
+                ))),
+                None,
+            ),
             None => (Rc::new(RefCell::new(Symbol::new_namespace())), None),
         };
         if let Some(alias_content) = alias_content {
-            aliases.insert(rc_as_usize(&my_symbol), alias_content);
+            aliases.push((my_symbol.clone(), alias_content));
         }
         for (child_name, child) in namespace.namespace {
             let child = recursively_convert(child, aliases);
@@ -44,35 +46,8 @@ pub fn convert_generated_library(
         }
         my_symbol
     }
-    pub fn recursively_convert_aliases(
-        symbol: Rc<RefCell<Symbol>>,
-        aliases: &mut HashMap<usize, Vec<AliasSegment>>,
-        symbol_stack: &mut Vec<Rc<RefCell<Symbol>>>,
-    ) {
-        if let Some(alias) = aliases.remove(&rc_as_usize(&symbol))
-            && let Symbol::Alias(target, _) = symbol.borrow_mut().deref_mut()
-        {
-            let mut current = symbol_stack.last().unwrap().clone();
-            for segment in alias {
-                current = match segment {
-                    grazelang_library::AliasSegment::Super => {
-                        current.borrow().get_parent().upgrade().unwrap()
-                    }
-                    grazelang_library::AliasSegment::Child(child) => {
-                        current.borrow().get_child(&child.into()).unwrap()
-                    }
-                }
-            }
-            *target = Rc::downgrade(&current);
-        }
-        symbol_stack.push(symbol.clone());
-        for child in symbol.borrow().get_children_cloned() {
-            recursively_convert_aliases(child, aliases, symbol_stack);
-            symbol_stack.pop().unwrap();
-        }
-    }
     let root = Rc::new(RefCell::new(Symbol::new_namespace()));
-    let mut aliases = HashMap::new();
+    let mut aliases = Vec::new();
     library.into_iter().for_each(|(name, namespace)| {
         Symbol::insert_child(
             &root,
@@ -80,11 +55,19 @@ pub fn convert_generated_library(
             recursively_convert(namespace, &mut aliases),
         );
     });
-    let mut symbol_stack = Vec::new();
-    recursively_convert_aliases(root, &mut aliases, &mut symbol_stack);
-    let root = Rc::try_unwrap(symbol_stack.pop().unwrap())
-        .unwrap()
-        .into_inner();
+    for (alias_symbol, segments) in aliases {
+        let mut current = alias_symbol.borrow().get_parent().upgrade().unwrap();
+        for segment in segments {
+            current = match segment {
+                AliasSegment::Super => current.borrow().get_parent().upgrade().unwrap(),
+                AliasSegment::Child(child) => current.borrow().get_child(&child.into()).unwrap(),
+            }
+        }
+        if let Symbol::Alias(target, _) = alias_symbol.borrow_mut().deref_mut() {
+            *target = Rc::downgrade(&current);
+        }
+    }
+    let root = Rc::try_unwrap(root).unwrap().into_inner();
     match root {
         Symbol::Namespace(namespace, _) => namespace.into_iter(),
         _ => unreachable!(),
