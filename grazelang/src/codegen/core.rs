@@ -44,10 +44,11 @@ use crate::{
         default_visit_expression_identifier, default_visit_expression_literal,
         default_visit_expression_unary_operation, default_visit_formatted_string_content,
         default_visit_isolated_block, default_visit_isolated_expression,
-        default_visit_statement_assignment, default_visit_statement_call,
-        default_visit_statement_forever, default_visit_statement_multi_input_control,
-        default_visit_statement_set_item, default_visit_statement_single_input_control,
-        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
+        default_visit_single_input_hat_statement, default_visit_statement_assignment,
+        default_visit_statement_call, default_visit_statement_forever,
+        default_visit_statement_multi_input_control, default_visit_statement_set_item,
+        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
+        default_visit_top_level_statement_stage,
     },
 };
 
@@ -2035,6 +2036,63 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     }
 
     // Target statements:
+
+    fn visit_single_input_hat_statement(
+        &self,
+        value: (
+            &Identifier,
+            &Expression,
+            &crate::parser::ast::CodeBlock,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        let (parent, this_id) =
+            wrap_in_statement(context, |context, parent, this_id| (parent, this_id));
+        let actual_identifier = get_actual_identifier!(context, value.0)?;
+        let actual_identifier_ref = actual_identifier.borrow();
+        let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+        let CallableKnownBlockSignature(opcode, params, known_params) =
+            known_block.resolve_for_call_block(context);
+        add_block(
+            context,
+            &this_id,
+            make_block(
+                parent,
+                opcode.to_string(),
+                HashMap::new(), // both of these will be replaced when the argument is available
+                HashMap::new(),
+                false,
+                None,
+            ),
+        );
+        default_visit_single_input_hat_statement(self, value, context)?;
+        let arg = context.pop_param().unwrap();
+        let mut fields = HashMap::new();
+        let mut inputs = HashMap::new();
+        add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+        if params.len() != 1 {
+            return Err(GrazeSb3GeneratorError::IncorrectParamCount {
+                unexpected: 1,
+                expected: params.len(),
+            });
+        }
+        let param = params.first().unwrap();
+        with_known_block!(context, arg, value => {
+            add_param_to_params(context, param, value, &mut inputs, &mut fields)?;
+        });
+        let block = context
+            .current_sb3_target
+            .as_mut()
+            .unwrap() // the visitor should always guarantee there is a target when blocks are added
+            .blocks
+            .get_mut(this_id.as_str())
+            .unwrap();
+        block.fields = fields;
+        block.inputs = inputs;
+        Ok(())
+    }
 
     fn visit_isolated_block(
         &self,
