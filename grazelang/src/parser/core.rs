@@ -1911,7 +1911,9 @@ pub mod statement {
 /// Statements do not include semicolons.
 pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Statement> {
     match peek_token!(token_stream) {
-        Token::LetKeyword => statement::parse_statement_data_declaration_fully(token_stream, context),
+        Token::LetKeyword => {
+            statement::parse_statement_data_declaration_fully(token_stream, context)
+        }
         // TODO: Prevent users from naming variables "super" or possibly "root"
         Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
             let identifier = parse_full_identifier(token_stream, context)?;
@@ -2040,6 +2042,12 @@ pub fn parse_sprite_statement(
                         (start_pos, get_token_end!(token_stream)),
                     ))
                 }
+                Token::LeftBrace => Ok(SpriteStatement::NoInputHatStatement(
+                    identifier,
+                    parse_code_block(token_stream, context)?,
+                    consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
+                    (start_pos, get_token_end!(token_stream)),
+                )),
                 _ => {
                     let expression = parse_expression(token_stream, context)?;
                     parse_sprite_rest_of_single_input_control(
@@ -2048,7 +2056,7 @@ pub fn parse_sprite_statement(
                         identifier,
                         expression,
                         start_pos,
-                    )
+                    ) // TODO: capture error and replace message 
                 }
             }
         }
@@ -2203,6 +2211,12 @@ pub fn parse_stage_statement(
                         (start_pos, get_token_end!(token_stream)),
                     ))
                 }
+                Token::LeftBrace => Ok(StageStatement::NoInputHatStatement(
+                    identifier,
+                    parse_code_block(token_stream, context)?,
+                    consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
+                    (start_pos, get_token_end!(token_stream)),
+                )),
                 _ => {
                     let expression = parse_expression(token_stream, context)?;
                     parse_stage_rest_of_single_input_control(
@@ -2211,7 +2225,7 @@ pub fn parse_stage_statement(
                         identifier,
                         expression,
                         start_pos,
-                    )
+                    ) // TODO: capture error and replace message
                 }
             }
         }

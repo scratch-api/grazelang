@@ -218,6 +218,7 @@ impl ResolveKnownBlock for KnownBlock {
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> CallableKnownBlockSignature<'a> {
         const EMPTY_KNOWN_PARAM_VEC: &Vec<(CallBlockParam, KnownBlock)> = &Vec::new();
+        const EMPTY_PARAM_VEC: &Vec<CallBlockParam> = &Vec::new();
         match self {
             KnownBlock::Callable(opcode, params) => {
                 CallableKnownBlockSignature(opcode, params, EMPTY_KNOWN_PARAM_VEC)
@@ -225,12 +226,14 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::PartialCallable(opcode, values, params) => {
                 CallableKnownBlockSignature(opcode, params, values)
             }
+            KnownBlock::SingletonReporter { opcode, params, field, assign } => {
+                CallableKnownBlockSignature(opcode, EMPTY_PARAM_VEC, params)
+            }
             KnownBlock::Variable { .. }
             | KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
-            | KnownBlock::PrimitiveBlock { .. }
-            | KnownBlock::SingletonReporter { .. } => todo!(), // warn user about incorrect usage
+            | KnownBlock::PrimitiveBlock { .. } => todo!(), // warn user about incorrect usage
         }
     }
 

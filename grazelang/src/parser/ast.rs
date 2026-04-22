@@ -113,6 +113,7 @@ pub enum StageStatement {
     DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
     BackdropDeclaration(BackdropKeyword, AssetDeclaration, Semicolon, PosRange),
     SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, PosRange),
+    NoInputHatStatement(Identifier, CodeBlock, Option<Semicolon>, PosRange),
     SingleInputHatStatement(
         Identifier,
         Expression,
@@ -147,6 +148,7 @@ impl GetPos for StageStatement {
             StageStatement::DataDeclaration(_, _, _, p) => p,
             StageStatement::BackdropDeclaration(_, _, _, p) => p,
             StageStatement::SoundDeclaration(_, _, _, p) => p,
+            StageStatement::NoInputHatStatement(_, _, _, p) => p,
             StageStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
             StageStatement::IsolatedBlock(_, _, p) => p,
@@ -161,6 +163,7 @@ pub enum SpriteStatement {
     DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
     CostumeDeclaration(CostumeKeyword, AssetDeclaration, Semicolon, PosRange),
     SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, PosRange),
+    NoInputHatStatement(Identifier, CodeBlock, Option<Semicolon>, PosRange),
     SingleInputHatStatement(
         Identifier,
         Expression,
@@ -195,6 +198,7 @@ impl GetPos for SpriteStatement {
             SpriteStatement::DataDeclaration(_, _, _, p) => p,
             SpriteStatement::CostumeDeclaration(_, _, _, p) => p,
             SpriteStatement::SoundDeclaration(_, _, _, p) => p,
+            SpriteStatement::NoInputHatStatement(_, _, _, p) => p,
             SpriteStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
             SpriteStatement::IsolatedBlock(_, _, p) => p,
@@ -607,6 +611,10 @@ pub enum Expression {
 }
 
 impl Expression {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Expression::Literal(Literal::EmptyExpression(..)))
+    }
+
     pub fn calculate_value(&self) -> Sb3Primitive {
         match self {
             Expression::Literal(literal) => {

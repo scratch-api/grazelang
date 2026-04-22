@@ -112,6 +112,14 @@ pub trait GrazeVisitor<C, E> {
         default_visit_sound_declaration(self, value, context)
     }
 
+    fn visit_no_input_hat_statement(
+        &self,
+        value: (&Identifier, &CodeBlock, &Option<Semicolon>, &PosRange),
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_no_input_hat_statement(self, value, context)
+    }
+
     fn visit_single_input_hat_statement(
         &self,
         value: (
@@ -740,6 +748,12 @@ where
                 context,
             )?;
         }
+        StageStatement::NoInputHatStatement(identifier, code_block, semicolon, pos_range) => {
+            visitor.visit_no_input_hat_statement(
+                (identifier, code_block, semicolon, pos_range),
+                context,
+            )?;
+        }
         StageStatement::SingleInputHatStatement(
             identifier,
             expression,
@@ -833,6 +847,12 @@ where
                 context,
             )?;
         }
+        SpriteStatement::NoInputHatStatement(identifier, code_block, semicolon, pos_range) => {
+            visitor.visit_no_input_hat_statement(
+                (identifier, code_block, semicolon, pos_range),
+                context,
+            )?;
+        }
         SpriteStatement::SingleInputHatStatement(
             identifier,
             expression,
@@ -920,6 +940,18 @@ pub fn default_visit_sound_declaration<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
+    Ok(())
+}
+
+pub fn default_visit_no_input_hat_statement<V, C, E>(
+    visitor: &V,
+    value: (&Identifier, &CodeBlock, &Option<Semicolon>, &PosRange),
+    context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    visitor.visit_code_block(value.1, context)?;
     Ok(())
 }
 
