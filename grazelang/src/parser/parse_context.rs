@@ -20,6 +20,13 @@ use crate::{codegen, names::Namespace, parser::ast::Literal};
 
 pub type IdString = IString;
 
+macro_rules! static_ref_of_const {
+    ($expr:expr, $type_:ty) => {{
+        const VALUE: &$type_ = &$expr;
+        VALUE
+    }};
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Primitive {
     String(IString),
@@ -217,18 +224,20 @@ impl ResolveKnownBlock for KnownBlock {
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> CallableKnownBlockSignature<'a> {
-        const EMPTY_KNOWN_PARAM_VEC: &Vec<(CallBlockParam, KnownBlock)> = &Vec::new();
-        const EMPTY_PARAM_VEC: &Vec<CallBlockParam> = &Vec::new();
         match self {
-            KnownBlock::Callable(opcode, params) => {
-                CallableKnownBlockSignature(opcode, params, EMPTY_KNOWN_PARAM_VEC)
-            }
+            KnownBlock::Callable(opcode, params) => CallableKnownBlockSignature(
+                opcode,
+                params,
+                static_ref_of_const!(Vec::new(), Vec<(CallBlockParam, KnownBlock)>),
+            ),
             KnownBlock::PartialCallable(opcode, values, params) => {
                 CallableKnownBlockSignature(opcode, params, values)
             }
-            KnownBlock::SingletonReporter { opcode, params, field, assign } => {
-                CallableKnownBlockSignature(opcode, EMPTY_PARAM_VEC, params)
-            }
+            KnownBlock::SingletonReporter { opcode, params, .. } => CallableKnownBlockSignature(
+                opcode,
+                static_ref_of_const!(Vec::new(), Vec<CallBlockParam>),
+                params,
+            ),
             KnownBlock::Variable { .. }
             | KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
