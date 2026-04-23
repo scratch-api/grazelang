@@ -8,7 +8,7 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
-    CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature,
+    BindInfo, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature,
     SimpleCallableKnownBlockSignature, project_json::Sb3Primitive,
 };
 use rand::SeedableRng;
@@ -25,7 +25,7 @@ use super::{
 
 use crate::{
     codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment},
-    library,
+    library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     names::Namespace,
     parser::{
         ast::{
@@ -104,6 +104,62 @@ impl FormattedStringContext {
     }
 }
 
+pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
+    if let Symbol::KnownBlock(known_block, _, _) = symbol {
+        match known_block.as_mut() {
+            KnownBlock::Variable {
+                bind_info,
+                canonical_name,
+                id,
+                ..
+            } => {
+                bind_info.replace(BindInfo {
+                    parent_target: parent_target.clone(),
+                    property_of_params: vec![
+                        (
+                            CallBlockParam {
+                                kind: CallBlockParamKind::Field { default: None },
+                                name: literal!("PROPERTY"),
+                            },
+                            KnownBlock::FieldValue {
+                                value: Sb3FieldValue::WithId {
+                                    value: Sb3Primitive::String(canonical_name.to_string()),
+                                    id: id.to_string(),
+                                },
+                            },
+                        ),
+                        {
+                            let name = literal!("OBJECT");
+                            (
+                                CallBlockParam {
+                                    kind: CallBlockParamKind::MenuInput {
+                                        opcode: literal!("sensing_of_object_menu"),
+                                        field_name: name.clone(),
+                                        default: Sb3FieldValue::Normal("_stage_".into()),
+                                    },
+                                    name,
+                                },
+                                KnownBlock::FieldValue {
+                                    value: Sb3FieldValue::Normal(parent_target.as_str().into()),
+                                },
+                            )
+                        },
+                    ],
+                });
+            }
+            KnownBlock::List { .. }
+            | KnownBlock::FieldValue { .. }
+            | KnownBlock::BlockRef { .. }
+            | KnownBlock::PrimitiveBlock { .. }
+            | KnownBlock::Callable(..)
+            | KnownBlock::PartialCallable(..)
+            | KnownBlock::SingletonReporter { .. } => (),
+        }
+    }
+}
+
+pub const STAGE_ISTRING: &IString = &literal!("stage");
+
 impl GrazeSb3GeneratorContext {
     pub fn new(parse_context: ParseContext) -> Result<Self, std::io::Error> {
         let mut this = Self::without_standard_namespaces(parse_context)?;
@@ -133,7 +189,7 @@ impl GrazeSb3GeneratorContext {
             let mut namespace = Namespace::new();
             Symbol::insert_child(
                 &targets_symbol,
-                target.get_namespace_name(),
+                target.get_namespace_name().clone(),
                 Rc::new(RefCell::new(Symbol::KnownBlock(
                     Box::new(KnownBlock::FieldValue {
                         value: Sb3FieldValue::Normal(super::project_json::Sb3Primitive::String(
@@ -141,14 +197,22 @@ impl GrazeSb3GeneratorContext {
                         )),
                     }),
                     {
-                        let symbol_count = target.borrow_symbols().len();
-                        let (symbols, assets) = target
+                        let is_stage = matches!(target, Target::Stage { .. });
+                        let symbol_count = target.borrow_symbols().len()
+                            // Accounts for the symbols that every target has e.g. volume
+                            + if is_stage {
+                                3
+                            } else {
+                                7
+                            };
+                        let (mut symbols, assets) = target
                             .borrow_symbols()
                             .iter()
                             .map(|(key, value)| {
                                 value
                                     .derive_symbol_and_attachment(&mut rng, &mut namespace)
-                                    .map(|(symbol, asset)| {
+                                    .map(|(mut symbol, asset)| {
+                                        add_bind_info(&mut symbol, target.get_namespace_name());
                                         ((key.clone(), Rc::new(RefCell::new(symbol))), asset)
                                     })
                             })
@@ -163,13 +227,19 @@ impl GrazeSb3GeneratorContext {
                                     Ok((symbols, assets))
                                 },
                             )?;
-                        target_attachments.insert(target.get_namespace_name(), assets);
+                        symbols.extend(if is_stage {
+                            create_stage_dependent_symbols(target.get_namespace_name())
+                        } else {
+                            create_sprite_dependent_symbols(target.get_namespace_name())
+                        });
+                        target_attachments.insert(target.get_namespace_name().clone(), assets);
                         symbols
                     },
                     Weak::new(),
                 ))),
             );
         }
+        let stage_symbol = targets_symbol.borrow().get_child(STAGE_ISTRING).unwrap();
         Symbol::insert_child(&root_symbol, literal!("sprites"), targets_symbol);
         Symbol::insert_child(
             &root_symbol,
@@ -199,9 +269,16 @@ impl GrazeSb3GeneratorContext {
                         let (symbol, attachment) = symbol
                             .derive_symbol_and_attachment(&mut rng, &mut global_namespace)
                             .unwrap();
+                        let mut symbol_for_stage = symbol.clone();
+                        add_bind_info(&mut symbol_for_stage, &literal!("_stage_"));
                         if let Some(attachment) = attachment {
                             stage_target_attachments.push(attachment);
                         }
+                        Symbol::insert_child(
+                            &stage_symbol,
+                            name.clone(),
+                            Rc::new(RefCell::new(symbol_for_stage)),
+                        );
                         Symbol::insert_child(
                             &variables_symbol,
                             name,
@@ -2048,6 +2125,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
+        context.current_previous_block = None;
+        context.current_parent = None;
+        context.arg_stack.clear();
         let (parent, this_id) = wrap_in_statement(context, |_, parent, this_id| (parent, this_id));
         let actual_identifier = get_actual_identifier!(context, value.0)?;
         let actual_identifier_ref = actual_identifier.borrow();
@@ -2099,6 +2179,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
+        context.current_previous_block = None;
+        context.current_parent = None;
+        context.arg_stack.clear();
         let (parent, this_id) = wrap_in_statement(context, |_, parent, this_id| (parent, this_id));
         let actual_identifier = get_actual_identifier!(context, value.0)?;
         let actual_identifier_ref = actual_identifier.borrow();
@@ -2171,6 +2254,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
+        context.current_previous_block = None;
+        context.current_parent = None;
+        context.arg_stack.clear();
         let (parent, this_id) = wrap_in_statement(context, |_, parent, this_id| (parent, this_id));
         let actual_identifier = get_actual_identifier!(context, value.0)?;
         let actual_identifier_ref = actual_identifier.borrow();
@@ -2273,7 +2359,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .uninitialized_stage
             .take()
             .ok_or(GrazeSb3GeneratorError::RepeatedStageInitialization)?;
-        let target_name = literal!("stage");
+        let target_name = STAGE_ISTRING.clone();
         let assets = context.target_attachments.remove(&target_name).unwrap();
         for asset in assets {
             match asset {

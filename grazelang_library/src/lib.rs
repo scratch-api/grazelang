@@ -9,6 +9,33 @@ use serde::{Deserialize, Serialize};
 
 use crate::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BindInfo {
+    pub parent_target: IString,
+    pub property_of_params: Vec<(CallBlockParam, KnownBlock)>,
+}
+
+impl ToTokens for BindInfo {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let BindInfo {
+            parent_target,
+            property_of_params,
+        } = self;
+        let parent_target = parent_target.as_str();
+        let (property_of_params_keys, property_of_params_values): (Vec<_>, Vec<_>) =
+            property_of_params
+                .iter()
+                .map(|(key, value)| (key, value))
+                .unzip();
+        tokens.append_all(quote! {
+            ::grazelang_library::BindInfo {
+                parent_target: ::arcstr::literal!(#parent_target),
+                property_of_params: vec![#( (#property_of_params_keys, #property_of_params_values ) ),*]
+            }
+        });
+    }
+}
+
 /// Resolved symbols or primitive expressions like strings for usage in inputs or fields
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum KnownBlock {
@@ -16,6 +43,7 @@ pub enum KnownBlock {
         canonical_name: String,
         id: IString,
         assign: SimpleCallableKnownBlockSignature,
+        bind_info: Option<BindInfo>,
     },
     List {
         canonical_name: String,
@@ -44,6 +72,7 @@ pub enum KnownBlock {
         params: Vec<(CallBlockParam, KnownBlock)>,
         field: Option<project_json::Sb3FieldValue>,
         assign: Option<SimpleCallableKnownBlockSignature>,
+        bind_info: Option<BindInfo>,
     },
 }
 
@@ -154,7 +183,7 @@ impl ToTokens for CallBlockParam {
 }
 
 impl KnownBlock {
-    pub fn new_variable(canonical_name: String, id: IString) -> Self {
+    pub fn new_variable(canonical_name: String, id: IString, bind_info: Option<BindInfo>) -> Self {
         let assign = SimpleCallableKnownBlockSignature(
             literal!("data_setvariableto"),
             CallBlockParam {
@@ -180,6 +209,7 @@ impl KnownBlock {
             canonical_name,
             id,
             assign,
+            bind_info,
         }
     }
 }
@@ -213,17 +243,23 @@ impl ToTokens for KnownBlock {
                 canonical_name,
                 id,
                 assign,
+                bind_info,
             } => {
                 let id = id.as_str();
+                let bind_info = quote_option(bind_info.as_ref());
                 tokens.append_all(quote! {
                     #prefix::Variable {
                         canonical_name: #canonical_name.to_string(),
                         id: ::arcstr::literal!(#id),
                         assign: #assign,
+                        bind_info: #bind_info,
                     }
                 });
             }
-            KnownBlock::List { canonical_name, id } => {
+            KnownBlock::List {
+                canonical_name,
+                id,
+            } => {
                 let id = id.as_str();
                 tokens.append_all(quote! {
                     #prefix::List {
@@ -262,17 +298,20 @@ impl ToTokens for KnownBlock {
                 params,
                 field,
                 assign,
+                bind_info,
             } => {
                 let opcode = opcode.as_str();
                 let (keys, values): (Vec<_>, Vec<_>) = params.iter().map(|(k, v)| (k, v)).unzip();
                 let field = quote_option(field.as_ref());
                 let assign = quote_option(assign.as_ref());
+                let bind_info = quote_option(bind_info.as_ref());
                 tokens.append_all(quote! {
                     #prefix::SingletonReporter {
                         opcode: ::arcstr::literal!(#opcode),
                         params: ::std::vec![#( (#keys, #values) ),*],
                         field: #field,
                         assign: #assign,
+                        bind_info: #bind_info,
                     }
                 });
             }

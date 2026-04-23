@@ -102,7 +102,6 @@ pub trait ResolveKnownBlock {
 }
 
 impl ResolveKnownBlock for KnownBlock {
-    // TODO: add c blocks
     fn resolve_for_input<'a>(
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
@@ -113,8 +112,18 @@ impl ResolveKnownBlock for KnownBlock {
                 canonical_name,
                 id,
                 assign: _,
+                bind_info,
             } => {
-                // f: possibly set x and y
+                // TODO: possibly set x and y
+                if let Some(bind_info) = bind_info
+                    && let Some(target) = context.current_sb3_target.as_ref()
+                    && bind_info.parent_target.as_str() != target.name.as_str()
+                {
+                    return KnownBlockInput::SimpleBlock(
+                        static_ref_of_const!(literal!("sensing_of"), IString),
+                        &bind_info.property_of_params,
+                    );
+                }
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::Variable {
                     name: canonical_name.to_string(),
                     id: id.to_string(),
@@ -122,7 +131,10 @@ impl ResolveKnownBlock for KnownBlock {
                     y: None,
                 })
             }
-            KnownBlock::List { canonical_name, id } => {
+            KnownBlock::List {
+                canonical_name,
+                id,
+            } => {
                 // TODO: possibly set x and y
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::List {
                     name: canonical_name.to_string(),
@@ -146,6 +158,7 @@ impl ResolveKnownBlock for KnownBlock {
                 params,
                 field: _,
                 assign: _,
+                bind_info: _,
             } => KnownBlockInput::SimpleBlock(opcode, params),
         }
     }
@@ -160,11 +173,12 @@ impl ResolveKnownBlock for KnownBlock {
                 canonical_name,
                 id,
                 assign: _,
+                bind_info: _,
+            }
+            | KnownBlock::List {
+                canonical_name,
+                id,
             } => Sb3FieldValue::WithId {
-                value: Sb3Primitive::String(canonical_name.to_string()),
-                id: id.to_string(),
-            },
-            KnownBlock::List { canonical_name, id } => Sb3FieldValue::WithId {
                 value: Sb3Primitive::String(canonical_name.to_string()),
                 id: id.to_string(),
             },
@@ -211,6 +225,7 @@ impl ResolveKnownBlock for KnownBlock {
                 params: _,
                 field,
                 assign: _,
+                bind_info: _,
             } => {
                 // TODO: warn user about incorrect usage if no field supplied
                 field
@@ -255,12 +270,14 @@ impl ResolveKnownBlock for KnownBlock {
                 canonical_name: _,
                 id: _,
                 assign,
+                bind_info: _,
             }
             | KnownBlock::SingletonReporter {
                 opcode: _,
                 params: _,
                 field: _,
                 assign: Some(assign),
+                bind_info: _,
             } => assign,
             KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
@@ -520,7 +537,7 @@ impl TargetSymbolDescriptor {
                     let id_string = id.to_string();
                     Ok((
                         Symbol::KnownBlock(
-                            Box::new(KnownBlock::new_variable(canonical_name.clone(), id)),
+                            Box::new(KnownBlock::new_variable(canonical_name.clone(), id, None)),
                             HashMap::new(),
                             Weak::new(),
                         ),
@@ -632,14 +649,14 @@ impl Target {
         }
     }
 
-    pub fn get_namespace_name(&self) -> IString {
+    pub fn get_namespace_name(&self) -> &IString {
         match self {
             Target::Sprite {
                 name,
                 canonical_name: _,
                 symbols: _,
-            } => name.clone(),
-            Target::Stage { symbols: _ } => literal!("stage"),
+            } => name,
+            Target::Stage { symbols: _ } => codegen::core::STAGE_ISTRING,
         }
     }
 }

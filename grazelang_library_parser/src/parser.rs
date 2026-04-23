@@ -240,6 +240,7 @@ impl BlockEntry {
                                     )
                                 },
                             ),
+                            bind_info: None,
                         },
                     ))),
                 },
@@ -311,6 +312,7 @@ pub fn process_toolbox_category(
                     params: _,
                     field,
                     assign: _,
+                    bind_info: _,
                 } = known_block.as_mut()
             {
                 field.replace(field_value.clone());
