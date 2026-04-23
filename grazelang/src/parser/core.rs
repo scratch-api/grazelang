@@ -1720,7 +1720,12 @@ pub mod statement {
                         "Expected '('.",
                         "'('"
                     );
-                    let literal = parse_literal(token_stream, context)?;
+                    let path = expect_token!(
+                        token_stream,
+                        Token::SimpleString(string) => (string, get_token_position!(token_stream)),
+                        "Expected '('.",
+                        "'('"
+                    );
                     let right_parens = expect_token!(
                         token_stream,
                         Token::RightParens => from_stream_pos!(token_stream => RightParens),
@@ -1740,21 +1745,21 @@ pub mod statement {
                                     CostumeDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        source: literal.clone(),
+                                        source: path.0.clone(),
                                     }
                                 ),
                                 AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
                                     BackdropDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        source: literal.clone(),
+                                        source: path.0.clone(),
                                     }
                                 ),
                                 AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
                                     SoundDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        source: literal.clone(),
+                                        source: path.0.clone(),
                                     }
                                 ),
                             }
@@ -1765,7 +1770,7 @@ pub mod statement {
                             canonical_identifier,
                             identifier,
                             left_parens,
-                            literal,
+                            path,
                             right_parens,
                             (start_pos, get_token_end!(token_stream)),
                         ),
@@ -1809,7 +1814,12 @@ pub mod statement {
                     "Expected '('.",
                     "'('"
                 );
-                let literal = parse_literal(token_stream, context)?;
+                let path = expect_token!(
+                    token_stream,
+                    Token::SimpleString(string) => (string, get_token_position!(token_stream)),
+                    "Expected '('.",
+                    "'('"
+                );
                 let right_parens = expect_token!(
                     token_stream,
                     Token::RightParens => from_stream_pos!(token_stream => RightParens),
@@ -1827,15 +1837,15 @@ pub mod statement {
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
                                 CostumeDescriptor { name: name.clone(), canonical_name,
-                                    source: literal.clone(), }
+                                    source: path.0.clone(), }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
                                 BackdropDescriptor { name: name.clone(), canonical_name,
-                                    source: literal.clone(), }
+                                    source: path.0.clone(), }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
                                 SoundDescriptor { name: name.clone(), canonical_name,
-                                    source: literal.clone(), }
+                                    source: path.0.clone(), }
                             ),
                         }
                     );
@@ -1844,7 +1854,7 @@ pub mod statement {
                     Some(canonical_identifier),
                     identifier,
                     left_parens,
-                    literal,
+                    path,
                     right_parens,
                     (start_pos, get_token_end!(token_stream)),
                 )))
@@ -1858,7 +1868,12 @@ pub mod statement {
                     "Expected '('.",
                     "'('"
                 );
-                let literal = parse_literal(token_stream, context)?;
+                let path = expect_token!(
+                    token_stream,
+                    Token::SimpleString(string) => (string, get_token_position!(token_stream)),
+                    "Expected '('.",
+                    "'('"
+                );
                 let right_parens = expect_token!(
                     token_stream,
                     Token::RightParens => from_stream_pos!(token_stream => RightParens),
@@ -1876,15 +1891,15 @@ pub mod statement {
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
                                 CostumeDescriptor { name: name.clone(), canonical_name,
-                                    source: literal.clone(), }
+                                    source: path.0.clone(), }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
                                 BackdropDescriptor { name: name.clone(), canonical_name,
-                                    source: literal.clone(), }
+                                    source: path.0.clone(), }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
                                 SoundDescriptor { name: name.clone(), canonical_name,
-                                    source: literal.clone(), }
+                                    source: path.0.clone(), }
                             ),
                         }
                     );
@@ -1893,7 +1908,7 @@ pub mod statement {
                     None,
                     identifier,
                     left_parens,
-                    literal,
+                    path,
                     right_parens,
                     (start_pos, get_token_end!(token_stream)),
                 )))

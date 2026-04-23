@@ -3,7 +3,6 @@ use std::{
     collections::HashMap,
     ops::DerefMut,
     rc::{Rc, Weak},
-    sync::Arc,
 };
 
 use arcstr::{ArcStr as IString, literal};

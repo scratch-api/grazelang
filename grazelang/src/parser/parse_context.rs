@@ -62,21 +62,21 @@ pub struct CustomBlockDescriptor {
 pub struct CostumeDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub source: Literal,
+    pub source: IString,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BackdropDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub source: Literal,
+    pub source: IString,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SoundDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub source: Literal,
+    pub source: IString,
 }
 
 pub trait ResolveKnownBlock {
@@ -131,10 +131,7 @@ impl ResolveKnownBlock for KnownBlock {
                     y: None,
                 })
             }
-            KnownBlock::List {
-                canonical_name,
-                id,
-            } => {
+            KnownBlock::List { canonical_name, id } => {
                 // TODO: possibly set x and y
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::List {
                     name: canonical_name.to_string(),
@@ -175,10 +172,7 @@ impl ResolveKnownBlock for KnownBlock {
                 assign: _,
                 bind_info: _,
             }
-            | KnownBlock::List {
-                canonical_name,
-                id,
-            } => Sb3FieldValue::WithId {
+            | KnownBlock::List { canonical_name, id } => Sb3FieldValue::WithId {
                 value: Sb3Primitive::String(canonical_name.to_string()),
                 id: id.to_string(),
             },
@@ -403,9 +397,9 @@ pub enum TargetSymbolDescriptor {
 }
 
 impl TargetSymbolDescriptor {
-    pub fn compute_hash(path: IString) -> Result<String, std::io::Error> {
+    pub fn compute_hash(path: &str) -> Result<String, std::io::Error> {
         use std::fs::File;
-        let mut file = File::open(path.to_string())?;
+        let mut file = File::open(path)?;
         let mut data: Vec<u8> = Vec::new();
         file.read_to_end(&mut data)?;
         let digest = md5::compute(data);
@@ -436,12 +430,7 @@ impl TargetSymbolDescriptor {
                     source,
                 }) => {
                     // TODO: better ext detections
-                    source
-                        .get_string_value()
-                        .as_str()
-                        .rsplit_once('.')
-                        .unwrap()
-                        .1
+                    source.as_str().rsplit_once('.').unwrap_or(("", "")).1
                 }
                 _ => unreachable!(),
             }
@@ -459,7 +448,7 @@ impl TargetSymbolDescriptor {
             TargetSymbolDescriptor::Sound(descriptor) => Some(&descriptor.source),
             _ => None,
         }
-        .map(|value| Self::compute_hash(value.cast_to_string()))
+        .map(|value| Self::compute_hash(value.as_str()))
         .transpose()?
         .map(|value| {
             let file_ext = get_file_extension_unwrapped(self);

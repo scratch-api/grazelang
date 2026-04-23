@@ -698,10 +698,10 @@ where
     let mut fields = HashMap::new();
     let mut inputs = HashMap::new();
     add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
-    if params.len() - 1 != arg_count {
+    if params.len() != arg_count + 1 {
         return Err(GrazeSb3GeneratorError::IncorrectParamCount {
-            unexpected: arg_count,
-            expected: params.len() - 1,
+            unexpected: arg_count + 1,
+            expected: params.len(),
         });
     }
     let substack_input_name = if let CallBlockParam {

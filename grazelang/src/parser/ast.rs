@@ -233,7 +233,7 @@ pub struct SingleAssetDeclaration(
     pub Option<CanonicalIdentifier>,
     pub Identifier,
     pub LeftParens,
-    pub Literal,
+    pub (IString, PosRange),
     pub RightParens,
     pub PosRange,
 );
