@@ -16,7 +16,11 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
-use crate::{codegen, names::Namespace, parser::ast::Literal};
+use crate::{
+    codegen,
+    names::Namespace,
+    parser::ast::{CustomBlockParamKindValue, Literal},
+};
 
 pub type IdString = IString;
 
@@ -53,9 +57,19 @@ pub struct ListDescriptor {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CustomBlockParamDescriptor {
+    pub name: IString,
+    pub canonical_name: Option<IString>,
+    pub kind: CustomBlockParamKindValue,
+    pub default: Sb3Primitive,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
+    pub params: Vec<CustomBlockParamDescriptor>,
+    pub is_warp: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -289,7 +303,7 @@ pub enum Symbol {
     Namespace(HashMap<IString, Rc<RefCell<Symbol>>>, Weak<RefCell<Symbol>>),
     KnownBlock(
         Box<KnownBlock>,
-        HashMap<IString, Rc<RefCell<Symbol>>>, // TODO: remove Option
+        HashMap<IString, Rc<RefCell<Symbol>>>,
         Weak<RefCell<Symbol>>,
     ),
     Sprites(Weak<RefCell<Symbol>>),

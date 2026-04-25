@@ -448,11 +448,12 @@ pub mod statement {
     use crate::{
         lexer,
         parser::ast::{
-            AssetDeclaration, CanonicalIdentifier, Comma, DataDeclaration, DataDeclarationScope,
-            LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
-            NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon,
-            SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
-            SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword,
+            AssetDeclaration, CanonicalIdentifier, Comma, CustomBlockParamKind,
+            CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope, LeftBrace,
+            LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
+            NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
+            Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
+            SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier,
         },
     };
 
@@ -1921,6 +1922,150 @@ pub mod statement {
             ),
         }
     }
+
+    pub fn parse_custom_block(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+    ) -> ParseOut<(
+        Option<WarpSpecifier>,
+        ProcKeyword,
+        Option<CanonicalIdentifier>,
+        Identifier,
+        LeftParens,
+        Vec<(
+            Option<CustomBlockParamKind>,
+            Option<CanonicalIdentifier>,
+            Identifier,
+            Option<Comma>,
+        )>,
+        RightParens,
+        CodeBlock,
+        Option<Semicolon>,
+        PosRange,
+    )> {
+        let (warp_specifier, start_pos) = match peek_token!(token_stream) {
+            Token::WarpKeyword => (
+                Some(WarpSpecifier {
+                    is_warp: true,
+                    pos_range: {
+                        skip_token!(token_stream);
+                        get_token_position!(token_stream)
+                    },
+                }),
+                Some(get_token_start!(token_stream)),
+            ),
+            Token::NowarpKeyword => (
+                Some(WarpSpecifier {
+                    is_warp: false,
+                    pos_range: {
+                        skip_token!(token_stream);
+                        get_token_position!(token_stream)
+                    },
+                }),
+                Some(get_token_start!(token_stream)),
+            ),
+            _ => (None, None),
+        };
+        let proc_keyword = expect_token!(
+            token_stream,
+            Token::ProcKeyword => from_stream_pos!(token_stream => ast::ProcKeyword),
+            "Expected \"proc\".",
+            "\"proc\""
+        );
+        let start_pos = start_pos.unwrap_or_else(|| get_token_start!(token_stream));
+        let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => ast::CanonicalIdentifier {
+            name: value,
+            pos_range: get_token_position!(token_stream),
+        });
+        let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+        let left_parens = expect_token!(
+            token_stream,
+            Token::LeftParens => from_stream_pos!(token_stream => ast::LeftParens),
+            "Expected '('.",
+            "'('"
+        );
+        let mut params = Vec::new();
+        let right_parens = loop {
+            consume_then_never_if!(token_stream, Token::RightParens => break from_stream_pos!(token_stream => ast::RightParens));
+            let param_kind = if let Token::Identifier(ident) = peek_token!(token_stream) {
+                match ident.as_str() {
+                    "str" => Some(CustomBlockParamKindValue::String),
+                    "bool" => Some(CustomBlockParamKindValue::Boolean),
+                    "num" => Some(CustomBlockParamKindValue::Number),
+                    _ => None,
+                }
+                .map(|value| {
+                    Ok(CustomBlockParamKind {
+                        kind: value,
+                        pos_range: {
+                            skip_token!(token_stream);
+                            get_token_position!(token_stream)
+                        },
+                    })
+                })
+                .transpose()?
+            } else {
+                None
+            };
+            let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => ast::CanonicalIdentifier {
+                name: value,
+                pos_range: get_token_position!(token_stream),
+            });
+            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            let comma = match peek_token!(token_stream) {
+                Token::Comma => Some({
+                    skip_token!(token_stream);
+                    from_stream_pos!(token_stream => ast::Comma)
+                }),
+                Token::RightParens => None,
+                _ => emit_unexpected_token!(
+                    token_stream,
+                    "Expected ',' or ')'.",
+                    "',' or ')'",
+                    next_token!(token_stream)
+                ),
+            };
+            params.push((param_kind, canonical_identifier, identifier, comma));
+        };
+        let code_block = parse_code_block(token_stream, context)?;
+        // TODO: Warn about shadowing
+        with_mut_next_target!(context, target => {
+            use parse_context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
+            let symbols = target.borrow_symbols_mut();
+            let name = &identifier.names[0].0;
+            symbols.insert(
+                name.clone(),
+                TargetSymbolDescriptor::CustomBlockDescriptor(CustomBlockDescriptor {
+                    name: identifier.to_single().unwrap().0.clone(),
+                    canonical_name: canonical_identifier.as_ref().map(|value| &value.name).cloned(),
+                    params: params.iter().map(|value| {
+                        CustomBlockParamDescriptor {
+                            name: value.2.to_single().unwrap().0.clone(),
+                            canonical_name: value.1.as_ref().map(|value| &value.name).cloned(),
+                            kind: value.0.as_ref().map(|value| &value.kind).copied().unwrap_or(CustomBlockParamKindValue::String),
+                            default: match &value.0 {
+                                Some(CustomBlockParamKind { kind: CustomBlockParamKindValue::Boolean, pos_range: _ }) => "false".into(),
+                                _ => "".into()
+                            }
+                        }
+                    }).collect(),
+                    is_warp: warp_specifier.as_ref().map(|value| value.is_warp).unwrap_or(false)
+                })
+            );
+        });
+        Ok((
+            warp_specifier,
+            proc_keyword,
+            canonical_identifier,
+            identifier,
+            left_parens,
+            params,
+            right_parens,
+            code_block,
+            consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
+            (start_pos, get_token_end!(token_stream)),
+        ))
+    }
 }
 
 /// Statements do not include semicolons.
@@ -1995,6 +2140,32 @@ pub fn parse_sprite_statement(
             ))
         }
         Token::LetKeyword => statement::parse_sprite_data_declaration_fully(token_stream, context),
+        Token::NowarpKeyword | Token::WarpKeyword | Token::ProcKeyword => {
+            let (
+                proc_keyword,
+                warp_specifier,
+                canonical_identifier,
+                identifier,
+                left_parens,
+                items,
+                right_parens,
+                code_block,
+                semicolon,
+                pos_range,
+            ) = statement::parse_custom_block(token_stream, context)?;
+            Ok(SpriteStatement::CustomBlockDefinition(
+                proc_keyword,
+                warp_specifier,
+                canonical_identifier,
+                identifier,
+                left_parens,
+                items,
+                right_parens,
+                code_block,
+                semicolon,
+                pos_range,
+            ))
+        }
         Token::Identifier(_) => {
             #[inline]
             fn parse_sprite_rest_of_single_input_control(
@@ -2111,8 +2282,8 @@ pub fn parse_sprite_statement(
         }
         _ => emit_unexpected_token!(
             token_stream,
-            "Expected hat statement, \"let\", \"sound\" or \"costume\".",
-            "hat statement, \"let\", \"sound\" or \"costume\"",
+            "Expected hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\".",
+            "hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"",
             next_token!(token_stream)
         ),
     }
@@ -2164,6 +2335,32 @@ pub fn parse_stage_statement(
             ))
         }
         Token::LetKeyword => statement::parse_stage_data_declaration_fully(token_stream, context),
+        Token::NowarpKeyword | Token::WarpKeyword | Token::ProcKeyword => {
+            let (
+                proc_keyword,
+                warp_specifier,
+                canonical_identifier,
+                identifier,
+                left_parens,
+                items,
+                right_parens,
+                code_block,
+                semicolon,
+                pos_range,
+            ) = statement::parse_custom_block(token_stream, context)?;
+            Ok(StageStatement::CustomBlockDefinition(
+                proc_keyword,
+                warp_specifier,
+                canonical_identifier,
+                identifier,
+                left_parens,
+                items,
+                right_parens,
+                code_block,
+                semicolon,
+                pos_range,
+            ))
+        }
         Token::Identifier(_) => {
             #[inline]
             fn parse_stage_rest_of_single_input_control(

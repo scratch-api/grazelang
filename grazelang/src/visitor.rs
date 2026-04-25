@@ -4,13 +4,13 @@ use crate::{
     lexer::PosRange,
     parser::ast::{
         AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
-        Comma, CostumeKeyword, DataDeclaration, DataDeclarationScope, Expression,
-        FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens,
-        LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
-        NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon,
-        SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement,
-        StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf,
-        TopLevelStatement, UnOp, VarKeyword, VarsKeyword,
+        Comma, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope,
+        Expression, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket,
+        LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword,
+        Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
+        Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword,
+        SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse,
+        SyntacticIf, TopLevelStatement, UnOp, VarKeyword, VarsKeyword, WarpSpecifier,
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -148,6 +148,30 @@ pub trait GrazeVisitor<C, E> {
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_multi_input_hat_statement(self, value, context)
+    }
+
+    fn visit_custom_block_definition(
+        &self,
+        value: (
+            &Option<WarpSpecifier>,
+            &ProcKeyword,
+            &Option<CanonicalIdentifier>,
+            &Identifier,
+            &LeftParens,
+            &Vec<(
+                Option<CustomBlockParamKind>,
+                Option<CanonicalIdentifier>,
+                Identifier,
+                Option<Comma>,
+            )>,
+            &RightParens,
+            &CodeBlock,
+            &Option<Semicolon>,
+            &PosRange,
+        ),
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_custom_block_definition(self, value, context)
     }
 
     fn visit_isolated_block(
@@ -788,6 +812,34 @@ where
                 context,
             )?;
         }
+        StageStatement::CustomBlockDefinition(
+            proc_keyword,
+            warp_specifier,
+            canonical_identifier,
+            identifier,
+            left_parens,
+            items,
+            right_parens,
+            code_block,
+            semicolon,
+            pos_range,
+        ) => {
+            visitor.visit_custom_block_definition(
+                (
+                    proc_keyword,
+                    warp_specifier,
+                    canonical_identifier,
+                    identifier,
+                    left_parens,
+                    items,
+                    right_parens,
+                    code_block,
+                    semicolon,
+                    pos_range,
+                ),
+                context,
+            )?;
+        }
         StageStatement::IsolatedBlock(code_block, semicolon, pos_range) => {
             visitor.visit_isolated_block((code_block, semicolon, pos_range), context)?;
         }
@@ -876,6 +928,34 @@ where
         ) => {
             visitor.visit_multi_input_hat_statement(
                 (
+                    identifier,
+                    left_parens,
+                    items,
+                    right_parens,
+                    code_block,
+                    semicolon,
+                    pos_range,
+                ),
+                context,
+            )?;
+        }
+        SpriteStatement::CustomBlockDefinition(
+            warp_specifier,
+            proc_keyword,
+            canonical_identifier,
+            identifier,
+            left_parens,
+            items,
+            right_parens,
+            code_block,
+            semicolon,
+            pos_range,
+        ) => {
+            visitor.visit_custom_block_definition(
+                (
+                    warp_specifier,
+                    proc_keyword,
+                    canonical_identifier,
                     identifier,
                     left_parens,
                     items,
@@ -990,7 +1070,38 @@ pub fn default_visit_multi_input_hat_statement<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
+    for item in value.2 {
+        visitor.visit_expression(&item.0, context)?;
+    }
     visitor.visit_code_block(value.4, context)?;
+    Ok(())
+}
+
+pub fn default_visit_custom_block_definition<V, C, E>(
+    visitor: &V,
+    value: (
+        &Option<WarpSpecifier>,
+        &ProcKeyword,
+        &Option<CanonicalIdentifier>,
+        &Identifier,
+        &LeftParens,
+        &Vec<(
+            Option<CustomBlockParamKind>,
+            Option<CanonicalIdentifier>,
+            Identifier,
+            Option<Comma>,
+        )>,
+        &RightParens,
+        &CodeBlock,
+        &Option<Semicolon>,
+        &PosRange,
+    ),
+    context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    visitor.visit_code_block(value.7, context)?;
     Ok(())
 }
 

@@ -1166,17 +1166,26 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let UnOpDescriptor {
                 opcode,
                 operand_input_name,
+                extra_inputs,
                 field_values,
                 default,
             } = value.0.get_descriptor();
             let operand_input_value = (param_to_input_repr_no_menu(operand, context)?, default);
+            let mut inputs = HashMap::with_capacity(extra_inputs.len() + 1);
+            inputs.insert(operand_input_name, operand_input_value.into());
+            for (key, value) in extra_inputs {
+                inputs.insert(
+                    key,
+                    Sb3InputValue::Shadow(Sb3InputRepr::PrimitiveBlock(value)),
+                );
+            }
             add_block(
                 context,
                 &this_id,
                 make_block(
                     parent,
                     opcode.to_string(),
-                    HashMap::from([(operand_input_name, operand_input_value.into())]),
+                    inputs,
                     field_values,
                     false,
                     None,
@@ -1971,7 +1980,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 crate::parser::ast::SyntacticElse,
                 crate::parser::ast::CodeBlock,
             )>,
-        ) -> Result<IString, GrazeSb3GeneratorError> {
+        ) -> Result<(), GrazeSb3GeneratorError> {
             wrap_in_statement(context, |context, parent, this_id| {
                 let use_if_else = else_ifs.len() > 1 || else_value.is_some();
                 let opcode = if use_if_else {
@@ -2004,12 +2013,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 match (else_ifs.len() > 1, else_value) {
                     (true, _) => {
                         context.current_previous_block = None;
-                        let inner_id =
-                            make_if_else_recursively(visitor, context, &else_ifs[1..], else_value)?;
-                        inputs.insert(
-                            "SUBSTACK2".to_string(),
-                            Sb3InputValue::NoShadow(Sb3InputRepr::Reference(inner_id.to_string())),
-                        );
+                        make_if_else_recursively(visitor, context, &else_ifs[1..], else_value)?;
+                        if let Some(Param::BlockStack(Some(inner_id))) = context.pop_param() {
+                            inputs.insert(
+                                "SUBSTACK2".to_string(),
+                                Sb3InputValue::NoShadow(Sb3InputRepr::Reference(inner_id)),
+                            );
+                        };
                     }
                     (false, Some(else_value)) => {
                         context.current_previous_block = None;
@@ -2043,7 +2053,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         None,
                     ),
                 );
-                Ok(this_id)
+                Ok(())
             })
         }
         wrap_in_statement(context, |context, parent, this_id| {
@@ -2077,11 +2087,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
             if use_if_else {
                 context.current_previous_block = None;
-                let inner_id = make_if_else_recursively(self, context, value.1, value.2)?;
-                inputs.insert(
-                    "SUBSTACK2".to_string(),
-                    Sb3InputValue::NoShadow(Sb3InputRepr::Reference(inner_id.to_string())),
-                );
+                make_if_else_recursively(self, context, value.1, value.2)?;
+                if let Some(Param::BlockStack(Some(inner_id))) = context.pop_param() {
+                    inputs.insert(
+                        "SUBSTACK2".to_string(),
+                        Sb3InputValue::NoShadow(Sb3InputRepr::Reference(inner_id.to_string())),
+                    );
+                };
             }
             add_block(
                 context,

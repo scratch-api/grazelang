@@ -33,7 +33,6 @@ pub enum TopLevelStatement {
         Semicolon,
         PosRange,
     ),
-    // Mod(),
     EmptyStatement(Semicolon),
 }
 
@@ -109,6 +108,49 @@ impl GetPos for SoundKeyword {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProcKeyword(pub PosRange);
+
+impl GetPos for ProcKeyword {
+    #[inline]
+    fn get_position(&self) -> &PosRange {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WarpSpecifier {
+    pub is_warp: bool,
+    pub pos_range: PosRange,
+}
+
+impl GetPos for WarpSpecifier {
+    #[inline]
+    fn get_position(&self) -> &PosRange {
+        &self.pos_range
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum CustomBlockParamKindValue {
+    Number,
+    String,
+    Boolean,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CustomBlockParamKind {
+    pub kind: CustomBlockParamKindValue,
+    pub pos_range: PosRange,
+}
+
+impl GetPos for CustomBlockParamKind {
+    #[inline]
+    fn get_position(&self) -> &PosRange {
+        &self.pos_range
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StageStatement {
     DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
     BackdropDeclaration(BackdropKeyword, AssetDeclaration, Semicolon, PosRange),
@@ -130,6 +172,23 @@ pub enum StageStatement {
         Option<Semicolon>,
         PosRange,
     ),
+    CustomBlockDefinition(
+        Option<WarpSpecifier>,
+        ProcKeyword,
+        Option<CanonicalIdentifier>,
+        Identifier,
+        LeftParens,
+        Vec<(
+            Option<CustomBlockParamKind>,
+            Option<CanonicalIdentifier>,
+            Identifier,
+            Option<Comma>,
+        )>,
+        RightParens,
+        CodeBlock,
+        Option<Semicolon>,
+        PosRange,
+    ),
     IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
     IsolatedExpression(
         LeftParens,
@@ -138,7 +197,6 @@ pub enum StageStatement {
         Option<Semicolon>,
         PosRange,
     ),
-    // Mod(),
     EmptyStatement(Semicolon),
 }
 
@@ -151,6 +209,7 @@ impl GetPos for StageStatement {
             StageStatement::NoInputHatStatement(_, _, _, p) => p,
             StageStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
+            StageStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
             StageStatement::IsolatedBlock(_, _, p) => p,
             StageStatement::IsolatedExpression(_, _, _, _, p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
@@ -180,6 +239,23 @@ pub enum SpriteStatement {
         Option<Semicolon>,
         PosRange,
     ),
+    CustomBlockDefinition(
+        Option<WarpSpecifier>,
+        ProcKeyword,
+        Option<CanonicalIdentifier>,
+        Identifier,
+        LeftParens,
+        Vec<(
+            Option<CustomBlockParamKind>,
+            Option<CanonicalIdentifier>,
+            Identifier,
+            Option<Comma>,
+        )>,
+        RightParens,
+        CodeBlock,
+        Option<Semicolon>,
+        PosRange,
+    ),
     IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
     IsolatedExpression(
         LeftParens,
@@ -188,7 +264,6 @@ pub enum SpriteStatement {
         Option<Semicolon>,
         PosRange,
     ),
-    // Mod(),
     EmptyStatement(Semicolon),
 }
 
@@ -201,6 +276,7 @@ impl GetPos for SpriteStatement {
             SpriteStatement::NoInputHatStatement(_, _, _, p) => p,
             SpriteStatement::SingleInputHatStatement(_, _, _, _, p) => p,
             SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
+            SpriteStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
             SpriteStatement::IsolatedBlock(_, _, p) => p,
             SpriteStatement::IsolatedExpression(_, _, _, _, p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
@@ -919,13 +995,54 @@ impl GetPos for UnOp {
 pub struct UnOpDescriptor {
     pub opcode: String,
     pub operand_input_name: String,
+    pub extra_inputs: HashMap<String, crate::codegen::project_json::Sb3PrimitiveBlock>,
     pub field_values: HashMap<String, crate::codegen::project_json::Sb3FieldValue>,
     pub default: Option<crate::codegen::project_json::Sb3PrimitiveBlock>,
 }
 
 impl UnOp {
     pub fn get_descriptor(&self) -> UnOpDescriptor {
-        todo!()
+        use crate::codegen::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
+
+        match self {
+            UnOp::Minus(_) => UnOpDescriptor {
+                opcode: "operator_subtract".to_string(),
+                operand_input_name: "NUM2".to_string(),
+                extra_inputs: HashMap::from([(
+                    "NUM1".to_string(),
+                    Sb3PrimitiveBlock::Number("".into()),
+                )]),
+                field_values: HashMap::new(),
+                default: Some(Sb3PrimitiveBlock::Number("".into())),
+            },
+            UnOp::Not(_) => UnOpDescriptor {
+                opcode: "operator_not".to_string(),
+                operand_input_name: "OPERAND".to_string(),
+                extra_inputs: HashMap::new(),
+                field_values: HashMap::new(),
+                default: None,
+            },
+            UnOp::Exp(_) => UnOpDescriptor {
+                opcode: "operator_mathop".to_string(),
+                operand_input_name: "NUM".to_string(),
+                extra_inputs: HashMap::new(),
+                field_values: HashMap::from([(
+                    "OPERATOR".to_string(),
+                    Sb3FieldValue::Normal("e ^".into()),
+                )]),
+                default: Some(Sb3PrimitiveBlock::Number("".into())),
+            },
+            UnOp::Pow(_) => UnOpDescriptor {
+                opcode: "operator_mathop".to_string(),
+                operand_input_name: "NUM".to_string(),
+                extra_inputs: HashMap::new(),
+                field_values: HashMap::from([(
+                    "OPERATOR".to_string(),
+                    Sb3FieldValue::Normal("10 ^".into()),
+                )]),
+                default: Some(Sb3PrimitiveBlock::Number("".into())),
+            },
+        }
     }
 }
 
