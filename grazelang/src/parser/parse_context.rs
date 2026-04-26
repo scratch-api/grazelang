@@ -8,7 +8,7 @@ use std::{
 use arcstr::{ArcStr as IString, literal};
 pub use grazelang_library::KnownBlock;
 use grazelang_library::{
-    CallBlockParam, CallableKnownBlockSignature, KnownBlockInput,
+    CallBlockParam, CallableKnownBlockSignature, HasShadow, KnownBlockInput,
     SimpleCallableKnownBlockSignature,
     project_json::{Sb3ListDeclaration, Sb3Primitive, Sb3VariableDeclaration},
 };
@@ -16,11 +16,7 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    codegen,
-    names::Namespace,
-    parser::ast::{CustomBlockParamKindValue, Literal},
-};
+use crate::{codegen, names::Namespace, parser::ast::CustomBlockParamKindValue};
 
 pub type IdString = IString;
 
@@ -61,14 +57,13 @@ pub struct CustomBlockParamDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
     pub kind: CustomBlockParamKindValue,
-    pub default: Sb3Primitive,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub params: Vec<CustomBlockParamDescriptor>,
+    pub args: Vec<CustomBlockParamDescriptor>,
     pub is_warp: bool,
 }
 
@@ -160,7 +155,9 @@ impl ResolveKnownBlock for KnownBlock {
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
             KnownBlock::PrimitiveBlock { value } => KnownBlockInput::PrimitiveInput(value.clone()),
-            KnownBlock::Callable(..) | KnownBlock::PartialCallable(..) => {
+            KnownBlock::Callable(..)
+            | KnownBlock::PartialCallable(..)
+            | KnownBlock::CustomBlock { .. } => {
                 // TODO: warn user about probably incorrect usage
                 KnownBlockInput::PrimitiveInput("".into())
             }
@@ -171,6 +168,7 @@ impl ResolveKnownBlock for KnownBlock {
                 assign: _,
                 bind_info: _,
             } => KnownBlockInput::SimpleBlock(opcode, params),
+            KnownBlock::Empty => KnownBlockInput::Empty,
         }
     }
 
@@ -224,7 +222,10 @@ impl ResolveKnownBlock for KnownBlock {
                     },
                 }
             }
-            KnownBlock::Callable(..) | KnownBlock::PartialCallable(..) => {
+            KnownBlock::Callable(..)
+            | KnownBlock::PartialCallable(..)
+            | KnownBlock::CustomBlock { .. }
+            | KnownBlock::Empty => {
                 // TODO: warn user about probably incorrect usage
                 Sb3FieldValue::Normal("".into())
             }
@@ -247,25 +248,37 @@ impl ResolveKnownBlock for KnownBlock {
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> CallableKnownBlockSignature<'a> {
+        const NO_PARTIALS: &Vec<(CallBlockParam, KnownBlock)> = &Vec::new();
         match self {
-            KnownBlock::Callable(opcode, params) => CallableKnownBlockSignature(
-                opcode,
-                params,
-                static_ref_of_const!(Vec::new(), Vec<(CallBlockParam, KnownBlock)>),
-            ),
+            KnownBlock::Callable(opcode, params) => {
+                CallableKnownBlockSignature(opcode, params, NO_PARTIALS, None)
+            }
             KnownBlock::PartialCallable(opcode, values, params) => {
-                CallableKnownBlockSignature(opcode, params, values)
+                CallableKnownBlockSignature(opcode, params, values, None)
             }
             KnownBlock::SingletonReporter { opcode, params, .. } => CallableKnownBlockSignature(
                 opcode,
                 static_ref_of_const!(Vec::new(), Vec<CallBlockParam>),
                 params,
+                None,
+            ),
+            KnownBlock::CustomBlock {
+                proccode,
+                call_params,
+                params,
+                is_warp,
+            } => CallableKnownBlockSignature(
+                static_ref_of_const!(literal!("procedures_call"), IString),
+                call_params,
+                NO_PARTIALS,
+                Some((proccode, params, is_warp)),
             ),
             KnownBlock::Variable { .. }
             | KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
-            | KnownBlock::PrimitiveBlock { .. } => todo!(), // warn user about incorrect usage
+            | KnownBlock::PrimitiveBlock { .. }
+            | KnownBlock::Empty => todo!(), // warn user about incorrect usage
         }
     }
 
@@ -293,7 +306,9 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PrimitiveBlock { .. }
             | KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
-            | KnownBlock::SingletonReporter { .. } => todo!(), // warn user about incorrect usage
+            | KnownBlock::SingletonReporter { .. }
+            | KnownBlock::CustomBlock { .. }
+            | KnownBlock::Empty => todo!(), // warn user about incorrect usage
         } // TODO: Implement assignment of x, y etc
     }
 }
@@ -382,6 +397,20 @@ impl Symbol {
         }
     }
 
+    pub fn remove_child(
+        this: &Rc<RefCell<Self>>,
+        child_name: &IString,
+    ) -> Option<Rc<RefCell<Symbol>>> {
+        match &mut *this.borrow_mut() {
+            Symbol::Namespace(hash_map, ..) => hash_map.remove(child_name),
+            Symbol::KnownBlock(_, hash_map, ..) => hash_map.remove(child_name),
+            Symbol::Alias(alias, ..) => alias
+                .upgrade()
+                .and_then(|value| Self::remove_child(&value, child_name)),
+            Symbol::Sprites(..) => None,
+        }
+    }
+
     pub fn is_dependent(&self) -> bool {
         matches!(self, Symbol::Alias(..) | Symbol::Sprites(..))
     }
@@ -450,11 +479,58 @@ impl TargetSymbolDescriptor {
             }
         }
         if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = self {
-            let id = descriptor
-                .canonical_name
-                .clone()
-                .unwrap_or_else(|| descriptor.name.clone()); // TODO: use arguments
-            return todo!(); // TODO: implement custom block actual symbol
+            let proccode = descriptor.canonical_name.clone().unwrap_or_else(|| {
+                if descriptor.args.is_empty() {
+                    return descriptor.name.clone();
+                }
+                let mut proccode =
+                    String::with_capacity(descriptor.name.len() + 3 * descriptor.args.len());
+                proccode.push_str(descriptor.name.as_str());
+                for arg in &descriptor.args {
+                    proccode.push_str(" %");
+                    proccode.push(match &arg.kind {
+                        CustomBlockParamKindValue::Number => 'n',
+                        CustomBlockParamKindValue::String => 's',
+                        CustomBlockParamKindValue::Boolean => 'b',
+                    });
+                }
+                proccode.into()
+            });
+            let mut call_params = Vec::with_capacity(descriptor.args.len());
+            let mut params = Vec::with_capacity(descriptor.args.len());
+            for arg in &descriptor.args {
+                let is_bool = arg.kind == CustomBlockParamKindValue::Boolean;
+                let arg_id = codegen::ids::generate_random_id(rng);
+                call_params.push(CallBlockParam {
+                    kind: grazelang_library::CallBlockParamKind::Input {
+                        default: (!is_bool).then(|| {
+                            grazelang_library::project_json::Sb3PrimitiveBlock::String("".into())
+                        }),
+                    },
+                    name: arg_id.clone(),
+                });
+                params.push((
+                    arg_id,
+                    if is_bool {
+                        HasShadow::No
+                    } else {
+                        HasShadow::Yes
+                    },
+                ));
+            }
+            return Ok((
+                Symbol::KnownBlock(
+                    Box::new(KnownBlock::CustomBlock {
+                        proccode,
+                        call_params,
+                        params,
+                        is_warp: descriptor.is_warp,
+                    }),
+                    HashMap::new(),
+                    Weak::new(),
+                ),
+                None,
+            ));
         }
         match self {
             TargetSymbolDescriptor::Costume(descriptor) => Some(&descriptor.source),

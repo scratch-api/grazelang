@@ -1,0 +1,34 @@
+
+stage {
+    backdrop test("src/empty.svg");
+}
+
+sprite sawd {
+    costume test("src/empty.svg");
+    let global test;
+    let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
+    events.when_green_flag_clicked {
+        data.delete_all_of_list(lists.list_);
+        vars.test = 10 + 5 * 2;
+        control.if "test = 20" == "test = ${vars.test}" {
+            vars.test = 5;
+        }
+        control.repeat 10 {
+            data.add_to_list(lists.list_, 0);
+        }
+        lists.list_[vars.test] = 1;
+    }
+    {
+        vars.test = "";
+        lists.list_ = [1, 0, 0, 0, 0, 0, 0];
+    }
+    (
+        "0b${lists.list_}" + 10
+    )
+    warp proc test_proc(str a, bool b, num c) {
+        looks.say("a = ${args.a}; b = ${args.b}; c = ${args.c}");
+    }
+    {
+        sprites.sawd.test_proc("tea", 5 >= 4, 1);
+    }
+}

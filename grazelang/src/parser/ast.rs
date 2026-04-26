@@ -1226,4 +1226,9 @@ pub enum ParseError {
         context: &'static str,
         pos_range: PosRange,
     },
+    #[error("tried to declare a local symbol in stage at {pos_range:?} (context: {context})")]
+    LocalSymbolInStage {
+        context: &'static str,
+        pos_range: PosRange,
+    },
 }

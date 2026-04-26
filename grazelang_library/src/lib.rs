@@ -74,6 +74,13 @@ pub enum KnownBlock {
         assign: Option<SimpleCallableKnownBlockSignature>,
         bind_info: Option<BindInfo>,
     },
+    CustomBlock {
+        proccode: IString,
+        call_params: Vec<CallBlockParam>,
+        params: Vec<(IString, HasShadow)>,
+        is_warp: bool,
+    },
+    Empty,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,6 +89,7 @@ pub enum KnownBlockInput<'a> {
     BlockRef(IString),
     SimpleBlock(&'a IString, &'a Vec<(CallBlockParam, KnownBlock)>),
     Menu(project_json::Sb3FieldValue),
+    Empty,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,6 +97,7 @@ pub struct CallableKnownBlockSignature<'a>(
     pub &'a IString,
     pub &'a Vec<CallBlockParam>,
     pub &'a Vec<(CallBlockParam, KnownBlock)>,
+    pub Option<(&'a IString, &'a [(IString, HasShadow)], &'a bool)>,
 );
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -182,6 +191,29 @@ impl ToTokens for CallBlockParam {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HasShadow {
+    Yes,
+    No,
+}
+
+impl ToTokens for HasShadow {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        match self {
+            HasShadow::Yes => {
+                tokens.append_all(quote! {
+                    ::grazelang_library::HasShadow::Yes
+                });
+            }
+            HasShadow::No => {
+                tokens.append_all(quote! {
+                    ::grazelang_library::HasShadow::No
+                });
+            }
+        }
+    }
+}
+
 impl KnownBlock {
     pub fn new_variable(canonical_name: String, id: IString, bind_info: Option<BindInfo>) -> Self {
         let assign = SimpleCallableKnownBlockSignature(
@@ -256,10 +288,7 @@ impl ToTokens for KnownBlock {
                     }
                 });
             }
-            KnownBlock::List {
-                canonical_name,
-                id,
-            } => {
+            KnownBlock::List { canonical_name, id } => {
                 let id = id.as_str();
                 tokens.append_all(quote! {
                     #prefix::List {
@@ -313,6 +342,29 @@ impl ToTokens for KnownBlock {
                         assign: #assign,
                         bind_info: #bind_info,
                     }
+                });
+            }
+            KnownBlock::CustomBlock {
+                proccode,
+                call_params,
+                params,
+                is_warp,
+            } => {
+                let proccode = proccode.as_str();
+                let (keys, values): (Vec<_>, Vec<_>) =
+                    params.iter().map(|(k, v)| (k.as_str(), v)).unzip();
+                tokens.append_all(quote! {
+                    #prefix::CustomBlock {
+                        proccode: ::arcstr::literal!(#proccode),
+                        call_params: ::std::vec![#( #call_params ),*],
+                        params: ::std::vec![#( (::arcstr::literal!(#keys), #values) ),*],
+                        is_warp: #is_warp,
+                    }
+                });
+            }
+            KnownBlock::Empty => {
+                tokens.append_all(quote! {
+                    #prefix::Empty
                 });
             }
         }

@@ -782,6 +782,24 @@ pub mod statement {
                     next_token!(token_stream)
                 ),
             };
+
+            if matches!(
+                (default_scope, &scope, &context.next_target),
+                (
+                    DataDeclarationScope::Local(_),
+                    DataDeclarationScope::Unset,
+                    Some(parse_context::Target::Stage { .. })
+                ) | (
+                    _,
+                    DataDeclarationScope::Local(_),
+                    Some(parse_context::Target::Stage { .. })
+                )
+            ) {
+                return Err(ParseError::LocalSymbolInStage {
+                    context: static_current_context!(),
+                    pos_range: (start_pos.unwrap(), get_token_end!(token_stream)),
+                });
+            }
             with_mut_target_scope_or_global_scope!(
                 context,
                 matches!(
@@ -790,6 +808,12 @@ pub mod statement {
                         DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset
                     ) | (
                         _, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)
+                    )
+                ) ||
+                matches!(
+                    (default_scope, &scope, &context.next_target),
+                    (
+                        DataDeclarationScope::Unset, DataDeclarationScope::Unset, Some(parse_context::Target::Stage { .. })
                     )
                 ),
                 symbols => {
@@ -1216,9 +1240,22 @@ pub mod statement {
                 );
             }
         };
+        if matches!(
+            (&scope, &context.next_target),
+            (
+                DataDeclarationScope::Local(_),
+                Some(parse_context::Target::Stage { .. })
+            )
+        ) {
+            return Err(ParseError::LocalSymbolInStage {
+                context: static_current_context!(),
+                pos_range: (let_keyword_position.0, get_token_end!(token_stream)),
+            });
+        }
         with_mut_target_scope_or_global_scope!(
             context,
-            matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)),
+            matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) ||
+            matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(parse_context::Target::Stage { .. }))),
             symbols => {
                 // TODO: warn about shadowing
                 let name = &identifier.names[0].0;
@@ -2038,15 +2075,11 @@ pub mod statement {
                 TargetSymbolDescriptor::CustomBlockDescriptor(CustomBlockDescriptor {
                     name: identifier.to_single().unwrap().0.clone(),
                     canonical_name: canonical_identifier.as_ref().map(|value| &value.name).cloned(),
-                    params: params.iter().map(|value| {
+                    args: params.iter().map(|value| {
                         CustomBlockParamDescriptor {
                             name: value.2.to_single().unwrap().0.clone(),
                             canonical_name: value.1.as_ref().map(|value| &value.name).cloned(),
                             kind: value.0.as_ref().map(|value| &value.kind).copied().unwrap_or(CustomBlockParamKindValue::String),
-                            default: match &value.0 {
-                                Some(CustomBlockParamKind { kind: CustomBlockParamKindValue::Boolean, pos_range: _ }) => "false".into(),
-                                _ => "".into()
-                            }
                         }
                     }).collect(),
                     is_warp: warp_specifier.as_ref().map(|value| value.is_warp).unwrap_or(false)

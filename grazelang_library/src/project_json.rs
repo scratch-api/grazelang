@@ -930,7 +930,7 @@ impl Serialize for Sb3BlockMutation {
                 map.serialize_entry::<str, [(); 0]>("children", &[])?;
                 map.serialize_entry("proccode", procedure_code)?;
                 map.serialize_entry("argumentids", &json_encode::<S, _>(argument_ids)?)?;
-                map.serialize_entry("warp", warp)?;
+                map.serialize_entry("warp", &json_encode::<S, _>(warp)?)?;
                 map.end()
             }
             Sb3BlockMutation::ProceduresPrototype {
@@ -945,7 +945,7 @@ impl Serialize for Sb3BlockMutation {
                 map.serialize_entry::<str, [()]>("children", &[])?;
                 map.serialize_entry("proccode", procedure_code)?;
                 map.serialize_entry("argumentids", &json_encode::<S, _>(argument_ids)?)?;
-                map.serialize_entry("warp", warp)?;
+                map.serialize_entry("warp", &json_encode::<S, _>(warp)?)?;
                 map.serialize_entry("argumentnames", &json_encode::<S, _>(argument_names)?)?;
                 map.serialize_entry("argumentdefaults", &json_encode::<S, _>(argument_defaults)?)?;
                 map.end()
@@ -1404,7 +1404,19 @@ impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
 
 impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputValue {
     fn from(value: ((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)) -> Self {
-        (value.0, value.1.as_ref()).into()
+        // TODO: Implement primitive block conversion (if default is a positive integer, so would a literal value be)
+        let ((input_repr, is_shadow), shadow) = value;
+        if is_shadow == IsShadow::Yes {
+            return Self::Shadow(input_repr);
+        }
+        if let Some(shadow) = shadow {
+            Self::ObscuredShadow {
+                value: input_repr,
+                shadow: Sb3InputRepr::PrimitiveBlock(shadow),
+            }
+        } else {
+            Self::NoShadow(input_repr)
+        }
     }
 }
 
@@ -1422,6 +1434,26 @@ impl From<((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)> for Sb3InputVa
             }
         } else {
             Self::NoShadow(input_repr)
+        }
+    }
+}
+
+impl From<Sb3PrimitiveBlock> for Sb3InputValue {
+    fn from(value: Sb3PrimitiveBlock) -> Self {
+        if value.is_shadow() == IsShadow::Yes {
+            Sb3InputValue::Shadow(Sb3InputRepr::PrimitiveBlock(value))
+        } else {
+            Sb3InputValue::NoShadow(Sb3InputRepr::PrimitiveBlock(value))
+        }
+    }
+}
+
+impl From<&Sb3PrimitiveBlock> for Sb3InputValue {
+    fn from(value: &Sb3PrimitiveBlock) -> Self {
+        if value.is_shadow() == IsShadow::Yes {
+            Sb3InputValue::Shadow(Sb3InputRepr::PrimitiveBlock(value.clone()))
+        } else {
+            Sb3InputValue::NoShadow(Sb3InputRepr::PrimitiveBlock(value.clone()))
         }
     }
 }

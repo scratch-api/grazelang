@@ -8,7 +8,7 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
-    BindInfo, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature,
+    BindInfo, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature, HasShadow,
     SimpleCallableKnownBlockSignature, project_json::Sb3Primitive,
 };
 use rand::SeedableRng;
@@ -29,8 +29,8 @@ use crate::{
     names::Namespace,
     parser::{
         ast::{
-            BinOpDescriptor, DataDeclarationScope, Expression, FormattedStringContent, Identifier,
-            ListEntry, UnOpDescriptor,
+            BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope,
+            Expression, FormattedStringContent, Identifier, ListEntry, Literal, UnOpDescriptor,
         },
         parse_context::{
             IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, Target,
@@ -38,18 +38,18 @@ use crate::{
         },
     },
     visitor::{
-        GrazeVisitor, default_visit_code_block, default_visit_expression_binary_operation,
-        default_visit_expression_call, default_visit_expression_formatted_string,
-        default_visit_expression_get_item, default_visit_expression_get_letter,
-        default_visit_expression_identifier, default_visit_expression_literal,
-        default_visit_expression_unary_operation, default_visit_formatted_string_content,
-        default_visit_isolated_block, default_visit_isolated_expression,
-        default_visit_multi_input_hat_statement, default_visit_no_input_hat_statement,
-        default_visit_single_input_hat_statement, default_visit_statement_assignment,
-        default_visit_statement_call, default_visit_statement_forever,
-        default_visit_statement_multi_input_control, default_visit_statement_set_item,
-        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
-        default_visit_top_level_statement_stage,
+        GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
+        default_visit_expression_binary_operation, default_visit_expression_call,
+        default_visit_expression_formatted_string, default_visit_expression_get_item,
+        default_visit_expression_get_letter, default_visit_expression_identifier,
+        default_visit_expression_literal, default_visit_expression_unary_operation,
+        default_visit_formatted_string_content, default_visit_isolated_block,
+        default_visit_isolated_expression, default_visit_multi_input_hat_statement,
+        default_visit_no_input_hat_statement, default_visit_single_input_hat_statement,
+        default_visit_statement_assignment, default_visit_statement_call,
+        default_visit_statement_forever, default_visit_statement_multi_input_control,
+        default_visit_statement_set_item, default_visit_statement_single_input_control,
+        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
     },
 };
 
@@ -153,12 +153,15 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
             | KnownBlock::PrimitiveBlock { .. }
             | KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
-            | KnownBlock::SingletonReporter { .. } => (),
+            | KnownBlock::SingletonReporter { .. }
+            | KnownBlock::CustomBlock { .. }
+            | KnownBlock::Empty => (),
         }
     }
 }
 
 pub const STAGE_ISTRING: &IString = &literal!("stage");
+pub const SPRITES_ISTRING: &IString = &literal!("sprites");
 
 impl GrazeSb3GeneratorContext {
     pub fn new(parse_context: ParseContext) -> Result<Self, std::io::Error> {
@@ -240,7 +243,7 @@ impl GrazeSb3GeneratorContext {
             );
         }
         let stage_symbol = targets_symbol.borrow().get_child(STAGE_ISTRING).unwrap();
-        Symbol::insert_child(&root_symbol, literal!("sprites"), targets_symbol);
+        Symbol::insert_child(&root_symbol, SPRITES_ISTRING.clone(), targets_symbol);
         Symbol::insert_child(
             &root_symbol,
             literal!("broadcasts"),
@@ -351,18 +354,27 @@ impl GrazeSb3GeneratorContext {
         self.arg_stack.pop()
     }
 
+    pub fn resolve_path<'a, I>(&self, mut iterator: I) -> Option<Rc<RefCell<Symbol>>>
+    where
+        I: Iterator<Item = &'a IString>,
+    {
+        iterator.try_fold(self.root_symbol.clone(), |current, next| {
+            if next.as_str() == "super" {
+                current.borrow().get_parent().upgrade()
+            } else {
+                current.borrow().get_child(next)
+            }
+        })
+    }
+
     pub fn resolve_identifier(&self, identifier: &Identifier) -> Option<Rc<RefCell<Symbol>>> {
-        identifier
-            .scope
-            .iter()
-            .chain(identifier.names.iter())
-            .try_fold(self.root_symbol.clone(), |current, (next, _)| {
-                if next == &literal!("super") {
-                    current.borrow().get_parent().upgrade()
-                } else {
-                    current.borrow().get_child(next)
-                }
-            })
+        self.resolve_path(
+            identifier
+                .scope
+                .iter()
+                .chain(identifier.names.iter())
+                .map(|(next, _)| next),
+        )
     }
 }
 
@@ -529,6 +541,21 @@ pub fn introduce_input_menu(
     })
 }
 
+pub fn create_input_value<D>(
+    input_repr: Option<(Sb3InputRepr, IsShadow)>,
+    default: Option<D>,
+) -> Option<Sb3InputValue>
+where
+    ((Sb3InputRepr, IsShadow), Option<D>): Into<Sb3InputValue>,
+    D: Into<Sb3InputValue>,
+{
+    if let Some(input_repr) = input_repr {
+        Some((input_repr, default).into())
+    } else {
+        default.map(Into::into)
+    }
+}
+
 pub fn add_param_to_params(
     context: &mut GrazeSb3GeneratorContext,
     param: &CallBlockParam,
@@ -539,14 +566,12 @@ pub fn add_param_to_params(
     let param_name = param.name.to_string();
     match &param.kind {
         CallBlockParamKind::Input { default } => {
-            inputs.insert(
-                param_name,
-                (
-                    known_block_to_input_repr_no_menu(value, context)?,
-                    default.as_ref(),
-                )
-                    .into(),
-            );
+            if let Some(input_value) = create_input_value(
+                known_block_to_input_repr_no_menu(value, context)?,
+                default.as_ref(),
+            ) {
+                inputs.insert(param_name, input_value);
+            }
         }
         CallBlockParamKind::Field { .. } => {
             fields.insert(param_name, value.resolve_for_field(context));
@@ -572,6 +597,13 @@ pub fn add_param_to_params(
                 grazelang_library::KnownBlockInput::Menu(input_menu_value) => (
                     Sb3InputRepr::Reference(
                         introduce_input_menu(opcode, field_name, input_menu_value, context)
+                            .to_string(),
+                    ),
+                    true,
+                ),
+                grazelang_library::KnownBlockInput::Empty => (
+                    Sb3InputRepr::Reference(
+                        introduce_input_menu(opcode, field_name, default.clone(), context)
                             .to_string(),
                     ),
                     true,
@@ -638,35 +670,50 @@ where
 pub fn known_block_to_input_repr_no_menu(
     known_block: &KnownBlock,
     context: &mut GrazeSb3GeneratorContext,
-) -> Result<(Sb3InputRepr, IsShadow), GrazeSb3GeneratorError> {
+) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
     let known_block_input = known_block.resolve_for_input(context);
     match known_block_input {
         grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
             let is_shadow = sb3_primitive_block.is_shadow();
-            Ok((Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow))
+            Ok(Some((
+                Sb3InputRepr::PrimitiveBlock(sb3_primitive_block),
+                is_shadow,
+            )))
         }
-        grazelang_library::KnownBlockInput::BlockRef(id) => {
-            Ok((Sb3InputRepr::Reference(id.to_string()), IsShadow::No))
-        }
-        grazelang_library::KnownBlockInput::SimpleBlock(opcode, params) => Ok((
+        grazelang_library::KnownBlockInput::BlockRef(id) => Ok(Some((
+            Sb3InputRepr::Reference(id.to_string()),
+            IsShadow::No,
+        ))),
+        grazelang_library::KnownBlockInput::SimpleBlock(opcode, params) => Ok(Some((
             Sb3InputRepr::Reference(
                 introduce_input_simple_block(opcode, params.iter(), context)?.to_string(),
             ),
             IsShadow::No,
-        )),
+        ))),
         grazelang_library::KnownBlockInput::Menu(input_menu_value) => {
             Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value })
         }
+        grazelang_library::KnownBlockInput::Empty => Ok(None),
     }
 }
 
 pub fn param_to_input_repr_no_menu(
     param: Param,
     context: &mut GrazeSb3GeneratorContext,
-) -> Result<(Sb3InputRepr, IsShadow), GrazeSb3GeneratorError> {
+) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
     with_known_block!(context, param, value => {
         known_block_to_input_repr_no_menu(value, context)
     })
+}
+
+pub fn make_proc_call_mutation(
+    mutation: (&IString, &[(IString, HasShadow)], &bool),
+) -> Sb3BlockMutation {
+    Sb3BlockMutation::ProceduresCall {
+        procedure_code: mutation.0.to_string(),
+        argument_ids: mutation.1.iter().map(|value| value.0.to_string()).collect(),
+        warp: *mutation.2,
+    }
 }
 
 pub fn add_block(context: &mut GrazeSb3GeneratorContext, id: &IdString, block: Sb3Block) {
@@ -693,7 +740,7 @@ where
     let actual_identifier = get_actual_identifier!(context, identifier)?;
     let actual_identifier_ref = actual_identifier.borrow();
     let known_block = get_known_block!(actual_identifier_ref, identifier)?;
-    let CallableKnownBlockSignature(opcode, params, known_params) =
+    let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
         known_block.resolve_for_call_block(context);
     let mut fields = HashMap::new();
     let mut inputs = HashMap::new();
@@ -764,24 +811,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 operand_b_default,
                 is_negated,
             } = value.1.get_descriptor();
-            let inputs = HashMap::from([
-                (
-                    operand_a_input_name,
-                    (
-                        param_to_input_repr_no_menu(op_a_param, context)?,
-                        operand_a_default,
-                    )
-                        .into(),
-                ),
-                (
-                    operand_b_input_name,
-                    (
-                        param_to_input_repr_no_menu(op_b_param, context)?,
-                        operand_b_default,
-                    )
-                        .into(),
-                ),
-            ]);
+            let mut inputs = HashMap::with_capacity(2);
+            if let Some(input_value) = create_input_value(
+                param_to_input_repr_no_menu(op_a_param, context)?,
+                operand_a_default.as_ref(),
+            ) {
+                inputs.insert(operand_a_input_name, input_value);
+            }
+            if let Some(input_value) = create_input_value(
+                param_to_input_repr_no_menu(op_b_param, context)?,
+                operand_b_default.as_ref(),
+            ) {
+                inputs.insert(operand_b_input_name, input_value);
+            }
             if is_negated {
                 let inner_reporter_id = wrap_in_reporter(context, |context, parent, this_id| {
                     add_block(
@@ -858,7 +900,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
             let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-            let CallableKnownBlockSignature(opcode, params, known_params) =
+            let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
                 known_block.resolve_for_call_block(context);
             let mut fields = HashMap::new();
             let mut inputs = HashMap::new();
@@ -877,7 +919,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             add_block(
                 context,
                 &this_id,
-                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+                make_block(
+                    parent,
+                    opcode.to_string(),
+                    inputs,
+                    fields,
+                    false,
+                    mutation.map(make_proc_call_mutation),
+                ),
             );
             context.push_param(Param::Owned(this_id.into()));
             Ok(())
@@ -941,16 +990,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         fn make_join(
             parent: Option<String>,
-            left: Sb3InputValue,
-            right: Sb3InputValue,
+            left: Option<Sb3InputValue>,
+            right: Option<Sb3InputValue>,
         ) -> Sb3Block {
+            let mut inputs = HashMap::with_capacity(2);
+            if let Some(left) = left {
+                inputs.insert("STRING1".to_string(), left);
+            }
+            if let Some(right) = right {
+                inputs.insert("STRING2".to_string(), right);
+            }
             make_block(
                 parent,
                 "operator_join".to_string(),
-                HashMap::from([
-                    ("STRING1".to_string(), left),
-                    ("STRING2".to_string(), right),
-                ]),
+                inputs,
                 HashMap::new(),
                 false,
                 None,
@@ -976,31 +1029,31 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     let left = convert_into_block_tree(context, *left)?;
                     let left = param_to_input_repr_no_menu(left, context)?;
                     let right = param_to_input_repr_no_menu(right, context)?;
-                    #[cfg(feature = "use_shadows_for_formatted_strings")]
-                    let left = (
+                    let left = create_input_value(
                         left,
+                        #[cfg(feature = "use_shadows_for_formatted_strings")]
                         Some(Sb3PrimitiveBlock::String(
                             #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
                             "apple ".into(),
                             #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
                             "".into(),
                         )),
+                        #[cfg(not(feature = "use_shadows_for_formatted_strings"))]
+                        None::<Sb3PrimitiveBlock>,
                     );
-                    #[cfg(feature = "use_shadows_for_formatted_strings")]
-                    let right = (
+                    let right = create_input_value(
                         right,
+                        #[cfg(feature = "use_shadows_for_formatted_strings")]
                         Some(Sb3PrimitiveBlock::String(
                             #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
                             "banana".into(),
                             #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
                             "".into(),
                         )),
+                        #[cfg(not(feature = "use_shadows_for_formatted_strings"))]
+                        None::<Sb3PrimitiveBlock>,
                     );
-                    add_block(
-                        context,
-                        &this_id,
-                        make_join(parent, left.into(), right.into()),
-                    );
+                    add_block(context, &this_id, make_join(parent, left, right));
                     Ok(Param::Owned(KnownBlock::BlockRef { id: this_id }))
                 }
             }
@@ -1070,10 +1123,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         wrap_in_reporter(context, |context, parent, this_id| {
             default_visit_expression_get_item(self, value, context)?;
             let index = context.pop_param().unwrap();
-            let index_input_value = (
+
+            let inputs = if let Some(index_input_value) = create_input_value(
                 param_to_input_repr_no_menu(index, context)?,
                 Some(Sb3PrimitiveBlock::Integer(Sb3Primitive::Int128(1))),
-            );
+            ) {
+                HashMap::from([("INDEX".to_string(), index_input_value)])
+            } else {
+                HashMap::new()
+            };
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
             let known_block = get_known_block!(actual_identifier_ref, value.0)?;
@@ -1095,7 +1153,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 make_block(
                     parent,
                     "data_itemoflist".to_string(),
-                    HashMap::from([("INDEX".to_string(), index_input_value.into())]),
+                    inputs,
                     HashMap::from([("LIST".to_string(), list_field_value)]),
                     false,
                     None,
@@ -1120,27 +1178,31 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         wrap_in_reporter(context, |context, parent, this_id| {
             default_visit_expression_get_letter(self, value, context)?;
             let string = context.pop_param().unwrap();
-            let string_input_value: (_, Option<Sb3PrimitiveBlock>) = (
+            let string_input_value = create_input_value::<Sb3PrimitiveBlock>(
                 param_to_input_repr_no_menu(string, context)?,
                 Some("apple".into()),
             );
             let index = context.pop_param().unwrap();
-            let index_input_value = (
+            let index_input_value = create_input_value(
                 param_to_input_repr_no_menu(index, context)?,
                 Some(Sb3PrimitiveBlock::PositiveInteger(
                     super::project_json::Sb3Primitive::Int128(1),
                 )),
             );
+            let mut inputs = HashMap::with_capacity(2);
+            if let Some(string_input_value) = string_input_value {
+                inputs.insert("STRING".to_string(), string_input_value);
+            }
+            if let Some(index_input_value) = index_input_value {
+                inputs.insert("LETTER".to_string(), index_input_value);
+            }
             add_block(
                 context,
                 &this_id,
                 make_block(
                     parent,
                     "operator_letter_of".to_string(),
-                    HashMap::from([
-                        ("STRING".to_string(), string_input_value.into()),
-                        ("LETTER".to_string(), index_input_value.into()),
-                    ]),
+                    inputs,
                     HashMap::new(),
                     false,
                     None,
@@ -1170,9 +1232,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 field_values,
                 default,
             } = value.0.get_descriptor();
-            let operand_input_value = (param_to_input_repr_no_menu(operand, context)?, default);
+            let operand_input_value =
+                create_input_value(param_to_input_repr_no_menu(operand, context)?, default);
             let mut inputs = HashMap::with_capacity(extra_inputs.len() + 1);
-            inputs.insert(operand_input_name, operand_input_value.into());
+            if let Some(operand_input_value) = operand_input_value {
+                inputs.insert(operand_input_name, operand_input_value);
+            }
             for (key, value) in extra_inputs {
                 inputs.insert(
                     key,
@@ -1212,9 +1277,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         default_visit_expression_literal(self, value, context)?;
-        context.push_param(Param::Owned(KnownBlock::PrimitiveBlock {
-            value: value.into(),
-        }));
+        context.push_param(match value {
+            Literal::EmptyExpression(..) => Param::Owned(KnownBlock::Empty),
+            _ => Param::Owned(KnownBlock::PrimitiveBlock {
+                value: value.into(),
+            }),
+        });
         Ok(())
     }
 
@@ -1333,7 +1401,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let actual_identifier = get_actual_identifier!(context, value.0)?;
             let actual_identifier_ref = actual_identifier.borrow();
             let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-            let CallableKnownBlockSignature(opcode, params, known_params) =
+            let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
                 known_block.resolve_for_call_block(context);
             let mut fields = HashMap::new();
             let mut inputs = HashMap::new();
@@ -1352,7 +1420,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             add_block(
                 context,
                 &this_id,
-                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+                make_block(
+                    parent,
+                    opcode.to_string(),
+                    inputs,
+                    fields,
+                    false,
+                    mutation.map(make_proc_call_mutation),
+                ),
             );
             Ok(())
         })
@@ -1400,12 +1475,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         wrap_in_statement(context, |context, parent, this_id| {
             default_visit_statement_set_item(self, value, context)?;
             let item_value = context.pop_param().unwrap();
-            let item_value_input_value = (
+            let item_value_input_value = create_input_value::<Sb3PrimitiveBlock>(
                 param_to_input_repr_no_menu(item_value, context)?,
-                Some(Sb3PrimitiveBlock::String("thing".into())),
+                Some("thing".into()),
             );
             let index = context.pop_param().unwrap();
-            let index_input_value = (
+            let index_input_value = create_input_value(
                 param_to_input_repr_no_menu(index, context)?,
                 Some(Sb3PrimitiveBlock::Integer(Sb3Primitive::Int128(1))),
             );
@@ -1424,16 +1499,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 value: (canonical_name as &str).into(),
                 id: id.to_string(),
             };
+            let mut inputs = HashMap::with_capacity(2);
+            if let Some(index_input_value) = index_input_value {
+                inputs.insert("INDEX".to_string(), index_input_value);
+            }
+            if let Some(item_value_input_value) = item_value_input_value {
+                inputs.insert("ITEM".to_string(), item_value_input_value);
+            }
             add_block(
                 context,
                 &this_id,
                 make_block(
                     parent,
                     "data_replaceitemoflist".to_string(),
-                    HashMap::from([
-                        ("INDEX".to_string(), index_input_value.into()),
-                        ("ITEM".to_string(), item_value_input_value.into()),
-                    ]),
+                    inputs,
                     HashMap::from([("LIST".to_string(), list_field_value)]),
                     false,
                     None,
@@ -1495,23 +1574,30 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         self.visit_expression(expression, context)?;
                         let param = context.pop_param().unwrap();
                         let value = param_to_input_repr_no_menu(param, context)?;
-                        #[cfg(feature = "use_shadows_for_list_assignment")]
-                        let value = (
+                        let value = create_input_value(
                             value,
+                            #[cfg(feature = "use_shadows_for_list_assignment")]
                             Some(Sb3PrimitiveBlock::String(
                                 #[cfg(feature = "use_actual_defaults_for_list_assignment")]
                                 "thing".into(),
                                 #[cfg(not(feature = "use_actual_defaults_for_list_assignment"))]
                                 "".into(),
                             )),
+                            #[cfg(not(feature = "use_shadows_for_list_assignment"))]
+                            None::<Sb3PrimitiveBlock>,
                         );
+                        let inputs = if let Some(value) = value {
+                            HashMap::from([("ITEM".to_string(), value)])
+                        } else {
+                            HashMap::new()
+                        };
                         add_block(
                             context,
                             &this_id,
                             make_block(
                                 parent,
                                 "data_addtolist".to_string(),
-                                HashMap::from([("ITEM".to_string(), value.into())]),
+                                inputs,
                                 HashMap::from([("LIST".to_string(), list_field_value.clone())]),
                                 false,
                                 None,
@@ -1559,24 +1645,27 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        let stage_var_symbol = vec![(literal!("vars"), Default::default())];
-        let stage_list_symbol = vec![(literal!("lists"), Default::default())];
+        let stage_var_symbol = [literal!("vars")];
+        let stage_list_symbol = [literal!("lists")];
         let (this_target_var_symbol, this_target_list_symbol) = {
             let current_target = context.current_sb3_target.as_ref().unwrap();
             if current_target.is_stage {
-                (stage_var_symbol.clone(), stage_list_symbol.clone())
+                (
+                    (stage_var_symbol[0].clone(), None),
+                    (stage_list_symbol[0].clone(), None),
+                )
             } else {
-                let value = vec![
-                    (literal!("sprites"), Default::default()),
-                    (current_target.name.as_str().into(), Default::default()),
-                ];
+                let value: (_, Option<IString>) = (
+                    SPRITES_ISTRING.clone(),
+                    Some(current_target.name.as_str().into()),
+                );
                 (value.clone(), value)
             }
         };
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
         pub enum SingleAssignment {
-            List(Identifier, Vec<Sb3Primitive>),
-            Var(Identifier, Sb3Primitive),
+            List([Option<IString>; 3], Vec<Sb3Primitive>),
+            Var([Option<IString>; 3], Sb3Primitive),
         }
         let assignments: Vec<SingleAssignment> = match value.1 {
             crate::parser::ast::DataDeclaration::Mixed(parent_scope, _, items, _, _)
@@ -1593,7 +1682,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         expression,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let var = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             (parent_scope, my_scope),
                             (
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
@@ -1603,19 +1693,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                             )
                         ) {
-                            stage_var_symbol.clone()
+                            [Some(stage_var_symbol[0].clone()), Some(var), None]
                         } else {
-                            this_target_var_symbol.clone()
+                            let (a, b) = this_target_var_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(var)],
+                                None => [Some(a), Some(var), None],
+                            }
                         };
-                        let var = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::Var(
-                            Identifier {
-                                scope: target,
-                                names: vec![(var, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            expression.calculate_value(),
-                        )
+                        SingleAssignment::Var(path, expression.calculate_value())
                     }
                     crate::parser::ast::SingleDataDeclaration::EmptyVariable(
                         _,
@@ -1624,7 +1710,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let var = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             (parent_scope, my_scope),
                             (
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
@@ -1634,19 +1721,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                             )
                         ) {
-                            stage_var_symbol.clone()
+                            [Some(stage_var_symbol[0].clone()), Some(var), None]
                         } else {
-                            this_target_var_symbol.clone()
+                            let (a, b) = this_target_var_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(var)],
+                                None => [Some(a), Some(var), None],
+                            }
                         };
-                        let var = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::Var(
-                            Identifier {
-                                scope: target,
-                                names: vec![(var, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            "".into(),
-                        )
+                        SingleAssignment::Var(path, "".into())
                     }
                     crate::parser::ast::SingleDataDeclaration::List(
                         _,
@@ -1659,7 +1742,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let list = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             (parent_scope, my_scope),
                             (
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
@@ -1669,34 +1753,30 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                             )
                         ) {
-                            stage_list_symbol.clone()
+                            [Some(stage_list_symbol[0].clone()), Some(list), None]
                         } else {
-                            this_target_list_symbol.clone()
+                            let (a, b) = this_target_list_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(list)],
+                                None => [Some(a), Some(list), None],
+                            }
                         };
-                        let list = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::List(
-                            Identifier {
-                                scope: target,
-                                names: vec![(list, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            {
-                                let mut values = Vec::with_capacity(items.len());
-                                for (value, _) in items {
-                                    match value {
-                                        ListEntry::Expression(expression) => {
-                                            values.push(expression.calculate_value());
-                                        }
-                                        ListEntry::Unwrap(literal, _) => {
-                                            for c in literal.get_string_value().chars() {
-                                                values.push(c.to_string().into());
-                                            }
+                        SingleAssignment::List(path, {
+                            let mut values = Vec::with_capacity(items.len());
+                            for (value, _) in items {
+                                match value {
+                                    ListEntry::Expression(expression) => {
+                                        values.push(expression.calculate_value());
+                                    }
+                                    ListEntry::Unwrap(literal, _) => {
+                                        for c in literal.get_string_value().chars() {
+                                            values.push(c.to_string().into());
                                         }
                                     }
                                 }
-                                values
-                            },
-                        )
+                            }
+                            values
+                        })
                     }
                     crate::parser::ast::SingleDataDeclaration::EmptyList(
                         _,
@@ -1705,7 +1785,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let list = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             (parent_scope, my_scope),
                             (
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
@@ -1715,19 +1796,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                             )
                         ) {
-                            stage_list_symbol.clone()
+                            [Some(stage_list_symbol[0].clone()), Some(list), None]
                         } else {
-                            this_target_list_symbol.clone()
+                            let (a, b) = this_target_list_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(list)],
+                                None => [Some(a), Some(list), None],
+                            }
                         };
-                        let list = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::List(
-                            Identifier {
-                                scope: target,
-                                names: vec![(list, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            Vec::new(),
-                        )
+                        SingleAssignment::List(path, Vec::new())
                     }
                 })
                 .collect(),
@@ -1743,23 +1820,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         expression,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let var = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            stage_var_symbol.clone()
+                            [Some(stage_var_symbol[0].clone()), Some(var), None]
                         } else {
-                            this_target_var_symbol.clone()
+                            let (a, b) = this_target_var_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(var)],
+                                None => [Some(a), Some(var), None],
+                            }
                         };
-                        let var = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::Var(
-                            Identifier {
-                                scope: target,
-                                names: vec![(var, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            expression.calculate_value(),
-                        )
+                        SingleAssignment::Var(path, expression.calculate_value())
                     }
                     crate::parser::ast::SingleDataDeclaration::EmptyVariable(
                         _,
@@ -1768,23 +1842,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let var = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            stage_var_symbol.clone()
+                            [Some(stage_var_symbol[0].clone()), Some(var), None]
                         } else {
-                            this_target_var_symbol.clone()
+                            let (a, b) = this_target_var_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(var)],
+                                None => [Some(a), Some(var), None],
+                            }
                         };
-                        let var = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::Var(
-                            Identifier {
-                                scope: target,
-                                names: vec![(var, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            "".into(),
-                        )
+                        SingleAssignment::Var(path, "".into())
                     }
                     crate::parser::ast::SingleDataDeclaration::List(
                         _,
@@ -1797,38 +1868,35 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let list = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            stage_list_symbol.clone()
+                            [Some(stage_list_symbol[0].clone()), Some(list), None]
                         } else {
-                            this_target_list_symbol.clone()
+                            let (a, b) = this_target_list_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(list)],
+                                None => [Some(a), Some(list), None],
+                            }
                         };
-                        let list = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::List(
-                            Identifier {
-                                scope: target,
-                                names: vec![(list, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            {
-                                let mut values = Vec::with_capacity(items.len());
-                                for (value, _) in items {
-                                    match value {
-                                        ListEntry::Expression(expression) => {
-                                            values.push(expression.calculate_value());
-                                        }
-                                        ListEntry::Unwrap(literal, _) => {
-                                            for c in literal.get_string_value().chars() {
-                                                values.push(c.to_string().into());
-                                            }
+                        SingleAssignment::List(path, {
+                            let mut values = Vec::with_capacity(items.len());
+                            for (value, _) in items {
+                                match value {
+                                    ListEntry::Expression(expression) => {
+                                        values.push(expression.calculate_value());
+                                    }
+                                    ListEntry::Unwrap(literal, _) => {
+                                        for c in literal.get_string_value().chars() {
+                                            values.push(c.to_string().into());
                                         }
                                     }
                                 }
-                                values
-                            },
-                        )
+                            }
+                            values
+                        })
                     }
                     crate::parser::ast::SingleDataDeclaration::EmptyList(
                         _,
@@ -1837,23 +1905,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                     ) => {
-                        let target = if matches!(
+                        let list = identifier.to_single().unwrap().0.clone();
+                        let path = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            stage_list_symbol.clone()
+                            [Some(stage_list_symbol[0].clone()), Some(list), None]
                         } else {
-                            this_target_list_symbol.clone()
+                            let (a, b) = this_target_list_symbol.clone();
+                            match b {
+                                Some(b) => [Some(a), Some(b), Some(list)],
+                                None => [Some(a), Some(list), None],
+                            }
                         };
-                        let list = identifier.to_single().unwrap().0.clone();
-                        SingleAssignment::List(
-                            Identifier {
-                                scope: target,
-                                names: vec![(list, Default::default())],
-                                pos_range: Default::default(),
-                            },
-                            Vec::new(),
-                        )
+                        SingleAssignment::List(path, Vec::new())
                     }
                 };
                 vec![single_assignment]
@@ -1862,16 +1927,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         for assignment in assignments {
             match assignment {
                 SingleAssignment::List(identifier, sb3_primitives) => {
-                    let actual_identifier = get_actual_identifier!(context, &identifier)?;
+                    let actual_identifier = context
+                        .resolve_path(identifier.iter().map_while(|value| value.as_ref()))
+                        .unwrap();
                     let actual_identifier_ref = actual_identifier.borrow();
-                    let known_block = get_known_block!(actual_identifier_ref, &identifier)?;
+                    let known_block = actual_identifier_ref.get_block().unwrap();
                     let (canonical_name, id) = match known_block {
                         KnownBlock::List { canonical_name, id } => (canonical_name, id),
-                        _ => {
-                            return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
-                                identifier,
-                            });
-                        }
+                        _ => unreachable!(),
                     };
                     let list_field_value = Sb3FieldValue::WithId {
                         value: (canonical_name as &str).into(),
@@ -1914,9 +1977,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
                 SingleAssignment::Var(identifier, sb3_primitive) => {
                     wrap_in_statement(context, |context, parent, this_id| {
-                        let actual_identifier = get_actual_identifier!(context, &identifier)?;
+                        let actual_identifier = context
+                            .resolve_path(identifier.iter().map_while(|value| value.as_ref()))
+                            .unwrap();
                         let actual_identifier_ref = actual_identifier.borrow();
-                        let known_block = get_known_block!(actual_identifier_ref, &identifier)?;
+                        let known_block = actual_identifier_ref.get_block().unwrap();
                         let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
                             known_block.resolve_for_assignment(context);
                         let mut fields = HashMap::new();
@@ -1991,10 +2056,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 let mut inputs = HashMap::with_capacity(if use_if_else { 3 } else { 2 });
                 visitor.visit_expression(&else_ifs[0].2, context)?;
                 let condition_value = context.pop_param().unwrap();
-                inputs.insert(
-                    "CONDITION".to_string(),
-                    param_to_input_repr_no_menu(condition_value, context)?.into(),
-                );
+                if let Some(condition) = create_input_value(
+                    param_to_input_repr_no_menu(condition_value, context)?,
+                    None::<Sb3PrimitiveBlock>,
+                ) {
+                    inputs.insert("CONDITION".to_string(), condition);
+                }
                 visitor.visit_code_block(&else_ifs[0].3, context)?;
                 let first_branch = context.pop_param().unwrap();
                 let first_branch = if let Param::BlockStack(block_ref) = first_branch {
@@ -2066,10 +2133,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let mut inputs = HashMap::with_capacity(if use_if_else { 3 } else { 2 });
             self.visit_expression(&value.0.1, context)?;
             let condition_value = context.pop_param().unwrap();
-            inputs.insert(
-                "CONDITION".to_string(),
-                param_to_input_repr_no_menu(condition_value, context)?.into(),
-            );
+            if let Some(condition) = create_input_value(
+                param_to_input_repr_no_menu(condition_value, context)?,
+                None::<Sb3PrimitiveBlock>,
+            ) {
+                inputs.insert("CONDITION".to_string(), condition);
+            }
             self.visit_code_block(&value.0.2, context)?;
             let first_branch = context.pop_param().unwrap();
             let first_branch = if let Param::BlockStack(block_ref) = first_branch {
@@ -2144,7 +2213,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let actual_identifier = get_actual_identifier!(context, value.0)?;
         let actual_identifier_ref = actual_identifier.borrow();
         let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-        let CallableKnownBlockSignature(opcode, params, known_params) =
+        let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
             known_block.resolve_for_call_block(context);
         add_block(
             context,
@@ -2155,7 +2224,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 HashMap::new(), // both of these will be replaced when the argument is available
                 HashMap::new(),
                 false,
-                None,
+                mutation.map(make_proc_call_mutation),
             ),
         );
         default_visit_no_input_hat_statement(self, value, context)?;
@@ -2198,7 +2267,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let actual_identifier = get_actual_identifier!(context, value.0)?;
         let actual_identifier_ref = actual_identifier.borrow();
         let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-        let CallableKnownBlockSignature(opcode, params, known_params) =
+        let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
             known_block.resolve_for_call_block(context);
         add_block(
             context,
@@ -2209,7 +2278,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 HashMap::new(), // both of these will be replaced when the argument is available
                 HashMap::new(),
                 false,
-                None,
+                mutation.map(make_proc_call_mutation),
             ),
         );
         default_visit_single_input_hat_statement(self, value, context)?;
@@ -2273,7 +2342,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let actual_identifier = get_actual_identifier!(context, value.0)?;
         let actual_identifier_ref = actual_identifier.borrow();
         let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-        let CallableKnownBlockSignature(opcode, params, known_params) =
+        let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
             known_block.resolve_for_call_block(context);
         add_block(
             context,
@@ -2284,7 +2353,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 HashMap::new(), // both of these will be replaced when the argument is available
                 HashMap::new(),
                 false,
-                None,
+                mutation.map(make_proc_call_mutation),
             ),
         );
         default_visit_multi_input_hat_statement(self, value, context)?;
@@ -2320,6 +2389,173 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .unwrap();
         block.fields = fields;
         block.inputs = inputs;
+        Ok(())
+    }
+
+    fn visit_custom_block_definition(
+        &self,
+        value: (
+            &Option<crate::parser::ast::WarpSpecifier>,
+            &crate::parser::ast::ProcKeyword,
+            &Option<crate::parser::ast::CanonicalIdentifier>,
+            &Identifier,
+            &crate::parser::ast::LeftParens,
+            &Vec<(
+                Option<crate::parser::ast::CustomBlockParamKind>,
+                Option<crate::parser::ast::CanonicalIdentifier>,
+                Identifier,
+                Option<crate::parser::ast::Comma>,
+            )>,
+            &crate::parser::ast::RightParens,
+            &crate::parser::ast::CodeBlock,
+            &Option<crate::parser::ast::Semicolon>,
+            &crate::lexer::PosRange,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        context.current_previous_block = None;
+        context.current_parent = None;
+        context.arg_stack.clear();
+        let current_target = context.current_sb3_target.as_ref().unwrap();
+
+        let proc_name = value.3.to_single().unwrap().0.clone();
+        let proc_rc = context
+            .resolve_path(
+                if current_target.is_stage {
+                    [SPRITES_ISTRING.clone(), STAGE_ISTRING.clone(), proc_name]
+                } else {
+                    [
+                        SPRITES_ISTRING.clone(),
+                        current_target.name.as_str().into(),
+                        proc_name,
+                    ]
+                }
+                .iter(),
+            )
+            .unwrap();
+        let proc_ref = proc_rc.borrow();
+        let (proccode, params, is_warp) = if let KnownBlock::CustomBlock {
+            proccode,
+            call_params: _,
+            params,
+            is_warp,
+        } = proc_ref.get_block().unwrap()
+        {
+            (proccode, params, is_warp)
+        } else {
+            unreachable!()
+        };
+        wrap_in_statement(context, |context, parent, this_id| {
+            let prototype_id = wrap_in_statement(context, |context, parent, this_id| {
+                add_block(
+                    context,
+                    &this_id,
+                    make_block(
+                        parent.clone(),
+                        "procedures_prototype".to_string(),
+                        HashMap::new(),
+                        HashMap::new(),
+                        false,
+                        Some(Sb3BlockMutation::ProceduresPrototype {
+                            procedure_code: proccode.to_string(),
+                            argument_ids: params.iter().map(|value| value.0.to_string()).collect(),
+                            warp: *is_warp,
+                            argument_names: value
+                                .5
+                                .iter()
+                                .map(|value| {
+                                    value
+                                        .1
+                                        .as_ref()
+                                        .map(|value| value.name.to_string())
+                                        .unwrap_or_else(|| {
+                                            value.2.to_single().unwrap().0.to_string()
+                                        })
+                                })
+                                .collect(),
+                            argument_defaults: params
+                                .iter()
+                                .map(|value| {
+                                    serde_json::Value::String(if value.1 == HasShadow::No {
+                                        "false".to_string()
+                                    } else {
+                                        "".to_string()
+                                    })
+                                })
+                                .collect(),
+                        }),
+                    ),
+                );
+                Ok(this_id)
+            })?;
+            add_block(
+                context,
+                &this_id,
+                make_block(
+                    parent.clone(),
+                    "procedures_definition".to_string(),
+                    HashMap::from([(
+                        "custom_block".to_string(),
+                        Sb3InputValue::NoShadow(Sb3InputRepr::Reference(prototype_id.to_string())),
+                    )]),
+                    HashMap::new(),
+                    false,
+                    None,
+                ),
+            );
+            Ok(())
+        })?;
+        let arguments = value
+            .5
+            .iter()
+            .map(|value| {
+                let name = value
+                    .1
+                    .as_ref()
+                    .map(|value| value.name.to_string())
+                    .unwrap_or_else(|| value.2.to_single().unwrap().0.to_string());
+                (
+                    name.as_str().into(),
+                    Rc::new(RefCell::new(Symbol::KnownBlock(
+                        Box::new(KnownBlock::SingletonReporter {
+                            opcode: if matches!(
+                                value.0,
+                                Some(CustomBlockParamKind {
+                                    kind: CustomBlockParamKindValue::Boolean,
+                                    pos_range: _,
+                                })
+                            ) {
+                                literal!("argument_reporter_boolean")
+                            } else {
+                                literal!("argument_reporter_string_number")
+                            },
+                            params: vec![(
+                                CallBlockParam {
+                                    kind: CallBlockParamKind::Field { default: None },
+                                    name: literal!("VALUE"),
+                                },
+                                KnownBlock::FieldValue {
+                                    value: Sb3FieldValue::Normal(Sb3Primitive::String(name)),
+                                },
+                            )],
+                            field: None,
+                            assign: None,
+                            bind_info: None,
+                        }),
+                        HashMap::new(),
+                        Weak::new(),
+                    ))),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        const ARGUMENTS_ISTRING: &IString = &literal!("args");
+        Symbol::insert_child(
+            &context.root_symbol,
+            ARGUMENTS_ISTRING.clone(),
+            Rc::new(RefCell::new(Symbol::Namespace(arguments, Weak::new()))),
+        );
+        default_visit_custom_block_definition(self, value, context)?;
+        Symbol::remove_child(&context.root_symbol, ARGUMENTS_ISTRING);
         Ok(())
     }
 
