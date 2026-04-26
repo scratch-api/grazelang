@@ -29,6 +29,6 @@ sprite sawd {
         looks.say("a = ${args.a}; b = ${args.b}; c = ${args.c}");
     }
     {
-        sprites.sawd.test_proc("tea", 5 >= 4, 1);
+        my_blocks.test_proc("tea", 5 >= 4, 1);
     }
 }

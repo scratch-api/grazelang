@@ -162,6 +162,7 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
 
 pub const STAGE_ISTRING: &IString = &literal!("stage");
 pub const SPRITES_ISTRING: &IString = &literal!("sprites");
+pub const MY_BLOCKS_ISTRING: &IString = &literal!("my_blocks");
 
 impl GrazeSb3GeneratorContext {
     pub fn new(parse_context: ParseContext) -> Result<Self, std::io::Error> {
@@ -214,9 +215,9 @@ impl GrazeSb3GeneratorContext {
                             .map(|(key, value)| {
                                 value
                                     .derive_symbol_and_attachment(&mut rng, &mut namespace)
-                                    .map(|(mut symbol, asset)| {
+                                    .map(|(mut symbol, attachment)| {
                                         add_bind_info(&mut symbol, target.get_namespace_name());
-                                        ((key.clone(), Rc::new(RefCell::new(symbol))), asset)
+                                        ((key.clone(), Rc::new(RefCell::new(symbol))), attachment)
                                     })
                             })
                             .try_fold::<_, _, Result<_, std::io::Error>>(
@@ -2619,6 +2620,21 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 TargetAttachment::List(name, sb3_list_declaration) => {
                     stage.lists.insert(name, sb3_list_declaration);
                 }
+                TargetAttachment::CustomBlock(name, custom_block) => {
+                    Symbol::insert_child(
+                        &context
+                            .root_symbol
+                            .borrow()
+                            .get_child(MY_BLOCKS_ISTRING)
+                            .unwrap(),
+                        name,
+                        Rc::new(RefCell::new(Symbol::KnownBlock(
+                            Box::new(custom_block),
+                            HashMap::new(),
+                            Weak::new(),
+                        ))),
+                    );
+                }
             }
         }
         context.current_sb3_target = Some(stage);
@@ -2627,6 +2643,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .sb3
             .targets
             .push(context.current_sb3_target.take().unwrap());
+        Symbol::clear_children(
+            &context
+                .root_symbol
+                .borrow()
+                .get_child(MY_BLOCKS_ISTRING)
+                .unwrap(),
+        );
         Ok(())
     }
 
@@ -2660,6 +2683,21 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 TargetAttachment::List(name, sb3_list_declaration) => {
                     new_sprite.lists.insert(name, sb3_list_declaration);
                 }
+                TargetAttachment::CustomBlock(name, custom_block) => {
+                    Symbol::insert_child(
+                        &context
+                            .root_symbol
+                            .borrow()
+                            .get_child(MY_BLOCKS_ISTRING)
+                            .unwrap(),
+                        name,
+                        Rc::new(RefCell::new(Symbol::KnownBlock(
+                            Box::new(custom_block),
+                            HashMap::new(),
+                            Weak::new(),
+                        ))),
+                    );
+                }
             }
         }
         new_sprite.layer_order = context.sb3.targets.len()
@@ -2674,6 +2712,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .sb3
             .targets
             .push(context.current_sb3_target.take().unwrap());
+        Symbol::clear_children(
+            &context
+                .root_symbol
+                .borrow()
+                .get_child(MY_BLOCKS_ISTRING)
+                .unwrap(),
+        );
         Ok(())
     }
 }

@@ -411,6 +411,22 @@ impl Symbol {
         }
     }
 
+    pub fn clear_children(this: &Rc<RefCell<Self>>) {
+        let alias = match &mut *this.borrow_mut() {
+            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
+                hash_map.clear();
+                return;
+            }
+            Symbol::Alias(alias, ..) => alias.upgrade(),
+            Symbol::Sprites(..) => {
+                return;
+            }
+        };
+        if let Some(alias) = alias {
+            Self::clear_children(&alias);
+        }
+    }
+
     pub fn is_dependent(&self) -> bool {
         matches!(self, Symbol::Alias(..) | Symbol::Sprites(..))
     }
@@ -521,15 +537,25 @@ impl TargetSymbolDescriptor {
             return Ok((
                 Symbol::KnownBlock(
                     Box::new(KnownBlock::CustomBlock {
-                        proccode,
-                        call_params,
-                        params,
+                        proccode: proccode.clone(),
+                        call_params: call_params.clone(),
+                        params: params.clone(),
                         is_warp: descriptor.is_warp,
                     }),
                     HashMap::new(),
                     Weak::new(),
                 ),
-                None,
+                Some(
+                    grazelang_library::project_json::TargetAttachment::CustomBlock(
+                        descriptor.name.clone(),
+                        KnownBlock::CustomBlock {
+                            proccode,
+                            call_params,
+                            params,
+                            is_warp: descriptor.is_warp,
+                        },
+                    ),
+                ),
             ));
         }
         match self {

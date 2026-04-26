@@ -1,3 +1,4 @@
+use arcstr::ArcStr as IString;
 use quote::{ToTokens, TokenStreamExt, quote};
 use serde::{
     Deserialize, Serialize,
@@ -7,7 +8,7 @@ use serde::{
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::quote_option;
+use crate::{KnownBlock, quote_option};
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1389,6 +1390,7 @@ pub enum TargetAttachment {
     Sound(Sb3Sound),
     Var(String, Sb3VariableDeclaration),
     List(String, Sb3ListDeclaration),
+    CustomBlock(IString, KnownBlock),
 }
 
 impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
