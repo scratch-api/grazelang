@@ -168,7 +168,31 @@ impl GrazeSb3GeneratorContext {
     pub fn new(parse_context: ParseContext) -> Result<Self, std::io::Error> {
         let mut this = Self::without_standard_namespaces(parse_context)?;
         this.add_namespace_refs(library::get_standard_library_namespaces());
+        Self::alias_standard_namespaces(&this.root_symbol);
         Ok(this)
+    }
+
+    fn alias_standard_namespaces(root_symbol: &Rc<RefCell<Symbol>>) {
+        let namespaces = root_symbol.borrow().get_children_cloned();
+        let mut flattened = HashMap::<IString, Option<Weak<RefCell<Symbol>>>>::new();
+        for namespace in namespaces {
+            for (key, value) in namespace.borrow().get_entries_cloned() {
+                if let Some(mut_value) = flattened.get_mut(&key) {
+                    mut_value.take();
+                } else {
+                    flattened.insert(key, Some(Rc::downgrade(&value)));
+                }
+            }
+        }
+        for (key, value) in flattened {
+            if let Some(value) = value {
+                Symbol::insert_child(
+                    root_symbol,
+                    key,
+                    Rc::new(RefCell::new(Symbol::Alias(value, Weak::new()))),
+                );
+            }
+        }
     }
 
     pub fn without_standard_namespaces(
@@ -359,13 +383,15 @@ impl GrazeSb3GeneratorContext {
     where
         I: Iterator<Item = &'a IString>,
     {
-        iterator.try_fold(self.root_symbol.clone(), |current, next| {
-            if next.as_str() == "super" {
-                current.borrow().get_parent().upgrade()
-            } else {
-                current.borrow().get_child(next)
-            }
-        })
+        iterator
+            .try_fold(self.root_symbol.clone(), |current, next| {
+                if next.as_str() == "super" {
+                    current.borrow().get_parent().upgrade()
+                } else {
+                    current.borrow().get_child(next)
+                }
+            })
+            .and_then(|value| Symbol::unalias(&value))
     }
 
     pub fn resolve_identifier(&self, identifier: &Identifier) -> Option<Rc<RefCell<Symbol>>> {

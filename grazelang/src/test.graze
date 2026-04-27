@@ -8,25 +8,25 @@ sprite sawd {
     let global test;
     let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
     events.when_green_flag_clicked {
-        data.delete_all_of_list(lists.list_);
-        vars.test = 10 + 5 * 2;
-        control.if "test = 20" == "test = ${vars.test}" {
-            vars.test = 5;
+        delete_all_of_list(list_);
+        test = 10 + 5 * 2;
+        if "test = 20" == "test = ${test}" {
+            test = 5;
         }
-        control.repeat 10 {
-            data.add_to_list(lists.list_, 0);
+        repeat 10 {
+            add_to_list(list_, 0);
         }
-        lists.list_[vars.test] = 1;
+        list_[test] = 1;
     }
     {
-        vars.test = "";
-        lists.list_ = [1, 0, 0, 0, 0, 0, 0];
+        test = "";
+        list_ = [1, 0, 0, 0, 0, 0, 0];
     }
     (
-        "0b${lists.list_}" + 10
+        "0b${list_}" + 10
     )
     warp proc test_proc(str a, bool b, num c) {
-        looks.say("a = ${args.a}; b = ${args.b}; c = ${args.c}");
+        say("a = ${args.a}; b = ${args.b}; c = ${args.c}");
     }
     {
         my_blocks.test_proc("tea", 5 >= 4, 1);

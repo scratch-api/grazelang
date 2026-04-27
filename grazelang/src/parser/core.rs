@@ -1428,6 +1428,13 @@ pub mod statement {
                     | Token::StageKeyword
                     | Token::VarsKeyword
                     | Token::ListsKeyword => {
+                        if let Token::Identifier(ident) = peek_token!(token_stream) {
+                            if ident.as_str() != "else" {
+                                break None;
+                            }
+                        } else {
+                            break None;
+                        }
                         let else_identifier = parse_full_identifier(token_stream, context)?;
                         let syntactic_else =
                             if let Some(value) = else_identifier.to_syntactic_else() {

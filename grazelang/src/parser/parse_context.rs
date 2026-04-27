@@ -321,7 +321,6 @@ pub enum Symbol {
         HashMap<IString, Rc<RefCell<Symbol>>>,
         Weak<RefCell<Symbol>>,
     ),
-    Sprites(Weak<RefCell<Symbol>>),
     Alias(Weak<RefCell<Symbol>>, Weak<RefCell<Symbol>>),
 }
 
@@ -333,7 +332,14 @@ impl Symbol {
     pub fn get_block(&self) -> Option<&KnownBlock> {
         match self {
             Symbol::KnownBlock(known_block, ..) => Some(known_block),
-            Symbol::Namespace(..) | Symbol::Sprites(..) | Symbol::Alias(..) => None,
+            Symbol::Namespace(..) | Symbol::Alias(..) => None,
+        }
+    }
+
+    pub fn unalias(this: &Rc<RefCell<Self>>) -> Option<Rc<RefCell<Self>>> {
+        match &*this.borrow() {
+            Symbol::Namespace(..) | Symbol::KnownBlock(..) => Some(this.clone()),
+            Symbol::Alias(weak, _) => weak.upgrade().and_then(|this| Symbol::unalias(&this)),
         }
     }
 
@@ -345,11 +351,10 @@ impl Symbol {
             Symbol::Alias(alias, ..) => alias
                 .upgrade()
                 .and_then(|value| value.borrow().get_child(child_name)),
-            Symbol::Sprites(..) => None,
         }
     }
 
-    /// Expensive
+    /// Clones the children and allocates them in a dedicated Vec
     pub fn get_children_cloned(&self) -> Vec<Rc<RefCell<Symbol>>> {
         match self {
             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
@@ -359,7 +364,20 @@ impl Symbol {
                 .upgrade()
                 .map(|value| value.borrow().get_children_cloned())
                 .unwrap_or_default(),
-            Symbol::Sprites(..) => Vec::new(),
+        }
+    }
+
+    /// Clones the children and keys and allocates them in a dedicated Vec
+    pub fn get_entries_cloned(&self) -> Vec<(IString, Rc<RefCell<Symbol>>)> {
+        match self {
+            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => hash_map
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+            Symbol::Alias(alias, ..) => alias
+                .upgrade()
+                .map(|value| value.borrow().get_entries_cloned())
+                .unwrap_or_default(),
         }
     }
 
@@ -367,7 +385,6 @@ impl Symbol {
         match self {
             Symbol::Namespace(_, parent_ref)
             | Symbol::KnownBlock(_, _, parent_ref)
-            | Symbol::Sprites(parent_ref)
             | Symbol::Alias(_, parent_ref) => parent_ref,
         }
     }
@@ -376,7 +393,6 @@ impl Symbol {
         match self {
             Symbol::Namespace(_, parent_ref)
             | Symbol::KnownBlock(_, _, parent_ref)
-            | Symbol::Sprites(parent_ref)
             | Symbol::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
         }
     }
@@ -393,7 +409,6 @@ impl Symbol {
             Symbol::Alias(alias, ..) => alias
                 .upgrade()
                 .and_then(|value| Self::insert_child(&value, child_name, child)),
-            Symbol::Sprites(..) => None,
         }
     }
 
@@ -407,7 +422,6 @@ impl Symbol {
             Symbol::Alias(alias, ..) => alias
                 .upgrade()
                 .and_then(|value| Self::remove_child(&value, child_name)),
-            Symbol::Sprites(..) => None,
         }
     }
 
@@ -418,17 +432,15 @@ impl Symbol {
                 return;
             }
             Symbol::Alias(alias, ..) => alias.upgrade(),
-            Symbol::Sprites(..) => {
-                return;
-            }
         };
         if let Some(alias) = alias {
             Self::clear_children(&alias);
         }
     }
 
-    pub fn is_dependent(&self) -> bool {
-        matches!(self, Symbol::Alias(..) | Symbol::Sprites(..))
+    // Whether this symbol is an alias
+    pub fn is_alias(&self) -> bool {
+        matches!(self, Symbol::Alias(..))
     }
 }
 
