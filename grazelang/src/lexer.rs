@@ -6,7 +6,8 @@ use arcstr::literal as literal_istring;
 use logos::{Lexer, Logos};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::from_str as json_from_str;
+
+use crate::string_unescape::unescape;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Logos)]
 #[logos(extras = (Vec<usize>, usize))]
@@ -153,16 +154,19 @@ pub enum LexedRightBrace {
 }
 
 pub fn parse_simple_string_literal(lex: &mut Lexer<Token>) -> Option<IString> {
-    json_from_str::<'_, IString>(lex.slice()).ok()
+    let slice = lex.slice();
+    unescape(&slice[1..slice.len() - 1]).map(Into::into).ok()
+    // json_from_str::<'_, IString>(lex.slice()).ok()
 }
 
 pub fn parse_canonical_name(lex: &mut Lexer<Token>) -> Option<IString> {
     let slice = lex.slice();
-    let inner = &slice[1..slice.len() - 1];
-    json_from_str::<'_, IString>(
-        format!("\"{}\"", inner.replace('"', "\\\"").replace("\\`", "`")).as_str(),
-    )
-    .ok()
+    unescape(&slice[1..slice.len() - 1]).map(Into::into).ok()
+    // let inner = &slice[1..slice.len() - 1];
+    // json_from_str::<'_, IString>(
+    //     format!("\"{}\"", inner.replace('"', "\\\"").replace("\\`", "`")).as_str(),
+    // )
+    // .ok()
 }
 
 pub fn parse_string(lex: &mut Lexer<Token>) -> IString {
@@ -176,8 +180,9 @@ pub fn parse_number(lex: &mut Lexer<Token>) -> IString {
 pub fn parse_left_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
     lex.extras.1 += 1;
     let slice = lex.slice();
-    let json = slice[..slice.len() - 2].to_string() + "\"";
-    json_from_str::<'_, IString>(&json).ok()
+    unescape(&slice[1..slice.len() - 2]).map(Into::into).ok()
+    // let json = slice[..slice.len() - 2].to_string() + "\"";
+    // json_from_str::<'_, IString>(&json).ok()
 }
 
 fn middle_regex_continuation() -> &'static Regex {
@@ -214,13 +219,15 @@ pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
 }
 
 pub fn parse_middle_format_string(slice: &str) -> Option<IString> {
-    let json = String::from("\"") + &slice[..slice.len() - 2] + "\"";
-    json_from_str::<'_, IString>(&json).ok()
+    unescape(&slice[..slice.len() - 2]).map(Into::into).ok()
+    // let json = String::from("\"") + &slice[..slice.len() - 2] + "\"";
+    // json_from_str::<'_, IString>(&json).ok()
 }
 
 pub fn parse_right_format_string(slice: &str) -> Option<IString> {
-    let json = String::from("\"") + slice;
-    json_from_str::<'_, IString>(&json).ok()
+    unescape(&slice[..slice.len() - 1]).map(Into::into).ok()
+    // let json = String::from("\"") + slice;
+    // json_from_str::<'_, IString>(&json).ok()
 }
 
 pub fn register_newline(lex: &mut Lexer<Token>) {
