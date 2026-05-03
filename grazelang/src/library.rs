@@ -1,9 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    ops::DerefMut,
-    rc::{Rc, Weak},
-};
+use std::{collections::HashMap, rc::Rc};
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
@@ -13,7 +8,7 @@ use grazelang_library::{
 };
 use grazelang_library_parser::generate_library;
 
-use crate::parser::parse_context::Symbol;
+use crate::parser::parse_context::{Symbol, SymbolId, SymbolTable};
 
 pub fn get_generated_library() -> HashMap<String, LibraryItem> {
     generate_library!("schemas/toolbox_schema.json")
@@ -21,60 +16,68 @@ pub fn get_generated_library() -> HashMap<String, LibraryItem> {
 
 pub fn convert_generated_library(
     library: HashMap<String, LibraryItem>,
-) -> impl Iterator<Item = (IString, Rc<RefCell<Symbol>>)> {
+    symbol_table: &mut SymbolTable,
+    root_symbol: SymbolId,
+) {
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum ConvertedSymbol {
+        Symbol(SymbolId),
+        Alias(Vec<AliasSegment>),
+    }
     pub fn recursively_convert(
         namespace: LibraryItem,
-        aliases: &mut Vec<(Rc<RefCell<Symbol>>, Vec<AliasSegment>)>,
-    ) -> Rc<RefCell<Symbol>> {
-        let (my_symbol, alias_content) = match namespace.value {
-            Some(LibraryItemValue::Alias(alias)) => (
-                Rc::new(RefCell::new(Symbol::Alias(Weak::new(), Weak::new()))),
-                Some(alias),
-            ),
-            Some(LibraryItemValue::KnownBlock(known_block)) => (
-                Rc::new(RefCell::new(Symbol::KnownBlock(
-                    known_block,
-                    HashMap::new(),
-                    Weak::new(),
-                ))),
-                None,
-            ),
-            None => (Rc::new(RefCell::new(Symbol::new_namespace())), None),
+        symbol_table: &mut SymbolTable,
+        aliases: &mut Vec<(SymbolId, IString, Vec<AliasSegment>)>,
+    ) -> ConvertedSymbol {
+        let my_symbol = match namespace.value {
+            Some(LibraryItemValue::Alias(alias)) => ConvertedSymbol::Alias(alias),
+            Some(LibraryItemValue::KnownBlock(known_block)) => {
+                ConvertedSymbol::Symbol(symbol_table.new_symbol(Symbol {
+                    known_block: Some(Rc::new(*known_block)),
+                    namespace: HashMap::new(),
+                    parent: Default::default(),
+                }))
+            }
+            None => ConvertedSymbol::Symbol(symbol_table.new_symbol(Symbol {
+                known_block: None,
+                namespace: HashMap::new(),
+                parent: Default::default(),
+            })),
         };
-        if let Some(alias_content) = alias_content {
-            aliases.push((my_symbol.clone(), alias_content));
-        }
-        for (child_name, child) in namespace.namespace {
-            let child = recursively_convert(child, aliases);
-            Symbol::insert_child(&my_symbol, child_name.into(), child);
+        if let ConvertedSymbol::Symbol(my_symbol) = &my_symbol {
+            for (child_name, child) in namespace.namespace {
+                let child = recursively_convert(child, symbol_table, aliases);
+                match child {
+                    ConvertedSymbol::Symbol(child) => {
+                        symbol_table.insert_child(*my_symbol, child_name.into(), child);
+                    }
+                    ConvertedSymbol::Alias(alias_segments) => {
+                        aliases.push((*my_symbol, child_name.into(), alias_segments));
+                    }
+                }
+            }
         }
         my_symbol
     }
-    let root = Rc::new(RefCell::new(Symbol::new_namespace()));
     let mut aliases = Vec::new();
     library.into_iter().for_each(|(name, namespace)| {
-        Symbol::insert_child(
-            &root,
-            name.as_str().into(),
-            recursively_convert(namespace, &mut aliases),
-        );
+        if let ConvertedSymbol::Symbol(symbol) =
+            recursively_convert(namespace, symbol_table, &mut aliases)
+        {
+            symbol_table.insert_child(root_symbol, name.as_str().into(), symbol);
+        }
     });
-    for (alias_symbol, segments) in aliases {
-        let mut current = alias_symbol.borrow().get_parent().upgrade().unwrap();
+    for (parent_symbol, alias_name, segments) in aliases {
+        let mut current = parent_symbol;
         for segment in segments {
             current = match segment {
-                AliasSegment::Super => current.borrow().get_parent().upgrade().unwrap(),
-                AliasSegment::Child(child) => current.borrow().get_child(&child.into()).unwrap(),
+                AliasSegment::Super => symbol_table[current].parent,
+                AliasSegment::Child(child) => {
+                    symbol_table.get_child(current, child.as_str()).unwrap()
+                }
             }
         }
-        if let Symbol::Alias(target, _) = alias_symbol.borrow_mut().deref_mut() {
-            *target = Rc::downgrade(&current);
-        }
-    }
-    let root = Rc::try_unwrap(root).unwrap().into_inner();
-    match root {
-        Symbol::Namespace(namespace, _) => namespace.into_iter(),
-        _ => unreachable!(),
+        symbol_table.insert_alias(parent_symbol, alias_name, current);
     }
 }
 
@@ -83,25 +86,23 @@ pub fn get_standard_library_namespace_count() -> usize {
     10
 }
 
-pub fn get_standard_library_namespaces() -> impl Iterator<Item = (IString, Rc<RefCell<Symbol>>)> {
-    convert_generated_library(get_generated_library())
+pub fn add_standard_library_namespaces(symbol_table: &mut SymbolTable, root_symbol: SymbolId) {
+    convert_generated_library(get_generated_library(), symbol_table, root_symbol)
 }
 
 /// Creates symbols like `sprites.<sprite_name>.x` that are to be accessed as `sensing_of` blocks for a sprite
-pub fn create_sprite_dependent_symbols(
-    target_name: &IString,
-) -> Vec<(IString, Rc<RefCell<Symbol>>)> {
+pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, Symbol)> {
     const OBJECT_ISTRING: &IString = &literal!("OBJECT");
-    const PROPERTY_ISTRING: &IString= &literal!("PROPERTY");
+    const PROPERTY_ISTRING: &IString = &literal!("PROPERTY");
     #[inline]
-    fn symbol_of(name: IString, known_block: KnownBlock) -> (IString, Rc<RefCell<Symbol>>) {
+    fn symbol_of(name: IString, known_block: KnownBlock) -> (IString, Symbol) {
         (
             name,
-            Rc::new(RefCell::new(Symbol::KnownBlock(
-                Box::new(known_block),
-                HashMap::new(),
-                Weak::new(),
-            ))),
+            Symbol {
+                known_block: Some(Rc::new(known_block)),
+                namespace: HashMap::new(),
+                parent: Default::default(),
+            },
         )
     }
     vec![
@@ -464,20 +465,18 @@ pub fn create_sprite_dependent_symbols(
 }
 
 /// Creates symbols like `sprites.<sprite_name>.x` that are to be accessed as `sensing_of` blocks for the stage
-pub fn create_stage_dependent_symbols(
-    target_name: &IString,
-) -> Vec<(IString, Rc<RefCell<Symbol>>)> {
+pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Symbol)> {
     const OBJECT_ISTRING: &IString = &literal!("OBJECT");
-    const PROPERTY_ISTRING: &IString= &literal!("PROPERTY");
+    const PROPERTY_ISTRING: &IString = &literal!("PROPERTY");
     #[inline]
-    fn symbol_of(name: IString, known_block: KnownBlock) -> (IString, Rc<RefCell<Symbol>>) {
+    fn symbol_of(name: IString, known_block: KnownBlock) -> (IString, Symbol) {
         (
             name,
-            Rc::new(RefCell::new(Symbol::KnownBlock(
-                Box::new(known_block),
-                HashMap::new(),
-                Weak::new(),
-            ))),
+            Symbol {
+                known_block: Some(Rc::new(known_block)),
+                namespace: HashMap::new(),
+                parent: Default::default(),
+            },
         )
     }
     vec![

@@ -1,7 +1,10 @@
 use std::{
+    borrow::Borrow,
     cell::RefCell,
     collections::{HashMap, VecDeque},
+    hash::Hash,
     io::Read,
+    ops::{Index, IndexMut},
     rc::{Rc, Weak},
 };
 
@@ -313,136 +316,232 @@ impl ResolveKnownBlock for KnownBlock {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Symbol {
-    Namespace(HashMap<IString, Rc<RefCell<Symbol>>>, Weak<RefCell<Symbol>>),
-    KnownBlock(
-        Box<KnownBlock>,
-        HashMap<IString, Rc<RefCell<Symbol>>>,
-        Weak<RefCell<Symbol>>,
-    ),
-    Alias(Weak<RefCell<Symbol>>, Weak<RefCell<Symbol>>),
+#[derive(Debug, Clone, PartialEq)]
+pub struct SymbolTable {
+    pub table: Vec<Symbol>,
 }
 
-impl Symbol {
-    pub fn new_namespace() -> Self {
-        Self::Namespace(HashMap::new(), Weak::new())
+impl SymbolTable {
+    pub fn new() -> Self {
+        Self { table: Vec::new() }
     }
 
-    pub fn get_block(&self) -> Option<&KnownBlock> {
-        match self {
-            Symbol::KnownBlock(known_block, ..) => Some(known_block),
-            Symbol::Namespace(..) | Symbol::Alias(..) => None,
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            table: Vec::with_capacity(capacity),
         }
     }
 
-    pub fn unalias(this: &Rc<RefCell<Self>>) -> Option<Rc<RefCell<Self>>> {
-        match &*this.borrow() {
-            Symbol::Namespace(..) | Symbol::KnownBlock(..) => Some(this.clone()),
-            Symbol::Alias(weak, _) => weak.upgrade().and_then(|this| Symbol::unalias(&this)),
-        }
+    pub fn reserve(&mut self, additional: usize) {
+        self.table.reserve(additional);
     }
 
-    pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<Symbol>>> {
-        match self {
-            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
-                hash_map.get(child_name).cloned()
-            }
-            Symbol::Alias(alias, ..) => alias
-                .upgrade()
-                .and_then(|value| value.borrow().get_child(child_name)),
-        }
+    pub fn new_symbol(&mut self, symbol: Symbol) -> SymbolId {
+        self.table.push(symbol);
+        SymbolId(self.table.len() - 1)
     }
 
-    /// Clones the children and allocates them in a dedicated Vec
-    pub fn get_children_cloned(&self) -> Vec<Rc<RefCell<Symbol>>> {
-        match self {
-            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
-                hash_map.values().cloned().collect()
-            }
-            Symbol::Alias(alias, ..) => alias
-                .upgrade()
-                .map(|value| value.borrow().get_children_cloned())
-                .unwrap_or_default(),
-        }
+    pub fn new_child_symbol(
+        &mut self,
+        parent: SymbolId,
+        child_name: IString,
+        known_block: Option<Rc<KnownBlock>>,
+        hash_map_cap: usize,
+    ) -> SymbolId {
+        let namespace = HashMap::with_capacity(hash_map_cap);
+        let symbol = self.new_symbol(Symbol {
+            known_block,
+            namespace,
+            parent,
+        });
+        self.insert_child(parent, child_name, symbol);
+        symbol
     }
 
-    /// Clones the children and keys and allocates them in a dedicated Vec
-    pub fn get_entries_cloned(&self) -> Vec<(IString, Rc<RefCell<Symbol>>)> {
-        match self {
-            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => hash_map
-                .iter()
-                .map(|(key, value)| (key.clone(), value.clone()))
-                .collect(),
-            Symbol::Alias(alias, ..) => alias
-                .upgrade()
-                .map(|value| value.borrow().get_entries_cloned())
-                .unwrap_or_default(),
-        }
-    }
-
-    pub fn get_parent(&self) -> &Weak<RefCell<Symbol>> {
-        match self {
-            Symbol::Namespace(_, parent_ref)
-            | Symbol::KnownBlock(_, _, parent_ref)
-            | Symbol::Alias(_, parent_ref) => parent_ref,
-        }
-    }
-
-    pub fn replace_parent(&mut self, parent: Weak<RefCell<Symbol>>) -> Weak<RefCell<Symbol>> {
-        match self {
-            Symbol::Namespace(_, parent_ref)
-            | Symbol::KnownBlock(_, _, parent_ref)
-            | Symbol::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
-        }
+    pub fn get_child<Q>(&self, symbol: SymbolId, child_name: &Q) -> Option<SymbolId>
+    where
+        Q: ?Sized + Hash + Eq,
+        IString: Borrow<Q>,
+    {
+        self[symbol].namespace.get(child_name).copied()
     }
 
     pub fn insert_child(
-        this: &Rc<RefCell<Self>>,
+        &mut self,
+        symbol: SymbolId,
         child_name: IString,
-        child: Rc<RefCell<Symbol>>,
-    ) -> Option<Rc<RefCell<Symbol>>> {
-        child.borrow_mut().replace_parent(Rc::downgrade(this));
-        match &mut *this.borrow_mut() {
-            Symbol::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
-            Symbol::KnownBlock(_, hash_map, ..) => hash_map.insert(child_name, child),
-            Symbol::Alias(alias, ..) => alias
-                .upgrade()
-                .and_then(|value| Self::insert_child(&value, child_name, child)),
-        }
+        child: SymbolId,
+    ) -> Option<SymbolId> {
+        self[child].parent = symbol;
+        self[symbol].namespace.insert(child_name, child)
     }
 
-    pub fn remove_child(
-        this: &Rc<RefCell<Self>>,
-        child_name: &IString,
-    ) -> Option<Rc<RefCell<Symbol>>> {
-        match &mut *this.borrow_mut() {
-            Symbol::Namespace(hash_map, ..) => hash_map.remove(child_name),
-            Symbol::KnownBlock(_, hash_map, ..) => hash_map.remove(child_name),
-            Symbol::Alias(alias, ..) => alias
-                .upgrade()
-                .and_then(|value| Self::remove_child(&value, child_name)),
-        }
-    }
-
-    pub fn clear_children(this: &Rc<RefCell<Self>>) {
-        let alias = match &mut *this.borrow_mut() {
-            Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
-                hash_map.clear();
-                return;
-            }
-            Symbol::Alias(alias, ..) => alias.upgrade(),
-        };
-        if let Some(alias) = alias {
-            Self::clear_children(&alias);
-        }
-    }
-
-    // Whether this symbol is an alias
-    pub fn is_alias(&self) -> bool {
-        matches!(self, Symbol::Alias(..))
+    pub fn insert_alias(
+        &mut self,
+        symbol: SymbolId,
+        child_name: IString,
+        child: SymbolId,
+    ) -> Option<SymbolId> {
+        self[symbol].namespace.insert(child_name, child)
     }
 }
+
+impl Index<SymbolId> for SymbolTable {
+    type Output = Symbol;
+    fn index(&self, index: SymbolId) -> &Self::Output {
+        &self.table[index.0]
+    }
+}
+
+impl IndexMut<SymbolId> for SymbolTable {
+    fn index_mut(&mut self, index: SymbolId) -> &mut Self::Output {
+        &mut self.table[index.0]
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct SymbolId(pub usize);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Symbol {
+    pub known_block: Option<Rc<KnownBlock>>,
+    pub namespace: HashMap<IString, SymbolId>,
+    pub parent: SymbolId,
+}
+
+// #[derive(Debug, Clone)]
+// pub enum Symbol {
+//     Namespace(
+//         HashMap<IString, Rc<RefCell<Symbol>>>,
+//         Weak<RefCell<Symbol>>,
+//     ),
+//     KnownBlock(
+//         Box<KnownBlock>,
+//         HashMap<IString, Rc<RefCell<Symbol>>>,
+//         Weak<RefCell<Symbol>>,
+//     ),
+//     Alias(Weak<RefCell<Symbol>>, Weak<RefCell<Symbol>>),
+// }
+
+// impl Symbol {
+//     pub fn new_namespace() -> Self {
+//         Self::Namespace(HashMap::new(), Weak::new())
+//     }
+
+//     pub fn get_block(&self) -> Option<&KnownBlock> {
+//         match self {
+//             Symbol::KnownBlock(known_block, ..) => Some(known_block),
+//             Symbol::Namespace(..) | Symbol::Alias(..) => None,
+//         }
+//     }
+
+//     pub fn unalias(this: &Rc<RefCell<Self>>) -> Option<Rc<RefCell<Self>>> {
+//         match &*this.borrow() {
+//             Symbol::Namespace(..) | Symbol::KnownBlock(..) => Some(this.clone()),
+//             Symbol::Alias(weak, _) => weak.upgrade().and_then(|this| Symbol::unalias(&this)),
+//         }
+//     }
+
+//     pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<Symbol>>> {
+//         match self {
+//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
+//                 hash_map.get(child_name).cloned()
+//             }
+//             Symbol::Alias(alias, ..) => alias
+//                 .upgrade()
+//                 .and_then(|value| value.borrow().get_child(child_name)),
+//         }
+//     }
+
+//     /// Clones the children and allocates them in a dedicated Vec
+//     pub fn get_children_cloned(&self) -> Vec<Rc<RefCell<Symbol>>> {
+//         match self {
+//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
+//                 hash_map.values().cloned().collect()
+//             }
+//             Symbol::Alias(alias, ..) => alias
+//                 .upgrade()
+//                 .map(|value| value.borrow().get_children_cloned())
+//                 .unwrap_or_default(),
+//         }
+//     }
+
+//     /// Clones the children and keys and allocates them in a dedicated Vec
+//     pub fn get_entries_cloned(&self) -> Vec<(IString, Rc<RefCell<Symbol>>)> {
+//         match self {
+//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => hash_map
+//                 .iter()
+//                 .map(|(key, value)| (key.clone(), value.clone()))
+//                 .collect(),
+//             Symbol::Alias(alias, ..) => alias
+//                 .upgrade()
+//                 .map(|value| value.borrow().get_entries_cloned())
+//                 .unwrap_or_default(),
+//         }
+//     }
+
+//     pub fn get_parent(&self) -> &Weak<RefCell<Symbol>> {
+//         match self {
+//             Symbol::Namespace(_, parent_ref)
+//             | Symbol::KnownBlock(_, _, parent_ref)
+//             | Symbol::Alias(_, parent_ref) => parent_ref,
+//         }
+//     }
+
+//     pub fn replace_parent(&mut self, parent: Weak<RefCell<Symbol>>) -> Weak<RefCell<Symbol>> {
+//         match self {
+//             Symbol::Namespace(_, parent_ref)
+//             | Symbol::KnownBlock(_, _, parent_ref)
+//             | Symbol::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
+//         }
+//     }
+
+//     pub fn insert_child(
+//         this: &Rc<RefCell<Self>>,
+//         child_name: IString,
+//         child: Rc<RefCell<Symbol>>,
+//     ) -> Option<Rc<RefCell<Symbol>>> {
+//         child.borrow_mut().replace_parent(Rc::downgrade(this));
+//         match &mut *this.borrow_mut() {
+//             Symbol::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
+//             Symbol::KnownBlock(_, hash_map, ..) => hash_map.insert(child_name, child),
+//             Symbol::Alias(alias, ..) => alias
+//                 .upgrade()
+//                 .and_then(|value| Self::insert_child(&value, child_name, child)),
+//         }
+//     }
+
+//     pub fn remove_child(
+//         this: &Rc<RefCell<Self>>,
+//         child_name: &IString,
+//     ) -> Option<Rc<RefCell<Symbol>>> {
+//         match &mut *this.borrow_mut() {
+//             Symbol::Namespace(hash_map, ..) => hash_map.remove(child_name),
+//             Symbol::KnownBlock(_, hash_map, ..) => hash_map.remove(child_name),
+//             Symbol::Alias(alias, ..) => alias
+//                 .upgrade()
+//                 .and_then(|value| Self::remove_child(&value, child_name)),
+//         }
+//     }
+
+//     pub fn clear_children(this: &Rc<RefCell<Self>>) {
+//         let alias = match &mut *this.borrow_mut() {
+//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
+//                 hash_map.clear();
+//                 return;
+//             }
+//             Symbol::Alias(alias, ..) => alias.upgrade(),
+//         };
+//         if let Some(alias) = alias {
+//             Self::clear_children(&alias);
+//         }
+//     }
+
+//     // Whether this symbol is an alias
+//     pub fn is_alias(&self) -> bool {
+//         matches!(self, Symbol::Alias(..))
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub struct BroadcastDescriptor {
@@ -547,16 +646,16 @@ impl TargetSymbolDescriptor {
                 ));
             }
             return Ok((
-                Symbol::KnownBlock(
-                    Box::new(KnownBlock::CustomBlock {
+                Symbol {
+                    known_block: Some(Rc::new(KnownBlock::CustomBlock {
                         proccode: proccode.clone(),
                         call_params: call_params.clone(),
                         params: params.clone(),
                         is_warp: descriptor.is_warp,
-                    }),
-                    HashMap::new(),
-                    Weak::new(),
-                ),
+                    })),
+                    namespace: HashMap::new(),
+                    parent: Default::default(),
+                },
                 Some(
                     grazelang_library::project_json::TargetAttachment::CustomBlock(
                         descriptor.name.clone(),
@@ -581,8 +680,8 @@ impl TargetSymbolDescriptor {
         .map(|value| {
             let file_ext = get_file_extension_unwrapped(self);
             Ok((
-                Symbol::KnownBlock(
-                    Box::new(match self {
+                Symbol {
+                    known_block: Some(Rc::new(match self {
                         // TODO: implement specific known blocks here
                         TargetSymbolDescriptor::Costume(..)
                         | TargetSymbolDescriptor::Backdrop(..)
@@ -592,10 +691,10 @@ impl TargetSymbolDescriptor {
                             ),
                         },
                         _ => unreachable!(),
-                    }),
-                    HashMap::new(),
-                    Weak::new(),
-                ),
+                    })),
+                    namespace: HashMap::new(),
+                    parent: Default::default(),
+                },
                 match self {
                     // TODO: implement specific known blocks here
                     TargetSymbolDescriptor::Costume(CostumeDescriptor {
@@ -653,11 +752,15 @@ impl TargetSymbolDescriptor {
                     );
                     let id_string = id.to_string();
                     Ok((
-                        Symbol::KnownBlock(
-                            Box::new(KnownBlock::new_variable(canonical_name.clone(), id, None)),
-                            HashMap::new(),
-                            Weak::new(),
-                        ),
+                        Symbol {
+                            known_block: Some(Rc::new(KnownBlock::new_variable(
+                                canonical_name.clone(),
+                                id,
+                                None,
+                            ))),
+                            namespace: HashMap::new(),
+                            parent: Default::default(),
+                        },
                         Some(grazelang_library::project_json::TargetAttachment::Var(
                             id_string,
                             Sb3VariableDeclaration {
@@ -682,14 +785,14 @@ impl TargetSymbolDescriptor {
                     );
                     let id_string = id.to_string();
                     Ok((
-                        Symbol::KnownBlock(
-                            Box::new(KnownBlock::List {
+                        Symbol {
+                            known_block: Some(Rc::new(KnownBlock::List {
                                 canonical_name: canonical_name.clone(),
                                 id,
-                            }), // TODO: add list length as method
-                            HashMap::new(),
-                            Weak::new(),
-                        ),
+                            })), // TODO: add list length as method
+                            namespace: HashMap::new(),
+                            parent: Default::default(),
+                        },
                         Some(grazelang_library::project_json::TargetAttachment::List(
                             id_string,
                             Sb3ListDeclaration(

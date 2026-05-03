@@ -1,9 +1,8 @@
 #![allow(clippy::result_large_err)]
 use std::{
-    cell::RefCell,
     collections::HashMap,
     iter::{self, zip},
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use arcstr::{ArcStr as IString, literal};
@@ -33,8 +32,8 @@ use crate::{
             Expression, FormattedStringContent, Identifier, ListEntry, Literal, UnOpDescriptor,
         },
         parse_context::{
-            IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, Target,
-            TargetSymbolDescriptor,
+            IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable,
+            Target, TargetSymbolDescriptor,
         },
     },
     visitor::{
@@ -79,7 +78,8 @@ pub struct GrazeSb3Generator;
 pub struct GrazeSb3GeneratorContext {
     pub sb3: Sb3Root,
     pub targets: Vec<Target>,
-    pub root_symbol: Rc<RefCell<Symbol>>,
+    // Root symbol is always 0.
+    pub symbol_table: SymbolTable,
     pub block_counter: IdCounter,
     pub arg_stack: Vec<Param>,
     pub current_block_id: IdString,
@@ -105,8 +105,8 @@ impl FormattedStringContext {
 }
 
 pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
-    if let Symbol::KnownBlock(known_block, _, _) = symbol {
-        match known_block.as_mut() {
+    if let Some(known_block) = &mut symbol.known_block {
+        match Rc::get_mut(known_block).unwrap() {
             KnownBlock::Variable {
                 bind_info,
                 canonical_name,
@@ -167,30 +167,26 @@ pub const MY_BLOCKS_ISTRING: &IString = &literal!("my_blocks");
 impl GrazeSb3GeneratorContext {
     pub fn new(parse_context: ParseContext) -> Result<Self, std::io::Error> {
         let mut this = Self::without_standard_namespaces(parse_context)?;
-        this.add_namespace_refs(library::get_standard_library_namespaces());
-        Self::alias_standard_namespaces(&this.root_symbol);
+        library::add_standard_library_namespaces(&mut this.symbol_table, Default::default());
+        Self::alias_standard_namespaces(&mut this.symbol_table, Default::default());
         Ok(this)
     }
 
-    fn alias_standard_namespaces(root_symbol: &Rc<RefCell<Symbol>>) {
-        let namespaces = root_symbol.borrow().get_children_cloned();
-        let mut flattened = HashMap::<IString, Option<Weak<RefCell<Symbol>>>>::new();
-        for namespace in namespaces {
-            for (key, value) in namespace.borrow().get_entries_cloned() {
-                if let Some(mut_value) = flattened.get_mut(&key) {
+    fn alias_standard_namespaces(symbol_table: &mut SymbolTable, root_symbol: SymbolId) {
+        let namespaces = &symbol_table[root_symbol].namespace;
+        let mut flattened = HashMap::<IString, Option<SymbolId>>::new();
+        for &namespace in namespaces.values() {
+            for (key, &value) in &symbol_table[namespace].namespace {
+                if let Some(mut_value) = flattened.get_mut(key) {
                     mut_value.take();
                 } else {
-                    flattened.insert(key, Some(Rc::downgrade(&value)));
+                    flattened.insert(key.clone(), Some(value));
                 }
             }
         }
         for (key, value) in flattened {
             if let Some(value) = value {
-                Symbol::insert_child(
-                    root_symbol,
-                    key,
-                    Rc::new(RefCell::new(Symbol::Alias(value, Weak::new()))),
-                );
+                symbol_table.insert_alias(root_symbol, key, value);
             }
         }
     }
@@ -200,94 +196,93 @@ impl GrazeSb3GeneratorContext {
     ) -> Result<Self, std::io::Error> {
         let mut rng = Xoshiro256StarStar::from_seed(parse_context.random_seed);
         let targets: Vec<Target> = parse_context.parsed_targets.into();
-        let root_symbol = Rc::new_cyclic(|me| {
-            RefCell::new(Symbol::Namespace(
-                HashMap::with_capacity(library::get_standard_library_namespace_count() + 4),
-                // ^ extensions + sprites + broadcasts + global variables + global lists
-                me.clone(),
-            ))
+        let standard_library_namespace_count = library::get_standard_library_namespace_count();
+        let mut symbol_table =
+            SymbolTable::with_capacity(1 + standard_library_namespace_count + 4 + targets.len());
+        let root_symbol = symbol_table.new_symbol(Symbol {
+            known_block: None,
+            namespace: HashMap::with_capacity(standard_library_namespace_count + 4),
+            parent: Default::default(),
         });
 
-        let targets_symbol = Rc::new(RefCell::new(Symbol::Namespace(
-            HashMap::with_capacity(targets.len()),
-            Weak::new(),
-        )));
+        let targets_symbol = symbol_table.new_child_symbol(
+            root_symbol,
+            SPRITES_ISTRING.clone(),
+            None,
+            targets.len(),
+        );
         let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
             let mut namespace = Namespace::new();
-            Symbol::insert_child(
-                &targets_symbol,
+
+            let is_stage = matches!(target, Target::Stage { .. });
+            let symbol_count = target.borrow_symbols().len()
+                // Accounts for the symbols that every target has e.g. volume
+                + if is_stage {
+                    3
+                } else {
+                    7
+                };
+            let target_symbol = symbol_table.new_child_symbol(
+                targets_symbol,
                 target.get_namespace_name().clone(),
-                Rc::new(RefCell::new(Symbol::KnownBlock(
-                    Box::new(KnownBlock::FieldValue {
-                        value: Sb3FieldValue::Normal(super::project_json::Sb3Primitive::String(
-                            target.get_field_name(),
-                        )),
-                    }),
-                    {
-                        let is_stage = matches!(target, Target::Stage { .. });
-                        let symbol_count = target.borrow_symbols().len()
-                            // Accounts for the symbols that every target has e.g. volume
-                            + if is_stage {
-                                3
-                            } else {
-                                7
-                            };
-                        let (mut symbols, assets) = target
-                            .borrow_symbols()
-                            .iter()
-                            .map(|(key, value)| {
-                                value
-                                    .derive_symbol_and_attachment(&mut rng, &mut namespace)
-                                    .map(|(mut symbol, attachment)| {
-                                        add_bind_info(&mut symbol, target.get_namespace_name());
-                                        ((key.clone(), Rc::new(RefCell::new(symbol))), attachment)
-                                    })
-                            })
-                            .try_fold::<_, _, Result<_, std::io::Error>>(
-                                (HashMap::with_capacity(symbol_count), Vec::new()),
-                                |(mut symbols, mut assets), item| {
-                                    let ((key, symbol), asset) = item?;
-                                    symbols.insert(key, symbol);
-                                    if let Some(asset) = asset {
-                                        assets.push(asset);
-                                    }
-                                    Ok((symbols, assets))
-                                },
-                            )?;
-                        symbols.extend(if is_stage {
-                            create_stage_dependent_symbols(target.get_namespace_name())
-                        } else {
-                            create_sprite_dependent_symbols(target.get_namespace_name())
-                        });
-                        target_attachments.insert(target.get_namespace_name().clone(), assets);
-                        symbols
-                    },
-                    Weak::new(),
-                ))),
+                Some(Rc::new(KnownBlock::FieldValue {
+                    value: Sb3FieldValue::Normal(super::project_json::Sb3Primitive::String(
+                        target.get_field_name(),
+                    )),
+                })),
+                symbol_count,
             );
+            let (mut symbols, assets) = target
+                .borrow_symbols()
+                .iter()
+                .map(|(key, value)| {
+                    value
+                        .derive_symbol_and_attachment(&mut rng, &mut namespace)
+                        .map(|(mut symbol, attachment)| {
+                            add_bind_info(&mut symbol, target.get_namespace_name());
+                            ((key.clone(), symbol), attachment)
+                        })
+                })
+                .try_fold::<_, _, Result<_, std::io::Error>>(
+                    (HashMap::with_capacity(symbol_count), Vec::new()),
+                    |(mut symbols, mut assets), item| {
+                        let ((key, symbol), asset) = item?;
+                        symbols.insert(key, symbol);
+                        if let Some(asset) = asset {
+                            assets.push(asset);
+                        }
+                        Ok((symbols, assets))
+                    },
+                )?;
+            symbols.extend(if is_stage {
+                create_stage_dependent_symbols(target.get_namespace_name())
+            } else {
+                create_sprite_dependent_symbols(target.get_namespace_name())
+            });
+            target_attachments.insert(target.get_namespace_name().clone(), assets);
+            for (key, symbol) in symbols {
+                let symbol = symbol_table.new_symbol(symbol);
+                symbol_table.insert_child(target_symbol, key, symbol);
+            }
         }
-        let stage_symbol = targets_symbol.borrow().get_child(STAGE_ISTRING).unwrap();
-        Symbol::insert_child(&root_symbol, SPRITES_ISTRING.clone(), targets_symbol);
-        Symbol::insert_child(
-            &root_symbol,
+        let stage_symbol = symbol_table
+            .get_child(targets_symbol, STAGE_ISTRING)
+            .unwrap();
+
+        let broadcasts_symbol = symbol_table.new_child_symbol(
+            root_symbol,
             literal!("broadcasts"),
-            Rc::new(RefCell::new(Symbol::Namespace(
-                parse_context
-                    .broadcasts
-                    .iter()
-                    .map(|(key, value)| {
-                        (
-                            key.clone(),
-                            Rc::new(RefCell::new(value.derive_symbol(&mut rng))),
-                        )
-                    })
-                    .collect(),
-                Weak::new(),
-            ))),
+            None,
+            parse_context.broadcasts.len(),
         );
-        let variables_symbol = Rc::new(RefCell::new(Symbol::new_namespace()));
-        let lists_symbol = Rc::new(RefCell::new(Symbol::new_namespace()));
+        for (key, value) in &parse_context.broadcasts {
+            let symbol = symbol_table.new_symbol(value.derive_symbol(&mut rng));
+            symbol_table.insert_child(broadcasts_symbol, key.clone(), symbol);
+        }
+        let variables_symbol =
+            symbol_table.new_child_symbol(root_symbol, literal!("vars"), None, 0);
+        let lists_symbol = symbol_table.new_child_symbol(root_symbol, literal!("lists"), None, 0);
         let mut global_namespace = Namespace::new();
         {
             let stage_target_attachments = target_attachments.get_mut("stage").unwrap();
@@ -297,21 +292,22 @@ impl GrazeSb3GeneratorContext {
                         let (symbol, attachment) = symbol
                             .derive_symbol_and_attachment(&mut rng, &mut global_namespace)
                             .unwrap();
-                        let mut symbol_for_stage = symbol.clone();
+                        let mut symbol_for_stage: Symbol = Symbol {
+                            known_block: symbol
+                                .known_block
+                                .as_ref()
+                                .map(|value| Rc::new(value.as_ref().clone())),
+                            namespace: symbol.namespace.clone(),
+                            parent: symbol.parent,
+                        };
                         add_bind_info(&mut symbol_for_stage, &literal!("_stage_"));
                         if let Some(attachment) = attachment {
                             stage_target_attachments.push(attachment);
                         }
-                        Symbol::insert_child(
-                            &stage_symbol,
-                            name.clone(),
-                            Rc::new(RefCell::new(symbol_for_stage)),
-                        );
-                        Symbol::insert_child(
-                            &variables_symbol,
-                            name,
-                            Rc::new(RefCell::new(symbol)),
-                        );
+                        let symbol_for_stage = symbol_table.new_symbol(symbol_for_stage);
+                        let symbol = symbol_table.new_symbol(symbol);
+                        symbol_table.insert_child(stage_symbol, name.clone(), symbol_for_stage);
+                        symbol_table.insert_child(variables_symbol, name, symbol);
                     }
                     TargetSymbolDescriptor::List(_) => {
                         let (symbol, attachment) = symbol
@@ -320,21 +316,19 @@ impl GrazeSb3GeneratorContext {
                         if let Some(attachment) = attachment {
                             stage_target_attachments.push(attachment);
                         }
-                        Symbol::insert_child(&lists_symbol, name, Rc::new(RefCell::new(symbol)));
+                        let symbol = symbol_table.new_symbol(symbol);
+                        symbol_table.insert_child(lists_symbol, name, symbol);
                     }
                     _ => (), // Handled just to be sure although it shouldn't happen
                 }
             }
         }
-        Symbol::insert_child(&root_symbol, literal!("vars"), variables_symbol);
-
-        Symbol::insert_child(&root_symbol, literal!("lists"), lists_symbol);
         let mut block_counter = IdCounter::new();
         let next_block_id = block_counter.get_new_id();
         Ok(Self {
             sb3: Sb3Root::default(),
             targets,
-            root_symbol,
+            symbol_table,
             block_counter,
             arg_stack: Vec::new(),
             current_block_id: next_block_id,
@@ -345,22 +339,6 @@ impl GrazeSb3GeneratorContext {
             formatted_string_context: FormattedStringContext::new(),
             target_attachments,
         })
-    }
-
-    pub fn add_namespaces<I>(&mut self, namespaces: I)
-    where
-        I: Iterator<Item = (IString, Symbol)>,
-    {
-        self.add_namespace_refs(namespaces.map(|(key, value)| (key, Rc::new(RefCell::new(value)))));
-    }
-
-    pub fn add_namespace_refs<I>(&mut self, namespaces: I)
-    where
-        I: Iterator<Item = (IString, Rc<RefCell<Symbol>>)>,
-    {
-        for (name, symbol) in namespaces {
-            Symbol::insert_child(&self.root_symbol, name, symbol);
-        }
     }
 
     fn new_block(&mut self) {
@@ -379,22 +357,20 @@ impl GrazeSb3GeneratorContext {
         self.arg_stack.pop()
     }
 
-    pub fn resolve_path<'a, I>(&self, mut iterator: I) -> Option<Rc<RefCell<Symbol>>>
+    pub fn resolve_path<'a, I>(&self, mut iterator: I) -> Option<SymbolId>
     where
         I: Iterator<Item = &'a IString>,
     {
-        iterator
-            .try_fold(self.root_symbol.clone(), |current, next| {
-                if next.as_str() == "super" {
-                    current.borrow().get_parent().upgrade()
-                } else {
-                    current.borrow().get_child(next)
-                }
-            })
-            .and_then(|value| Symbol::unalias(&value))
+        iterator.try_fold(SymbolId::default(), |current, next| {
+            if next.as_str() == "super" {
+                Some(self.symbol_table[current].parent)
+            } else {
+                self.symbol_table.get_child(current, next)
+            }
+        })
     }
 
-    pub fn resolve_identifier(&self, identifier: &Identifier) -> Option<Rc<RefCell<Symbol>>> {
+    pub fn resolve_identifier(&self, identifier: &Identifier) -> Option<SymbolId> {
         self.resolve_path(
             identifier
                 .scope
@@ -503,13 +479,14 @@ macro_rules! with_known_block {
         match $param {
             Param::Owned(ref $known_block) => $action,
             Param::LazyIdentifier(value) => {
-                let rc = $context.resolve_identifier(&value).ok_or_else(|| {
+                let symbol_id = $context.resolve_identifier(&value).ok_or_else(|| {
                     GrazeSb3GeneratorError::UnknownIdentifier {
                         identifier: value.clone(),
                     }
                 })?;
-                let actual_identifier = rc.borrow();
-                let $known_block = actual_identifier.get_block().ok_or_else(|| {
+                let symbol = &$context.symbol_table[symbol_id];
+                let known_block_rc = symbol.known_block.clone();
+                let $known_block = known_block_rc.as_ref().ok_or_else(|| {
                     GrazeSb3GeneratorError::IdentifierIsNotABlock {
                         identifier: value.clone(),
                     }
@@ -523,26 +500,27 @@ macro_rules! with_known_block {
     };
 }
 
-macro_rules! get_actual_identifier {
-    ($context:expr, $identifier:expr) => {{
-        let identifier = $identifier;
-        let actual_identifier = $context.resolve_identifier(identifier).ok_or_else(|| {
-            GrazeSb3GeneratorError::UnknownIdentifier {
-                identifier: identifier.clone(),
-            }
-        });
-        actual_identifier
-    }};
+pub fn get_symbol_id(
+    context: &mut GrazeSb3GeneratorContext,
+    identifier: &Identifier,
+) -> Result<SymbolId, GrazeSb3GeneratorError> {
+    context.resolve_identifier(identifier).ok_or_else(|| {
+        GrazeSb3GeneratorError::UnknownIdentifier {
+            identifier: identifier.clone(),
+        }
+    })
 }
 
-macro_rules! get_known_block {
-    ($actual_identifier_ref:expr, $identifier:expr) => {{
-        $actual_identifier_ref.get_block().ok_or_else(|| {
-            GrazeSb3GeneratorError::IdentifierIsNotABlock {
-                identifier: $identifier.clone(),
-            }
+pub fn get_known_block<'a>(
+    symbol: &'a Symbol,
+    identifier: &Identifier,
+) -> Result<&'a Rc<KnownBlock>, GrazeSb3GeneratorError> {
+    symbol
+        .known_block
+        .as_ref()
+        .ok_or_else(|| GrazeSb3GeneratorError::IdentifierIsNotABlock {
+            identifier: identifier.clone(),
         })
-    }};
 }
 
 pub fn introduce_input_menu(
@@ -764,9 +742,9 @@ pub fn create_control_block<I>(
 where
     I: Iterator<Item = Param>,
 {
-    let actual_identifier = get_actual_identifier!(context, identifier)?;
-    let actual_identifier_ref = actual_identifier.borrow();
-    let known_block = get_known_block!(actual_identifier_ref, identifier)?;
+    let symbol_id = get_symbol_id(context, identifier)?;
+    let symbol = &context.symbol_table[symbol_id];
+    let known_block = get_known_block(symbol, identifier)?.clone();
     let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
         known_block.resolve_for_call_block(context);
     let mut fields = HashMap::new();
@@ -808,7 +786,14 @@ where
     add_block(
         context,
         &this_id,
-        make_block(parent, opcode.to_string(), inputs, fields, false, None),
+        make_block(
+            parent,
+            opcode.to_string(),
+            inputs,
+            fields,
+            false,
+            mutation.map(make_proc_call_mutation),
+        ),
     );
     Ok(())
 }
@@ -924,9 +909,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
                 .take(value.2.len())
                 .collect::<Vec<_>>();
-            let actual_identifier = get_actual_identifier!(context, value.0)?;
-            let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+            let symbol_id = get_symbol_id(context, value.0)?;
+            let symbol = &context.symbol_table[symbol_id];
+            let known_block = get_known_block(symbol, value.0)?.clone();
             let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
                 known_block.resolve_for_call_block(context);
             let mut fields = HashMap::new();
@@ -1159,10 +1144,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             } else {
                 HashMap::new()
             };
-            let actual_identifier = get_actual_identifier!(context, value.0)?;
-            let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-            let (canonical_name, id) = match known_block {
+            let symbol_id = get_symbol_id(context, value.0)?;
+            let symbol = &context.symbol_table[symbol_id];
+            let known_block = get_known_block(symbol, value.0)?.clone();
+            let (canonical_name, id) = match known_block.as_ref() {
                 KnownBlock::List { canonical_name, id } => (canonical_name, id),
                 _ => {
                     return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
@@ -1171,7 +1156,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
             };
             let list_field_value = Sb3FieldValue::WithId {
-                value: (canonical_name as &str).into(),
+                value: canonical_name.as_str().into(),
                 id: id.to_string(),
             };
             add_block(
@@ -1328,9 +1313,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
             default_visit_statement_assignment(self, value, context)?;
-            let actual_identifier = get_actual_identifier!(context, value.0)?;
-            let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+            let symbol_id = get_symbol_id(context, value.0)?;
+            let symbol = &context.symbol_table[symbol_id];
+            let known_block = get_known_block(symbol, value.0)?.clone();
             let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
                 known_block.resolve_for_assignment(context);
             let assignment_value = context.pop_param().unwrap();
@@ -1425,9 +1410,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
                 .take(value.2.len())
                 .collect::<Vec<_>>();
-            let actual_identifier = get_actual_identifier!(context, value.0)?;
-            let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+            let symbol_id = get_symbol_id(context, value.0)?;
+            let symbol = &context.symbol_table[symbol_id];
+            let known_block = get_known_block(symbol, value.0)?.clone();
             let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
                 known_block.resolve_for_call_block(context);
             let mut fields = HashMap::new();
@@ -1511,10 +1496,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 param_to_input_repr_no_menu(index, context)?,
                 Some(Sb3PrimitiveBlock::Integer(Sb3Primitive::Int128(1))),
             );
-            let actual_identifier = get_actual_identifier!(context, value.0)?;
-            let actual_identifier_ref = actual_identifier.borrow();
-            let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-            let (canonical_name, id) = match known_block {
+            let symbol_id = get_symbol_id(context, value.0)?;
+            let symbol = &context.symbol_table[symbol_id];
+            let known_block = get_known_block(symbol, value.0)?.clone();
+            let (canonical_name, id) = match known_block.as_ref() {
                 KnownBlock::List { canonical_name, id } => (canonical_name, id),
                 _ => {
                     return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
@@ -1523,7 +1508,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
             };
             let list_field_value = Sb3FieldValue::WithId {
-                value: (canonical_name as &str).into(),
+                value: canonical_name.as_str().into(),
                 id: id.to_string(),
             };
             let mut inputs = HashMap::with_capacity(2);
@@ -1565,10 +1550,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        let actual_identifier = get_actual_identifier!(context, value.0)?;
-        let actual_identifier_ref = actual_identifier.borrow();
-        let known_block = get_known_block!(actual_identifier_ref, value.0)?;
-        let (canonical_name, id) = match known_block {
+        let symbol_id = get_symbol_id(context, value.0)?;
+        let symbol = &context.symbol_table[symbol_id];
+        let known_block = get_known_block(symbol, value.0)?.clone();
+        let (canonical_name, id) = match known_block.as_ref() {
             KnownBlock::List { canonical_name, id } => (canonical_name, id),
             _ => {
                 return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
@@ -1577,7 +1562,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
         };
         let list_field_value = Sb3FieldValue::WithId {
-            value: (canonical_name as &str).into(),
+            value: canonical_name.as_str().into(),
             id: id.to_string(),
         };
         wrap_in_statement(context, |context, parent, this_id| {
@@ -1954,17 +1939,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         for assignment in assignments {
             match assignment {
                 SingleAssignment::List(identifier, sb3_primitives) => {
-                    let actual_identifier = context
+                    let symbol_id = context
                         .resolve_path(identifier.iter().map_while(|value| value.as_ref()))
                         .unwrap();
-                    let actual_identifier_ref = actual_identifier.borrow();
-                    let known_block = actual_identifier_ref.get_block().unwrap();
-                    let (canonical_name, id) = match known_block {
+                    let symbol = &context.symbol_table[symbol_id];
+                    let known_block = symbol.known_block.as_ref().unwrap().clone();
+                    let (canonical_name, id) = match known_block.as_ref() {
                         KnownBlock::List { canonical_name, id } => (canonical_name, id),
                         _ => unreachable!(),
                     };
                     let list_field_value = Sb3FieldValue::WithId {
-                        value: (canonical_name as &str).into(),
+                        value: canonical_name.as_str().into(),
                         id: id.to_string(),
                     };
                     wrap_in_statement(context, |context, parent, this_id| {
@@ -2004,11 +1989,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
                 SingleAssignment::Var(identifier, sb3_primitive) => {
                     wrap_in_statement(context, |context, parent, this_id| {
-                        let actual_identifier = context
+                        let symbol_id = context
                             .resolve_path(identifier.iter().map_while(|value| value.as_ref()))
                             .unwrap();
-                        let actual_identifier_ref = actual_identifier.borrow();
-                        let known_block = actual_identifier_ref.get_block().unwrap();
+                        let symbol = &context.symbol_table[symbol_id];
+                        let known_block = symbol.known_block.as_ref().unwrap().clone();
                         let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
                             known_block.resolve_for_assignment(context);
                         let mut fields = HashMap::new();
@@ -2237,9 +2222,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_parent = None;
         context.arg_stack.clear();
         let (parent, this_id) = wrap_in_statement(context, |_, parent, this_id| (parent, this_id));
-        let actual_identifier = get_actual_identifier!(context, value.0)?;
-        let actual_identifier_ref = actual_identifier.borrow();
-        let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+        let symbol_id = get_symbol_id(context, value.0)?;
+        let symbol = &context.symbol_table[symbol_id];
+        let known_block = get_known_block(symbol, value.0)?.clone();
         let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
             known_block.resolve_for_call_block(context);
         add_block(
@@ -2291,9 +2276,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_parent = None;
         context.arg_stack.clear();
         let (parent, this_id) = wrap_in_statement(context, |_, parent, this_id| (parent, this_id));
-        let actual_identifier = get_actual_identifier!(context, value.0)?;
-        let actual_identifier_ref = actual_identifier.borrow();
-        let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+        let symbol_id = get_symbol_id(context, value.0)?;
+        let symbol = &context.symbol_table[symbol_id];
+        let known_block = get_known_block(symbol, value.0)?.clone();
         let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
             known_block.resolve_for_call_block(context);
         add_block(
@@ -2366,9 +2351,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_parent = None;
         context.arg_stack.clear();
         let (parent, this_id) = wrap_in_statement(context, |_, parent, this_id| (parent, this_id));
-        let actual_identifier = get_actual_identifier!(context, value.0)?;
-        let actual_identifier_ref = actual_identifier.borrow();
-        let known_block = get_known_block!(actual_identifier_ref, value.0)?;
+        let symbol_id = get_symbol_id(context, value.0)?;
+        let symbol = &context.symbol_table[symbol_id];
+        let known_block = get_known_block(symbol, value.0)?.clone();
         let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
             known_block.resolve_for_call_block(context);
         add_block(
@@ -2446,7 +2431,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let current_target = context.current_sb3_target.as_ref().unwrap();
 
         let proc_name = value.3.to_single().unwrap().0.clone();
-        let proc_rc = context
+        let proc_symbol_id = context
             .resolve_path(
                 if current_target.is_stage {
                     [SPRITES_ISTRING.clone(), STAGE_ISTRING.clone(), proc_name]
@@ -2460,13 +2445,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 .iter(),
             )
             .unwrap();
-        let proc_ref = proc_rc.borrow();
+        let proc_symbol = &context.symbol_table[proc_symbol_id];
+        let proc_known_block = proc_symbol.known_block.as_ref().unwrap().clone();
         let (proccode, params, is_warp) = if let KnownBlock::CustomBlock {
             proccode,
             call_params: _,
             params,
             is_warp,
-        } = proc_ref.get_block().unwrap()
+        } = proc_known_block.as_ref()
         {
             (proccode, params, is_warp)
         } else {
@@ -2543,8 +2529,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     .unwrap_or_else(|| value.2.to_single().unwrap().0.to_string());
                 (
                     name.as_str().into(),
-                    Rc::new(RefCell::new(Symbol::KnownBlock(
-                        Box::new(KnownBlock::SingletonReporter {
+                    Symbol {
+                        known_block: Some(Rc::new(KnownBlock::SingletonReporter {
                             opcode: if matches!(
                                 value.0,
                                 Some(CustomBlockParamKind {
@@ -2568,21 +2554,30 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             field: None,
                             assign: None,
                             bind_info: None,
-                        }),
-                        HashMap::new(),
-                        Weak::new(),
-                    ))),
+                        })),
+                        namespace: HashMap::new(),
+                        parent: Default::default(),
+                    },
                 )
             })
             .collect::<HashMap<_, _>>();
         const ARGUMENTS_ISTRING: &IString = &literal!("args");
-        Symbol::insert_child(
-            &context.root_symbol,
+        let arguments_symbol_id = context.symbol_table.new_child_symbol(
+            Default::default(),
             ARGUMENTS_ISTRING.clone(),
-            Rc::new(RefCell::new(Symbol::Namespace(arguments, Weak::new()))),
+            None,
+            arguments.len(),
         );
+        for (key, arg) in arguments {
+            let arg = context.symbol_table.new_symbol(arg);
+            context
+                .symbol_table
+                .insert_child(arguments_symbol_id, key, arg);
+        }
         default_visit_custom_block_definition(self, value, context)?;
-        Symbol::remove_child(&context.root_symbol, ARGUMENTS_ISTRING);
+        context.symbol_table[Default::default()]
+            .namespace
+            .remove(ARGUMENTS_ISTRING);
         Ok(())
     }
 
@@ -2636,6 +2631,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .ok_or(GrazeSb3GeneratorError::RepeatedStageInitialization)?;
         let target_name = STAGE_ISTRING.clone();
         let assets = context.target_attachments.remove(&target_name).unwrap();
+        let my_blocks_symbol_id = context
+            .symbol_table
+            .get_child(Default::default(), MY_BLOCKS_ISTRING)
+            .unwrap();
         for asset in assets {
             match asset {
                 TargetAttachment::Costume(costume) => stage.costumes.push(costume),
@@ -2647,18 +2646,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     stage.lists.insert(name, sb3_list_declaration);
                 }
                 TargetAttachment::CustomBlock(name, custom_block) => {
-                    Symbol::insert_child(
-                        &context
-                            .root_symbol
-                            .borrow()
-                            .get_child(MY_BLOCKS_ISTRING)
-                            .unwrap(),
+                    context.symbol_table.new_child_symbol(
+                        my_blocks_symbol_id,
                         name,
-                        Rc::new(RefCell::new(Symbol::KnownBlock(
-                            Box::new(custom_block),
-                            HashMap::new(),
-                            Weak::new(),
-                        ))),
+                        Some(Rc::new(custom_block)),
+                        0,
                     );
                 }
             }
@@ -2669,13 +2661,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .sb3
             .targets
             .push(context.current_sb3_target.take().unwrap());
-        Symbol::clear_children(
-            &context
-                .root_symbol
-                .borrow()
-                .get_child(MY_BLOCKS_ISTRING)
-                .unwrap(),
-        );
+        context.symbol_table[my_blocks_symbol_id].namespace.clear();
         Ok(())
     }
 
@@ -2699,6 +2685,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         // TODO: explicitly error when multiple sprites have the same name
         let assets = context.target_attachments.remove(&target_name).unwrap();
         let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
+        let my_blocks_symbol_id = context
+            .symbol_table
+            .get_child(Default::default(), MY_BLOCKS_ISTRING)
+            .unwrap();
         for asset in assets {
             match asset {
                 TargetAttachment::Costume(costume) => new_sprite.costumes.push(costume),
@@ -2710,18 +2700,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     new_sprite.lists.insert(name, sb3_list_declaration);
                 }
                 TargetAttachment::CustomBlock(name, custom_block) => {
-                    Symbol::insert_child(
-                        &context
-                            .root_symbol
-                            .borrow()
-                            .get_child(MY_BLOCKS_ISTRING)
-                            .unwrap(),
+                    context.symbol_table.new_child_symbol(
+                        my_blocks_symbol_id,
                         name,
-                        Rc::new(RefCell::new(Symbol::KnownBlock(
-                            Box::new(custom_block),
-                            HashMap::new(),
-                            Weak::new(),
-                        ))),
+                        Some(Rc::new(custom_block)),
+                        0,
                     );
                 }
             }
@@ -2738,13 +2721,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .sb3
             .targets
             .push(context.current_sb3_target.take().unwrap());
-        Symbol::clear_children(
-            &context
-                .root_symbol
-                .borrow()
-                .get_child(MY_BLOCKS_ISTRING)
-                .unwrap(),
-        );
+        context.symbol_table[my_blocks_symbol_id].namespace.clear();
         Ok(())
     }
 }
