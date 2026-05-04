@@ -13,14 +13,21 @@ pub use grazelang_library::KnownBlock;
 use grazelang_library::{
     CallBlockParam, CallableKnownBlockSignature, HasShadow, KnownBlockInput,
     SimpleCallableKnownBlockSignature,
-    project_json::{Sb3ListDeclaration, Sb3Primitive, Sb3VariableDeclaration},
+    project_json::{
+        Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock, Sb3VariableDeclaration,
+        TargetAttachment,
+    },
 };
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen::{self, core::AssetFile},
+    codegen::{
+        self,
+        core::AssetFile,
+        ids::{generate_random_id_as_string, generate_random_id_string},
+    },
     names::Namespace,
     parser::ast::CustomBlockParamKindValue,
 };
@@ -551,12 +558,29 @@ pub struct Symbol {
 pub struct BroadcastDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub known_block: Option<Rc<RefCell<Symbol>>>,
 }
 
 impl BroadcastDescriptor {
-    pub fn derive_symbol<T: Rng>(&self, rng: &mut T) -> Symbol {
-        todo!()
+    pub fn derive_related_data<T: Rng>(&self, rng: &mut T) -> (Symbol, TargetAttachment) {
+        let name = self
+            .canonical_name
+            .as_ref()
+            .map(IString::to_string)
+            .unwrap_or_else(|| self.name.to_string());
+        let id = generate_random_id_as_string(rng);
+        (
+            Symbol {
+                known_block: Some(Rc::new(KnownBlock::PrimitiveBlock {
+                    value: Sb3PrimitiveBlock::Broadcast {
+                        name: name.clone(),
+                        id: id.clone(),
+                    },
+                })),
+                namespace: HashMap::new(),
+                parent: Default::default(),
+            },
+            TargetAttachment::Broadcast { name, id },
+        )
     }
 }
 
@@ -638,7 +662,7 @@ impl TargetSymbolDescriptor {
             let mut params = Vec::with_capacity(descriptor.args.len());
             for arg in &descriptor.args {
                 let is_bool = arg.kind == CustomBlockParamKindValue::Boolean;
-                let arg_id = codegen::ids::generate_random_id(rng);
+                let arg_id = codegen::ids::generate_random_id_string(rng);
                 call_params.push(CallBlockParam {
                     kind: grazelang_library::CallBlockParamKind::Input {
                         default: (!is_bool).then(|| {
@@ -765,15 +789,16 @@ impl TargetSymbolDescriptor {
                         name,
                         canonical_name,
                         source,
-                    }) => {
-                        Some(AssetFile { file_name: md5ext, file_path: source.clone() })
-                    }
+                    }) => Some(AssetFile {
+                        file_name: md5ext,
+                        file_path: source.clone(),
+                    }),
                     _ => unreachable!(),
                 },
             ))
         })
         .unwrap_or_else(|| {
-            let id = codegen::ids::generate_random_id(rng);
+            let id = codegen::ids::generate_random_id_string(rng);
             match self {
                 TargetSymbolDescriptor::Var(var_descriptor) => {
                     let canonical_name = namespace.introduce_new_symbol(

@@ -291,9 +291,14 @@ impl GrazeSb3GeneratorContext {
             None,
             parse_context.broadcasts.len(),
         );
-        for (key, value) in &parse_context.broadcasts {
-            let symbol = symbol_table.new_symbol(value.derive_symbol(&mut rng));
-            symbol_table.insert_child(broadcasts_symbol, key.clone(), symbol);
+        {
+            let stage_target_attachments = target_attachments.get_mut("stage").unwrap();
+            for (key, value) in &parse_context.broadcasts {
+                let (symbol, target_attachment) = value.derive_related_data(&mut rng);
+                stage_target_attachments.push(target_attachment);
+                let symbol = symbol_table.new_symbol(symbol);
+                symbol_table.insert_child(broadcasts_symbol, key.clone(), symbol);
+            }
         }
         let variables_symbol =
             symbol_table.new_child_symbol(root_symbol, literal!("vars"), None, 0);
@@ -2683,6 +2688,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         0,
                     );
                 }
+                TargetAttachment::Broadcast { name, id } => {
+                    stage.broadcasts.insert(id, name);
+                }
             }
         }
         context.current_sb3_target = Some(stage);
@@ -2736,6 +2744,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         Some(Rc::new(custom_block)),
                         0,
                     );
+                }
+                TargetAttachment::Broadcast { name, id } => {
+                    new_sprite.broadcasts.insert(id, name);
                 }
             }
         }

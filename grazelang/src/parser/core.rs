@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use arcstr::{ArcStr as IString, literal};
-use logos::Lexer;
+use logos::{Lexer, Logos};
 use std::{collections::VecDeque, iter::Peekable, vec};
 
 macro_rules! static_current_context {
@@ -99,7 +99,7 @@ macro_rules! match_token_or_return_none {
 
 macro_rules! peek_token {
     ($token_stream:expr) => {
-        match $token_stream.0.peek() {
+        match $token_stream.peek() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return {
@@ -117,7 +117,7 @@ macro_rules! peek_token {
         }
     };
     (optional $token_stream:expr) => {
-        match $token_stream.0.peek() {
+        match $token_stream.peek() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
@@ -129,7 +129,7 @@ macro_rules! peek_token {
         }
     };
     ($token_stream:expr => Option) => {
-        match $token_stream.0.peek() {
+        match $token_stream.peek() {
             Some(Ok(value)) => Some(value),
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
@@ -144,8 +144,7 @@ macro_rules! peek_token {
 
 macro_rules! next_token {
     ($token_stream:expr) => {{
-        $token_stream.1.next();
-        match $token_stream.0.next() {
+        match $token_stream.next() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
@@ -161,8 +160,7 @@ macro_rules! next_token {
         }
     }};
     (optional $token_stream:expr) => {{
-        $token_stream.1.next();
-        match $token_stream.0.next() {
+        match $token_stream.next() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck(
@@ -174,8 +172,7 @@ macro_rules! next_token {
         }
     }};
     ($token_stream:expr => Option) => {{
-        $token_stream.1.next();
-        match $token_stream.0.next() {
+        match $token_stream.next() {
             Some(Ok(value)) => Some(value),
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck(
@@ -190,8 +187,7 @@ macro_rules! next_token {
 
 macro_rules! skip_token {
     ($token_stream:expr) => {{
-        $token_stream.1.next();
-        if let Some(Err(_)) = $token_stream.0.next() {
+        if let Some(Err(_)) = $token_stream.next() {
             return Err(ParseError::LexerStuck {
                 context: static_current_context!(),
                 pos_range: get_token_position!($token_stream),
@@ -202,19 +198,19 @@ macro_rules! skip_token {
 
 macro_rules! get_token_position {
     ($token_stream:expr) => {
-        internal_get_pos_range($token_stream.1, $token_stream.1.span())
+        $token_stream.span()
     };
 }
 
 macro_rules! get_token_start {
     ($token_stream:expr) => {
-        internal_get_position($token_stream.1, $token_stream.1.span().start)
+        $token_stream.span().0
     };
 }
 
 macro_rules! get_token_end {
     ($token_stream:expr) => {
-        internal_get_position($token_stream.1, $token_stream.1.span().end)
+        $token_stream.span().1
     };
 }
 
@@ -259,22 +255,63 @@ macro_rules! with_mut_target_scope_or_global_scope {
     };
 }
 
-#[macro_export]
-macro_rules! make_parse_in {
-    ($lexer:expr) => {
-        &mut (&mut (&mut $lexer.clone()).peekable(), $lexer)
-    };
-}
-
-type ParseIn<'a, 'b, 'c, 'd, 'e, 'f> = &'a mut (
-    &'b mut Peekable<&'c mut Lexer<'d, Token>>,
-    &'e mut Lexer<'f, Token>,
-);
+type ParseIn<'a, 'b> = &'a mut PeekableLexer<'b>;
 type ParseOut<T> = Result<T, ParseError>;
 
-pub fn enter(lex: &mut Lexer<Token>) -> ParseOut<GrazeProgram> {
+#[derive(Debug, Clone)]
+pub struct PeekableLexer<'a> {
+    pub lexer: Lexer<'a, Token>,
+    pub peeked_token: Option<Option<Result<Token, <Token as Logos<'a>>::Error>>>,
+    pub current_span: Option<PosRange>,
+}
+
+impl<'a> Iterator for PeekableLexer<'a> {
+    type Item = Result<Token, <Token as Logos<'a>>::Error>;
+    fn next(&mut self) -> Option<Result<Token, <Token as Logos<'a>>::Error>> {
+        if let Some(token) = self.peeked_token.take() {
+            return token;
+        }
+        self.current_span = None;
+        self.lexer.next()
+    }
+}
+
+impl<'a> PeekableLexer<'a> {
+    pub fn new(lexer: Lexer<'a, Token>) -> Self {
+        Self {
+            lexer,
+            current_span: None,
+            peeked_token: None,
+        }
+    }
+
+    pub fn peek(&mut self) -> Option<&Result<Token, <Token as Logos<'a>>::Error>> {
+        self.peeked_token
+            .get_or_insert_with(|| {
+                self.current_span = Some(internal_get_pos_range(&self.lexer, self.lexer.span()));
+                self.lexer.next()
+            })
+            .as_ref()
+        // if let Some(peeked) = &self.peeked_token {
+        //     return Some(peeked);
+        // }
+        // self.peeked_token = self.lexer.next();
+        // self.peeked_token.as_ref()
+    }
+
+    pub fn span(&mut self) -> PosRange {
+        if let Some(current_span) = self.current_span {
+            return current_span;
+        }
+        let current_span = internal_get_pos_range(&self.lexer, self.lexer.span());
+        self.current_span = Some(current_span);
+        current_span
+    }
+}
+
+pub fn enter(lex: Lexer<Token>) -> ParseOut<GrazeProgram> {
     let mut context = ParseContext::new();
-    parse_graze_program(make_parse_in!(lex), &mut context)
+    parse_graze_program(&mut PeekableLexer::new(lex), &mut context)
 }
 
 pub fn parse_graze_program(
@@ -2592,7 +2629,6 @@ pub fn parse_top_level_statement(
                 BroadcastDescriptor {
                     name: name.clone(),
                     canonical_name,
-                    known_block: None,
                 },
             );
             let return_val = Ok(TopLevelStatement::BroadcastDeclaration(

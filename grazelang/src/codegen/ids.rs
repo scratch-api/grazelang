@@ -52,12 +52,16 @@ const ID_SOUP: &[u8] =
     b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%()*+,-./:;=?@[]^_`{|}~";
 const ID_LENGTH: usize = 20;
 
-pub fn generate_random_id<T: Rng>(rng: &mut T) -> IdString {
+pub fn generate_random_id_as_string<T: Rng>(rng: &mut T) -> String {
     static UNIFORM_LOCK: OnceLock<Uniform<usize>> = OnceLock::new();
     let uniform = UNIFORM_LOCK.get_or_init(|| Uniform::new(0, ID_SOUP.len()).unwrap());
     let mut id = String::with_capacity(ID_LENGTH);
     for char_idx in uniform.sample_iter(rng).take(ID_LENGTH) {
         id.push(ID_SOUP[char_idx] as char);
     }
-    id.into()
+    id
+}
+
+pub fn generate_random_id_string<T: Rng>(rng: &mut T) -> IdString {
+    generate_random_id_as_string(rng).into()
 }

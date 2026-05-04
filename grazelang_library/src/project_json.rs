@@ -1391,6 +1391,7 @@ pub enum TargetAttachment {
     Var(String, Sb3VariableDeclaration),
     List(String, Sb3ListDeclaration),
     CustomBlock(IString, KnownBlock),
+    Broadcast { name: String, id: String },
 }
 
 impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
