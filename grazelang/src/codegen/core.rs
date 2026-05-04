@@ -90,6 +90,13 @@ pub struct GrazeSb3GeneratorContext {
     pub current_previous_block: Option<IdString>,
     pub formatted_string_context: FormattedStringContext,
     pub target_attachments: HashMap<IString, Vec<TargetAttachment>>,
+    pub asset_files: HashMap<String, IString>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssetFile {
+    pub file_name: String,
+    pub file_path: IString,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -211,6 +218,7 @@ impl GrazeSb3GeneratorContext {
             None,
             targets.len(),
         );
+        let mut asset_files = HashMap::new();
         let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
             let mut namespace = Namespace::new();
@@ -237,22 +245,29 @@ impl GrazeSb3GeneratorContext {
                 .borrow_symbols()
                 .iter()
                 .map(|(key, value)| {
-                    value
-                        .derive_symbol_and_attachment(&mut rng, &mut namespace)
-                        .map(|(mut symbol, attachment)| {
+                    value.derive_related_data(&mut rng, &mut namespace).map(
+                        |(mut symbol, attachment, asset_file)| {
                             add_bind_info(&mut symbol, target.get_namespace_name());
+                            if let Some(AssetFile {
+                                file_name,
+                                file_path,
+                            }) = asset_file
+                            {
+                                asset_files.insert(file_name, file_path);
+                            }
                             ((key.clone(), symbol), attachment)
-                        })
+                        },
+                    )
                 })
                 .try_fold::<_, _, Result<_, std::io::Error>>(
                     (HashMap::with_capacity(symbol_count), Vec::new()),
-                    |(mut symbols, mut assets), item| {
+                    |(mut symbols, mut target_attachments), item| {
                         let ((key, symbol), asset) = item?;
                         symbols.insert(key, symbol);
                         if let Some(asset) = asset {
-                            assets.push(asset);
+                            target_attachments.push(asset);
                         }
-                        Ok((symbols, assets))
+                        Ok((symbols, target_attachments))
                     },
                 )?;
             symbols.extend(if is_stage {
@@ -289,9 +304,16 @@ impl GrazeSb3GeneratorContext {
             for (name, symbol) in parse_context.global_symbols.drain() {
                 match &symbol {
                     TargetSymbolDescriptor::Var(_) => {
-                        let (symbol, attachment) = symbol
-                            .derive_symbol_and_attachment(&mut rng, &mut global_namespace)
+                        let (symbol, attachment, asset_file) = symbol
+                            .derive_related_data(&mut rng, &mut global_namespace)
                             .unwrap();
+                        if let Some(AssetFile {
+                            file_name,
+                            file_path,
+                        }) = asset_file
+                        {
+                            asset_files.insert(file_name, file_path);
+                        }
                         let mut symbol_for_stage: Symbol = Symbol {
                             known_block: symbol
                                 .known_block
@@ -310,9 +332,16 @@ impl GrazeSb3GeneratorContext {
                         symbol_table.insert_child(variables_symbol, name, symbol);
                     }
                     TargetSymbolDescriptor::List(_) => {
-                        let (symbol, attachment) = symbol
-                            .derive_symbol_and_attachment(&mut rng, &mut global_namespace)
+                        let (symbol, attachment, asset_file) = symbol
+                            .derive_related_data(&mut rng, &mut global_namespace)
                             .unwrap();
+                        if let Some(AssetFile {
+                            file_name,
+                            file_path,
+                        }) = asset_file
+                        {
+                            asset_files.insert(file_name, file_path);
+                        }
                         if let Some(attachment) = attachment {
                             stage_target_attachments.push(attachment);
                         }
@@ -338,6 +367,7 @@ impl GrazeSb3GeneratorContext {
             current_previous_block: None,
             formatted_string_context: FormattedStringContext::new(),
             target_attachments,
+            asset_files,
         })
     }
 

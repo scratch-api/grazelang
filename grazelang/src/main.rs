@@ -13,5 +13,7 @@ fn main() {
 
     visitor.visit_graze_program(&parsed, &mut context).unwrap();
 
+    dbg!(&context.asset_files);
+
     println!("{}", serde_json::to_string(&context.sb3).unwrap());
 }

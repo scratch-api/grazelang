@@ -19,7 +19,11 @@ use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
-use crate::{codegen, names::Namespace, parser::ast::CustomBlockParamKindValue};
+use crate::{
+    codegen::{self, core::AssetFile},
+    names::Namespace,
+    parser::ast::CustomBlockParamKindValue,
+};
 
 pub type IdString = IString;
 
@@ -577,11 +581,18 @@ impl TargetSymbolDescriptor {
         Ok(hex_digest)
     }
 
-    pub fn derive_symbol_and_attachment<T: Rng>(
+    pub fn derive_related_data<T: Rng>(
         &self,
         rng: &mut T,
         namespace: &mut Namespace,
-    ) -> Result<(Symbol, Option<codegen::project_json::TargetAttachment>), std::io::Error> {
+    ) -> Result<
+        (
+            Symbol,
+            Option<codegen::project_json::TargetAttachment>,
+            Option<AssetFile>,
+        ),
+        std::io::Error,
+    > {
         pub fn get_file_extension_unwrapped(this: &TargetSymbolDescriptor) -> &str {
             match this {
                 TargetSymbolDescriptor::Costume(CostumeDescriptor {
@@ -667,6 +678,7 @@ impl TargetSymbolDescriptor {
                         },
                     ),
                 ),
+                None,
             ));
         }
         match self {
@@ -679,6 +691,7 @@ impl TargetSymbolDescriptor {
         .transpose()?
         .map(|value| {
             let file_ext = get_file_extension_unwrapped(self);
+            let md5ext = format!("{}.{}", value, file_ext);
             Ok((
                 Symbol {
                     known_block: Some(Rc::new(match self {
@@ -711,7 +724,7 @@ impl TargetSymbolDescriptor {
                             codegen::project_json::Sb3Costume {
                                 asset_id: value.clone(),
                                 name: canonical_name.as_ref().unwrap_or(name).to_string(),
-                                md5ext: format!("{}.{}", value, file_ext),
+                                md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
                                 bitmap_resolution: Some(1.0), // TODO: better default and more control
                                 rotation_center_x: 0.0,
@@ -728,7 +741,7 @@ impl TargetSymbolDescriptor {
                             codegen::project_json::Sb3Sound {
                                 asset_id: value.clone(),
                                 name: canonical_name.as_ref().unwrap_or(name).to_string(),
-                                md5ext: format!("{}.{}", value, file_ext),
+                                md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
                                 rate: 48000.0, // TODO: better default and more control
                                 sample_count: 1124,
@@ -736,7 +749,27 @@ impl TargetSymbolDescriptor {
                         ))
                     }
                     _ => unreachable!(),
-                }, // TODO: add asset
+                },
+                match self {
+                    TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                        name,
+                        canonical_name,
+                        source,
+                    })
+                    | TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                        name,
+                        canonical_name,
+                        source,
+                    })
+                    | TargetSymbolDescriptor::Sound(SoundDescriptor {
+                        name,
+                        canonical_name,
+                        source,
+                    }) => {
+                        Some(AssetFile { file_name: md5ext, file_path: source.clone() })
+                    }
+                    _ => unreachable!(),
+                },
             ))
         })
         .unwrap_or_else(|| {
@@ -773,6 +806,7 @@ impl TargetSymbolDescriptor {
                                 is_cloud: var_descriptor.is_cloud,
                             },
                         )),
+                        None,
                     ))
                 }
                 TargetSymbolDescriptor::List(list_descriptor) => {
@@ -804,6 +838,7 @@ impl TargetSymbolDescriptor {
                                 },
                             ),
                         )),
+                        None,
                     ))
                 }
                 TargetSymbolDescriptor::CustomBlockDescriptor(_)
