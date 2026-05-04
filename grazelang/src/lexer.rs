@@ -14,7 +14,10 @@ use crate::string_unescape::unescape;
 #[logos(skip r"[ \t\f]+")]
 #[logos(skip(r"\n|\r\n?", register_newline))]
 #[logos(skip(r"//[^\n]*", allow_greedy = true))]
-#[logos(skip r"/\*(?:[^*]|(?:\*[^/]))*?\*/")]
+#[logos(skip(
+    r"/\*(?:[^*]|(?:\*[^/]))*?\*/",
+    register_newlines_from_multiline_comment
+))]
 pub enum Token {
     #[token("sprite")]
     SpriteKeyword,
@@ -82,9 +85,9 @@ pub enum Token {
     Minus,
     #[token("!")]
     Not,
-    #[regex(r"[eE]\s*\^")]
+    #[regex(r"[eE] *\^")]
     Exp,
-    #[regex(r"10\s*\^")]
+    #[regex(r"10 *\^")]
     Pow,
     #[token("*")]
     Times,
@@ -113,9 +116,9 @@ pub enum Token {
     Or,
     #[token("..")]
     Unwrap,
-    #[regex(r#""(?:[^\\"$]|(?:\\.))*""#, parse_simple_string_literal)]
+    #[regex(r#""(?:[^\\"$\r\n]|(?:\\.))*""#, parse_simple_string_literal)]
     SimpleString(IString),
-    #[regex(r#"`(?:[^\\`]|(?:\\.))*`"#, parse_canonical_name)]
+    #[regex(r#"`(?:[^\\`\r\n]|(?:\\.))*`"#, parse_canonical_name)]
     CanonicalIdentifier(IString),
     #[regex(r#"\w+"#, parse_string)]
     Identifier(IString),
@@ -138,12 +141,8 @@ pub enum Token {
     OctalInt(IString),
     #[regex(r#"0b[01](?:_?[01])*"#, parse_number)]
     BinaryInt(IString),
-    #[regex(r#""(?:[^"$]|(?:\\.))*\$\{"#, parse_left_format_string)]
+    #[regex(r#""(?:[^\\"$\r\n]|(?:\\.))*\$\{"#, parse_left_format_string)]
     LeftFormattedString(IString),
-    // #[regex(r#"\}(?:[^"$]|(?:\\.))*\$\{"#, parse_middle_format_string)]
-    // MiddleFormattedString(IString),
-    // #[regex(r#"\}(?:[^"$]|(?:\\.))*""#, parse_right_format_string)]
-    // RightFormattedString(IString),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -156,17 +155,11 @@ pub enum LexedRightBrace {
 pub fn parse_simple_string_literal(lex: &mut Lexer<Token>) -> Option<IString> {
     let slice = lex.slice();
     unescape(&slice[1..slice.len() - 1]).map(Into::into).ok()
-    // json_from_str::<'_, IString>(lex.slice()).ok()
 }
 
 pub fn parse_canonical_name(lex: &mut Lexer<Token>) -> Option<IString> {
     let slice = lex.slice();
     unescape(&slice[1..slice.len() - 1]).map(Into::into).ok()
-    // let inner = &slice[1..slice.len() - 1];
-    // json_from_str::<'_, IString>(
-    //     format!("\"{}\"", inner.replace('"', "\\\"").replace("\\`", "`")).as_str(),
-    // )
-    // .ok()
 }
 
 pub fn parse_string(lex: &mut Lexer<Token>) -> IString {
@@ -187,12 +180,12 @@ pub fn parse_left_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
 
 fn middle_regex_continuation() -> &'static Regex {
     static REGEX_LOCK: OnceLock<Regex> = OnceLock::new();
-    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*\$\{"#).unwrap())
+    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.))*\$\{"#).unwrap())
 }
 
 fn end_regex_continuation() -> &'static Regex {
     static REGEX_LOCK: OnceLock<Regex> = OnceLock::new();
-    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^"$]|(?:\\.))*""#).unwrap())
+    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.))*""#).unwrap())
 }
 
 pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
@@ -232,6 +225,18 @@ pub fn parse_right_format_string(slice: &str) -> Option<IString> {
 
 pub fn register_newline(lex: &mut Lexer<Token>) {
     lex.extras.0.push(lex.span().end);
+}
+
+pub fn register_newlines_from_multiline_comment(lex: &mut Lexer<Token>) {
+    let mut extras = Vec::new();
+    let slice: &str = lex.slice();
+    let start_offset = lex.span().start;
+    for (i, b) in slice.bytes().enumerate() {
+        if b == b'\n' {
+            extras.push(start_offset + i + 1);
+        }
+    }
+    lex.extras.0.extend(extras);
 }
 
 pub type PosRange = ((usize, usize), (usize, usize));

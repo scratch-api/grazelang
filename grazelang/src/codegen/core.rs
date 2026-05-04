@@ -72,6 +72,22 @@ pub enum GrazeSb3GeneratorError {
     PassedNormalParamAsBlockStack { param: Param },
 }
 
+#[derive(Debug, Error)]
+pub enum GrazeSb3GeneratorCreationError {
+    #[error("io error: {error:?}")]
+    IoError { error: std::io::Error },
+    #[error("you cannot call two sprites the same name: {name:?}")]
+    ShadowedSprite { name: String },
+    #[error("you cannot call a sprite \"stage\", try using a canonical name")]
+    ShadowedStage,
+}
+
+impl From<std::io::Error> for GrazeSb3GeneratorCreationError {
+    fn from(value: std::io::Error) -> Self {
+        Self::IoError { error: value }
+    }
+}
+
 pub struct GrazeSb3Generator;
 
 #[derive(Debug, Clone)]
@@ -85,6 +101,7 @@ pub struct GrazeSb3GeneratorContext {
     pub current_block_id: IdString,
     pub current_parent: Option<String>,
     pub current_sb3_target: Option<Sb3Target>,
+    pub current_target_symbol_name: Option<IString>,
     /// Is None while and after being initialized
     pub uninitialized_stage: Option<Sb3Target>,
     pub current_previous_block: Option<IdString>,
@@ -172,7 +189,7 @@ pub const SPRITES_ISTRING: &IString = &literal!("sprites");
 pub const MY_BLOCKS_ISTRING: &IString = &literal!("my_blocks");
 
 impl GrazeSb3GeneratorContext {
-    pub fn new(parse_context: ParseContext) -> Result<Self, std::io::Error> {
+    pub fn new(parse_context: ParseContext) -> Result<Self, GrazeSb3GeneratorCreationError> {
         let mut this = Self::without_standard_namespaces(parse_context)?;
         library::add_standard_library_namespaces(&mut this.symbol_table, Default::default());
         Self::alias_standard_namespaces(&mut this.symbol_table, Default::default());
@@ -200,7 +217,7 @@ impl GrazeSb3GeneratorContext {
 
     pub fn without_standard_namespaces(
         mut parse_context: ParseContext,
-    ) -> Result<Self, std::io::Error> {
+    ) -> Result<Self, GrazeSb3GeneratorCreationError> {
         let mut rng = Xoshiro256StarStar::from_seed(parse_context.random_seed);
         let targets: Vec<Target> = parse_context.parsed_targets.into();
         let standard_library_namespace_count = library::get_standard_library_namespace_count();
@@ -221,6 +238,16 @@ impl GrazeSb3GeneratorContext {
         let mut asset_files = HashMap::new();
         let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
+            if let Target::Sprite {
+                name,
+                canonical_name: _,
+                symbols: _,
+            } = target
+            {
+                if name.as_str() == "stage" {
+                    return Err(GrazeSb3GeneratorCreationError::ShadowedStage);
+                }
+            }
             let mut namespace = Namespace::new();
 
             let is_stage = matches!(target, Target::Stage { .. });
@@ -275,7 +302,14 @@ impl GrazeSb3GeneratorContext {
             } else {
                 create_sprite_dependent_symbols(target.get_namespace_name())
             });
-            target_attachments.insert(target.get_namespace_name().clone(), assets);
+            if target_attachments
+                .insert(target.get_namespace_name().clone(), assets)
+                .is_some()
+            {
+                return Err(GrazeSb3GeneratorCreationError::ShadowedSprite {
+                    name: target.get_namespace_name().to_string(),
+                });
+            }
             for (key, symbol) in symbols {
                 let symbol = symbol_table.new_symbol(symbol);
                 symbol_table.insert_child(target_symbol, key, symbol);
@@ -368,6 +402,7 @@ impl GrazeSb3GeneratorContext {
             current_block_id: next_block_id,
             current_parent: None,
             current_sb3_target: None,
+            current_target_symbol_name: None,
             uninitialized_stage: Some(Sb3Target::new_stage()),
             current_previous_block: None,
             formatted_string_context: FormattedStringContext::new(),
@@ -1106,14 +1141,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
         }
         let section_count = value.0.len();
-        context.formatted_string_context = FormattedStringContext {
-            ids: if section_count == 1 {
-                vec![context.current_parent.clone()]
-            } else {
-                Vec::with_capacity(section_count)
+        let prev_formatted_string_context = std::mem::replace(
+            &mut context.formatted_string_context,
+            FormattedStringContext {
+                ids: if section_count == 1 {
+                    vec![context.current_parent.clone()]
+                } else {
+                    Vec::with_capacity(section_count)
+                },
+                current_idx: 0,
             },
-            current_idx: 0,
-        };
+        );
         let formatted_string = join_recursively(context, value.0);
         let formatted_string = match formatted_string {
             FormattedStringTree::Expression => {
@@ -1139,6 +1177,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
         };
         default_visit_expression_formatted_string(self, value, context)?;
+        context.formatted_string_context = prev_formatted_string_context;
         let param = convert_into_block_tree(context, formatted_string)?;
         context.push_param(param);
         Ok(())
@@ -2473,7 +2512,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } else {
                     [
                         SPRITES_ISTRING.clone(),
-                        current_target.name.as_str().into(),
+                        context
+                            .current_target_symbol_name
+                            .as_ref()
+                            .unwrap()
+                            .as_str()
+                            .into(),
                         proc_name,
                     ]
                 }
@@ -2665,7 +2709,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .take()
             .ok_or(GrazeSb3GeneratorError::RepeatedStageInitialization)?;
         let target_name = STAGE_ISTRING.clone();
-        let assets = context.target_attachments.remove(&target_name).unwrap();
+        let assets = context.target_attachments.remove("stage").unwrap();
         let my_blocks_symbol_id = context
             .symbol_table
             .get_child(Default::default(), MY_BLOCKS_ISTRING)
@@ -2694,6 +2738,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
         }
         context.current_sb3_target = Some(stage);
+        context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
         default_visit_top_level_statement_stage(self, value, context)?;
         context
             .sb3
@@ -2721,7 +2766,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .map(|value| value.name.clone())
             .unwrap_or_else(|| value.2.names.last().unwrap().0.clone());
         // TODO: explicitly error when multiple sprites have the same name
-        let assets = context.target_attachments.remove(&target_name).unwrap();
+        let assets = context
+            .target_attachments
+            .remove(&value.2.to_single().unwrap().0)
+            .unwrap();
         let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
         let my_blocks_symbol_id = context
             .symbol_table
@@ -2757,6 +2805,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 0
             };
         context.current_sb3_target = Some(new_sprite);
+        context.current_target_symbol_name = Some(value.2.to_single().unwrap().0.clone());
         default_visit_top_level_statement_sprite(self, value, context)?;
         context
             .sb3
