@@ -3,7 +3,7 @@ stage {
     backdrop test_costume("src/empty.svg");
 }
 
-sprite sawd {
+sprite `Sprite1` sprite_1 {
     costume test_costume("src/empty.svg");
     let global test;
     let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];

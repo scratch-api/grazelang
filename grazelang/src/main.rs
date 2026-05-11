@@ -1,4 +1,4 @@
-use grazelang::parser::parse_context::ParseContext;
+use grazelang::parser::parse_context::{GrazeMessage, ParseContext};
 use grazelang::visitor::GrazeVisitor;
 use grazelang::{
     codegen, lexer,
@@ -10,6 +10,15 @@ fn main() {
     let mut context = ParseContext::new();
 
     let parsed = parser::parse_graze_program(&mut PeekableLexer::new(lexer), &mut context).unwrap();
+
+    for message in &context.messages {
+        dbg!(message);
+    }
+
+    if !context.successful {
+        dbg!(parsed);
+        panic!("Parsing unsuccessful.");
+    }
 
     let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
     let visitor = codegen::core::GrazeSb3Generator;

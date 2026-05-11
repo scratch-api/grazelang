@@ -243,11 +243,9 @@ impl GrazeSb3GeneratorContext {
                 canonical_name: _,
                 symbols: _,
             } = target
-            {
-                if name.as_str() == "stage" {
+                && name.as_str() == "stage" {
                     return Err(GrazeSb3GeneratorCreationError::ShadowedStage);
                 }
-            }
             let mut namespace = Namespace::new();
 
             let is_stage = matches!(target, Target::Stage { .. });

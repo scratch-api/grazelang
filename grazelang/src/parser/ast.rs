@@ -34,6 +34,7 @@ pub enum TopLevelStatement {
         PosRange,
     ),
     EmptyStatement(Semicolon),
+    InvalidStatement(PosRange),
 }
 
 impl GetPos for TopLevelStatement {
@@ -43,6 +44,7 @@ impl GetPos for TopLevelStatement {
             TopLevelStatement::Sprite(_, _, _, _, _, p) => p,
             TopLevelStatement::BroadcastDeclaration(_, _, _, _, p) => p,
             TopLevelStatement::EmptyStatement(p) => &p.0,
+            TopLevelStatement::InvalidStatement(p) => p,
         }
     }
 }
@@ -198,6 +200,7 @@ pub enum StageStatement {
         PosRange,
     ),
     EmptyStatement(Semicolon),
+    InvalidStatement(PosRange),
 }
 
 impl GetPos for StageStatement {
@@ -213,6 +216,7 @@ impl GetPos for StageStatement {
             StageStatement::IsolatedBlock(_, _, p) => p,
             StageStatement::IsolatedExpression(_, _, _, _, p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
+            StageStatement::InvalidStatement(p) => p,
         }
     }
 }
@@ -265,6 +269,7 @@ pub enum SpriteStatement {
         PosRange,
     ),
     EmptyStatement(Semicolon),
+    InvalidStatement(PosRange),
 }
 
 impl GetPos for SpriteStatement {
@@ -280,6 +285,7 @@ impl GetPos for SpriteStatement {
             SpriteStatement::IsolatedBlock(_, _, p) => p,
             SpriteStatement::IsolatedExpression(_, _, _, _, p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
+            SpriteStatement::InvalidStatement(p) => p,
         }
     }
 }
@@ -383,6 +389,7 @@ pub enum Statement {
         PosRange,
     ),
     EmptyStatement(Semicolon),
+    InvalidStatement(PosRange),
 }
 
 impl GetPos for Statement {
@@ -398,6 +405,7 @@ impl GetPos for Statement {
             Statement::Forever(_, _, _, p) => p,
             Statement::IfElse(_, _, _, _, p) => p,
             Statement::EmptyStatement(p) => &p.0,
+            Statement::InvalidStatement(p) => p,
         }
     }
 }
@@ -1212,23 +1220,25 @@ pub enum ParseError {
     #[error(
         "the lexer reached the end of input without the parser completing (context: {context})"
     )]
-    UnexpectedEndOfInput { context: &'static str },
+    UnexpectedEndOfInput { context: IString },
     #[error("unexpected token at {pos_range:?}, expected {expected} (context: {context})")]
     UnexpectedToken {
-        expected: &'static str,
-        message: &'static str,
-        context: &'static str,
+        expected: IString,
+        message: IString,
+        context: IString,
         found: crate::lexer::Token,
         pos_range: PosRange,
     },
     #[error("the lexer got stuck after the token at {pos_range:?} (context: {context})")]
     LexerStuck {
-        context: &'static str,
+        context: IString,
         pos_range: PosRange,
     },
     #[error("tried to declare a local symbol in stage at {pos_range:?} (context: {context})")]
     LocalSymbolInStage {
-        context: &'static str,
+        context: IString,
         pos_range: PosRange,
     },
+    #[error("tried to peek back at the beginning of the content (context: {context:?})")]
+    PeekedBackAtBeginning { context: IString },
 }

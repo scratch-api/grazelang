@@ -639,6 +639,9 @@ where
         TopLevelStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
+        TopLevelStatement::InvalidStatement(_) => {
+            panic!("You must pass a valid AST to the visitor.")
+        }
     }
     Ok(())
 }
@@ -858,6 +861,7 @@ where
         StageStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
+        StageStatement::InvalidStatement(_) => panic!("You must pass a valid AST to the visitor."),
     }
     Ok(())
 }
@@ -985,6 +989,7 @@ where
         SpriteStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
+        SpriteStatement::InvalidStatement(_) => panic!("You must pass a valid AST to the visitor."),
     }
     Ok(())
 }
@@ -1305,6 +1310,7 @@ where
         Statement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
+        Statement::InvalidStatement(_) => panic!("You must pass a valid AST to the visitor."),
     }
     Ok(())
 }

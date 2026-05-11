@@ -28,8 +28,9 @@ use crate::{
         core::AssetFile,
         ids::{generate_random_id_as_string, generate_random_id_string},
     },
+    lexer::PosRange,
     names::Namespace,
-    parser::ast::CustomBlockParamKindValue,
+    parser::ast::{CustomBlockParamKindValue, ParseError},
 };
 
 pub type IdString = IString;
@@ -941,6 +942,89 @@ impl Target {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GrazeError {
+    Plain(String, PosRange),
+    ParseError(ParseError),
+}
+
+impl From<ParseError> for GrazeError {
+    fn from(value: ParseError) -> Self {
+        Self::ParseError(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GrazeWarning {
+    Plain(String, PosRange),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GrazeInfo {
+    Plain(String, PosRange),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GrazeSuggestion {
+    SimpleCodeChange {
+        replace_pos_range: PosRange,
+        replace_text: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum GrazeMessage {
+    Error(GrazeError, Option<GrazeSuggestion>),
+    Warning(GrazeWarning, Option<GrazeSuggestion>),
+    Info(GrazeInfo, Option<GrazeSuggestion>),
+}
+
+impl From<ParseError> for GrazeMessage {
+    fn from(value: ParseError) -> Self {
+        Self::Error(value.into(), None)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum GrazeMessageSetting {
+    // Maybe there will be settings inbetween later
+    #[default]
+    /// tag: 255, is default
+    All,
+    /// tag: 9
+    Infos,
+    /// tag: 6
+    Warnings,
+    /// tag: 3
+    Errors,
+    /// tag: 0
+    None,
+}
+
+impl GrazeMessageSetting {
+    pub fn get_numeric(&self) -> u8 {
+        match self {
+            GrazeMessageSetting::All => 255,
+            GrazeMessageSetting::Infos => 9,
+            GrazeMessageSetting::Warnings => 6,
+            GrazeMessageSetting::Errors => 3,
+            GrazeMessageSetting::None => 0,
+        }
+    }
+}
+
+impl PartialOrd for GrazeMessageSetting {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for GrazeMessageSetting {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.get_numeric().cmp(&other.get_numeric())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ParseContext {
     // If stage is in this, it should be the first element
@@ -950,10 +1034,16 @@ pub struct ParseContext {
     pub next_target: Option<Target>,
     pub global_symbols: HashMap<IString, TargetSymbolDescriptor>,
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
+    pub messages: Vec<GrazeMessage>,
+    pub message_setting: GrazeMessageSetting,
+    pub successful: bool,
 }
 
 impl ParseContext {
-    pub fn new() -> Self {
+    pub fn with_seed_and_message_setting(
+        random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
+        message_setting: GrazeMessageSetting,
+    ) -> Self {
         Self {
             parsed_targets: VecDeque::from([Target::Stage {
                 symbols: HashMap::new(),
@@ -965,8 +1055,23 @@ impl ParseContext {
             // )])),
             global_symbols: HashMap::new(),
             next_target: None,
-            random_seed: Default::default(),
+            random_seed,
+            messages: Vec::new(),
+            message_setting,
+            successful: true,
         }
+    }
+
+    pub fn with_seed(random_seed: <Xoshiro256StarStar as SeedableRng>::Seed) -> Self {
+        Self::with_seed_and_message_setting(random_seed, Default::default())
+    }
+
+    pub fn with_message_setting(message_setting: GrazeMessageSetting) -> Self {
+        Self::with_seed_and_message_setting(Default::default(), message_setting)
+    }
+
+    pub fn new() -> Self {
+        Self::with_seed_and_message_setting(Default::default(), Default::default())
     }
 
     // pub fn get_stage_mut(&mut self) -> &mut Target {

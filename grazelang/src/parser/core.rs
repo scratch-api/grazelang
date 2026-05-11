@@ -3,13 +3,10 @@ use super::{
         self, BinOp, CodeBlock, Expression, Identifier, ParseError, SpriteStatement,
         StageStatement, Statement,
     },
-    parse_context::ParseContext,
+    parse_context::{GrazeMessageSetting, ParseContext},
 };
 use crate::{
-    lexer::{
-        self, PosRange, Token, get_pos_range as internal_get_pos_range,
-        get_position as internal_get_position,
-    },
+    lexer::{self, PosRange, Token, get_pos_range as internal_get_pos_range},
     parser::{
         ast::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
         parse_context::{self, BroadcastDescriptor},
@@ -33,16 +30,22 @@ macro_rules! static_current_context {
 }
 
 macro_rules! expect_token {
-    ($token_stream:expr, $pattern:pat => (), $msg1:expr, $msg2:expr) => {{
-        let token = next_token!($token_stream);
-        if !matches!(token, $pattern) {
-            emit_unexpected_token!($token_stream, $msg1, $msg2, token)
-        }
-    }};
     ($token_stream:expr, $pattern:pat => $value:expr, $msg1:expr, $msg2:expr) => {{
         match next_token!($token_stream) {
             $pattern => $value,
             token => emit_unexpected_token!($token_stream, $msg1, $msg2, token),
+        }
+    }};
+}
+
+macro_rules! expect_token_or_message {
+    ($token_stream:expr, $context:expr, $pattern:pat => $value:expr, $msg1:expr, $msg2:expr, $default_value:expr) => {{
+        match next_token!($token_stream) {
+            $pattern => $value,
+            token => {
+                emit_unexpected_token_message!($context, $token_stream, $msg1, $msg2, token);
+                return $default_value;
+            }
         }
     }};
 }
@@ -104,14 +107,14 @@ macro_rules! peek_token {
             Some(Err(_)) => {
                 return {
                     Err(ParseError::LexerStuck {
-                        context: static_current_context!(),
-                        pos_range: get_token_position!($token_stream),
+                        context: literal!(static_current_context!()),
+                        pos_range: get_token_pos_range($token_stream),
                     })
                 }
             }
             None => {
                 return Err(ParseError::UnexpectedEndOfInput {
-                    context: static_current_context!(),
+                    context: literal!(static_current_context!()),
                 })
             }
         }
@@ -121,8 +124,8 @@ macro_rules! peek_token {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
-                    context: static_current_context!(),
-                    pos_range: get_token_position!($token_stream),
+                    context: literal!(static_current_context!()),
+                    pos_range: get_token_pos_range($token_stream),
                 })
             }
             None => return Ok(None),
@@ -133,11 +136,61 @@ macro_rules! peek_token {
             Some(Ok(value)) => Some(value),
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
-                    context: static_current_context!(),
-                    pos_range: get_token_position!($token_stream),
+                    context: literal!(static_current_context!()),
+                    pos_range: get_token_pos_range($token_stream),
                 })
             }
             None => None,
+        }
+    };
+}
+
+macro_rules! peek_back {
+    ($token_stream:expr) => {
+        match $token_stream.peek_back() {
+            Some(Some(Ok(value))) => value,
+            Some(Some(Err(_))) => {
+                return {
+                    Err(ParseError::LexerStuck {
+                        context: literal!(static_current_context!()),
+                        pos_range: get_token_pos_range($token_stream),
+                    })
+                }
+            }
+            Some(None) => {
+                return Err(ParseError::UnexpectedEndOfInput {
+                    context: literal!(static_current_context!()),
+                })
+            }
+            None => {
+                return Err(ParseError::PeekedBackAtBeginning {
+                    context: literal!(static_current_context!()),
+                })
+            }
+        }
+    };
+    (optional $token_stream:expr) => {
+        match $token_stream.peek_back() {
+            Some(Some(Ok(value))) => value,
+            Some(Some(Err(_))) => {
+                return Err(ParseError::LexerStuck {
+                    context: literal!(static_current_context!()),
+                    pos_range: get_token_pos_range($token_stream),
+                })
+            }
+            None | Some(None) => return Ok(None),
+        }
+    };
+    ($token_stream:expr => Option) => {
+        match $token_stream.peek_back() {
+            Some(Some(Ok(value))) => Some(value),
+            Some(Some(Err(_))) => {
+                return Err(ParseError::LexerStuck {
+                    context: literal!(static_current_context!()),
+                    pos_range: get_token_pos_range($token_stream),
+                })
+            }
+            None | Some(None) => None,
         }
     };
 }
@@ -148,13 +201,13 @@ macro_rules! next_token {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
-                    context: static_current_context!(),
-                    pos_range: get_token_position!($token_stream),
+                    context: literal!(static_current_context!()),
+                    pos_range: get_token_pos_range($token_stream),
                 });
             }
             None => {
                 return Err(ParseError::UnexpectedEndOfInput {
-                    context: static_current_context!(),
+                    context: literal!(static_current_context!()),
                 });
             }
         }
@@ -165,7 +218,7 @@ macro_rules! next_token {
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck(
                     static_current_context!(),
-                    get_token_position!($token_stream),
+                    get_token_pos_range($token_stream),
                 ));
             }
             None => return Ok(None),
@@ -177,7 +230,7 @@ macro_rules! next_token {
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck(
                     static_current_context!(),
-                    get_token_position!($token_stream),
+                    get_token_pos_range($token_stream),
                 ));
             }
             None => None,
@@ -189,46 +242,136 @@ macro_rules! skip_token {
     ($token_stream:expr) => {{
         if let Some(Err(_)) = $token_stream.next() {
             return Err(ParseError::LexerStuck {
-                context: static_current_context!(),
-                pos_range: get_token_position!($token_stream),
+                context: literal!(static_current_context!()),
+                pos_range: get_token_pos_range($token_stream),
             });
         }
     }};
 }
 
-macro_rules! get_token_position {
-    ($token_stream:expr) => {
-        $token_stream.span()
-    };
+pub fn get_token_pos_range(token_stream: ParseIn) -> PosRange {
+    token_stream.span()
 }
 
-macro_rules! get_token_start {
-    ($token_stream:expr) => {
-        $token_stream.span().0
-    };
+// macro_rules! get_token_position {
+//     ($token_stream:expr) => {
+//         $token_stream.span()
+//     };
+// }
+
+pub fn get_token_start(token_stream: ParseIn) -> (usize, usize) {
+    token_stream.span().0
 }
 
-macro_rules! get_token_end {
-    ($token_stream:expr) => {
-        $token_stream.span().1
-    };
+pub fn get_token_end(token_stream: ParseIn) -> (usize, usize) {
+    token_stream.span().1
 }
+
+// macro_rules! get_token_start_2 {
+//     ($token_stream:expr) => {
+//         $token_stream.span().0
+//     };
+// }
+
+// macro_rules! get_token_end_2 {
+//     ($token_stream:expr) => {
+//         $token_stream.span().1
+//     };
+// }
 
 macro_rules! emit_unexpected_token {
     ($token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
-        return Err(ParseError::UnexpectedToken {
-            message: $msg_1,
-            expected: $msg_2,
-            context: static_current_context!(),
+        return Err(create_unexpected_token_error!(
+            $token_stream,
+            $msg_1,
+            $msg_2,
+            $found
+        ))
+    };
+}
+
+macro_rules! create_unexpected_token_error {
+    ($token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
+        ParseError::UnexpectedToken {
+            message: literal!($msg_1),
+            expected: literal!($msg_2),
+            context: literal!(static_current_context!()),
             found: $found,
-            pos_range: get_token_position!($token_stream),
-        })
+            pos_range: get_token_pos_range($token_stream),
+        }
+    };
+}
+
+macro_rules! try_or_emit_message {
+    ($value:expr, $context:expr, $default_value:expr) => {
+        match $value {
+            Ok(value) => value,
+            Err(err) => {
+                $context.successful = false;
+                if $context.message_setting >= GrazeMessageSetting::Errors {
+                    $context.messages.push(err.into());
+                }
+                return $default_value;
+            }
+        }
+    };
+}
+
+macro_rules! find_statement_end_and_return_invalid {
+    ($token_stream:expr, $start_pos:expr, $stmt_type:ty) => {{
+        statement::find_statement_end($token_stream)?;
+        Ok(<$stmt_type>::InvalidStatement((
+            $start_pos,
+            get_token_end($token_stream),
+        )))
+    }};
+}
+
+macro_rules! find_top_level_statement_end_and_return_invalid {
+    ($token_stream:expr, $start_pos:expr, $stmt_type:ty) => {{
+        statement::find_top_level_statement_end($token_stream)?;
+        Ok(<$stmt_type>::InvalidStatement((
+            $start_pos,
+            get_token_end($token_stream),
+        )))
+    }};
+}
+
+pub fn find_next_token<F>(token_stream: ParseIn, mut predicate: F) -> Result<(), ParseError>
+where
+    F: FnMut(&Token) -> bool,
+{
+    if predicate(peek_back!(token_stream)) {
+        return Ok(());
+    }
+    loop {
+        if predicate(&next_token!(token_stream)) {
+            return Ok(());
+        }
+    }
+}
+
+macro_rules! emit_unexpected_token_message {
+    ($context:expr, $token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
+        $context.successful = false;
+        if $context.message_setting >= GrazeMessageSetting::Errors {
+            $context.messages.push(
+                ParseError::UnexpectedToken {
+                    message: literal!($msg_1),
+                    expected: literal!($msg_2),
+                    context: literal!(static_current_context!()),
+                    found: $found,
+                    pos_range: get_token_pos_range($token_stream),
+                }
+                .into(),
+            );
+        }
     };
 }
 
 macro_rules! from_stream_pos {
     ($token_stream:expr => $node:path) => {
-        $node(get_token_position!($token_stream))
+        $node(get_token_pos_range($token_stream))
     };
 }
 
@@ -259,20 +402,42 @@ type ParseIn<'a, 'b> = &'a mut PeekableLexer<'b>;
 type ParseOut<T> = Result<T, ParseError>;
 
 #[derive(Debug, Clone)]
+/// [`PeekableLexer`] has two possible states:
+/// 1. peeked
+/// 2. unpeeked
+///
+/// When peeked, `current_token` is `Some(_)`, `current_span` is `Some(_)`
+///
+/// When unpeeked, `current_token` is `None(_)`
 pub struct PeekableLexer<'a> {
+    /// Do not access directly
     pub lexer: Lexer<'a, Token>,
-    pub peeked_token: Option<Option<Result<Token, <Token as Logos<'a>>::Error>>>,
+    /// Do not access directly
+    pub current_token: Option<Option<Result<Token, <Token as Logos<'a>>::Error>>>,
+    /// Do not access directly
     pub current_span: Option<PosRange>,
+    /// Do not access directly
+    pub previous_token: Option<Option<Result<Token, <Token as Logos<'a>>::Error>>>,
+    /// Do not access directly
+    pub previous_span: Option<PosRange>,
 }
 
 impl<'a> Iterator for PeekableLexer<'a> {
     type Item = Result<Token, <Token as Logos<'a>>::Error>;
+    /// Puts the PeekableLexer into unpeeked state
     fn next(&mut self) -> Option<Result<Token, <Token as Logos<'a>>::Error>> {
-        if let Some(token) = self.peeked_token.take() {
+        // whether self is peeked
+        if let Some(token) = self.current_token.take() {
+            self.previous_span = self.current_span.take();
+            self.previous_token = Some(token.clone());
             return token;
         }
+        // self is unpeeked
+        self.previous_span = Some(self.span());
         self.current_span = None;
-        self.lexer.next()
+        let token = self.lexer.next();
+        self.previous_token = Some(token.clone());
+        token
     }
 }
 
@@ -281,14 +446,20 @@ impl<'a> PeekableLexer<'a> {
         Self {
             lexer,
             current_span: None,
-            peeked_token: None,
+            current_token: None,
+            previous_token: None,
+            previous_span: None,
         }
     }
 
+    /// Puts the PeekableLexer into peeked state
     pub fn peek(&mut self) -> Option<&Result<Token, <Token as Logos<'a>>::Error>> {
-        self.peeked_token
+        self.current_token
             .get_or_insert_with(|| {
-                self.current_span = Some(internal_get_pos_range(&self.lexer, self.lexer.span()));
+                if self.current_span.is_none() {
+                    self.current_span =
+                        Some(internal_get_pos_range(&self.lexer, self.lexer.span()));
+                }
                 self.lexer.next()
             })
             .as_ref()
@@ -299,7 +470,27 @@ impl<'a> PeekableLexer<'a> {
         // self.peeked_token.as_ref()
     }
 
-    pub fn span(&mut self) -> PosRange {
+    pub fn span(&self) -> PosRange {
+        self.current_span
+            .unwrap_or_else(|| internal_get_pos_range(&self.lexer, self.lexer.span()))
+    }
+
+    pub fn peek_back(&self) -> Option<Option<&Result<Token, <Token as Logos<'a>>::Error>>> {
+        self.previous_token.as_ref().map(Option::as_ref)
+    }
+
+    pub fn span_back(&self) -> Option<PosRange> {
+        self.previous_span
+    }
+
+    pub fn step_back_if_unpeeked(&mut self) {
+        if self.current_token.is_none() {
+            self.current_token = self.previous_token.take();
+            self.current_span = self.previous_span.take();
+        }
+    }
+
+    pub fn span_memoize(&mut self) -> PosRange {
         if let Some(current_span) = self.current_span {
             return current_span;
         }
@@ -354,9 +545,9 @@ pub fn parse_single_identifier_as_identifier(
         scope: Vec::new(),
         names: vec![(
             parse_single_identifier(token_stream, context)?,
-            get_token_position!(token_stream),
+            get_token_pos_range(token_stream),
         )],
-        pos_range: get_token_position!(token_stream),
+        pos_range: get_token_pos_range(token_stream),
     })
 }
 
@@ -366,9 +557,9 @@ pub fn parse_full_identifier(
 ) -> ParseOut<Identifier> {
     let mut names: Vec<(IString, PosRange)> = vec![(
         parse_single_identifier(token_stream, context)?,
-        get_token_position!(token_stream),
+        get_token_pos_range(token_stream),
     )];
-    let start_pos = get_token_start!(token_stream);
+    let start_pos = get_token_start(token_stream);
     let mut scope: Option<Vec<(IString, PosRange)>> = None;
     loop {
         match match peek_token!(token_stream => Option) {
@@ -396,10 +587,10 @@ pub fn parse_full_identifier(
         skip_token!(token_stream);
         names.push({
             match next_token!(token_stream) {
-                Token::Identifier(value) => (value, get_token_position!(token_stream)),
-                Token::StageKeyword => (literal!("stage"), get_token_position!(token_stream)),
-                Token::VarsKeyword => (literal!("vars"), get_token_position!(token_stream)),
-                Token::ListsKeyword => (literal!("lists"), get_token_position!(token_stream)),
+                Token::Identifier(value) => (value, get_token_pos_range(token_stream)),
+                Token::StageKeyword => (literal!("stage"), get_token_pos_range(token_stream)),
+                Token::VarsKeyword => (literal!("vars"), get_token_pos_range(token_stream)),
+                Token::ListsKeyword => (literal!("lists"), get_token_pos_range(token_stream)),
                 token => emit_unexpected_token!(
                     token_stream,
                     "Expected an identifier.",
@@ -416,7 +607,7 @@ pub fn parse_full_identifier(
     Ok(Identifier {
         scope: scope.unwrap_or_default(),
         names,
-        pos_range: (start_pos, get_token_end!(token_stream)),
+        pos_range: (start_pos, get_token_end(token_stream)),
     })
 }
 
@@ -425,8 +616,8 @@ pub fn parse_full_identifier_starting_with(
     context: &mut ParseContext,
     value: IString,
 ) -> ParseOut<Identifier> {
-    let mut names: Vec<(IString, PosRange)> = vec![(value, get_token_position!(token_stream))];
-    let start_pos = get_token_start!(token_stream);
+    let mut names: Vec<(IString, PosRange)> = vec![(value, get_token_pos_range(token_stream))];
+    let start_pos = get_token_start(token_stream);
     let mut scope: Option<Vec<(IString, PosRange)>> = None;
     loop {
         match match peek_token!(token_stream => Option) {
@@ -454,10 +645,10 @@ pub fn parse_full_identifier_starting_with(
         skip_token!(token_stream);
         names.push({
             match next_token!(token_stream) {
-                Token::Identifier(value) => (value, get_token_position!(token_stream)),
-                Token::StageKeyword => (literal!("stage"), get_token_position!(token_stream)),
-                Token::VarsKeyword => (literal!("vars"), get_token_position!(token_stream)),
-                Token::ListsKeyword => (literal!("lists"), get_token_position!(token_stream)),
+                Token::Identifier(value) => (value, get_token_pos_range(token_stream)),
+                Token::StageKeyword => (literal!("stage"), get_token_pos_range(token_stream)),
+                Token::VarsKeyword => (literal!("vars"), get_token_pos_range(token_stream)),
+                Token::ListsKeyword => (literal!("lists"), get_token_pos_range(token_stream)),
                 token => emit_unexpected_token!(
                     token_stream,
                     "Expected an identifier.",
@@ -474,7 +665,7 @@ pub fn parse_full_identifier_starting_with(
     Ok(Identifier {
         scope: scope.unwrap_or_default(),
         names,
-        pos_range: (start_pos, get_token_end!(token_stream)),
+        pos_range: (start_pos, get_token_end(token_stream)),
     })
 }
 
@@ -504,36 +695,36 @@ pub mod statement {
         use ast::Literal as LLiteral;
         match token {
             Token::SimpleString(value) => {
-                Ok(LLiteral::String(value, get_token_position!(token_stream)))
+                Ok(LLiteral::String(value, get_token_pos_range(token_stream)))
             }
             Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
                 value,
-                get_token_position!(token_stream),
+                get_token_pos_range(token_stream),
             )),
             Token::DecimalFloat(value) => Ok(LLiteral::DecimalFloat(
                 value,
-                get_token_position!(token_stream),
+                get_token_pos_range(token_stream),
             )),
             Token::HexadecimalInt(value) => Ok(LLiteral::HexadecimalInt(
                 value,
-                get_token_position!(token_stream),
+                get_token_pos_range(token_stream),
             )),
             Token::OctalInt(value) => {
-                Ok(LLiteral::OctalInt(value, get_token_position!(token_stream)))
+                Ok(LLiteral::OctalInt(value, get_token_pos_range(token_stream)))
             }
             Token::BinaryInt(value) => Ok(LLiteral::BinaryInt(
                 value,
-                get_token_position!(token_stream),
+                get_token_pos_range(token_stream),
             )),
             Token::LeftParens => {
-                let left_parens_position = get_token_position!(token_stream);
+                let left_parens_position = get_token_pos_range(token_stream);
                 expect_token!(
                     token_stream,
                     Token::RightParens => {
                         Ok(LLiteral::EmptyExpression(
                             LeftParens(left_parens_position),
                             from_stream_pos!(token_stream => RightParens),
-                            (left_parens_position.0, get_token_end!(token_stream)),
+                            (left_parens_position.0, get_token_end(token_stream)),
                         ))
                     },
                     "Expected ')'.",
@@ -569,12 +760,12 @@ pub mod statement {
                 }
                 Token::Unwrap => {
                     skip_token!(token_stream);
-                    let unwrap_start = get_token_start!(token_stream);
+                    let unwrap_start = get_token_start(token_stream);
                     expect_token!(
                         token_stream,
                         Token::SimpleString(value) => ListEntry::Unwrap(
-                            ast::Literal::String(value, get_token_position!(token_stream)),
-                            (unwrap_start, get_token_end!(token_stream)),
+                            ast::Literal::String(value, get_token_pos_range(token_stream)),
+                            (unwrap_start, get_token_end(token_stream)),
                         ),
                         "Expected a simple string literal.",
                         "a simple string literal"
@@ -641,17 +832,17 @@ pub mod statement {
             let scope = match peek_token!(token_stream) {
                 Token::GlobalKeyword => {
                     skip_token!(token_stream);
-                    start_pos = Some(get_token_start!(token_stream));
+                    start_pos = Some(get_token_start(token_stream));
                     from_stream_pos!(token_stream => DataDeclarationScope::Global)
                 }
                 Token::LocalKeyword => {
                     skip_token!(token_stream);
-                    start_pos = Some(get_token_start!(token_stream));
+                    start_pos = Some(get_token_start(token_stream));
                     from_stream_pos!(token_stream => DataDeclarationScope::Local)
                 }
                 Token::CloudKeyword => {
                     skip_token!(token_stream);
-                    start_pos = Some(get_token_start!(token_stream));
+                    start_pos = Some(get_token_start(token_stream));
                     from_stream_pos!(token_stream => DataDeclarationScope::Cloud)
                 }
                 Token::RightBrace(lexer::LexedRightBrace::Normal) => break,
@@ -662,14 +853,14 @@ pub mod statement {
                 Token::VarKeyword => {
                     skip_token!(token_stream);
                     if start_pos.is_none() {
-                        start_pos = Some(get_token_start!(token_stream));
+                        start_pos = Some(get_token_start(token_stream));
                     }
                     from_stream_pos!(token_stream => SingleDataDeclarationType::Var)
                 }
                 Token::ListKeyword => {
                     skip_token!(token_stream);
                     if start_pos.is_none() {
-                        start_pos = Some(get_token_start!(token_stream));
+                        start_pos = Some(get_token_start(token_stream));
                     }
                     from_stream_pos!(token_stream => SingleDataDeclarationType::List)
                 }
@@ -678,22 +869,22 @@ pub mod statement {
             let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => {
                 let value = value.clone();
                 if start_pos.is_none() {
-                    start_pos = Some(get_token_start!(token_stream));
+                    start_pos = Some(get_token_start(token_stream));
                 }
                 CanonicalIdentifier {
                     name: value,
-                    pos_range: get_token_position!(token_stream),
+                    pos_range: get_token_pos_range(token_stream),
                 }
             });
             let identifier = match next_token!(token_stream) {
                 Token::Identifier(value) => {
                     if start_pos.is_none() {
-                        start_pos = Some(get_token_start!(token_stream));
+                        start_pos = Some(get_token_start(token_stream));
                     }
                     Identifier {
                         scope: Vec::new(),
-                        names: vec![(value, get_token_position!(token_stream))],
-                        pos_range: get_token_position!(token_stream),
+                        names: vec![(value, get_token_pos_range(token_stream))],
+                        pos_range: get_token_pos_range(token_stream),
                     }
                 }
                 token => match (scope, dec_type, canonical_identifier) {
@@ -833,8 +1024,8 @@ pub mod statement {
                 )
             ) {
                 return Err(ParseError::LocalSymbolInStage {
-                    context: static_current_context!(),
-                    pos_range: (start_pos.unwrap(), get_token_end!(token_stream)),
+                    context: literal!(static_current_context!()),
+                    pos_range: (start_pos.unwrap(), get_token_end(token_stream)),
                 });
             }
             with_mut_target_scope_or_global_scope!(
@@ -918,14 +1109,14 @@ pub mod statement {
                             scope,
                             canonical_identifier,
                             identifier,
-                            (start_pos.unwrap(), get_token_end!(token_stream)),
+                            (start_pos.unwrap(), get_token_end(token_stream)),
                         ),
                         DefaultDataDeclarationType::List => SingleDataDeclaration::EmptyList(
                             None,
                             scope,
                             canonical_identifier,
                             identifier,
-                            (start_pos.unwrap(), get_token_end!(token_stream)),
+                            (start_pos.unwrap(), get_token_end(token_stream)),
                         ),
                     },
                     SingleDataDeclarationType::Var(p) => SingleDataDeclaration::EmptyVariable(
@@ -933,14 +1124,14 @@ pub mod statement {
                         scope,
                         canonical_identifier,
                         identifier,
-                        (start_pos.unwrap(), get_token_end!(token_stream)),
+                        (start_pos.unwrap(), get_token_end(token_stream)),
                     ),
                     SingleDataDeclarationType::List(p) => SingleDataDeclaration::EmptyList(
                         Some(ListKeyword(p)),
                         scope,
                         canonical_identifier,
                         identifier,
-                        (start_pos.unwrap(), get_token_end!(token_stream)),
+                        (start_pos.unwrap(), get_token_end(token_stream)),
                     ),
                 },
                 DeclarationValue::Var(assignment_operator, literal) => {
@@ -955,7 +1146,7 @@ pub mod statement {
                         identifier,
                         assignment_operator,
                         literal,
-                        (start_pos.unwrap(), get_token_end!(token_stream)),
+                        (start_pos.unwrap(), get_token_end(token_stream)),
                     )
                 }
                 DeclarationValue::List(assignment_operator, left_brace, items, right_brace) => {
@@ -972,7 +1163,7 @@ pub mod statement {
                         left_brace,
                         items,
                         right_brace,
-                        (start_pos.unwrap(), get_token_end!(token_stream)),
+                        (start_pos.unwrap(), get_token_end(token_stream)),
                     )
                 }
             };
@@ -1010,7 +1201,7 @@ pub mod statement {
             "Data declaration needs to start with \"let\".",
             "\"let\""
         );
-        let let_keyword_position = get_token_position!(token_stream);
+        let let_keyword_position = get_token_pos_range(token_stream);
         let mut start_pos = None::<PosRange>;
         let scope = match peek_token!(token_stream) {
             Token::GlobalKeyword => {
@@ -1079,9 +1270,9 @@ pub mod statement {
                         left_brace,
                         declarations,
                         right_brace,
-                        (start_pos.unwrap().0, get_token_end!(token_stream)),
+                        (start_pos.unwrap().0, get_token_end(token_stream)),
                     ),
-                    (let_keyword_position.0, get_token_end!(token_stream)),
+                    (let_keyword_position.0, get_token_end(token_stream)),
                 ));
             }
             Token::ListsKeyword => {
@@ -1118,9 +1309,9 @@ pub mod statement {
                         left_brace,
                         declarations,
                         right_brace,
-                        (start_pos.unwrap().0, get_token_end!(token_stream)),
+                        (start_pos.unwrap().0, get_token_end(token_stream)),
                     ),
-                    (let_keyword_position.0, get_token_end!(token_stream)),
+                    (let_keyword_position.0, get_token_end(token_stream)),
                 ));
             }
             Token::LeftParens => {
@@ -1149,9 +1340,9 @@ pub mod statement {
                         left_parens,
                         declarations,
                         right_parens,
-                        (start_pos.unwrap().0, get_token_end!(token_stream)),
+                        (start_pos.unwrap().0, get_token_end(token_stream)),
                     ),
-                    (let_keyword_position.0, get_token_end!(token_stream)),
+                    (let_keyword_position.0, get_token_end(token_stream)),
                 ));
             }
             _ => SingleDataDeclarationType::Unset,
@@ -1163,7 +1354,7 @@ pub mod statement {
             }
             CanonicalIdentifier {
                 name: value,
-                pos_range: get_token_position!(token_stream),
+                pos_range: get_token_pos_range(token_stream),
             }
         });
         let identifier = match next_token!(token_stream) {
@@ -1173,8 +1364,8 @@ pub mod statement {
                 }
                 Identifier {
                     scope: Vec::new(),
-                    names: vec![(value, get_token_position!(token_stream))],
-                    pos_range: get_token_position!(token_stream),
+                    names: vec![(value, get_token_pos_range(token_stream))],
+                    pos_range: get_token_pos_range(token_stream),
                 }
             }
             token => match (scope, dec_type, canonical_identifier) {
@@ -1285,8 +1476,8 @@ pub mod statement {
             )
         ) {
             return Err(ParseError::LocalSymbolInStage {
-                context: static_current_context!(),
-                pos_range: (let_keyword_position.0, get_token_end!(token_stream)),
+                context: literal!(static_current_context!()),
+                pos_range: (let_keyword_position.0, get_token_end(token_stream)),
             });
         }
         with_mut_target_scope_or_global_scope!(
@@ -1349,21 +1540,21 @@ pub mod statement {
                     scope,
                     canonical_identifier,
                     identifier,
-                    (start_pos.unwrap().0, get_token_end!(token_stream)),
+                    (start_pos.unwrap().0, get_token_end(token_stream)),
                 ),
                 SingleDataDeclarationType::Var(p) => SingleDataDeclaration::EmptyVariable(
                     Some(VarKeyword(p)),
                     scope,
                     canonical_identifier,
                     identifier,
-                    (start_pos.unwrap().0, get_token_end!(token_stream)),
+                    (start_pos.unwrap().0, get_token_end(token_stream)),
                 ),
                 SingleDataDeclarationType::List(p) => SingleDataDeclaration::EmptyList(
                     Some(ListKeyword(p)),
                     scope,
                     canonical_identifier,
                     identifier,
-                    (start_pos.unwrap().0, get_token_end!(token_stream)),
+                    (start_pos.unwrap().0, get_token_end(token_stream)),
                 ),
             },
             DeclarationValue::Var(assignment_operator, literal) => SingleDataDeclaration::Variable(
@@ -1377,7 +1568,7 @@ pub mod statement {
                 identifier,
                 assignment_operator,
                 literal,
-                (start_pos.unwrap().0, get_token_end!(token_stream)),
+                (start_pos.unwrap().0, get_token_end(token_stream)),
             ),
             DeclarationValue::List(assignment_operator, left_brace, items, right_brace) => {
                 SingleDataDeclaration::List(
@@ -1393,14 +1584,14 @@ pub mod statement {
                     left_brace,
                     items,
                     right_brace,
-                    (start_pos.unwrap().0, get_token_end!(token_stream)),
+                    (start_pos.unwrap().0, get_token_end(token_stream)),
                 )
             }
         };
         Ok((
             LetKeyword(let_keyword_position),
             DataDeclaration::Single(declaration.into()),
-            (let_keyword_position.0, get_token_end!(token_stream)),
+            (let_keyword_position.0, get_token_end(token_stream)),
         ))
     }
 
@@ -1409,7 +1600,7 @@ pub mod statement {
         context: &mut ParseContext,
         identifier: Identifier,
     ) -> ParseOut<Statement> {
-        let start_pos = get_token_start!(token_stream);
+        let start_pos = get_token_start(token_stream);
         expect_token!(token_stream, Token::Assign => (), "Expected '='.", "'='");
         let assignment_operator = from_stream_pos!(token_stream => NormalAssignmentOperator);
         if matches!(peek_token!(token_stream), Token::LeftBracket) {
@@ -1426,7 +1617,7 @@ pub mod statement {
                     "Expected ';'.",
                     "';'"
                 ),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ));
         }
         Ok(Statement::Assignment(
@@ -1439,7 +1630,7 @@ pub mod statement {
                 "Expected ';'.",
                 "';'"
             ),
-            (start_pos, get_token_end!(token_stream)),
+            (start_pos, get_token_end(token_stream)),
         ))
     }
 
@@ -1531,7 +1722,7 @@ pub mod statement {
                 code_blocks,
                 final_code_block,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => Semicolon)),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ));
         }
         Ok(Statement::SingleInputControl(
@@ -1539,7 +1730,7 @@ pub mod statement {
             expression,
             code_block,
             consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => Semicolon)),
-            (start_pos, get_token_end!(token_stream)),
+            (start_pos, get_token_end(token_stream)),
         ))
     }
 
@@ -1548,7 +1739,7 @@ pub mod statement {
         context: &mut ParseContext,
         identifier: Identifier,
     ) -> ParseOut<Statement> {
-        let start_pos = get_token_start!(token_stream);
+        let start_pos = get_token_start(token_stream);
         let (left_parens, expressions, right_parens) = match peek_token!(token_stream) {
             Token::LeftParens => parse_expression_list(token_stream, context)?,
             _ => {
@@ -1581,7 +1772,7 @@ pub mod statement {
                             right_parens,
                             parse_code_block(token_stream, context)?,
                             consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => Semicolon)),
-                            (start_pos, get_token_end!(token_stream)),
+                            (start_pos, get_token_end(token_stream)),
                         ));
                     }
                     let pos_range = (left_parens.0.0, right_parens.0.1);
@@ -1603,7 +1794,7 @@ pub mod statement {
                         right_parens,
                         parse_code_block(token_stream, context)?,
                         consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => Semicolon)),
-                        (start_pos, get_token_end!(token_stream)),
+                        (start_pos, get_token_end(token_stream)),
                     ));
                 }
             };
@@ -1626,7 +1817,7 @@ pub mod statement {
                 "Expected ';'.",
                 "';'"
             ),
-            (start_pos, get_token_end!(token_stream)),
+            (start_pos, get_token_end(token_stream)),
         ))
     }
 
@@ -1635,7 +1826,7 @@ pub mod statement {
         context: &mut ParseContext,
         identifier: Identifier,
     ) -> ParseOut<Statement> {
-        let start_pos = get_token_start!(token_stream);
+        let start_pos = get_token_start(token_stream);
         if peek_token!(token_stream) != &Token::LeftBrace {
             emit_unexpected_token!(
                 token_stream,
@@ -1649,7 +1840,7 @@ pub mod statement {
             identifier,
             code_block,
             consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => Semicolon)),
-            (start_pos, get_token_end!(token_stream)),
+            (start_pos, get_token_end(token_stream)),
         ))
     }
 
@@ -1664,7 +1855,7 @@ pub mod statement {
             Token::LeftParens => parse_call_or_control(token_stream, context, identifier),
             Token::LeftBrace => parse_forever(token_stream, context, identifier),
             Token::LeftBracket => {
-                let start_pos = get_token_start!(token_stream);
+                let start_pos = get_token_start(token_stream);
                 skip_token!(token_stream);
                 let left_bracket = from_stream_pos!(token_stream => LeftBracket);
                 let item = parse_expression(token_stream, context)?;
@@ -1694,7 +1885,7 @@ pub mod statement {
                         "Expected ';'.",
                         "';'"
                     ),
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 ))
             }
             _ => parse_call_or_control(token_stream, context, identifier),
@@ -1777,7 +1968,7 @@ pub mod statement {
             Token::LeftParens => {
                 skip_token!(token_stream);
                 let left_parens = from_stream_pos!(token_stream => LeftParens);
-                let start_pos = get_token_start!(token_stream);
+                let start_pos = get_token_start(token_stream);
                 let mut declarations = Vec::<(SingleAssetDeclaration, Option<Comma>)>::new();
                 let right_parens = loop {
                     consume_then_never_if!(
@@ -1788,14 +1979,14 @@ pub mod statement {
                         token_stream,
                         Token::CanonicalIdentifier(name) => (
                             Some(CanonicalIdentifier {
-                                name, pos_range: get_token_position!(token_stream)
+                                name, pos_range: get_token_pos_range(token_stream)
                             }),
-                            Some(get_token_start!(token_stream))
+                            Some(get_token_start(token_stream))
                         )
                     )
                     .unwrap_or((None, None));
                     let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
-                    let start_pos = start_pos.unwrap_or(get_token_start!(token_stream));
+                    let start_pos = start_pos.unwrap_or(get_token_start(token_stream));
                     let left_parens = expect_token!(
                         token_stream,
                         Token::LeftParens => from_stream_pos!(token_stream => LeftParens),
@@ -1804,7 +1995,7 @@ pub mod statement {
                     );
                     let path = expect_token!(
                         token_stream,
-                        Token::SimpleString(string) => (string, get_token_position!(token_stream)),
+                        Token::SimpleString(string) => (string, get_token_pos_range(token_stream)),
                         "Expected '('.",
                         "'('"
                     );
@@ -1854,7 +2045,7 @@ pub mod statement {
                             left_parens,
                             path,
                             right_parens,
-                            (start_pos, get_token_end!(token_stream)),
+                            (start_pos, get_token_end(token_stream)),
                         ),
                         {
                             match peek_token!(token_stream) {
@@ -1877,18 +2068,18 @@ pub mod statement {
                     left_parens,
                     declarations,
                     right_parens,
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 ))
             }
             Token::CanonicalIdentifier(_) => {
                 let canonical_identifier = match next_token!(token_stream) {
                     Token::CanonicalIdentifier(name) => CanonicalIdentifier {
                         name,
-                        pos_range: get_token_position!(token_stream),
+                        pos_range: get_token_pos_range(token_stream),
                     },
                     _ => unreachable!(),
                 };
-                let start_pos = get_token_start!(token_stream);
+                let start_pos = get_token_start(token_stream);
                 let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
                 let left_parens = expect_token!(
                     token_stream,
@@ -1898,7 +2089,7 @@ pub mod statement {
                 );
                 let path = expect_token!(
                     token_stream,
-                    Token::SimpleString(string) => (string, get_token_position!(token_stream)),
+                    Token::SimpleString(string) => (string, get_token_pos_range(token_stream)),
                     "Expected '('.",
                     "'('"
                 );
@@ -1938,12 +2129,12 @@ pub mod statement {
                     left_parens,
                     path,
                     right_parens,
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 )))
             }
             Token::Identifier(_) => {
                 let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
-                let start_pos = get_token_start!(token_stream);
+                let start_pos = get_token_start(token_stream);
                 let left_parens = expect_token!(
                     token_stream,
                     Token::LeftParens => from_stream_pos!(token_stream => LeftParens),
@@ -1952,7 +2143,7 @@ pub mod statement {
                 );
                 let path = expect_token!(
                     token_stream,
-                    Token::SimpleString(string) => (string, get_token_position!(token_stream)),
+                    Token::SimpleString(string) => (string, get_token_pos_range(token_stream)),
                     "Expected '('.",
                     "'('"
                 );
@@ -1992,7 +2183,7 @@ pub mod statement {
                     left_parens,
                     path,
                     right_parens,
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 )))
             }
             _ => emit_unexpected_token!(
@@ -2030,20 +2221,20 @@ pub mod statement {
                     is_warp: true,
                     pos_range: {
                         skip_token!(token_stream);
-                        get_token_position!(token_stream)
+                        get_token_pos_range(token_stream)
                     },
                 }),
-                Some(get_token_start!(token_stream)),
+                Some(get_token_start(token_stream)),
             ),
             Token::NowarpKeyword => (
                 Some(WarpSpecifier {
                     is_warp: false,
                     pos_range: {
                         skip_token!(token_stream);
-                        get_token_position!(token_stream)
+                        get_token_pos_range(token_stream)
                     },
                 }),
-                Some(get_token_start!(token_stream)),
+                Some(get_token_start(token_stream)),
             ),
             _ => (None, None),
         };
@@ -2053,10 +2244,10 @@ pub mod statement {
             "Expected \"proc\".",
             "\"proc\""
         );
-        let start_pos = start_pos.unwrap_or_else(|| get_token_start!(token_stream));
+        let start_pos = start_pos.unwrap_or_else(|| get_token_start(token_stream));
         let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => ast::CanonicalIdentifier {
             name: value,
-            pos_range: get_token_position!(token_stream),
+            pos_range: get_token_pos_range(token_stream),
         });
         let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
         let left_parens = expect_token!(
@@ -2080,7 +2271,7 @@ pub mod statement {
                         kind: value,
                         pos_range: {
                             skip_token!(token_stream);
-                            get_token_position!(token_stream)
+                            get_token_pos_range(token_stream)
                         },
                     })
                 })
@@ -2090,7 +2281,7 @@ pub mod statement {
             };
             let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => ast::CanonicalIdentifier {
                 name: value,
-                pos_range: get_token_position!(token_stream),
+                pos_range: get_token_pos_range(token_stream),
             });
             let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
             let comma = match peek_token!(token_stream) {
@@ -2140,21 +2331,109 @@ pub mod statement {
             right_parens,
             code_block,
             consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-            (start_pos, get_token_end!(token_stream)),
+            (start_pos, get_token_end(token_stream)),
         ))
+    }
+
+    pub fn find_statement_end(token_stream: ParseIn) -> Result<(), ParseError> {
+        let mut layers = 0_i32;
+        let mut step_back = false;
+        find_next_token(token_stream, |token| match token {
+            Token::Semicolon => {
+                layers == 0
+            },
+            Token::LeftBrace => {
+                layers += 1;
+                false
+            }
+            Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+                // Example 1:
+                // ```
+                // {
+                //     misformed-identifier
+                // //  ^ Error is encountered here
+                // }
+                // ```
+                // ^ Invalid statement ends here
+                //
+                // Example 2:
+                // ```
+                // {
+                //     misformed-identifier {
+                // //  ^ Error is encountered here
+                //         something
+                //     }
+                // //  ^ Invalid statement ends here
+                // }
+                // ```
+                // That is the reason for the one instead of a zero here.
+                if layers > 1 {
+                    layers -= 1;
+                    false
+                } else {
+                    if layers == 0 {
+                        step_back = true;
+                    }
+                    true
+                }
+            }
+            _ => false,
+        })?;
+        if step_back {
+            token_stream.step_back_if_unpeeked();
+        }
+        Ok(())
+    }
+
+    pub fn find_top_level_statement_end(token_stream: ParseIn) -> Result<(), ParseError> {
+        let mut layers = 0_i32;
+        let mut step_back = false;
+        find_next_token(token_stream, |token| match token {
+            Token::Semicolon => {
+                layers == 0
+            },
+            Token::LeftBrace => {
+                layers += 1;
+                false
+            }
+            Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+                if layers > 1 {
+                    layers -= 1;
+                    false
+                } else {
+                    true
+                }
+            }
+            _ => false,
+        })?;
+        if step_back {
+            token_stream.step_back_if_unpeeked();
+        }
+        Ok(())
     }
 }
 
 /// Statements do not include semicolons.
 pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Statement> {
+    let start = get_token_end(token_stream);
     match peek_token!(token_stream) {
-        Token::LetKeyword => {
-            statement::parse_statement_data_declaration_fully(token_stream, context)
-        }
+        Token::LetKeyword => Ok(try_or_emit_message!(
+            statement::parse_statement_data_declaration_fully(token_stream, context),
+            context,
+            find_statement_end_and_return_invalid!(token_stream, start, Statement)
+        )),
         // TODO: Prevent users from naming variables "super" or possibly "root"
         Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
-            let identifier = parse_full_identifier(token_stream, context)?;
-            statement::parse_statement_after_identifier(token_stream, context, identifier)
+            let identifier = try_or_emit_message!(
+                parse_full_identifier(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start, Statement)
+            );
+            Ok(try_or_emit_message!(
+                statement::parse_statement_after_identifier(token_stream, context, identifier),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start, Statement)
+            ))
         }
         Token::Semicolon => Ok(Statement::EmptyStatement(expect_token!(
             token_stream,
@@ -2162,11 +2441,15 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             "Expected ';'.",
             "';'"
         ))),
-        _ => emit_unexpected_token!(
-            token_stream,
-            "Expected ';', \"let\" or an identifier.",
-            "';', \"let\" or an identifier",
-            next_token!(token_stream)
+        _ => try_or_emit_message!(
+            Err(create_unexpected_token_error!(
+                token_stream,
+                "Expected ';', \"let\" or an identifier.",
+                "';', \"let\" or an identifier",
+                next_token!(token_stream)
+            )),
+            context,
+            find_statement_end_and_return_invalid!(token_stream, start, Statement)
         ),
     }
 }
@@ -2179,45 +2462,73 @@ pub fn parse_sprite_statement(
         Token::CostumeKeyword => {
             skip_token!(token_stream);
             let costume_keyword = from_stream_pos!(token_stream => ast::CostumeKeyword);
-            let start_pos = get_token_start!(token_stream);
+            let start_pos = get_token_start(token_stream);
             Ok(SpriteStatement::CostumeDeclaration(
                 costume_keyword,
-                statement::parse_asset_declaration(
+                try_or_emit_message!(
+                    statement::parse_asset_declaration(
+                        token_stream,
+                        context,
+                        statement::AssetDeclarationType::Costume,
+                    ),
+                    context,
+                    find_statement_end_and_return_invalid!(
+                        token_stream,
+                        start_pos,
+                        SpriteStatement
+                    )
+                ),
+                expect_token_or_message!(
                     token_stream,
                     context,
-                    statement::AssetDeclarationType::Costume,
-                )?,
-                expect_token!(
-                    token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
                     "Expected ';'.",
-                    "';'"
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
                 ),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
         Token::SoundKeyword => {
             skip_token!(token_stream);
             let sound_keyword = from_stream_pos!(token_stream => ast::SoundKeyword);
-            let start_pos = get_token_start!(token_stream);
+            let start_pos = get_token_start(token_stream);
             Ok(SpriteStatement::SoundDeclaration(
                 sound_keyword,
-                statement::parse_asset_declaration(
+                try_or_emit_message!(
+                    statement::parse_asset_declaration(
+                        token_stream,
+                        context,
+                        statement::AssetDeclarationType::Sound,
+                    ),
+                    context,
+                    find_statement_end_and_return_invalid!(
+                        token_stream,
+                        start_pos,
+                        SpriteStatement
+                    )
+                ),
+                expect_token_or_message!(
                     token_stream,
                     context,
-                    statement::AssetDeclarationType::Sound,
-                )?,
-                expect_token!(
-                    token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
                     "Expected ';'.",
-                    "';'"
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
                 ),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
-        Token::LetKeyword => statement::parse_sprite_data_declaration_fully(token_stream, context),
+        Token::LetKeyword => {
+            let start_pos = get_token_end(token_stream);
+            Ok(try_or_emit_message!(
+                statement::parse_sprite_data_declaration_fully(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
+            ))
+        }
         Token::NowarpKeyword | Token::WarpKeyword | Token::ProcKeyword => {
+            let start_pos = get_token_end(token_stream);
             let (
                 proc_keyword,
                 warp_specifier,
@@ -2229,7 +2540,11 @@ pub fn parse_sprite_statement(
                 code_block,
                 semicolon,
                 pos_range,
-            ) = statement::parse_custom_block(token_stream, context)?;
+            ) = try_or_emit_message!(
+                statement::parse_custom_block(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
+            );
             Ok(SpriteStatement::CustomBlockDefinition(
                 proc_keyword,
                 warp_specifier,
@@ -2255,17 +2570,37 @@ pub fn parse_sprite_statement(
                 Ok(SpriteStatement::SingleInputHatStatement(
                     identifier,
                     expression,
-                    parse_code_block(token_stream, context)?,
+                    try_or_emit_message!(
+                        parse_code_block(token_stream, context),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            SpriteStatement
+                        )
+                    ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 ))
             }
-            let identifier = parse_full_identifier(token_stream, context)?;
+            let start_pos = get_token_end(token_stream);
+            let identifier = try_or_emit_message!(
+                parse_full_identifier(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
+            );
             let start_pos = identifier.pos_range.0;
             match peek_token!(token_stream) {
                 Token::LeftParens => {
-                    let (left_parens, expressions, right_parens) =
-                        parse_expression_list(token_stream, context)?;
+                    let (left_parens, expressions, right_parens) = try_or_emit_message!(
+                        parse_expression_list(token_stream, context),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            SpriteStatement
+                        )
+                    );
                     if expressions.is_empty() {
                         let pos_range = (left_parens.0.0, right_parens.0.1);
                         return parse_sprite_rest_of_single_input_control(
@@ -2300,55 +2635,98 @@ pub fn parse_sprite_statement(
                         left_parens,
                         expressions,
                         right_parens,
-                        parse_code_block(token_stream, context)?,
+                        try_or_emit_message!(
+                            parse_code_block(token_stream, context),
+                            context,
+                            find_statement_end_and_return_invalid!(
+                                token_stream,
+                                start_pos,
+                                SpriteStatement
+                            )
+                        ),
                         consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                        (start_pos, get_token_end!(token_stream)),
+                        (start_pos, get_token_end(token_stream)),
                     ))
                 }
                 Token::LeftBrace => Ok(SpriteStatement::NoInputHatStatement(
                     identifier,
-                    parse_code_block(token_stream, context)?,
+                    try_or_emit_message!(
+                        parse_code_block(token_stream, context),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            SpriteStatement
+                        )
+                    ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 )),
                 _ => {
-                    let expression = parse_expression(token_stream, context)?;
-                    parse_sprite_rest_of_single_input_control(
-                        token_stream,
+                    let expression = try_or_emit_message!(
+                        parse_expression(token_stream, context),
                         context,
-                        identifier,
-                        expression,
-                        start_pos,
-                    ) // TODO: capture error and replace message 
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            SpriteStatement
+                        )
+                    );
+                    Ok(try_or_emit_message!(
+                        parse_sprite_rest_of_single_input_control(
+                            token_stream,
+                            context,
+                            identifier,
+                            expression,
+                            start_pos,
+                        ),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            SpriteStatement
+                        )
+                    )) // TODO: capture error and replace message 
                 }
             }
         }
         Token::LeftBrace => {
-            let code_block = parse_code_block(token_stream, context)?;
+            let start_pos = get_token_end(token_stream);
+            let code_block = try_or_emit_message!(
+                parse_code_block(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
+            );
             let start_pos = code_block.pos_range.0;
             Ok(SpriteStatement::IsolatedBlock(
                 code_block,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
         Token::LeftParens => {
             skip_token!(token_stream);
             let left_parens = from_stream_pos!(token_stream => ast::LeftParens);
-            let start_pos = get_token_start!(token_stream);
-            let expression = parse_expression(token_stream, context)?;
-            let right_parens = expect_token!(
+            let start_pos = get_token_start(token_stream);
+            let expression = try_or_emit_message!(
+                parse_expression(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
+            );
+            let right_parens = expect_token_or_message!(
                 token_stream,
+                context,
                 Token::RightParens => from_stream_pos!(token_stream => ast::RightParens),
                 "Expected ')'.",
-                "')'"
+                "')'",
+                find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
             );
             Ok(SpriteStatement::IsolatedExpression(
                 left_parens,
                 expression,
                 right_parens,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
         Token::Semicolon => {
@@ -2357,12 +2735,20 @@ pub fn parse_sprite_statement(
                 from_stream_pos!(token_stream => ast::Semicolon),
             ))
         }
-        _ => emit_unexpected_token!(
-            token_stream,
-            "Expected hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\".",
-            "hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"",
-            next_token!(token_stream)
-        ),
+        _ => {
+            let token = next_token!(token_stream);
+            let start = get_token_start(token_stream);
+            try_or_emit_message!(
+                Err(create_unexpected_token_error!(
+                    token_stream,
+                    "Expected hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\".",
+                    "hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"",
+                    token
+                )),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start, SpriteStatement)
+            )
+        }
     }
 }
 
@@ -2374,45 +2760,65 @@ pub fn parse_stage_statement(
         Token::CostumeKeyword | Token::BackdropKeyword => {
             skip_token!(token_stream);
             let backdrop_keyword = from_stream_pos!(token_stream => ast::BackdropKeyword);
-            let start_pos = get_token_start!(token_stream);
+            let start_pos = get_token_start(token_stream);
             Ok(StageStatement::BackdropDeclaration(
                 backdrop_keyword,
-                statement::parse_asset_declaration(
+                try_or_emit_message!(
+                    statement::parse_asset_declaration(
+                        token_stream,
+                        context,
+                        statement::AssetDeclarationType::Backdrop,
+                    ),
+                    context,
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+                ),
+                expect_token_or_message!(
                     token_stream,
                     context,
-                    statement::AssetDeclarationType::Backdrop,
-                )?,
-                expect_token!(
-                    token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
                     "Expected ';'.",
-                    "';'"
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
                 ),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
         Token::SoundKeyword => {
             skip_token!(token_stream);
             let sound_keyword = from_stream_pos!(token_stream => ast::SoundKeyword);
-            let start_pos = get_token_start!(token_stream);
+            let start_pos = get_token_start(token_stream);
             Ok(StageStatement::SoundDeclaration(
                 sound_keyword,
-                statement::parse_asset_declaration(
+                try_or_emit_message!(
+                    statement::parse_asset_declaration(
+                        token_stream,
+                        context,
+                        statement::AssetDeclarationType::Sound,
+                    ),
+                    context,
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+                ),
+                expect_token_or_message!(
                     token_stream,
                     context,
-                    statement::AssetDeclarationType::Sound,
-                )?,
-                expect_token!(
-                    token_stream,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
                     "Expected ';'.",
-                    "';'"
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
                 ),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
-        Token::LetKeyword => statement::parse_stage_data_declaration_fully(token_stream, context),
+        Token::LetKeyword => {
+            let start_pos = get_token_end(token_stream);
+            Ok(try_or_emit_message!(
+                statement::parse_stage_data_declaration_fully(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+            ))
+        }
         Token::NowarpKeyword | Token::WarpKeyword | Token::ProcKeyword => {
+            let start_pos = get_token_end(token_stream);
             let (
                 proc_keyword,
                 warp_specifier,
@@ -2424,7 +2830,11 @@ pub fn parse_stage_statement(
                 code_block,
                 semicolon,
                 pos_range,
-            ) = statement::parse_custom_block(token_stream, context)?;
+            ) = try_or_emit_message!(
+                statement::parse_custom_block(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+            );
             Ok(StageStatement::CustomBlockDefinition(
                 proc_keyword,
                 warp_specifier,
@@ -2450,17 +2860,37 @@ pub fn parse_stage_statement(
                 Ok(StageStatement::SingleInputHatStatement(
                     identifier,
                     expression,
-                    parse_code_block(token_stream, context)?,
+                    try_or_emit_message!(
+                        parse_code_block(token_stream, context),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            StageStatement
+                        )
+                    ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 ))
             }
-            let identifier = parse_full_identifier(token_stream, context)?;
+            let start_pos = get_token_end(token_stream);
+            let identifier = try_or_emit_message!(
+                parse_full_identifier(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+            );
             let start_pos = identifier.pos_range.0;
             match peek_token!(token_stream) {
                 Token::LeftParens => {
-                    let (left_parens, expressions, right_parens) =
-                        parse_expression_list(token_stream, context)?;
+                    let (left_parens, expressions, right_parens) = try_or_emit_message!(
+                        parse_expression_list(token_stream, context),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            StageStatement
+                        )
+                    );
                     if expressions.is_empty() {
                         let pos_range = (left_parens.0.0, right_parens.0.1);
                         return parse_stage_rest_of_single_input_control(
@@ -2495,19 +2925,43 @@ pub fn parse_stage_statement(
                         left_parens,
                         expressions,
                         right_parens,
-                        parse_code_block(token_stream, context)?,
+                        try_or_emit_message!(
+                            parse_code_block(token_stream, context),
+                            context,
+                            find_statement_end_and_return_invalid!(
+                                token_stream,
+                                start_pos,
+                                StageStatement
+                            )
+                        ),
                         consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                        (start_pos, get_token_end!(token_stream)),
+                        (start_pos, get_token_end(token_stream)),
                     ))
                 }
                 Token::LeftBrace => Ok(StageStatement::NoInputHatStatement(
                     identifier,
-                    parse_code_block(token_stream, context)?,
+                    try_or_emit_message!(
+                        parse_code_block(token_stream, context),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            StageStatement
+                        )
+                    ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                    (start_pos, get_token_end!(token_stream)),
+                    (start_pos, get_token_end(token_stream)),
                 )),
                 _ => {
-                    let expression = parse_expression(token_stream, context)?;
+                    let expression = try_or_emit_message!(
+                        parse_expression(token_stream, context),
+                        context,
+                        find_statement_end_and_return_invalid!(
+                            token_stream,
+                            start_pos,
+                            StageStatement
+                        )
+                    );
                     parse_stage_rest_of_single_input_control(
                         token_stream,
                         context,
@@ -2519,31 +2973,42 @@ pub fn parse_stage_statement(
             }
         }
         Token::LeftBrace => {
-            let code_block = parse_code_block(token_stream, context)?;
+            let start_pos = get_token_end(token_stream);
+            let code_block = try_or_emit_message!(
+                parse_code_block(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+            );
             let start_pos = code_block.pos_range.0;
             Ok(StageStatement::IsolatedBlock(
                 code_block,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
         Token::LeftParens => {
             skip_token!(token_stream);
             let left_parens = from_stream_pos!(token_stream => ast::LeftParens);
-            let start_pos = get_token_start!(token_stream);
-            let expression = parse_expression(token_stream, context)?;
-            let right_parens = expect_token!(
+            let start_pos = get_token_start(token_stream);
+            let expression = try_or_emit_message!(
+                parse_expression(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+            );
+            let right_parens = expect_token_or_message!(
                 token_stream,
+                context,
                 Token::RightParens => from_stream_pos!(token_stream => ast::RightParens),
                 "Expected ')'.",
-                "')'"
+                "')'",
+                find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
             );
             Ok(StageStatement::IsolatedExpression(
                 left_parens,
                 expression,
                 right_parens,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ))
         }
         Token::Semicolon => {
@@ -2552,12 +3017,20 @@ pub fn parse_stage_statement(
                 from_stream_pos!(token_stream => ast::Semicolon),
             ))
         }
-        _ => emit_unexpected_token!(
-            token_stream,
-            "Expected hat statement, '{', '(', ';', \"let\", \"sound\", \"backdrop\" or \"costume\".",
-            "hat statement, '{', '(', ';', \"let\", \"sound\", \"backdrop\" or \"costume\"",
-            next_token!(token_stream)
-        ),
+        _ => {
+            let token = next_token!(token_stream);
+            let start = get_token_start(token_stream);
+            try_or_emit_message!(
+                Err(create_unexpected_token_error!(
+                    token_stream,
+                    "Expected hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\".",
+                    "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\"",
+                    token
+                )),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start, StageStatement)
+            )
+        }
     }
 }
 
@@ -2568,13 +3041,21 @@ pub fn parse_top_level_statement(
     match next_token!(token_stream) {
         Token::StageKeyword => {
             let stage_keyword = from_stream_pos!(token_stream => ast::StageKeyword);
-            let start_pos = get_token_start!(token_stream);
+            let start_pos = get_token_start(token_stream);
             context.next_target = Some(context.parsed_targets.swap_remove_front(0).unwrap());
             let return_value = Ok(TopLevelStatement::Stage(
                 stage_keyword,
-                parse_stage_code_block(token_stream, context)?,
+                try_or_emit_message!(
+                    parse_stage_code_block(token_stream, context),
+                    context,
+                    find_top_level_statement_end_and_return_invalid!(
+                        token_stream,
+                        start_pos,
+                        TopLevelStatement
+                    )
+                ),
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ));
             let stage = context.next_target.take().unwrap();
             context.parsed_targets.push_front(stage);
@@ -2582,15 +3063,19 @@ pub fn parse_top_level_statement(
         }
         Token::SpriteKeyword => {
             let sprite_keyword = from_stream_pos!(token_stream => ast::SpriteKeyword);
-            let start_pos = get_token_start!(token_stream);
+            let start_pos = get_token_start(token_stream);
             let canonical_identifier = consume_and_use_if!(
                 token_stream,
                 Token::CanonicalIdentifier(name) => ast::CanonicalIdentifier {
                     name,
-                    pos_range: get_token_position!(token_stream)
+                    pos_range: get_token_pos_range(token_stream)
                 }
             );
-            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            let identifier = try_or_emit_message!(
+                parse_single_identifier_as_identifier(token_stream, context),
+                context,
+                find_top_level_statement_end_and_return_invalid!(token_stream, start_pos, TopLevelStatement)
+            );
             context.next_target = Some(parse_context::Target::new_sprite(
                 identifier.names[0].0.clone(),
                 canonical_identifier
@@ -2601,9 +3086,17 @@ pub fn parse_top_level_statement(
                 sprite_keyword,
                 canonical_identifier,
                 identifier,
-                parse_sprite_code_block(token_stream, context)?,
+                try_or_emit_message!(
+                    parse_sprite_code_block(token_stream, context),
+                    context,
+                    find_top_level_statement_end_and_return_invalid!(
+                        token_stream,
+                        start_pos,
+                        TopLevelStatement
+                    )
+                ),
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon)),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ));
             let target = context.next_target.take().unwrap();
             context.parsed_targets.push_back(target);
@@ -2611,15 +3104,19 @@ pub fn parse_top_level_statement(
         }
         Token::BroadcastKeyword => {
             let broadcast_keyword = from_stream_pos!(token_stream => ast::BroadcastKeyword);
-            let start_pos = get_token_start!(token_stream);
+            let start_pos = get_token_start(token_stream);
             let canonical_identifier = consume_and_use_if!(
                 token_stream,
                 Token::CanonicalIdentifier(name) => ast::CanonicalIdentifier {
                     name,
-                    pos_range: get_token_position!(token_stream)
+                    pos_range: get_token_pos_range(token_stream)
                 }
             );
-            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            let identifier = try_or_emit_message!(
+                parse_single_identifier_as_identifier(token_stream, context),
+                context,
+                find_top_level_statement_end_and_return_invalid!(token_stream, start_pos, TopLevelStatement)
+            );
             let name = &identifier.names[0].0;
             let canonical_name = canonical_identifier
                 .as_ref()
@@ -2635,13 +3132,15 @@ pub fn parse_top_level_statement(
                 broadcast_keyword,
                 canonical_identifier,
                 identifier,
-                expect_token!(
+                expect_token_or_message!(
                     token_stream,
+                    context,
                     Token::Semicolon => from_stream_pos!(token_stream => ast::Semicolon),
                     "Expected ';'.",
-                    "';'"
+                    "';'",
+                    find_top_level_statement_end_and_return_invalid!(token_stream, start_pos, TopLevelStatement)
                 ),
-                (start_pos, get_token_end!(token_stream)),
+                (start_pos, get_token_end(token_stream)),
             ));
             context.next_target = None;
             return_val
@@ -2649,12 +3148,19 @@ pub fn parse_top_level_statement(
         Token::Semicolon => Ok(TopLevelStatement::EmptyStatement(
             from_stream_pos!(token_stream => ast::Semicolon),
         )),
-        token => emit_unexpected_token!(
-            token_stream,
-            "Expected \"stage\", \"sprite\" or ';'.",
-            "\"stage\", \"sprite\" or ';'",
-            token
-        ),
+        token => {
+            let start = get_token_start(token_stream);
+            try_or_emit_message!(
+                Err(create_unexpected_token_error!(
+                    token_stream,
+                    "Expected \"stage\", \"sprite\" or ';'.",
+                    "\"stage\", \"sprite\" or ';'",
+                    token
+                )),
+                context,
+                find_top_level_statement_end_and_return_invalid!(token_stream, start, TopLevelStatement)
+            )
+        }
     }
 }
 
@@ -2665,7 +3171,7 @@ pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> Pa
         "Expected '{'.",
         "'{'"
     );
-    let start_pos = get_token_start!(token_stream);
+    let start_pos = get_token_start(token_stream);
     let mut statements = Vec::<Statement>::new();
     let right_brace = loop {
         consume_then_never_if!(
@@ -2678,7 +3184,7 @@ pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> Pa
         left_brace,
         statements,
         right_brace,
-        pos_range: (start_pos, get_token_end!(token_stream)),
+        pos_range: (start_pos, get_token_end(token_stream)),
     })
 }
 
@@ -2687,7 +3193,7 @@ pub fn parse_sprite_code_block(
     context: &mut ParseContext,
 ) -> ParseOut<SpriteCodeBlock> {
     expect_token!(token_stream, Token::LeftBrace => (), "Expected '{'.", "'{'");
-    let start_pos = get_token_start!(token_stream);
+    let start_pos = get_token_start(token_stream);
     let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
     let mut statements = Vec::<SpriteStatement>::new();
     let right_brace = loop {
@@ -2701,7 +3207,7 @@ pub fn parse_sprite_code_block(
         left_brace,
         statements,
         right_brace,
-        pos_range: (start_pos, get_token_end!(token_stream)),
+        pos_range: (start_pos, get_token_end(token_stream)),
     })
 }
 
@@ -2710,7 +3216,7 @@ pub fn parse_stage_code_block(
     context: &mut ParseContext,
 ) -> ParseOut<StageCodeBlock> {
     expect_token!(token_stream, Token::LeftBrace => (), "Expected '{'.", "'{'");
-    let start_pos = get_token_start!(token_stream);
+    let start_pos = get_token_start(token_stream);
     let left_brace = from_stream_pos!(token_stream => ast::LeftBrace);
     let mut statements = Vec::<StageStatement>::new();
     let right_brace = loop {
@@ -2724,7 +3230,7 @@ pub fn parse_stage_code_block(
         left_brace,
         statements,
         right_brace,
-        pos_range: (start_pos, get_token_end!(token_stream)),
+        pos_range: (start_pos, get_token_end(token_stream)),
     })
 }
 
@@ -2757,7 +3263,7 @@ pub mod expression {
                         left_parens,
                         expressions,
                         right_parens,
-                        (token_position.0, get_token_end!(token_stream)),
+                        (token_position.0, get_token_end(token_stream)),
                     ))
                 }
                 Some(Token::LeftBracket) => {
@@ -2770,14 +3276,14 @@ pub mod expression {
                             expect_token!(token_stream, Token::RightBracket => (), "Expected ']'.", "']'");
                             from_stream_pos!(token_stream => RightBracket)
                         },
-                        (token_position.0, get_token_end!(token_stream)),
+                        (token_position.0, get_token_end(token_stream)),
                     ))
                 }
                 _ => Ok(Expression::Identifier(identifier)),
             }
         }
         let token = next_token!(token_stream);
-        let token_position = get_token_position!(token_stream);
+        let token_position = get_token_pos_range(token_stream);
         use super::super::ast::Literal as LLiteral;
         use super::super::ast::UnOp;
         use Expression::Literal as ELiteral;
@@ -2807,22 +3313,22 @@ pub mod expression {
             Token::Minus => Ok(Expression::UnOp(
                 UnOp::Minus(token_position),
                 Box::new(parse_expression_without_binops(token_stream, context)?),
-                (token_position.0, get_token_end!(token_stream)),
+                (token_position.0, get_token_end(token_stream)),
             )),
             Token::Not => Ok(Expression::UnOp(
                 UnOp::Not(token_position),
                 Box::new(parse_expression_without_binops(token_stream, context)?),
-                (token_position.0, get_token_end!(token_stream)),
+                (token_position.0, get_token_end(token_stream)),
             )),
             Token::Exp => Ok(Expression::UnOp(
                 UnOp::Exp(token_position),
                 Box::new(parse_expression_without_binops(token_stream, context)?),
-                (token_position.0, get_token_end!(token_stream)),
+                (token_position.0, get_token_end(token_stream)),
             )),
             Token::Pow => Ok(Expression::UnOp(
                 UnOp::Pow(token_position),
                 Box::new(parse_expression_without_binops(token_stream, context)?),
-                (token_position.0, get_token_end!(token_stream)),
+                (token_position.0, get_token_end(token_stream)),
             )),
             Token::Identifier(value) => {
                 parse_expression_after_identifier(token_stream, context, value, token_position)
@@ -2845,12 +3351,12 @@ pub mod expression {
                     return Ok(ELiteral(LLiteral::EmptyExpression(
                         left_parens,
                         from_stream_pos!(token_stream => RightParens),
-                        (token_position.0, get_token_end!(token_stream)),
+                        (token_position.0, get_token_end(token_stream)),
                     )));
                 });
                 let expr = parse_expression(token_stream, context)?;
                 expect_token!(token_stream, Token::RightParens => (), "Expected ')'.", "')'");
-                let end_pos = get_token_end!(token_stream);
+                let end_pos = get_token_end(token_stream);
                 Ok(Expression::Parentheses(
                     left_parens,
                     Box::new(expr),
@@ -2875,7 +3381,7 @@ pub mod expression {
                             if !string.is_empty() {
                                 expressions.push(FormattedStringContent::String(
                                     string,
-                                    get_token_position!(token_stream),
+                                    get_token_pos_range(token_stream),
                                 ));
                             }
                         }
@@ -2883,7 +3389,7 @@ pub mod expression {
                             if !string.is_empty() {
                                 expressions.push(FormattedStringContent::String(
                                     string,
-                                    get_token_position!(token_stream),
+                                    get_token_pos_range(token_stream),
                                 ));
                             }
                             break;
@@ -2895,7 +3401,7 @@ pub mod expression {
                 }
                 Ok(Expression::FormattedString(
                     expressions,
-                    (token_position.0, get_token_end!(token_stream)),
+                    (token_position.0, get_token_end(token_stream)),
                 ))
             }
             token => emit_unexpected_token!(
@@ -2995,7 +3501,7 @@ pub fn parse_expression(token_stream: ParseIn, context: &mut ParseContext) -> Pa
             );
             let pos_range = (
                 string_expression.get_position().0,
-                get_token_end!(token_stream),
+                get_token_end(token_stream),
             );
             expressions.push_back(Expression::GetLetter(
                 Box::new(string_expression),
@@ -3035,7 +3541,7 @@ pub fn parse_expression_list(
             match peek_token!(token_stream) {
                 Token::Comma => {
                     skip_token!(token_stream);
-                    Some(ast::Comma(get_token_position!(token_stream)))
+                    Some(ast::Comma(get_token_pos_range(token_stream)))
                 }
                 Token::RightParens => None,
                 _ => {
