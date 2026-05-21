@@ -87,17 +87,20 @@ pub enum KnownBlock {
 pub enum KnownBlockInput<'a> {
     PrimitiveInput(project_json::Sb3PrimitiveBlock),
     BlockRef(IString),
-    SimpleBlock(&'a IString, &'a Vec<(CallBlockParam, KnownBlock)>),
+    SimpleBlock(&'a IString, &'a [(CallBlockParam, KnownBlock)]),
     Menu(project_json::Sb3FieldValue),
     Empty,
 }
 
+type CallableKnownBlockSignatureMutation<'a> =
+    Option<(&'a IString, &'a [(IString, HasShadow)], &'a bool)>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CallableKnownBlockSignature<'a>(
     pub &'a IString,
-    pub &'a Vec<CallBlockParam>,
-    pub &'a Vec<(CallBlockParam, KnownBlock)>,
-    pub Option<(&'a IString, &'a [(IString, HasShadow)], &'a bool)>,
+    pub &'a [CallBlockParam],
+    pub &'a [(CallBlockParam, KnownBlock)],
+    pub CallableKnownBlockSignatureMutation<'a>,
 );
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -3,13 +3,13 @@ use super::{
         self, BinOp, CodeBlock, Expression, Identifier, ParseError, SpriteStatement,
         StageStatement, Statement,
     },
-    parse_context::{GrazeMessageSetting, ParseContext},
+    context::{GrazeMessageSetting, ParseContext},
 };
 use crate::{
     lexer::{self, PosRange, Token, get_pos_range as internal_get_pos_range},
     parser::{
         ast::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
-        parse_context::{self, BroadcastDescriptor},
+        context::{self, BroadcastDescriptor},
     },
 };
 use arcstr::{ArcStr as IString, literal};
@@ -308,6 +308,14 @@ macro_rules! try_or_emit_message {
             Ok(value) => value,
             Err(err) => {
                 $context.successful = false;
+                match $context.message_setting {
+                    GrazeMessageSetting::ExitOnError => {
+                        $context.messages.push(err.clone().into());
+                        return Err(err);
+                    }
+                    GrazeMessageSetting::ExitOnErrorUnlogged => return Err(err),
+                    _ => (),
+                }
                 if $context.message_setting >= GrazeMessageSetting::Errors {
                     $context.messages.push(err.into());
                 }
@@ -352,21 +360,50 @@ where
 }
 
 macro_rules! emit_unexpected_token_message {
-    ($context:expr, $token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
+    ($context:expr, $token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {{
         $context.successful = false;
-        if $context.message_setting >= GrazeMessageSetting::Errors {
+        let message = literal!($msg_1);
+        let expected = literal!($msg_2);
+        let context = literal!(static_current_context!());
+        let found = $found;
+        let pos_range = get_token_pos_range($token_stream);
+        if matches!(
+            $context.message_setting,
+            GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+        ) {
+            if $context.message_setting == GrazeMessageSetting::ExitOnError {
+                $context.messages.push(
+                    ParseError::UnexpectedToken {
+                        message: message.clone(),
+                        expected: expected.clone(),
+                        context: context.clone(),
+                        found: found.clone(),
+                        pos_range,
+                    }
+                    .into(),
+                );
+            }
+            return Err(ParseError::UnexpectedToken {
+                message,
+                expected,
+                context,
+                found,
+                pos_range,
+            });
+        }
+        if $context.message_setting >= GrazeMessageSetting::ExitOnError {
             $context.messages.push(
                 ParseError::UnexpectedToken {
-                    message: literal!($msg_1),
-                    expected: literal!($msg_2),
-                    context: literal!(static_current_context!()),
-                    found: $found,
-                    pos_range: get_token_pos_range($token_stream),
+                    message,
+                    expected,
+                    context,
+                    found,
+                    pos_range,
                 }
                 .into(),
             );
         }
-    };
+    }};
 }
 
 macro_rules! from_stream_pos {
@@ -498,11 +535,6 @@ impl<'a> PeekableLexer<'a> {
         self.current_span = Some(current_span);
         current_span
     }
-}
-
-pub fn enter(lex: Lexer<Token>) -> ParseOut<GrazeProgram> {
-    let mut context = ParseContext::new();
-    parse_graze_program(&mut PeekableLexer::new(lex), &mut context)
 }
 
 pub fn parse_graze_program(
@@ -1016,11 +1048,11 @@ pub mod statement {
                 (
                     DataDeclarationScope::Local(_),
                     DataDeclarationScope::Unset,
-                    Some(parse_context::Target::Stage { .. })
+                    Some(context::Target::Stage { .. })
                 ) | (
                     _,
                     DataDeclarationScope::Local(_),
-                    Some(parse_context::Target::Stage { .. })
+                    Some(context::Target::Stage { .. })
                 )
             ) {
                 return Err(ParseError::LocalSymbolInStage {
@@ -1041,7 +1073,7 @@ pub mod statement {
                 matches!(
                     (default_scope, &scope, &context.next_target),
                     (
-                        DataDeclarationScope::Unset, DataDeclarationScope::Unset, Some(parse_context::Target::Stage { .. })
+                        DataDeclarationScope::Unset, DataDeclarationScope::Unset, Some(context::Target::Stage { .. })
                     )
                 ),
                 symbols => {
@@ -1053,7 +1085,7 @@ pub mod statement {
                             matches!(dec_type, SingleDataDeclarationType::List(_)) ||
                             (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)
                         ) {
-                            parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
+                            context::TargetSymbolDescriptor::List(context::ListDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
                                 value_is_initial_value: values_are_initial_values,
@@ -1079,7 +1111,7 @@ pub mod statement {
                                 }
                             })
                         } else {
-                            parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
+                            context::TargetSymbolDescriptor::Var(context::VarDescriptor {
                                 name: name.clone(),
                                 canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
                                 value_is_initial_value: values_are_initial_values,
@@ -1472,7 +1504,7 @@ pub mod statement {
             (&scope, &context.next_target),
             (
                 DataDeclarationScope::Local(_),
-                Some(parse_context::Target::Stage { .. })
+                Some(context::Target::Stage { .. })
             )
         ) {
             return Err(ParseError::LocalSymbolInStage {
@@ -1483,14 +1515,14 @@ pub mod statement {
         with_mut_target_scope_or_global_scope!(
             context,
             matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) ||
-            matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(parse_context::Target::Stage { .. }))),
+            matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
                 // TODO: warn about shadowing
                 let name = &identifier.names[0].0;
                 symbols.insert(
                     name.clone(),
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
-                        parse_context::TargetSymbolDescriptor::List(parse_context::ListDescriptor {
+                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
                             value_is_initial_value: values_are_initial_values,
@@ -1516,7 +1548,7 @@ pub mod statement {
                             }
                         })
                     } else {
-                        parse_context::TargetSymbolDescriptor::Var(parse_context::VarDescriptor {
+                        context::TargetSymbolDescriptor::Var(context::VarDescriptor {
                             name: name.clone(),
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
                             value_is_initial_value: values_are_initial_values,
@@ -2006,7 +2038,7 @@ pub mod statement {
                         "')'"
                     );
                     with_mut_next_target!(context, target => {
-                        use parse_context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
+                        use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                         // TODO: Warn about shadowing
                         let symbols = target.borrow_symbols_mut();
                         let name = &identifier.names[0].0;
@@ -2101,7 +2133,7 @@ pub mod statement {
                 );
                 // TODO: Warn about shadowing
                 with_mut_next_target!(context, target => {
-                    use parse_context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
+                    use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.names[0].0;
                     let canonical_name = Some(canonical_identifier.name.clone());
@@ -2155,7 +2187,7 @@ pub mod statement {
                 );
                 // TODO: Warn about shadowing
                 with_mut_next_target!(context, target => {
-                    use parse_context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
+                    use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.names[0].0;
                     let canonical_name = None;
@@ -2302,7 +2334,7 @@ pub mod statement {
         let code_block = parse_code_block(token_stream, context)?;
         // TODO: Warn about shadowing
         with_mut_next_target!(context, target => {
-            use parse_context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
+            use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
             let name = &identifier.names[0].0;
             symbols.insert(
@@ -2339,9 +2371,7 @@ pub mod statement {
         let mut layers = 0_i32;
         let mut step_back = false;
         find_next_token(token_stream, |token| match token {
-            Token::Semicolon => {
-                layers == 0
-            },
+            Token::Semicolon => layers == 0,
             Token::LeftBrace => {
                 layers += 1;
                 false
@@ -2389,9 +2419,7 @@ pub mod statement {
         let mut layers = 0_i32;
         let mut step_back = false;
         find_next_token(token_stream, |token| match token {
-            Token::Semicolon => {
-                layers == 0
-            },
+            Token::Semicolon => layers == 0,
             Token::LeftBrace => {
                 layers += 1;
                 false
@@ -3074,9 +3102,13 @@ pub fn parse_top_level_statement(
             let identifier = try_or_emit_message!(
                 parse_single_identifier_as_identifier(token_stream, context),
                 context,
-                find_top_level_statement_end_and_return_invalid!(token_stream, start_pos, TopLevelStatement)
+                find_top_level_statement_end_and_return_invalid!(
+                    token_stream,
+                    start_pos,
+                    TopLevelStatement
+                )
             );
-            context.next_target = Some(parse_context::Target::new_sprite(
+            context.next_target = Some(context::Target::new_sprite(
                 identifier.names[0].0.clone(),
                 canonical_identifier
                     .as_ref()
@@ -3115,7 +3147,11 @@ pub fn parse_top_level_statement(
             let identifier = try_or_emit_message!(
                 parse_single_identifier_as_identifier(token_stream, context),
                 context,
-                find_top_level_statement_end_and_return_invalid!(token_stream, start_pos, TopLevelStatement)
+                find_top_level_statement_end_and_return_invalid!(
+                    token_stream,
+                    start_pos,
+                    TopLevelStatement
+                )
             );
             let name = &identifier.names[0].0;
             let canonical_name = canonical_identifier
@@ -3158,7 +3194,11 @@ pub fn parse_top_level_statement(
                     token
                 )),
                 context,
-                find_top_level_statement_end_and_return_invalid!(token_stream, start, TopLevelStatement)
+                find_top_level_statement_end_and_return_invalid!(
+                    token_stream,
+                    start,
+                    TopLevelStatement
+                )
             )
         }
     }

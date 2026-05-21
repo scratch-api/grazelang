@@ -1,11 +1,10 @@
 use std::{
     borrow::Borrow,
-    cell::RefCell,
     collections::{HashMap, VecDeque},
     hash::Hash,
     io::Read,
     ops::{Index, IndexMut},
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use arcstr::{ArcStr as IString, literal};
@@ -23,14 +22,11 @@ use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen::{
-        self,
-        core::AssetFile,
-        ids::{generate_random_id_as_string, generate_random_id_string},
-    },
+    codegen::{self, core::AssetFile, ids::generate_random_id_as_string},
     lexer::PosRange,
     names::Namespace,
     parser::ast::{CustomBlockParamKindValue, ParseError},
+    settings::GrazeSettings,
 };
 
 pub type IdString = IString;
@@ -985,7 +981,7 @@ impl From<ParseError> for GrazeMessage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum GrazeMessageSetting {
     // Maybe there will be settings inbetween later
     #[default]
@@ -997,6 +993,10 @@ pub enum GrazeMessageSetting {
     Warnings,
     /// tag: 3
     Errors,
+    /// tag: 2
+    ExitOnError,
+    /// tag: 1
+    ExitOnErrorUnlogged,
     /// tag: 0
     None,
 }
@@ -1008,6 +1008,8 @@ impl GrazeMessageSetting {
             GrazeMessageSetting::Infos => 9,
             GrazeMessageSetting::Warnings => 6,
             GrazeMessageSetting::Errors => 3,
+            GrazeMessageSetting::ExitOnError => 2,
+            GrazeMessageSetting::ExitOnErrorUnlogged => 1,
             GrazeMessageSetting::None => 0,
         }
     }
@@ -1036,13 +1038,14 @@ pub struct ParseContext {
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
     pub messages: Vec<GrazeMessage>,
     pub message_setting: GrazeMessageSetting,
+    pub settings: GrazeSettings,
     pub successful: bool,
 }
 
 impl ParseContext {
-    pub fn with_seed_and_message_setting(
+    pub fn new(
+        settings: GrazeSettings,
         random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
-        message_setting: GrazeMessageSetting,
     ) -> Self {
         Self {
             parsed_targets: VecDeque::from([Target::Stage {
@@ -1057,21 +1060,10 @@ impl ParseContext {
             next_target: None,
             random_seed,
             messages: Vec::new(),
-            message_setting,
+            message_setting: settings.message_setting,
             successful: true,
+            settings,
         }
-    }
-
-    pub fn with_seed(random_seed: <Xoshiro256StarStar as SeedableRng>::Seed) -> Self {
-        Self::with_seed_and_message_setting(random_seed, Default::default())
-    }
-
-    pub fn with_message_setting(message_setting: GrazeMessageSetting) -> Self {
-        Self::with_seed_and_message_setting(Default::default(), message_setting)
-    }
-
-    pub fn new() -> Self {
-        Self::with_seed_and_message_setting(Default::default(), Default::default())
     }
 
     // pub fn get_stage_mut(&mut self) -> &mut Target {
@@ -1084,6 +1076,6 @@ impl ParseContext {
 
 impl Default for ParseContext {
     fn default() -> Self {
-        Self::new()
+        Self::new(Default::default(), Default::default())
     }
 }

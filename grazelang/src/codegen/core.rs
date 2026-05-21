@@ -31,11 +31,12 @@ use crate::{
             BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope,
             Expression, FormattedStringContent, Identifier, ListEntry, Literal, UnOpDescriptor,
         },
-        parse_context::{
+        context::{
             IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable,
             Target, TargetSymbolDescriptor,
         },
     },
+    settings::GrazeSettings,
     visitor::{
         GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
         default_visit_expression_binary_operation, default_visit_expression_call,
@@ -108,6 +109,7 @@ pub struct GrazeSb3GeneratorContext {
     pub formatted_string_context: FormattedStringContext,
     pub target_attachments: HashMap<IString, Vec<TargetAttachment>>,
     pub asset_files: HashMap<String, IString>,
+    pub settings: GrazeSettings,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -243,9 +245,10 @@ impl GrazeSb3GeneratorContext {
                 canonical_name: _,
                 symbols: _,
             } = target
-                && name.as_str() == "stage" {
-                    return Err(GrazeSb3GeneratorCreationError::ShadowedStage);
-                }
+                && name.as_str() == "stage"
+            {
+                return Err(GrazeSb3GeneratorCreationError::ShadowedStage);
+            }
             let mut namespace = Namespace::new();
 
             let is_stage = matches!(target, Target::Stage { .. });
@@ -406,6 +409,7 @@ impl GrazeSb3GeneratorContext {
             formatted_string_context: FormattedStringContext::new(),
             target_attachments,
             asset_files,
+            settings: std::mem::take(&mut parse_context.settings),
         })
     }
 

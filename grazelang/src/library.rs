@@ -8,7 +8,7 @@ use grazelang_library::{
 };
 use grazelang_library_parser::generate_library;
 
-use crate::parser::parse_context::{Symbol, SymbolId, SymbolTable};
+use crate::parser::context::{Symbol, SymbolId, SymbolTable};
 
 pub fn get_generated_library() -> HashMap<String, LibraryItem> {
     generate_library!("schemas/toolbox_schema.json")

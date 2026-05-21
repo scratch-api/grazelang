@@ -152,6 +152,13 @@ impl GetPos for CustomBlockParamKind {
     }
 }
 
+type CustomBlockParams = Vec<(
+    Option<CustomBlockParamKind>,
+    Option<CanonicalIdentifier>,
+    Identifier,
+    Option<Comma>,
+)>;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StageStatement {
     DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
@@ -180,12 +187,7 @@ pub enum StageStatement {
         Option<CanonicalIdentifier>,
         Identifier,
         LeftParens,
-        Vec<(
-            Option<CustomBlockParamKind>,
-            Option<CanonicalIdentifier>,
-            Identifier,
-            Option<Comma>,
-        )>,
+        CustomBlockParams,
         RightParens,
         CodeBlock,
         Option<Semicolon>,
@@ -249,12 +251,7 @@ pub enum SpriteStatement {
         Option<CanonicalIdentifier>,
         Identifier,
         LeftParens,
-        Vec<(
-            Option<CustomBlockParamKind>,
-            Option<CanonicalIdentifier>,
-            Identifier,
-            Option<Comma>,
-        )>,
+        CustomBlockParams,
         RightParens,
         CodeBlock,
         Option<Semicolon>,

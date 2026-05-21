@@ -1,5 +1,5 @@
-use crate::parser::parse_context;
-use parse_context::IdString;
+use crate::parser::context;
+use context::IdString;
 use rand::{
     Rng,
     distr::{Distribution, Uniform},
