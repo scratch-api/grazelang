@@ -574,8 +574,8 @@ pub fn parse_single_identifier_as_identifier(
     context: &mut ParseContext,
 ) -> ParseOut<Identifier> {
     Ok(Identifier {
-        scope: Vec::new(),
-        names: vec![(
+        path: Vec::new(),
+        fields: vec![(
             parse_single_identifier(token_stream, context)?,
             get_token_pos_range(token_stream),
         )],
@@ -592,14 +592,14 @@ pub fn parse_full_identifier(
         get_token_pos_range(token_stream),
     )];
     let start_pos = get_token_start(token_stream);
-    let mut scope: Option<Vec<(IString, PosRange)>> = None;
+    let mut path: Option<Vec<(IString, PosRange)>> = None;
     loop {
         match match peek_token!(token_stream => Option) {
             Some(value) => value,
             None => break,
         } {
             Token::ScopeResolution => {
-                if scope.is_some() {
+                if path.is_some() {
                     emit_unexpected_token!(
                         token_stream,
                         "Expected a dot.",
@@ -609,8 +609,8 @@ pub fn parse_full_identifier(
                 }
             }
             Token::Dot => {
-                if scope.is_none() {
-                    scope = Some(names);
+                if path.is_none() {
+                    path = Some(names);
                     names = Vec::new();
                 }
             }
@@ -632,13 +632,12 @@ pub fn parse_full_identifier(
             }
         });
     }
-    if names.len() > 1 && scope.is_none() {
-        scope = Some(names);
-        names = Vec::new();
+    if path.is_none() {
+        path = Some(std::mem::take(&mut names));
     }
     Ok(Identifier {
-        scope: scope.unwrap_or_default(),
-        names,
+        path: path.unwrap_or_default(),
+        fields: names,
         pos_range: (start_pos, get_token_end(token_stream)),
     })
 }
@@ -695,8 +694,8 @@ pub fn parse_full_identifier_starting_with(
         names = Vec::new();
     }
     Ok(Identifier {
-        scope: scope.unwrap_or_default(),
-        names,
+        path: scope.unwrap_or_default(),
+        fields: names,
         pos_range: (start_pos, get_token_end(token_stream)),
     })
 }
@@ -914,8 +913,8 @@ pub mod statement {
                         start_pos = Some(get_token_start(token_stream));
                     }
                     Identifier {
-                        scope: Vec::new(),
-                        names: vec![(value, get_token_pos_range(token_stream))],
+                        path: Vec::new(),
+                        fields: vec![(value, get_token_pos_range(token_stream))],
                         pos_range: get_token_pos_range(token_stream),
                     }
                 }
@@ -1078,7 +1077,7 @@ pub mod statement {
                 ),
                 symbols => {
                     // TODO: warn about shadowing
-                    let name = &identifier.names[0].0;
+                    let name = &identifier.fields[0].0;
                     symbols.insert(
                         name.clone(),
                         if (
@@ -1395,8 +1394,8 @@ pub mod statement {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
                 Identifier {
-                    scope: Vec::new(),
-                    names: vec![(value, get_token_pos_range(token_stream))],
+                    path: Vec::new(),
+                    fields: vec![(value, get_token_pos_range(token_stream))],
                     pos_range: get_token_pos_range(token_stream),
                 }
             }
@@ -1518,7 +1517,7 @@ pub mod statement {
             matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
                 // TODO: warn about shadowing
-                let name = &identifier.names[0].0;
+                let name = &identifier.fields[0].0;
                 symbols.insert(
                     name.clone(),
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
@@ -1706,9 +1705,9 @@ pub mod statement {
                                     "\"else\"",
                                     Token::Identifier(
                                         else_identifier
-                                            .names
+                                            .fields
                                             .last()
-                                            .or_else(|| else_identifier.scope.last())
+                                            .or_else(|| else_identifier.path.last())
                                             .unwrap()
                                             .0
                                             .clone()
@@ -1727,9 +1726,9 @@ pub mod statement {
                                     "\"if\"",
                                     Token::Identifier(
                                         if_identifier
-                                            .names
+                                            .fields
                                             .last()
-                                            .or_else(|| if_identifier.scope.last())
+                                            .or_else(|| if_identifier.path.last())
                                             .unwrap()
                                             .0
                                             .clone()
@@ -2041,7 +2040,7 @@ pub mod statement {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                         // TODO: Warn about shadowing
                         let symbols = target.borrow_symbols_mut();
-                        let name = &identifier.names[0].0;
+                        let name = &identifier.fields[0].0;
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
                         symbols.insert(
                             name.clone(),
@@ -2135,7 +2134,7 @@ pub mod statement {
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
-                    let name = &identifier.names[0].0;
+                    let name = &identifier.fields[0].0;
                     let canonical_name = Some(canonical_identifier.name.clone());
                     symbols.insert(
                         name.clone(),
@@ -2189,7 +2188,7 @@ pub mod statement {
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
-                    let name = &identifier.names[0].0;
+                    let name = &identifier.fields[0].0;
                     let canonical_name = None;
                     symbols.insert(
                         name.clone(),
@@ -2336,7 +2335,7 @@ pub mod statement {
         with_mut_next_target!(context, target => {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
-            let name = &identifier.names[0].0;
+            let name = &identifier.fields[0].0;
             symbols.insert(
                 name.clone(),
                 TargetSymbolDescriptor::CustomBlockDescriptor(CustomBlockDescriptor {
@@ -3109,7 +3108,7 @@ pub fn parse_top_level_statement(
                 )
             );
             context.next_target = Some(context::Target::new_sprite(
-                identifier.names[0].0.clone(),
+                identifier.fields[0].0.clone(),
                 canonical_identifier
                     .as_ref()
                     .map(|value| value.name.clone()),
@@ -3153,7 +3152,7 @@ pub fn parse_top_level_statement(
                     TopLevelStatement
                 )
             );
-            let name = &identifier.names[0].0;
+            let name = &identifier.fields[0].0;
             let canonical_name = canonical_identifier
                 .as_ref()
                 .map(|value| value.name.clone());

@@ -1130,15 +1130,11 @@ impl GetPos for FormattedStringContent {
     }
 }
 
-/// What counts as `scope`, what counts as `names`?
-///
-/// When there is only one segment: it counts as `names`.
-///
-/// When there are multiple segments: everything before the first dot is in `scope`.
+/// Anything before a dot is a path
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Identifier {
-    pub scope: Vec<(IString, PosRange)>,
-    pub names: Vec<(IString, PosRange)>,
+    pub path: Vec<(IString, PosRange)>,   // abc::def
+    pub fields: Vec<(IString, PosRange)>, // .ghi.jkl
     pub pos_range: PosRange,
 }
 
@@ -1151,9 +1147,9 @@ impl GetPos for Identifier {
 
 impl Identifier {
     pub fn to_single(&self) -> Option<&(IString, PosRange)> {
-        match (self.scope.len(), self.names.len()) {
-            (0, 1) => self.names.first(),
-            (1, 0) => self.scope.first(),
+        match (self.path.len(), self.fields.len()) {
+            (0, 1) => self.fields.first(),
+            (1, 0) => self.path.first(),
             _ => None,
         }
     }
@@ -1161,19 +1157,13 @@ impl Identifier {
 
 impl Identifier {
     pub fn to_syntactic_if(&self) -> Option<SyntacticIf> {
-        if self.names.len() != 1 || !self.scope.is_empty() {
-            return None;
-        }
-        self.names.first().and_then(|(value, pos_range)| {
+        self.to_single().and_then(|(value, pos_range)| {
             (value.as_str() == "if").then_some(SyntacticIf(*pos_range))
         })
     }
 
     pub fn to_syntactic_else(&self) -> Option<SyntacticElse> {
-        if self.names.len() != 1 || !self.scope.is_empty() {
-            return None;
-        }
-        self.names.first().and_then(|(value, pos_range)| {
+        self.to_single().and_then(|(value, pos_range)| {
             (value.as_str() == "else").then_some(SyntacticElse(*pos_range))
         })
     }

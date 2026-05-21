@@ -445,9 +445,9 @@ impl GrazeSb3GeneratorContext {
     pub fn resolve_identifier(&self, identifier: &Identifier) -> Option<SymbolId> {
         self.resolve_path(
             identifier
-                .scope
+                .path
                 .iter()
-                .chain(identifier.names.iter())
+                .chain(identifier.fields.iter())
                 .map(|(next, _)| next),
         )
     }
@@ -2766,7 +2766,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .1
             .as_ref()
             .map(|value| value.name.clone())
-            .unwrap_or_else(|| value.2.names.last().unwrap().0.clone());
+            .unwrap_or_else(|| value.2.fields.last().unwrap().0.clone());
         // TODO: explicitly error when multiple sprites have the same name
         let assets = context
             .target_attachments

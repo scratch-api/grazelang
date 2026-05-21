@@ -1,5 +1,4 @@
-use grazelang::parser::context::{GrazeMessage, GrazeMessageSetting, ParseContext};
-use grazelang::settings::GrazeSettings;
+use grazelang::parser::context::ParseContext;
 use grazelang::visitor::GrazeVisitor;
 use grazelang::{
     codegen, lexer,
@@ -8,10 +7,7 @@ use grazelang::{
 
 fn main() {
     let lexer = lexer::create_lexer(include_str!("./test.graze"));
-    let mut context = ParseContext::new(
-        Default::default(),
-        Default::default(),
-    );
+    let mut context = ParseContext::new(Default::default(), Default::default());
 
     let parsed = parser::parse_graze_program(&mut PeekableLexer::new(lexer), &mut context).unwrap();
 
