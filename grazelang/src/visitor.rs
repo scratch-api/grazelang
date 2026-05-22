@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use crate::{
     lexer::PosRange,
-    parser::ast::{
+    parser::cst::{
         AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
         Comma, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope,
         Expression, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket,

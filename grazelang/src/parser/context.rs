@@ -25,7 +25,7 @@ use crate::{
     codegen::{self, core::AssetFile, ids::generate_random_id_as_string},
     lexer::PosRange,
     names::Namespace,
-    parser::ast::{CustomBlockParamKindValue, ParseError},
+    parser::cst::{CustomBlockParamKindValue, ParseError},
     settings::GrazeSettings,
 };
 
