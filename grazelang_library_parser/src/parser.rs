@@ -23,7 +23,7 @@ pub struct BlockEntry {
     pub opcode: String,
     pub args: Vec<BlockArg>,
     pub alt_name: Option<String>,
-    pub assign: Option<AssignmentDescriptor>,
+    pub assign: Option<AssignmentDescriptor>, // TODO: implement these
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -49,6 +49,7 @@ pub enum BlockArg {
         field_type: String,
         value: Option<Sb3Primitive>,
         options: Option<Vec<MenuOption>>,
+        option_category: Option<String>, // TODO: implement these
     },
     #[serde(rename_all = "camelCase")]
     Input {
@@ -75,6 +76,7 @@ pub struct ShadowData {
     pub shadow_type: String,
     pub default_value: Option<String>,
     pub options: Option<Vec<MenuOption>>,
+    pub option_category: Option<String>, // TODO: implement these
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -129,6 +131,7 @@ impl BlockEntry {
                     field_type: _, // TODO: Should this be used somehow?
                     value,
                     options,
+                    option_category,
                 } => {
                     if let Some(associated_items) = associated_items {
                         options.iter().flatten().for_each(|value| {
@@ -157,6 +160,7 @@ impl BlockEntry {
                             shadow_type,
                             default_value,
                             options,
+                            option_category,
                         }) => {
                             if let Some(associated_items) = associated_items {
                                 options.iter().flatten().for_each(|value| {
