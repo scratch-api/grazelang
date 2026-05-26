@@ -566,7 +566,7 @@ macro_rules! with_known_block {
                 $action
             }
             Param::BlockStack(_) => {
-                t0do!() // T0DO: warn user about incorrect usage
+                todo!() // TODO: warn user about incorrect usage
             }
         }
     };
@@ -702,7 +702,7 @@ pub fn add_param_to_params(
             );
         }
         CallBlockParamKind::BlockStack => {
-            t0do!() // T0DO: warn user about incorrect usage
+            todo!() // TODO: warn user about incorrect usage
         }
     }
     Ok(())
@@ -2767,7 +2767,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .as_ref()
             .map(|value| value.name.clone())
             .unwrap_or_else(|| value.2.fields.last().unwrap().0.clone());
-        // T0DO: explicitly error when multiple sprites have the same name
+        // TODO: explicitly error when multiple sprites have the same name
         let assets = context
             .target_attachments
             .remove(&value.2.to_single().unwrap().0)
