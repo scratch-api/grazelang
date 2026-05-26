@@ -134,7 +134,7 @@ impl ResolveKnownBlock for KnownBlock {
                 assign: _,
                 bind_info,
             } => {
-                // TODO: possibly set x and y
+                // T0DO: possibly set x and y
                 if let Some(bind_info) = bind_info
                     && let Some(target) = context.current_sb3_target.as_ref()
                     && bind_info.parent_target.as_str() != target.name.as_str()
@@ -152,7 +152,7 @@ impl ResolveKnownBlock for KnownBlock {
                 })
             }
             KnownBlock::List { canonical_name, id } => {
-                // TODO: possibly set x and y
+                // T0DO: possibly set x and y
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::List {
                     name: canonical_name.to_string(),
                     id: id.to_string(),
@@ -161,7 +161,7 @@ impl ResolveKnownBlock for KnownBlock {
                 })
             }
             KnownBlock::FieldValue { value } => {
-                // TODO: warn user about possibly incorrect usage in some cases
+                // T0DO: warn user about possibly incorrect usage in some cases
                 KnownBlockInput::Menu(value.clone())
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
@@ -169,7 +169,7 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. } => {
-                // TODO: warn user about probably incorrect usage
+                // T0DO: warn user about probably incorrect usage
                 KnownBlockInput::PrimitiveInput("".into())
             }
             KnownBlock::SingletonReporter {
@@ -201,10 +201,10 @@ impl ResolveKnownBlock for KnownBlock {
             },
             KnownBlock::FieldValue { value } => value.clone(),
             KnownBlock::BlockRef { id } => {
-                Sb3FieldValue::Normal(id.into()) // TODO: warn user about probably incorrect usage.
+                Sb3FieldValue::Normal(id.into()) // T0DO: warn user about probably incorrect usage.
             }
             KnownBlock::PrimitiveBlock { value } => {
-                // TODO: warn user about possibly incorrect usage
+                // T0DO: warn user about possibly incorrect usage
                 match value {
                     codegen::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
                     | codegen::project_json::Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
@@ -237,7 +237,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::Empty => {
-                // TODO: warn user about probably incorrect usage
+                // T0DO: warn user about probably incorrect usage
                 Sb3FieldValue::Normal("".into())
             }
             KnownBlock::SingletonReporter {
@@ -247,7 +247,7 @@ impl ResolveKnownBlock for KnownBlock {
                 assign: _,
                 bind_info: _,
             } => {
-                // TODO: warn user about incorrect usage if no field supplied
+                // T0DO: warn user about incorrect usage if no field supplied
                 field
                     .clone()
                     .unwrap_or_else(|| codegen::project_json::Sb3FieldValue::Normal("".into()))
@@ -289,7 +289,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
             | KnownBlock::PrimitiveBlock { .. }
-            | KnownBlock::Empty => todo!(), // warn user about incorrect usage
+            | KnownBlock::Empty => t0do!(), // warn user about incorrect usage
         }
     }
 
@@ -319,8 +319,8 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::SingletonReporter { .. }
             | KnownBlock::CustomBlock { .. }
-            | KnownBlock::Empty => todo!(), // warn user about incorrect usage
-        } // TODO: Implement assignment of x, y etc
+            | KnownBlock::Empty => t0do!(), // warn user about incorrect usage
+        } // T0DO: Implement assignment of x, y etc
     }
 }
 
@@ -631,7 +631,7 @@ impl TargetSymbolDescriptor {
                     canonical_name: _,
                     source,
                 }) => {
-                    // TODO: better ext detections
+                    // T0DO: better ext detections
                     source.as_str().rsplit_once('.').unwrap_or(("", "")).1
                 }
                 _ => unreachable!(),
@@ -716,7 +716,7 @@ impl TargetSymbolDescriptor {
             Ok((
                 Symbol {
                     known_block: Some(Rc::new(match self {
-                        // TODO: implement specific known blocks here
+                        // T0DO: implement specific known blocks here
                         TargetSymbolDescriptor::Costume(..)
                         | TargetSymbolDescriptor::Backdrop(..)
                         | TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
@@ -730,7 +730,7 @@ impl TargetSymbolDescriptor {
                     parent: Default::default(),
                 },
                 match self {
-                    // TODO: implement specific known blocks here
+                    // T0DO: implement specific known blocks here
                     TargetSymbolDescriptor::Costume(CostumeDescriptor {
                         name,
                         canonical_name,
@@ -747,7 +747,7 @@ impl TargetSymbolDescriptor {
                                 name: canonical_name.as_ref().unwrap_or(name).to_string(),
                                 md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
-                                bitmap_resolution: Some(1.0), // TODO: better default and more control
+                                bitmap_resolution: Some(1.0), // T0DO: better default and more control
                                 rotation_center_x: 0.0,
                                 rotation_center_y: 0.0,
                             },
@@ -764,7 +764,7 @@ impl TargetSymbolDescriptor {
                                 name: canonical_name.as_ref().unwrap_or(name).to_string(),
                                 md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
-                                rate: 48000.0, // TODO: better default and more control
+                                rate: 48000.0, // T0DO: better default and more control
                                 sample_count: 1124,
                             },
                         ))
@@ -845,7 +845,7 @@ impl TargetSymbolDescriptor {
                             known_block: Some(Rc::new(KnownBlock::List {
                                 canonical_name: canonical_name.clone(),
                                 id,
-                            })), // TODO: add list length as method
+                            })), // T0DO: add list length as method
                             namespace: HashMap::new(),
                             parent: Default::default(),
                         },
@@ -922,7 +922,7 @@ impl Target {
                 canonical_name: _,
                 symbols: _,
             } => name.to_string(),
-            Target::Stage { symbols: _ } => "_stage_".to_string(), // TODO: check whether this is correct
+            Target::Stage { symbols: _ } => "_stage_".to_string(), // T0DO: check whether this is correct
         }
     }
 

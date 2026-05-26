@@ -23,7 +23,7 @@ pub struct BlockEntry {
     pub opcode: String,
     pub args: Vec<BlockArg>,
     pub alt_name: Option<String>,
-    pub assign: Option<AssignmentDescriptor>, // TODO: implement these
+    pub assign: Option<AssignmentDescriptor>, // T0DO: implement these
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ pub enum BlockArg {
         field_type: String,
         value: Option<Sb3Primitive>,
         options: Option<Vec<MenuOption>>,
-        option_category: Option<String>, // TODO: implement these
+        option_category: Option<String>, // T0DO: implement these
     },
     #[serde(rename_all = "camelCase")]
     Input {
@@ -76,7 +76,7 @@ pub struct ShadowData {
     pub shadow_type: String,
     pub default_value: Option<String>,
     pub options: Option<Vec<MenuOption>>,
-    pub option_category: Option<String>, // TODO: implement these
+    pub option_category: Option<String>, // T0DO: implement these
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -112,7 +112,7 @@ pub fn primitive_opcode_to_sb3_primitive_block(
         "math_angle" => Some(Sb3PrimitiveBlock::Angle(value)),
         "colour_picker" => Some(Sb3PrimitiveBlock::Color(value)),
         "text" => Some(Sb3PrimitiveBlock::String(value)),
-        // "event_broadcast_menu" => Some(Sb3PrimitiveBlock::Broadcast(value)), // TODO: implement these
+        // "event_broadcast_menu" => Some(Sb3PrimitiveBlock::Broadcast(value)), // T0DO: implement these
         // "data_variable" => Some(Sb3PrimitiveBlock::Variable(value)),
         // "data_listcontents" => Some(Sb3PrimitiveBlock::List(value)),
         _ => None,
@@ -128,7 +128,7 @@ impl BlockEntry {
             match arg {
                 BlockArg::Field {
                     name,
-                    field_type: _, // TODO: Should this be used somehow?
+                    field_type: _, // T0DO: Should this be used somehow?
                     value,
                     options,
                     option_category,
@@ -308,7 +308,7 @@ pub fn process_toolbox_category(
     let mut processed_associated_items =
         Vec::<(String, LibraryItem)>::with_capacity(associated_items.len());
     for (name, (field_value, _opcodes)) in associated_items {
-        // TODO: use opcodes
+        // T0DO: use opcodes
         if let Some(current) = namespace.get_mut(&name) {
             if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
                 && let KnownBlock::SingletonReporter {
@@ -321,7 +321,7 @@ pub fn process_toolbox_category(
             {
                 field.replace(field_value.clone());
             } else {
-                todo!() // TODO: warn about overlap
+                t0do!() // T0DO: warn about overlap
             }
         } else {
             namespace.insert(

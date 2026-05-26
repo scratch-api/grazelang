@@ -29,7 +29,7 @@ pub enum Token {
     WarpKeyword,
     #[token("nowarp")]
     NowarpKeyword,
-    #[token("use")] // TODO: Implement use statement
+    #[token("use")] // T0DO: Implement use statement
     UseKeyword,
     #[token("let")]
     LetKeyword,

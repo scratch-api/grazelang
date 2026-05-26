@@ -701,8 +701,8 @@ impl Expression {
             Expression::Literal(literal) => {
                 Sb3Primitive::String(literal.get_string_value().to_string())
             }
-            // TODO: try to calculate the value or warn the user
-            _ => todo!(),
+            // T0DO: try to calculate the value or warn the user
+            _ => t0do!(),
         }
     }
 }
@@ -1091,7 +1091,7 @@ impl Literal {
 
 impl From<&Literal> for Sb3Primitive {
     fn from(value: &Literal) -> Self {
-        value.get_string_value().into() // TODO: convert into int if small enough
+        value.get_string_value().into() // T0DO: convert into int if small enough
     }
 }
 
