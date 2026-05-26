@@ -1076,7 +1076,7 @@ pub mod statement {
                     )
                 ),
                 symbols => {
-                    // TODO: warn about shadowing
+                    // T0DO: warn about shadowing
                     let name = &identifier.fields[0].0;
                     symbols.insert(
                         name.clone(),
@@ -1516,7 +1516,7 @@ pub mod statement {
             matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) ||
             matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
-                // TODO: warn about shadowing
+                // T0DO: warn about shadowing
                 let name = &identifier.fields[0].0;
                 symbols.insert(
                     name.clone(),
@@ -2038,7 +2038,7 @@ pub mod statement {
                     );
                     with_mut_next_target!(context, target => {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
-                        // TODO: Warn about shadowing
+                        // T0DO: Warn about shadowing
                         let symbols = target.borrow_symbols_mut();
                         let name = &identifier.fields[0].0;
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
@@ -2130,7 +2130,7 @@ pub mod statement {
                     "Expected ')'.",
                     "')'"
                 );
-                // TODO: Warn about shadowing
+                // T0DO: Warn about shadowing
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
@@ -2184,7 +2184,7 @@ pub mod statement {
                     "Expected ')'.",
                     "')'"
                 );
-                // TODO: Warn about shadowing
+                // T0DO: Warn about shadowing
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
@@ -2331,7 +2331,7 @@ pub mod statement {
             params.push((param_kind, canonical_identifier, identifier, comma));
         };
         let code_block = parse_code_block(token_stream, context)?;
-        // TODO: Warn about shadowing
+        // T0DO: Warn about shadowing
         with_mut_next_target!(context, target => {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
@@ -2449,7 +2449,7 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             context,
             find_statement_end_and_return_invalid!(token_stream, start, Statement)
         )),
-        // TODO: Prevent users from naming variables "super" or possibly "root"
+        // T0DO: Prevent users from naming variables "super" or possibly "root"
         Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
             let identifier = try_or_emit_message!(
                 parse_full_identifier(token_stream, context),
@@ -2713,7 +2713,7 @@ pub fn parse_sprite_statement(
                             start_pos,
                             SpriteStatement
                         )
-                    )) // TODO: capture error and replace message 
+                    )) // T0DO: capture error and replace message 
                 }
             }
         }
@@ -2995,7 +2995,7 @@ pub fn parse_stage_statement(
                         identifier,
                         expression,
                         start_pos,
-                    ) // TODO: capture error and replace message
+                    ) // T0DO: capture error and replace message
                 }
             }
         }

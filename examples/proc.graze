@@ -1,0 +1,12 @@
+
+stage {
+    nowarp proc some_proc(
+        implicit_string_param,
+        str explicit_string_param,
+        bool boolean_param,
+        num number_param,
+        `actual_name` name_used_in_code
+    ) {
+
+    }
+}
