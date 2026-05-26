@@ -135,6 +135,7 @@ impl ResolveKnownBlock for KnownBlock {
                 bind_info,
             } => {
                 // TODO: possibly set x and y
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/20
                 if let Some(bind_info) = bind_info
                     && let Some(target) = context.current_sb3_target.as_ref()
                     && bind_info.parent_target.as_str() != target.name.as_str()
@@ -153,6 +154,7 @@ impl ResolveKnownBlock for KnownBlock {
             }
             KnownBlock::List { canonical_name, id } => {
                 // TODO: possibly set x and y
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/19
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::List {
                     name: canonical_name.to_string(),
                     id: id.to_string(),
@@ -162,6 +164,7 @@ impl ResolveKnownBlock for KnownBlock {
             }
             KnownBlock::FieldValue { value } => {
                 // TODO: warn user about possibly incorrect usage in some cases
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/18
                 KnownBlockInput::Menu(value.clone())
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
@@ -170,6 +173,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. } => {
                 // TODO: warn user about probably incorrect usage
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/17
                 KnownBlockInput::PrimitiveInput("".into())
             }
             KnownBlock::SingletonReporter {
@@ -202,9 +206,11 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::FieldValue { value } => value.clone(),
             KnownBlock::BlockRef { id } => {
                 Sb3FieldValue::Normal(id.into()) // TODO: warn user about probably incorrect usage.
+                                                 // Issue URL: https://github.com/scratch-api/grazelang/issues/16
             }
             KnownBlock::PrimitiveBlock { value } => {
                 // TODO: warn user about possibly incorrect usage
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/15
                 match value {
                     codegen::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
                     | codegen::project_json::Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
@@ -238,6 +244,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::Empty => {
                 // TODO: warn user about probably incorrect usage
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/14
                 Sb3FieldValue::Normal("".into())
             }
             KnownBlock::SingletonReporter {
@@ -248,6 +255,7 @@ impl ResolveKnownBlock for KnownBlock {
                 bind_info: _,
             } => {
                 // TODO: warn user about incorrect usage if no field supplied
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/13
                 field
                     .clone()
                     .unwrap_or_else(|| codegen::project_json::Sb3FieldValue::Normal("".into()))
@@ -321,6 +329,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::Empty => todo!(), // warn user about incorrect usage
         } // TODO: Implement assignment of x, y etc
+          // Issue URL: https://github.com/scratch-api/grazelang/issues/12
     }
 }
 
@@ -632,6 +641,7 @@ impl TargetSymbolDescriptor {
                     source,
                 }) => {
                     // TODO: better ext detections
+                    // Issue URL: https://github.com/scratch-api/grazelang/issues/11
                     source.as_str().rsplit_once('.').unwrap_or(("", "")).1
                 }
                 _ => unreachable!(),
@@ -717,6 +727,7 @@ impl TargetSymbolDescriptor {
                 Symbol {
                     known_block: Some(Rc::new(match self {
                         // TODO: implement specific known blocks here
+                        // Issue URL: https://github.com/scratch-api/grazelang/issues/10
                         TargetSymbolDescriptor::Costume(..)
                         | TargetSymbolDescriptor::Backdrop(..)
                         | TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
@@ -731,6 +742,7 @@ impl TargetSymbolDescriptor {
                 },
                 match self {
                     // TODO: implement specific known blocks here
+                    // Issue URL: https://github.com/scratch-api/grazelang/issues/9
                     TargetSymbolDescriptor::Costume(CostumeDescriptor {
                         name,
                         canonical_name,
@@ -748,6 +760,7 @@ impl TargetSymbolDescriptor {
                                 md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
                                 bitmap_resolution: Some(1.0), // TODO: better default and more control
+                                                              // Issue URL: https://github.com/scratch-api/grazelang/issues/8
                                 rotation_center_x: 0.0,
                                 rotation_center_y: 0.0,
                             },
@@ -765,6 +778,7 @@ impl TargetSymbolDescriptor {
                                 md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
                                 rate: 48000.0, // TODO: better default and more control
+                                               // Issue URL: https://github.com/scratch-api/grazelang/issues/7
                                 sample_count: 1124,
                             },
                         ))
@@ -846,6 +860,7 @@ impl TargetSymbolDescriptor {
                                 canonical_name: canonical_name.clone(),
                                 id,
                             })), // TODO: add list length as method
+                                 // Issue URL: https://github.com/scratch-api/grazelang/issues/6
                             namespace: HashMap::new(),
                             parent: Default::default(),
                         },
@@ -923,6 +938,7 @@ impl Target {
                 symbols: _,
             } => name.to_string(),
             Target::Stage { symbols: _ } => "_stage_".to_string(), // TODO: check whether this is correct
+                                                                   // Issue URL: https://github.com/scratch-api/grazelang/issues/5
         }
     }
 

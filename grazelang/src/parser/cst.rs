@@ -702,6 +702,7 @@ impl Expression {
                 Sb3Primitive::String(literal.get_string_value().to_string())
             }
             // TODO: try to calculate the value or warn the user
+            // Issue URL: https://github.com/scratch-api/grazelang/issues/31
             _ => todo!(),
         }
     }
@@ -1092,6 +1093,7 @@ impl Literal {
 impl From<&Literal> for Sb3Primitive {
     fn from(value: &Literal) -> Self {
         value.get_string_value().into() // TODO: convert into int if small enough
+                                        // Issue URL: https://github.com/scratch-api/grazelang/issues/30
     }
 }
 

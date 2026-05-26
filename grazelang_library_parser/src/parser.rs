@@ -24,6 +24,7 @@ pub struct BlockEntry {
     pub args: Vec<BlockArg>,
     pub alt_name: Option<String>,
     pub assign: Option<AssignmentDescriptor>, // TODO: implement these
+                                              // Issue URL: https://github.com/scratch-api/grazelang/issues/40
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,6 +51,7 @@ pub enum BlockArg {
         value: Option<Sb3Primitive>,
         options: Option<Vec<MenuOption>>,
         option_category: Option<String>, // TODO: implement these
+                                         // Issue URL: https://github.com/scratch-api/grazelang/issues/39
     },
     #[serde(rename_all = "camelCase")]
     Input {
@@ -77,6 +79,7 @@ pub struct ShadowData {
     pub default_value: Option<String>,
     pub options: Option<Vec<MenuOption>>,
     pub option_category: Option<String>, // TODO: implement these
+                                         // Issue URL: https://github.com/scratch-api/grazelang/issues/38
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -113,6 +116,7 @@ pub fn primitive_opcode_to_sb3_primitive_block(
         "colour_picker" => Some(Sb3PrimitiveBlock::Color(value)),
         "text" => Some(Sb3PrimitiveBlock::String(value)),
         // "event_broadcast_menu" => Some(Sb3PrimitiveBlock::Broadcast(value)), // TODO: implement these
+        // Issue URL: https://github.com/scratch-api/grazelang/issues/37
         // "data_variable" => Some(Sb3PrimitiveBlock::Variable(value)),
         // "data_listcontents" => Some(Sb3PrimitiveBlock::List(value)),
         _ => None,
@@ -129,6 +133,7 @@ impl BlockEntry {
                 BlockArg::Field {
                     name,
                     field_type: _, // TODO: Should this be used somehow?
+                                   // Issue URL: https://github.com/scratch-api/grazelang/issues/36
                     value,
                     options,
                     option_category,
@@ -309,6 +314,7 @@ pub fn process_toolbox_category(
         Vec::<(String, LibraryItem)>::with_capacity(associated_items.len());
     for (name, (field_value, _opcodes)) in associated_items {
         // TODO: use opcodes
+        // Issue URL: https://github.com/scratch-api/grazelang/issues/35
         if let Some(current) = namespace.get_mut(&name) {
             if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
                 && let KnownBlock::SingletonReporter {
@@ -322,6 +328,7 @@ pub fn process_toolbox_category(
                 field.replace(field_value.clone());
             } else {
                 todo!() // TODO: warn about overlap
+                        // Issue URL: https://github.com/scratch-api/grazelang/issues/34
             }
         } else {
             namespace.insert(

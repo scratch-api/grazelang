@@ -30,6 +30,7 @@ pub enum Token {
     #[token("nowarp")]
     NowarpKeyword,
     #[token("use")] // TODO: Implement use statement
+                    // Issue URL: https://github.com/scratch-api/grazelang/issues/4
     UseKeyword,
     #[token("let")]
     LetKeyword,
