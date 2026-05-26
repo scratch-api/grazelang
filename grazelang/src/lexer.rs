@@ -247,7 +247,9 @@ pub fn get_position(lex: &Lexer<Token>, character_index: usize) -> (usize, usize
         None => return (0, character_index),
     };
     if last_newline_index > character_index {
-        todo!()
+        let line = lex.extras.0.partition_point(|&x| x <= character_index);
+        let line_start = if line == 0 { 0 } else { lex.extras.0[line - 1] };
+        return (line, character_index - line_start);
     }
     (lex.extras.0.len(), character_index - last_newline_index)
 }
