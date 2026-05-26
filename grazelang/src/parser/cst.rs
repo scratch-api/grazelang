@@ -1091,7 +1091,7 @@ impl Literal {
 
 impl From<&Literal> for Sb3Primitive {
     fn from(value: &Literal) -> Self {
-        value.get_string_value().into()
+        value.get_string_value().into() // TODO: convert into int if small enough
     }
 }
 
