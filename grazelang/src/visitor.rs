@@ -31,7 +31,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &StageKeyword,
             &StageCodeBlock,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -47,10 +47,10 @@ pub trait GrazeVisitor<C, E> {
         &self,
         value: (
             &SpriteKeyword,
-            &Option<CanonicalIdentifier>,
+            Option<&CanonicalIdentifier>,
             &Identifier,
             &SpriteCodeBlock,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -66,7 +66,7 @@ pub trait GrazeVisitor<C, E> {
         &self,
         value: (
             &BroadcastKeyword,
-            &Option<CanonicalIdentifier>,
+            Option<&CanonicalIdentifier>,
             &Identifier,
             &Semicolon,
             &PosRange,
@@ -114,7 +114,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_no_input_hat_statement(
         &self,
-        value: (&Identifier, &CodeBlock, &Option<Semicolon>, &PosRange),
+        value: (&Identifier, &CodeBlock, Option<&Semicolon>, &PosRange),
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_no_input_hat_statement(self, value, context)
@@ -126,7 +126,7 @@ pub trait GrazeVisitor<C, E> {
             &Identifier,
             &Expression,
             &CodeBlock,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -139,10 +139,10 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &Vec<(Expression, Option<Comma>)>,
+            &[(Expression, Option<Comma>)],
             &RightParens,
             &CodeBlock,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -153,20 +153,20 @@ pub trait GrazeVisitor<C, E> {
     fn visit_custom_block_definition(
         &self,
         value: (
-            &Option<WarpSpecifier>,
+            Option<&WarpSpecifier>,
             &ProcKeyword,
-            &Option<CanonicalIdentifier>,
+            Option<&CanonicalIdentifier>,
             &Identifier,
             &LeftParens,
-            &Vec<(
+            &[(
                 Option<CustomBlockParamKind>,
                 Option<CanonicalIdentifier>,
                 Identifier,
                 Option<Comma>,
-            )>,
+            )],
             &RightParens,
             &CodeBlock,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -176,7 +176,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_isolated_block(
         &self,
-        value: (&CodeBlock, &Option<Semicolon>, &PosRange),
+        value: (&CodeBlock, Option<&Semicolon>, &PosRange),
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_isolated_block(self, value, context)
@@ -188,7 +188,7 @@ pub trait GrazeVisitor<C, E> {
             &LeftParens,
             &Expression,
             &RightParens,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -248,7 +248,7 @@ pub trait GrazeVisitor<C, E> {
             &Identifier,
             &NormalAssignmentOperator,
             &LeftBracket,
-            &Vec<(ListEntry, Option<Comma>)>,
+            &[(ListEntry, Option<Comma>)],
             &RightBracket,
             &Semicolon,
             &PosRange,
@@ -280,7 +280,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &Vec<(Expression, Option<Comma>)>,
+            &[(Expression, Option<Comma>)],
             &RightParens,
             &Semicolon,
             &PosRange,
@@ -296,7 +296,7 @@ pub trait GrazeVisitor<C, E> {
             &Identifier,
             &Expression,
             &CodeBlock,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -309,10 +309,10 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &Vec<(Expression, Option<Comma>)>,
+            &[(Expression, Option<Comma>)],
             &RightParens,
             &CodeBlock,
-            &Option<Semicolon>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -322,7 +322,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_forever(
         &self,
-        value: (&Identifier, &CodeBlock, &Option<Semicolon>, &PosRange),
+        value: (&Identifier, &CodeBlock, Option<&Semicolon>, &PosRange),
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_forever(self, value, context)
@@ -332,9 +332,9 @@ pub trait GrazeVisitor<C, E> {
         &self,
         value: (
             &(SyntacticIf, Expression, CodeBlock),
-            &Vec<(SyntacticElse, SyntacticIf, Expression, CodeBlock)>,
-            &Option<(SyntacticElse, CodeBlock)>,
-            &Option<Semicolon>,
+            &[(SyntacticElse, SyntacticIf, Expression, CodeBlock)],
+            Option<&(SyntacticElse, CodeBlock)>,
+            Option<&Semicolon>,
             &PosRange,
         ),
         context: &mut C,
@@ -348,7 +348,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_list_content(
         &self,
-        value: &Vec<(ListEntry, Option<Comma>)>,
+        value: &[(ListEntry, Option<Comma>)],
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_list_content(self, value, context)
@@ -363,7 +363,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &DataDeclarationScope,
             &LeftParens,
-            &Vec<(SingleDataDeclaration, Option<Comma>)>,
+            &[(SingleDataDeclaration, Option<Comma>)],
             &RightParens,
             &PosRange,
         ),
@@ -378,7 +378,7 @@ pub trait GrazeVisitor<C, E> {
             &DataDeclarationScope,
             &VarsKeyword,
             &LeftBrace,
-            &Vec<(SingleDataDeclaration, Option<Comma>)>,
+            &[(SingleDataDeclaration, Option<Comma>)],
             &RightBrace,
             &PosRange,
         ),
@@ -393,7 +393,7 @@ pub trait GrazeVisitor<C, E> {
             &DataDeclarationScope,
             &ListsKeyword,
             &LeftBrace,
-            &Vec<(SingleDataDeclaration, Option<Comma>)>,
+            &[(SingleDataDeclaration, Option<Comma>)],
             &RightBrace,
             &PosRange,
         ),
@@ -413,9 +413,9 @@ pub trait GrazeVisitor<C, E> {
     fn visit_single_variable_declaration(
         &self,
         value: (
-            &Option<VarKeyword>,
+            Option<&VarKeyword>,
             &DataDeclarationScope,
-            &Option<CanonicalIdentifier>,
+            Option<&CanonicalIdentifier>,
             &Identifier,
             &NormalAssignmentOperator,
             &Expression,
@@ -429,9 +429,9 @@ pub trait GrazeVisitor<C, E> {
     fn visit_single_empty_variable_declaration(
         &self,
         value: (
-            &Option<VarKeyword>,
+            Option<&VarKeyword>,
             &DataDeclarationScope,
-            &Option<CanonicalIdentifier>,
+            Option<&CanonicalIdentifier>,
             &Identifier,
             &PosRange,
         ),
@@ -443,13 +443,13 @@ pub trait GrazeVisitor<C, E> {
     fn visit_single_list_declaration(
         &self,
         value: (
-            &Option<ListKeyword>,
+            Option<&ListKeyword>,
             &DataDeclarationScope,
-            &Option<CanonicalIdentifier>,
+            Option<&CanonicalIdentifier>,
             &Identifier,
             &NormalAssignmentOperator,
             &LeftBracket,
-            &Vec<(ListEntry, Option<Comma>)>,
+            &[(ListEntry, Option<Comma>)],
             &RightBracket,
             &PosRange,
         ),
@@ -461,9 +461,9 @@ pub trait GrazeVisitor<C, E> {
     fn visit_single_empty_list_declaration(
         &self,
         value: (
-            &Option<ListKeyword>,
+            Option<&ListKeyword>,
             &DataDeclarationScope,
-            &Option<CanonicalIdentifier>,
+            Option<&CanonicalIdentifier>,
             &Identifier,
             &PosRange,
         ),
@@ -478,7 +478,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_formatted_string(
         &self,
-        value: (&Vec<FormattedStringContent>, &PosRange),
+        value: (&[FormattedStringContent], &PosRange),
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_formatted_string(self, value, context)
@@ -486,7 +486,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_binary_operation(
         &self,
-        value: (&Box<Expression>, &BinOp, &Box<Expression>, &PosRange),
+        value: (&Expression, &BinOp, &Expression, &PosRange),
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_binary_operation(self, value, context)
@@ -494,7 +494,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_unary_operation(
         &self,
-        value: (&UnOp, &Box<Expression>, &PosRange),
+        value: (&UnOp, &Expression, &PosRange),
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_unary_operation(self, value, context)
@@ -509,7 +509,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &Vec<(Expression, Option<Comma>)>,
+            &[(Expression, Option<Comma>)],
             &RightParens,
             &PosRange,
         ),
@@ -523,7 +523,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftBracket,
-            &Box<Expression>,
+            &Expression,
             &RightBracket,
             &PosRange,
         ),
@@ -535,9 +535,9 @@ pub trait GrazeVisitor<C, E> {
     fn visit_expression_get_letter(
         &self,
         value: (
-            &Box<Expression>,
+            &Expression,
             &LetterAccessLeftBracket,
-            &Box<Expression>,
+            &Expression,
             &RightBracket,
             &PosRange,
         ),
@@ -548,7 +548,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_parentheses(
         &self,
-        value: (&LeftParens, &Box<Expression>, &RightParens, &PosRange),
+        value: (&LeftParens, &Expression, &RightParens, &PosRange),
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_parentheses(self, value, context)
@@ -596,7 +596,7 @@ where
     match value {
         TopLevelStatement::Stage(stage_keyword, stage_code_block, semicolon, pos_range) => {
             visitor.visit_top_level_statement_stage(
-                (stage_keyword, stage_code_block, semicolon, pos_range),
+                (stage_keyword, stage_code_block, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -610,10 +610,10 @@ where
         ) => visitor.visit_top_level_statement_sprite(
             (
                 sprite_keyword,
-                canonical_identifier,
+                canonical_identifier.as_ref(),
                 identifier,
                 sprite_code_block,
-                semicolon,
+                semicolon.as_ref(),
                 pos_range,
             ),
             context,
@@ -628,7 +628,7 @@ where
             visitor.visit_top_level_statement_broadcast_declaration(
                 (
                     broadcast_keyword,
-                    canonical_identifier,
+                    canonical_identifier.as_ref(),
                     identifier,
                     semicolon,
                     pos_range,
@@ -651,7 +651,7 @@ pub fn default_visit_top_level_statement_stage<V, C, E>(
     value: (
         &StageKeyword,
         &StageCodeBlock,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -681,10 +681,10 @@ pub fn default_visit_top_level_statement_sprite<V, C, E>(
     visitor: &V,
     value: (
         &SpriteKeyword,
-        &Option<CanonicalIdentifier>,
+        Option<&CanonicalIdentifier>,
         &Identifier,
         &SpriteCodeBlock,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -714,7 +714,7 @@ pub fn default_visit_top_level_statement_broadcast_declaration<V, C, E>(
     visitor: &V,
     value: (
         &BroadcastKeyword,
-        &Option<CanonicalIdentifier>,
+        Option<&CanonicalIdentifier>,
         &Identifier,
         &Semicolon,
         &PosRange,
@@ -777,7 +777,7 @@ where
         }
         StageStatement::NoInputHatStatement(identifier, code_block, semicolon, pos_range) => {
             visitor.visit_no_input_hat_statement(
-                (identifier, code_block, semicolon, pos_range),
+                (identifier, code_block, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -789,7 +789,7 @@ where
             pos_range,
         ) => {
             visitor.visit_single_input_hat_statement(
-                (identifier, expression, code_block, semicolon, pos_range),
+                (identifier, expression, code_block, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -809,7 +809,7 @@ where
                     items,
                     right_parens,
                     code_block,
-                    semicolon,
+                    semicolon.as_ref(),
                     pos_range,
                 ),
                 context,
@@ -829,22 +829,22 @@ where
         ) => {
             visitor.visit_custom_block_definition(
                 (
-                    proc_keyword,
+                    proc_keyword.as_ref(),
                     warp_specifier,
-                    canonical_identifier,
+                    canonical_identifier.as_ref(),
                     identifier,
                     left_parens,
                     items,
                     right_parens,
                     code_block,
-                    semicolon,
+                    semicolon.as_ref(),
                     pos_range,
                 ),
                 context,
             )?;
         }
         StageStatement::IsolatedBlock(code_block, semicolon, pos_range) => {
-            visitor.visit_isolated_block((code_block, semicolon, pos_range), context)?;
+            visitor.visit_isolated_block((code_block, semicolon.as_ref(), pos_range), context)?;
         }
         StageStatement::IsolatedExpression(
             left_parens,
@@ -854,7 +854,7 @@ where
             pos_range,
         ) => {
             visitor.visit_isolated_expression(
-                (left_parens, expression, right_parens, semicolon, pos_range),
+                (left_parens, expression, right_parens, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -905,7 +905,7 @@ where
         }
         SpriteStatement::NoInputHatStatement(identifier, code_block, semicolon, pos_range) => {
             visitor.visit_no_input_hat_statement(
-                (identifier, code_block, semicolon, pos_range),
+                (identifier, code_block, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -917,7 +917,7 @@ where
             pos_range,
         ) => {
             visitor.visit_single_input_hat_statement(
-                (identifier, expression, code_block, semicolon, pos_range),
+                (identifier, expression, code_block, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -937,7 +937,7 @@ where
                     items,
                     right_parens,
                     code_block,
-                    semicolon,
+                    semicolon.as_ref(),
                     pos_range,
                 ),
                 context,
@@ -957,22 +957,22 @@ where
         ) => {
             visitor.visit_custom_block_definition(
                 (
-                    warp_specifier,
+                    warp_specifier.as_ref(),
                     proc_keyword,
-                    canonical_identifier,
+                    canonical_identifier.as_ref(),
                     identifier,
                     left_parens,
                     items,
                     right_parens,
                     code_block,
-                    semicolon,
+                    semicolon.as_ref(),
                     pos_range,
                 ),
                 context,
             )?;
         }
         SpriteStatement::IsolatedBlock(code_block, semicolon, pos_range) => {
-            visitor.visit_isolated_block((code_block, semicolon, pos_range), context)?;
+            visitor.visit_isolated_block((code_block, semicolon.as_ref(), pos_range), context)?;
         }
         SpriteStatement::IsolatedExpression(
             left_parens,
@@ -982,7 +982,7 @@ where
             pos_range,
         ) => {
             visitor.visit_isolated_expression(
-                (left_parens, expression, right_parens, semicolon, pos_range),
+                (left_parens, expression, right_parens, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -1030,7 +1030,7 @@ where
 
 pub fn default_visit_no_input_hat_statement<V, C, E>(
     visitor: &V,
-    value: (&Identifier, &CodeBlock, &Option<Semicolon>, &PosRange),
+    value: (&Identifier, &CodeBlock, Option<&Semicolon>, &PosRange),
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1046,7 +1046,7 @@ pub fn default_visit_single_input_hat_statement<V, C, E>(
         &Identifier,
         &Expression,
         &CodeBlock,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -1064,10 +1064,10 @@ pub fn default_visit_multi_input_hat_statement<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &Vec<(Expression, Option<Comma>)>,
+        &[(Expression, Option<Comma>)],
         &RightParens,
         &CodeBlock,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -1085,20 +1085,20 @@ where
 pub fn default_visit_custom_block_definition<V, C, E>(
     visitor: &V,
     value: (
-        &Option<WarpSpecifier>,
+        Option<&WarpSpecifier>,
         &ProcKeyword,
-        &Option<CanonicalIdentifier>,
+        Option<&CanonicalIdentifier>,
         &Identifier,
         &LeftParens,
-        &Vec<(
+        &[(
             Option<CustomBlockParamKind>,
             Option<CanonicalIdentifier>,
             Identifier,
             Option<Comma>,
-        )>,
+        )],
         &RightParens,
         &CodeBlock,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -1112,7 +1112,7 @@ where
 
 pub fn default_visit_isolated_block<V, C, E>(
     visitor: &V,
-    value: (&CodeBlock, &Option<Semicolon>, &PosRange),
+    value: (&CodeBlock, Option<&Semicolon>, &PosRange),
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1128,7 +1128,7 @@ pub fn default_visit_isolated_expression<V, C, E>(
         &LeftParens,
         &Expression,
         &RightParens,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -1271,7 +1271,7 @@ where
         }
         Statement::SingleInputControl(identifier, expression, code_block, semicolon, pos_range) => {
             visitor.visit_statement_single_input_control(
-                (identifier, expression, code_block, semicolon, pos_range),
+                (identifier, expression, code_block, semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -1291,7 +1291,7 @@ where
                     items,
                     right_parens,
                     code_block,
-                    semicolon,
+                    semicolon.as_ref(),
                     pos_range,
                 ),
                 context,
@@ -1299,11 +1299,11 @@ where
         }
         Statement::Forever(identifier, code_block, semicolon, pos_range) => {
             visitor
-                .visit_statement_forever((identifier, code_block, semicolon, pos_range), context)?;
+                .visit_statement_forever((identifier, code_block, semicolon.as_ref(), pos_range), context)?;
         }
         Statement::IfElse(start_branch, branches, else_branch, semicolon, pos_range) => {
             visitor.visit_statement_if_else(
-                (start_branch, branches, else_branch, semicolon, pos_range),
+                (start_branch, branches, else_branch.as_ref(), semicolon.as_ref(), pos_range),
                 context,
             )?;
         }
@@ -1351,7 +1351,7 @@ pub fn default_visit_statement_list_assignment<V, C, E>(
         &Identifier,
         &NormalAssignmentOperator,
         &LeftBracket,
-        &Vec<(ListEntry, Option<Comma>)>,
+        &[(ListEntry, Option<Comma>)],
         &RightBracket,
         &Semicolon,
         &PosRange,
@@ -1392,7 +1392,7 @@ pub fn default_visit_statement_call<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &Vec<(Expression, Option<Comma>)>,
+        &[(Expression, Option<Comma>)],
         &RightParens,
         &Semicolon,
         &PosRange,
@@ -1414,7 +1414,7 @@ pub fn default_visit_statement_single_input_control<V, C, E>(
         &Identifier,
         &Expression,
         &CodeBlock,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -1432,10 +1432,10 @@ pub fn default_visit_statement_multi_input_control<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &Vec<(Expression, Option<Comma>)>,
+        &[(Expression, Option<Comma>)],
         &RightParens,
         &CodeBlock,
-        &Option<Semicolon>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -1452,7 +1452,7 @@ where
 
 pub fn default_visit_statement_forever<V, C, E>(
     visitor: &V,
-    value: (&Identifier, &CodeBlock, &Option<Semicolon>, &PosRange),
+    value: (&Identifier, &CodeBlock, Option<&Semicolon>, &PosRange),
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1466,9 +1466,9 @@ pub fn default_visit_statement_if_else<V, C, E>(
     visitor: &V,
     value: (
         &(SyntacticIf, Expression, CodeBlock),
-        &Vec<(SyntacticElse, SyntacticIf, Expression, CodeBlock)>,
-        &Option<(SyntacticElse, CodeBlock)>,
-        &Option<Semicolon>,
+        &[(SyntacticElse, SyntacticIf, Expression, CodeBlock)],
+        Option<&(SyntacticElse, CodeBlock)>,
+        Option<&Semicolon>,
         &PosRange,
     ),
     context: &mut C,
@@ -1566,7 +1566,7 @@ where
 
 pub fn default_visit_list_content<V, C, E>(
     visitor: &V,
-    value: &Vec<(ListEntry, Option<Comma>)>,
+    value: &[(ListEntry, Option<Comma>)],
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1660,7 +1660,7 @@ pub fn default_visit_mixed_data_declaration<V, C, E>(
     value: (
         &DataDeclarationScope,
         &LeftParens,
-        &Vec<(SingleDataDeclaration, Option<Comma>)>,
+        &[(SingleDataDeclaration, Option<Comma>)],
         &RightParens,
         &PosRange,
     ),
@@ -1681,7 +1681,7 @@ pub fn default_visit_vars_data_declaration<V, C, E>(
         &DataDeclarationScope,
         &VarsKeyword,
         &LeftBrace,
-        &Vec<(SingleDataDeclaration, Option<Comma>)>,
+        &[(SingleDataDeclaration, Option<Comma>)],
         &RightBrace,
         &PosRange,
     ),
@@ -1702,7 +1702,7 @@ pub fn default_visit_lists_data_declaration<V, C, E>(
         &DataDeclarationScope,
         &ListsKeyword,
         &LeftBrace,
-        &Vec<(SingleDataDeclaration, Option<Comma>)>,
+        &[(SingleDataDeclaration, Option<Comma>)],
         &RightBrace,
         &PosRange,
     ),
@@ -1737,9 +1737,9 @@ where
         ) => {
             visitor.visit_single_variable_declaration(
                 (
-                    var_keyword,
+                    var_keyword.as_ref(),
                     data_declaration_scope,
-                    canonical_identifier,
+                    canonical_identifier.as_ref(),
                     identifier,
                     normal_assignment_operator,
                     expression,
@@ -1757,9 +1757,9 @@ where
         ) => {
             visitor.visit_single_empty_variable_declaration(
                 (
-                    var_keyword,
+                    var_keyword.as_ref(),
                     data_declaration_scope,
-                    canonical_identifier,
+                    canonical_identifier.as_ref(),
                     identifier,
                     pos_range,
                 ),
@@ -1779,9 +1779,9 @@ where
         ) => {
             visitor.visit_single_list_declaration(
                 (
-                    list_keyword,
+                    list_keyword.as_ref(),
                     data_declaration_scope,
-                    canonical_identifier,
+                    canonical_identifier.as_ref(),
                     identifier,
                     normal_assignment_operator,
                     left_bracket,
@@ -1801,9 +1801,9 @@ where
         ) => {
             visitor.visit_single_empty_list_declaration(
                 (
-                    list_keyword,
+                    list_keyword.as_ref(),
                     data_declaration_scope,
-                    canonical_identifier,
+                    canonical_identifier.as_ref(),
                     identifier,
                     pos_range,
                 ),
@@ -1817,9 +1817,9 @@ where
 pub fn default_visit_single_variable_declaration<V, C, E>(
     visitor: &V,
     value: (
-        &Option<VarKeyword>,
+        Option<&VarKeyword>,
         &DataDeclarationScope,
-        &Option<CanonicalIdentifier>,
+        Option<&CanonicalIdentifier>,
         &Identifier,
         &NormalAssignmentOperator,
         &Expression,
@@ -1837,9 +1837,9 @@ where
 pub fn default_visit_single_empty_variable_declaration<V, C, E>(
     visitor: &V,
     value: (
-        &Option<VarKeyword>,
+        Option<&VarKeyword>,
         &DataDeclarationScope,
-        &Option<CanonicalIdentifier>,
+        Option<&CanonicalIdentifier>,
         &Identifier,
         &PosRange,
     ),
@@ -1854,13 +1854,13 @@ where
 pub fn default_visit_single_list_declaration<V, C, E>(
     visitor: &V,
     value: (
-        &Option<ListKeyword>,
+        Option<&ListKeyword>,
         &DataDeclarationScope,
-        &Option<CanonicalIdentifier>,
+        Option<&CanonicalIdentifier>,
         &Identifier,
         &NormalAssignmentOperator,
         &LeftBracket,
-        &Vec<(ListEntry, Option<Comma>)>,
+        &[(ListEntry, Option<Comma>)],
         &RightBracket,
         &PosRange,
     ),
@@ -1876,9 +1876,9 @@ where
 pub fn default_visit_single_empty_list_declaration<V, C, E>(
     visitor: &V,
     value: (
-        &Option<ListKeyword>,
+        Option<&ListKeyword>,
         &DataDeclarationScope,
-        &Option<CanonicalIdentifier>,
+        Option<&CanonicalIdentifier>,
         &Identifier,
         &PosRange,
     ),
@@ -1903,7 +1903,7 @@ where
 
 pub fn default_visit_expression_formatted_string<V, C, E>(
     visitor: &V,
-    value: (&Vec<FormattedStringContent>, &PosRange),
+    value: (&[FormattedStringContent], &PosRange),
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1917,7 +1917,7 @@ where
 
 pub fn default_visit_expression_binary_operation<V, C, E>(
     visitor: &V,
-    value: (&Box<Expression>, &BinOp, &Box<Expression>, &PosRange),
+    value: (&Expression, &BinOp, &Expression, &PosRange),
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1930,7 +1930,7 @@ where
 
 pub fn default_visit_expression_unary_operation<V, C, E>(
     visitor: &V,
-    value: (&UnOp, &Box<Expression>, &PosRange),
+    value: (&UnOp, &Expression, &PosRange),
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1956,7 +1956,7 @@ pub fn default_visit_expression_call<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &Vec<(Expression, Option<Comma>)>,
+        &[(Expression, Option<Comma>)],
         &RightParens,
         &PosRange,
     ),
@@ -1976,7 +1976,7 @@ pub fn default_visit_expression_get_item<V, C, E>(
     value: (
         &Identifier,
         &LeftBracket,
-        &Box<Expression>,
+        &Expression,
         &RightBracket,
         &PosRange,
     ),
@@ -1992,9 +1992,9 @@ where
 pub fn default_visit_expression_get_letter<V, C, E>(
     visitor: &V,
     value: (
-        &Box<Expression>,
+        &Expression,
         &LetterAccessLeftBracket,
-        &Box<Expression>,
+        &Expression,
         &RightBracket,
         &PosRange,
     ),
@@ -2010,7 +2010,7 @@ where
 
 pub fn default_visit_expression_parentheses<V, C, E>(
     visitor: &V,
-    value: (&LeftParens, &Box<Expression>, &RightParens, &PosRange),
+    value: (&LeftParens, &Expression, &RightParens, &PosRange),
     context: &mut C,
 ) -> Result<(), E>
 where
