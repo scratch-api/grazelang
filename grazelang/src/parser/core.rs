@@ -14,7 +14,7 @@ use crate::{
 };
 use arcstr::{ArcStr as IString, literal};
 use logos::{Lexer, Logos};
-use std::{collections::VecDeque, iter::Peekable, vec};
+use std::{collections::VecDeque, vec};
 
 macro_rules! static_current_context {
     () => {

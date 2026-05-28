@@ -27,13 +27,13 @@ use crate::{
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     names::Namespace,
     parser::{
-        cst::{
-            BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope,
-            Expression, FormattedStringContent, Identifier, ListEntry, Literal, UnOpDescriptor,
-        },
         context::{
             IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable,
             Target, TargetSymbolDescriptor,
+        },
+        cst::{
+            BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope,
+            Expression, FormattedStringContent, Identifier, ListEntry, Literal, UnOpDescriptor,
         },
     },
     settings::GrazeSettings,
@@ -567,7 +567,7 @@ macro_rules! with_known_block {
             }
             Param::BlockStack(_) => {
                 todo!() // TODO: warn user about incorrect usage
-                        // Issue URL: https://github.com/scratch-api/grazelang/issues/3
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/3
             }
         }
     };
@@ -704,7 +704,7 @@ pub fn add_param_to_params(
         }
         CallBlockParamKind::BlockStack => {
             todo!() // TODO: warn user about incorrect usage
-                    // Issue URL: https://github.com/scratch-api/grazelang/issues/2
+            // Issue URL: https://github.com/scratch-api/grazelang/issues/2
         }
     }
     Ok(())
@@ -878,9 +878,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     fn visit_expression_binary_operation(
         &self,
         value: (
-            &Box<crate::parser::cst::Expression>,
+            &crate::parser::cst::Expression,
             &crate::parser::cst::BinOp,
-            &Box<crate::parser::cst::Expression>,
+            &crate::parser::cst::Expression,
             &crate::lexer::PosRange,
         ),
         context: &mut GrazeSb3GeneratorContext,
@@ -969,10 +969,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &crate::parser::cst::Identifier,
             &crate::parser::cst::LeftParens,
-            &Vec<(
+            &[(
                 crate::parser::cst::Expression,
                 Option<crate::parser::cst::Comma>,
-            )>,
+            )],
             &crate::parser::cst::RightParens,
             &crate::lexer::PosRange,
         ),
@@ -1022,7 +1022,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     fn visit_expression_formatted_string(
         &self,
         value: (
-            &Vec<crate::parser::cst::FormattedStringContent>,
+            &[crate::parser::cst::FormattedStringContent],
             &crate::lexer::PosRange,
         ),
         context: &mut GrazeSb3GeneratorContext,
@@ -1204,7 +1204,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &crate::parser::cst::Identifier,
             &crate::parser::cst::LeftBracket,
-            &Box<crate::parser::cst::Expression>,
+            &crate::parser::cst::Expression,
             &crate::parser::cst::RightBracket,
             &crate::lexer::PosRange,
         ),
@@ -1257,9 +1257,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     fn visit_expression_get_letter(
         &self,
         value: (
-            &Box<Expression>,
+            &Expression,
             &crate::parser::cst::LetterAccessLeftBracket,
-            &Box<Expression>,
+            &Expression,
             &crate::parser::cst::RightBracket,
             &crate::lexer::PosRange,
         ),
@@ -1307,7 +1307,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         &self,
         value: (
             &crate::parser::cst::UnOp,
-            &Box<crate::parser::cst::Expression>,
+            &crate::parser::cst::Expression,
             &crate::lexer::PosRange,
         ),
         context: &mut GrazeSb3GeneratorContext,
@@ -1417,7 +1417,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &Identifier,
             &crate::parser::cst::LeftParens,
-            &Vec<(Expression, Option<crate::parser::cst::Comma>)>,
+            &[(Expression, Option<crate::parser::cst::Comma>)],
             &crate::parser::cst::RightParens,
             &crate::parser::cst::CodeBlock,
             &Option<crate::parser::cst::Semicolon>,
@@ -1476,7 +1476,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &Identifier,
             &crate::parser::cst::LeftParens,
-            &Vec<(Expression, Option<crate::parser::cst::Comma>)>,
+            &[(Expression, Option<crate::parser::cst::Comma>)],
             &crate::parser::cst::RightParens,
             &crate::parser::cst::Semicolon,
             &crate::lexer::PosRange,
@@ -1618,10 +1618,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             &Identifier,
             &crate::parser::cst::NormalAssignmentOperator,
             &crate::parser::cst::LeftBracket,
-            &Vec<(
+            &[(
                 crate::parser::cst::ListEntry,
                 Option<crate::parser::cst::Comma>,
-            )>,
+            )],
             &crate::parser::cst::RightBracket,
             &crate::parser::cst::Semicolon,
             &crate::lexer::PosRange,
@@ -2107,12 +2107,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 Expression,
                 crate::parser::cst::CodeBlock,
             ),
-            &Vec<(
+            &[(
                 crate::parser::cst::SyntacticElse,
                 crate::parser::cst::SyntacticIf,
                 Expression,
                 crate::parser::cst::CodeBlock,
-            )>,
+            )],
             &Option<(
                 crate::parser::cst::SyntacticElse,
                 crate::parser::cst::CodeBlock,
@@ -2417,7 +2417,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &Identifier,
             &crate::parser::cst::LeftParens,
-            &Vec<(Expression, Option<crate::parser::cst::Comma>)>,
+            &[(Expression, Option<crate::parser::cst::Comma>)],
             &crate::parser::cst::RightParens,
             &crate::parser::cst::CodeBlock,
             &Option<crate::parser::cst::Semicolon>,
@@ -2490,12 +2490,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             &Option<crate::parser::cst::CanonicalIdentifier>,
             &Identifier,
             &crate::parser::cst::LeftParens,
-            &Vec<(
+            &[(
                 Option<crate::parser::cst::CustomBlockParamKind>,
                 Option<crate::parser::cst::CanonicalIdentifier>,
                 Identifier,
                 Option<crate::parser::cst::Comma>,
-            )>,
+            )],
             &crate::parser::cst::RightParens,
             &crate::parser::cst::CodeBlock,
             &Option<crate::parser::cst::Semicolon>,
@@ -2712,7 +2712,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .uninitialized_stage
             .take()
             .ok_or(GrazeSb3GeneratorError::RepeatedStageInitialization)?;
-        let target_name = STAGE_ISTRING.clone();
         let assets = context.target_attachments.remove("stage").unwrap();
         let my_blocks_symbol_id = context
             .symbol_table
