@@ -16,16 +16,3 @@ thiserror = "2.0.18"
 grazelang_library_parser = { path = "../grazelang_library_parser" }
 grazelang_library = { path = "../grazelang_library" }
 md5 = "0.8.0"
-
-[features]
-default = ["use_actual_defaults_everywhere"]
-use_shadows_for_formatted_strings = []
-use_actual_defaults_for_formatted_strings = [
-    "use_shadows_for_formatted_strings",
-]
-use_shadows_for_list_assignment = []
-use_actual_defaults_for_list_assignment = ["use_shadows_for_list_assignment"]
-use_actual_defaults_everywhere = [
-    "use_actual_defaults_for_formatted_strings",
-    "use_actual_defaults_for_list_assignment",
-]

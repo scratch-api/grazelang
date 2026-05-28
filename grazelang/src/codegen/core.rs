@@ -36,7 +36,7 @@ use crate::{
             Expression, FormattedStringContent, Identifier, ListEntry, Literal, UnOpDescriptor,
         },
     },
-    settings::GrazeSettings,
+    settings::{GrazeSettings, UseShadows},
     visitor::{
         GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
         default_visit_expression_binary_operation, default_visit_expression_call,
@@ -1117,27 +1117,37 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     let right = param_to_input_repr_no_menu(right, context)?;
                     let left = create_input_value(
                         left,
-                        #[cfg(feature = "use_shadows_for_formatted_strings")]
-                        Some(Sb3PrimitiveBlock::String(
-                            #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
-                            "apple ".into(),
-                            #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
-                            "".into(),
-                        )),
-                        #[cfg(not(feature = "use_shadows_for_formatted_strings"))]
-                        None::<Sb3PrimitiveBlock>,
+                        if context.settings.use_shadows == UseShadows::NotEverywhere {
+                            None::<Sb3PrimitiveBlock>
+                        } else {
+                            Some(Sb3PrimitiveBlock::String(
+                                if context.settings.use_shadows
+                                    == UseShadows::CorrectShadowsEverywhere
+                                {
+                                    "apple "
+                                } else {
+                                    ""
+                                }
+                                .into(),
+                            ))
+                        },
                     );
                     let right = create_input_value(
                         right,
-                        #[cfg(feature = "use_shadows_for_formatted_strings")]
-                        Some(Sb3PrimitiveBlock::String(
-                            #[cfg(feature = "use_actual_defaults_for_formatted_strings")]
-                            "banana".into(),
-                            #[cfg(not(feature = "use_actual_defaults_for_formatted_strings"))]
-                            "".into(),
-                        )),
-                        #[cfg(not(feature = "use_shadows_for_formatted_strings"))]
-                        None::<Sb3PrimitiveBlock>,
+                        if context.settings.use_shadows == UseShadows::NotEverywhere {
+                            None::<Sb3PrimitiveBlock>
+                        } else {
+                            Some(Sb3PrimitiveBlock::String(
+                                if context.settings.use_shadows
+                                    == UseShadows::CorrectShadowsEverywhere
+                                {
+                                    "banana"
+                                } else {
+                                    ""
+                                }
+                                .into(),
+                            ))
+                        },
                     );
                     add_block(context, &this_id, make_join(parent, left, right));
                     Ok(Param::Owned(KnownBlock::BlockRef { id: this_id }))
@@ -1666,15 +1676,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         let value = param_to_input_repr_no_menu(param, context)?;
                         let value = create_input_value(
                             value,
-                            #[cfg(feature = "use_shadows_for_list_assignment")]
-                            Some(Sb3PrimitiveBlock::String(
-                                #[cfg(feature = "use_actual_defaults_for_list_assignment")]
-                                "thing".into(),
-                                #[cfg(not(feature = "use_actual_defaults_for_list_assignment"))]
-                                "".into(),
-                            )),
-                            #[cfg(not(feature = "use_shadows_for_list_assignment"))]
-                            None::<Sb3PrimitiveBlock>,
+                            if context.settings.use_shadows == UseShadows::NotEverywhere {
+                                None::<Sb3PrimitiveBlock>
+                            } else {
+                                Some(Sb3PrimitiveBlock::String(
+                                    if context.settings.use_shadows
+                                        == UseShadows::CorrectShadowsEverywhere
+                                    {
+                                        "thing"
+                                    } else {
+                                        ""
+                                    }
+                                    .into(),
+                                ))
+                            },
                         );
                         let inputs = if let Some(value) = value {
                             HashMap::from([("ITEM".to_string(), value)])
