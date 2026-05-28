@@ -1,15 +1,15 @@
 use super::{
+    context::{GrazeMessageSetting, ParseContext},
     cst::{
         self, BinOp, CodeBlock, Expression, Identifier, ParseError, SpriteStatement,
         StageStatement, Statement,
     },
-    context::{GrazeMessageSetting, ParseContext},
 };
 use crate::{
     lexer::{self, PosRange, Token, get_pos_range as internal_get_pos_range},
     parser::{
-        cst::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
         context::{self, BroadcastDescriptor},
+        cst::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
     },
 };
 use arcstr::{ArcStr as IString, literal};
@@ -43,7 +43,14 @@ macro_rules! expect_token_or_message {
         match next_token!($token_stream) {
             $pattern => $value,
             token => {
-                emit_unexpected_token_message!($context, $token_stream, $msg1, $msg2, token);
+                emit_unexpected_token_message(
+                    $context,
+                    $token_stream,
+                    literal!($msg1),
+                    literal!($msg2),
+                    literal!(static_current_context!()),
+                    token,
+                )?;
                 return $default_value;
             }
         }
@@ -359,52 +366,101 @@ where
     }
 }
 
-macro_rules! emit_unexpected_token_message {
-    ($context:expr, $token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {{
-        $context.successful = false;
-        let message = literal!($msg_1);
-        let expected = literal!($msg_2);
-        let context = literal!(static_current_context!());
-        let found = $found;
-        let pos_range = get_token_pos_range($token_stream);
-        if matches!(
-            $context.message_setting,
-            GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
-        ) {
-            if $context.message_setting == GrazeMessageSetting::ExitOnError {
-                $context.messages.push(
-                    ParseError::UnexpectedToken {
-                        message: message.clone(),
-                        expected: expected.clone(),
-                        context: context.clone(),
-                        found: found.clone(),
-                        pos_range,
-                    }
-                    .into(),
-                );
-            }
-            return Err(ParseError::UnexpectedToken {
-                message,
-                expected,
-                context,
-                found,
-                pos_range,
-            });
-        }
-        if $context.message_setting >= GrazeMessageSetting::ExitOnError {
-            $context.messages.push(
+pub fn emit_unexpected_token_message(
+    context: &mut ParseContext,
+    token_stream: ParseIn,
+    msg_1: IString,
+    msg_2: IString,
+    code_context: IString,
+    found: Token,
+) -> ParseOut<()> {
+    context.successful = false;
+    let pos_range = get_token_pos_range(token_stream);
+    if matches!(
+        context.message_setting,
+        GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+    ) {
+        if context.message_setting == GrazeMessageSetting::ExitOnError {
+            context.messages.push(
                 ParseError::UnexpectedToken {
-                    message,
-                    expected,
-                    context,
-                    found,
+                    message: msg_1.clone(),
+                    expected: msg_2.clone(),
+                    context: code_context.clone(),
+                    found: found.clone(),
                     pos_range,
                 }
                 .into(),
             );
         }
-    }};
+        return Err(ParseError::UnexpectedToken {
+            message: msg_1,
+            expected: msg_2,
+            context: code_context,
+            found,
+            pos_range,
+        });
+    }
+    if context.message_setting >= GrazeMessageSetting::ExitOnError {
+        context.messages.push(
+            ParseError::UnexpectedToken {
+                message: msg_1,
+                expected: msg_2,
+                context: code_context,
+                found,
+                pos_range,
+            }
+            .into(),
+        );
+    }
+    Ok(())
 }
+
+// macro_rules! emit_unexpected_token_message {
+//     ($context:expr, $token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {{
+//         $context.successful = false;
+//         let message = literal!($msg_1);
+//         let expected = literal!($msg_2);
+//         let context = literal!(static_current_context!());
+//         let found = $found;
+//         let pos_range = get_token_pos_range($token_stream);
+//         if matches!(
+//             $context.message_setting,
+//             GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+//         ) {
+//             if $context.message_setting == GrazeMessageSetting::ExitOnError {
+//                 $context.messages.push(
+//                     ParseError::UnexpectedToken {
+//                         message: message.clone(),
+//                         expected: expected.clone(),
+//                         context: context.clone(),
+//                         found: found.clone(),
+//                         pos_range,
+//                     }
+//                     .into(),
+//                 );
+//             }
+//             return Err(ParseError::UnexpectedToken {
+//                 message,
+//                 expected,
+//                 context,
+//                 found,
+//                 pos_range,
+//             });
+//         }
+//         if $context.message_setting >= GrazeMessageSetting::ExitOnError {
+//             $context.messages.push(
+//                 ParseError::UnexpectedToken {
+//                     message,
+//                     expected,
+//                     context,
+//                     found,
+//                     pos_range,
+//                 }
+//                 .into(),
+//             );
+//         }
+//     }};
+// }
 
 macro_rules! from_stream_pos {
     ($token_stream:expr => $node:path) => {
@@ -2721,7 +2777,7 @@ pub fn parse_sprite_statement(
                             SpriteStatement
                         )
                     )) // TODO: capture error and replace message 
-                       // Issue URL: https://github.com/scratch-api/grazelang/issues/22
+                    // Issue URL: https://github.com/scratch-api/grazelang/issues/22
                 }
             }
         }
@@ -3004,7 +3060,7 @@ pub fn parse_stage_statement(
                         expression,
                         start_pos,
                     ) // TODO: capture error and replace message
-                      // Issue URL: https://github.com/scratch-api/grazelang/issues/21
+                    // Issue URL: https://github.com/scratch-api/grazelang/issues/21
                 }
             }
         }
