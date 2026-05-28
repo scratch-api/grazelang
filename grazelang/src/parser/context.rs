@@ -333,7 +333,7 @@ impl ResolveKnownBlock for KnownBlock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SymbolTable {
     pub table: Vec<Symbol>,
 }
