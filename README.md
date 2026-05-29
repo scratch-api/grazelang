@@ -5,7 +5,7 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 ## Roadmap
 
 - [x] Parser
-- [ ] SB3 generation
+- [x] SB3 generation
 - [ ] Compile time calculation of expressions
 - [ ] Extensions
 - [ ] Block position control
