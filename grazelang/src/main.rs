@@ -1,5 +1,8 @@
+use std::path::Path;
+
 use grazelang::parser::context::ParseContext;
 use grazelang::visitor::GrazeVisitor;
+use grazelang::zipper;
 use grazelang::{
     codegen, lexer,
     parser::{self, core::PeekableLexer},
@@ -28,4 +31,6 @@ fn main() {
     dbg!(&context.asset_files);
 
     println!("{}", serde_json::to_string(&context.sb3).unwrap());
+
+    zipper::write_to_zip_path(Path::new("./test.sb3"), &context).unwrap();
 }

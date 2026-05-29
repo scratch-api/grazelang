@@ -4,6 +4,7 @@ std
 data.json
 temps
 grazelang/schemas
+.vscode
 # Added by cargo
 
 /target

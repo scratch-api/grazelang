@@ -596,7 +596,12 @@ where
     match value {
         TopLevelStatement::Stage(stage_keyword, stage_code_block, semicolon, pos_range) => {
             visitor.visit_top_level_statement_stage(
-                (stage_keyword, stage_code_block, semicolon.as_ref(), pos_range),
+                (
+                    stage_keyword,
+                    stage_code_block,
+                    semicolon.as_ref(),
+                    pos_range,
+                ),
                 context,
             )?;
         }
@@ -789,7 +794,13 @@ where
             pos_range,
         ) => {
             visitor.visit_single_input_hat_statement(
-                (identifier, expression, code_block, semicolon.as_ref(), pos_range),
+                (
+                    identifier,
+                    expression,
+                    code_block,
+                    semicolon.as_ref(),
+                    pos_range,
+                ),
                 context,
             )?;
         }
@@ -854,7 +865,13 @@ where
             pos_range,
         ) => {
             visitor.visit_isolated_expression(
-                (left_parens, expression, right_parens, semicolon.as_ref(), pos_range),
+                (
+                    left_parens,
+                    expression,
+                    right_parens,
+                    semicolon.as_ref(),
+                    pos_range,
+                ),
                 context,
             )?;
         }
@@ -917,7 +934,13 @@ where
             pos_range,
         ) => {
             visitor.visit_single_input_hat_statement(
-                (identifier, expression, code_block, semicolon.as_ref(), pos_range),
+                (
+                    identifier,
+                    expression,
+                    code_block,
+                    semicolon.as_ref(),
+                    pos_range,
+                ),
                 context,
             )?;
         }
@@ -982,7 +1005,13 @@ where
             pos_range,
         ) => {
             visitor.visit_isolated_expression(
-                (left_parens, expression, right_parens, semicolon.as_ref(), pos_range),
+                (
+                    left_parens,
+                    expression,
+                    right_parens,
+                    semicolon.as_ref(),
+                    pos_range,
+                ),
                 context,
             )?;
         }
@@ -1271,7 +1300,13 @@ where
         }
         Statement::SingleInputControl(identifier, expression, code_block, semicolon, pos_range) => {
             visitor.visit_statement_single_input_control(
-                (identifier, expression, code_block, semicolon.as_ref(), pos_range),
+                (
+                    identifier,
+                    expression,
+                    code_block,
+                    semicolon.as_ref(),
+                    pos_range,
+                ),
                 context,
             )?;
         }
@@ -1298,12 +1333,20 @@ where
             )?;
         }
         Statement::Forever(identifier, code_block, semicolon, pos_range) => {
-            visitor
-                .visit_statement_forever((identifier, code_block, semicolon.as_ref(), pos_range), context)?;
+            visitor.visit_statement_forever(
+                (identifier, code_block, semicolon.as_ref(), pos_range),
+                context,
+            )?;
         }
         Statement::IfElse(start_branch, branches, else_branch, semicolon, pos_range) => {
             visitor.visit_statement_if_else(
-                (start_branch, branches, else_branch.as_ref(), semicolon.as_ref(), pos_range),
+                (
+                    start_branch,
+                    branches,
+                    else_branch.as_ref(),
+                    semicolon.as_ref(),
+                    pos_range,
+                ),
                 context,
             )?;
         }
@@ -1923,8 +1966,8 @@ pub fn default_visit_expression_binary_operation<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    visitor.visit_expression(value.0.deref(), context)?;
-    visitor.visit_expression(value.2.deref(), context)?;
+    visitor.visit_expression(value.0, context)?;
+    visitor.visit_expression(value.2, context)?;
     Ok(())
 }
 
@@ -1936,7 +1979,7 @@ pub fn default_visit_expression_unary_operation<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    visitor.visit_expression(value.1.deref(), context)?;
+    visitor.visit_expression(value.1, context)?;
     Ok(())
 }
 
@@ -1985,7 +2028,7 @@ pub fn default_visit_expression_get_item<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    visitor.visit_expression(value.2.deref(), context)?;
+    visitor.visit_expression(value.2, context)?;
     Ok(())
 }
 
@@ -2003,8 +2046,8 @@ pub fn default_visit_expression_get_letter<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    visitor.visit_expression(value.0.deref(), context)?;
-    visitor.visit_expression(value.2.deref(), context)?;
+    visitor.visit_expression(value.0, context)?;
+    visitor.visit_expression(value.2, context)?;
     Ok(())
 }
 
@@ -2016,7 +2059,7 @@ pub fn default_visit_expression_parentheses<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    visitor.visit_expression(value.1.deref(), context)?;
+    visitor.visit_expression(value.1, context)?;
     Ok(())
 }
 
