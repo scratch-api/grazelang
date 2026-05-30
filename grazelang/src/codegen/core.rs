@@ -32,8 +32,9 @@ use crate::{
             ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
-            BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope,
-            Expression, FormattedStringContent, Identifier, ListEntry, Literal, UnOpDescriptor,
+            self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
+            DataDeclarationScope, Expression, FormattedStringContent, Identifier, ListEntry,
+            Literal, UnOpDescriptor,
         },
     },
     settings::{GrazeSettings, UseShadows},
@@ -66,14 +67,14 @@ pub enum GrazeSb3GeneratorError {
     #[error("tried to get a list item for a non list, {identifier:?}")]
     ListAccessForNonLists { identifier: Identifier },
     #[error("cannot initialize stage multiple times")]
-    RepeatedStageInitialization,
+    RepeatedStageInitialization { stage_keyword: cst::StageKeyword },
     #[error("tried to call the identifier {identifier:?} as a c block when it was not possible")]
     BlockIsNotCBlock { identifier: Identifier },
     #[error("tried to pass normal parameter {param:?} as a block stack")]
     PassedNormalParamAsBlockStack { param: Param },
     #[error("tried to get the known block of a block stack")]
     TriedGetKnownBlockOfBlockStack,
-    #[error("tried to name two separate sprites , try canonical names")]
+    #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
 }
 // TODO: add pos range data for all errors
@@ -83,7 +84,7 @@ pub enum GrazeSb3GeneratorError {
 //  - [ ] UnexpectedInputMenu
 //  - [ ] IncorrectParamCount
 //  - [x] ListAccessForNonLists
-//  - [ ] RepeatedStageInitialization
+//  - [x] RepeatedStageInitialization
 //  - [x] BlockIsNotCBlock
 //  - [ ] PassedNormalParamAsBlockStack
 //  - [ ] TriedGetKnownBlockOfBlockStack
@@ -92,7 +93,10 @@ pub enum GrazeSb3GeneratorError {
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
     #[error("io error: {error:?}")]
-    IoError { #[from] error: std::io::Error },
+    IoError {
+        #[from]
+        error: std::io::Error,
+    },
     #[error("you cannot call two sprites the same name: {name:?}")]
     ShadowedSprite { name: String },
     #[error("you cannot call a sprite \"stage\", try using a canonical name")]
@@ -2743,10 +2747,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        let mut stage = context
-            .uninitialized_stage
-            .take()
-            .ok_or(GrazeSb3GeneratorError::RepeatedStageInitialization)?;
+        let mut stage = context.uninitialized_stage.take().ok_or(
+            GrazeSb3GeneratorError::RepeatedStageInitialization {
+                stage_keyword: value.0.clone(),
+            },
+        )?;
         let assets = context.target_attachments.remove("stage").unwrap();
         let my_blocks_symbol_id = context
             .symbol_table
@@ -2806,8 +2811,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let assets = context
             .target_attachments
             .remove(&value.2.to_single().unwrap().0)
-            .ok_or_else(|| {
-                GrazeSb3GeneratorError::ShadowedSprite { identifier: value.2.clone() }
+            .ok_or_else(|| GrazeSb3GeneratorError::ShadowedSprite {
+                identifier: value.2.clone(),
             })?;
         let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
         let my_blocks_symbol_id = context
