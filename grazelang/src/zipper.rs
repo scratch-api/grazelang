@@ -6,31 +6,16 @@ use std::{
 
 use zip::{CompressionMethod, ZipWriter, result::ZipError, write::SimpleFileOptions};
 
-use crate::{codegen::core::GrazeSb3GeneratorContext, zipper::WriteIntoZipError::IoError};
+use crate::codegen::core::GrazeSb3GeneratorContext;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum WriteIntoZipError {
-    ZipError(ZipError),
-    IoError(io::Error),
-    SerdeJsonError(serde_json::Error),
-}
-
-impl From<ZipError> for WriteIntoZipError {
-    fn from(value: ZipError) -> Self {
-        Self::ZipError(value)
-    }
-}
-
-impl From<io::Error> for WriteIntoZipError {
-    fn from(value: io::Error) -> Self {
-        Self::IoError(value)
-    }
-}
-
-impl From<serde_json::Error> for WriteIntoZipError {
-    fn from(value: serde_json::Error) -> Self {
-        Self::SerdeJsonError(value)
-    }
+    #[error(transparent)]
+    ZipError(#[from] ZipError),
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+    #[error(transparent)]
+    SerdeJsonError(#[from] serde_json::Error),
 }
 
 pub fn write_to_zip_path(
