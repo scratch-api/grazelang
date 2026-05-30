@@ -78,6 +78,7 @@ pub enum GrazeSb3GeneratorError {
     ShadowedSprite { identifier: Identifier },
 }
 // TODO: add pos range data for all errors
+// Issue URL: https://github.com/scratch-api/grazelang/issues/42
 // Variants:
 // - [x] UnknownIdentifier
 // - [x] IdentifierIsNotABlock
