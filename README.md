@@ -7,14 +7,15 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 - [x] Parser
 - [x] SB3 generation
 - [ ] Command Line interface
-- [ ] Compile time calculation of expressions
 - [ ] Extensions
-- [ ] Block position control
+- [ ] Comments
 - [ ] SB3 detranspiler
 - [ ] Syntax highlighting
-- [ ] Full LSP support
-- [ ] Preprocessing
 - [ ] Raw blocks
+- [ ] Block position control
+- [ ] Full LSP support
+- [ ] Compile time calculation of expressions
+- [ ] Preprocessing
 
 ## Credits
 
