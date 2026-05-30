@@ -8,7 +8,7 @@ use super::{
 use crate::{
     lexer::{self, PosRange, Token, get_pos_range as internal_get_pos_range},
     parser::{
-        context::{self, BroadcastDescriptor},
+        context::{self, BroadcastDescriptor, GrazeMessage},
         cst::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
     },
 };
@@ -315,7 +315,7 @@ macro_rules! try_or_emit_message {
             Ok(value) => value,
             Err(err) => {
                 $context.successful = false;
-                match $context.message_setting {
+                match $context.settings.message_setting {
                     GrazeMessageSetting::ExitOnError => {
                         $context.messages.push(err.clone().into());
                         return Err(err);
@@ -323,9 +323,7 @@ macro_rules! try_or_emit_message {
                     GrazeMessageSetting::ExitOnErrorUnlogged => return Err(err),
                     _ => (),
                 }
-                if $context.message_setting >= GrazeMessageSetting::Errors {
-                    $context.messages.push(err.into());
-                }
+                emit_message($context, err.into(), GrazeMessageSetting::Errors);
                 return $default_value;
             }
         }
@@ -350,6 +348,16 @@ macro_rules! find_top_level_statement_end_and_return_invalid {
             get_token_end($token_stream),
         )))
     }};
+}
+
+pub fn emit_message(
+    context: &mut ParseContext,
+    message: GrazeMessage,
+    message_type: GrazeMessageSetting,
+) {
+    if context.settings.message_setting >= message_type {
+        context.messages.push(message);
+    };
 }
 
 pub fn find_next_token<F>(token_stream: ParseIn, mut predicate: F) -> Result<(), ParseError>
@@ -377,10 +385,10 @@ pub fn emit_unexpected_token_message(
     context.successful = false;
     let pos_range = get_token_pos_range(token_stream);
     if matches!(
-        context.message_setting,
+        context.settings.message_setting,
         GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
     ) {
-        if context.message_setting == GrazeMessageSetting::ExitOnError {
+        if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
             context.messages.push(
                 ParseError::UnexpectedToken {
                     message: msg_1.clone(),
@@ -400,18 +408,18 @@ pub fn emit_unexpected_token_message(
             pos_range,
         });
     }
-    if context.message_setting >= GrazeMessageSetting::ExitOnError {
-        context.messages.push(
-            ParseError::UnexpectedToken {
-                message: msg_1,
-                expected: msg_2,
-                context: code_context,
-                found,
-                pos_range,
-            }
-            .into(),
-        );
-    }
+    emit_message(
+        context,
+        ParseError::UnexpectedToken {
+            message: msg_1,
+            expected: msg_2,
+            context: code_context,
+            found,
+            pos_range,
+        }
+        .into(),
+        GrazeMessageSetting::ExitOnError,
+    );
     Ok(())
 }
 
