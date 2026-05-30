@@ -79,17 +79,6 @@ pub enum GrazeSb3GeneratorError {
     ShadowedSprite { identifier: Identifier },
 }
 // TODO: add pos range data for all errors
-//  Error types:
-//  - [x] UnknownIdentifier
-//  - [x] IdentifierIsNotABlock
-//  - [x] UnexpectedInputMenu
-//  - [ ] IncorrectParamCount
-//  - [x] ListAccessForNonLists
-//  - [x] RepeatedStageInitialization
-//  - [x] BlockIsNotCBlock
-//  - [ ] PassedNormalParamAsBlockStack
-//  - [ ] TriedGetKnownBlockOfBlockStack
-//  - [x] ShadowedSprite
 // Issue URL: https://github.com/scratch-api/grazelang/issues/43
 
 #[derive(Debug, Error)]
