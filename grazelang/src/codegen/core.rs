@@ -77,7 +77,18 @@ pub enum GrazeSb3GeneratorError {
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
 }
-
+// TODO: add pos range data for all errors
+//  Error types:
+//  - [x] UnknownIdentifier
+//  - [x] IdentifierIsNotABlock
+//  - [ ] UnexpectedInputMenu
+//  - [ ] IncorrectParamCount
+//  - [x] ListAccessForNonLists
+//  - [x] RepeatedStageInitialization
+//  - [x] BlockIsNotCBlock
+//  - [ ] PassedNormalParamAsBlockStack
+//  - [ ] TriedGetKnownBlockOfBlockStack
+//  - [x] ShadowedSprite
 
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
