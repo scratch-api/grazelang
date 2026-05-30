@@ -78,6 +78,7 @@ pub enum GrazeSb3GeneratorError {
     ShadowedSprite { identifier: Identifier },
 }
 // TODO: add pos range data for all errors
+// Variants:
 // - [x] UnknownIdentifier
 // - [x] IdentifierIsNotABlock
 // - [ ] UnexpectedInputMenu
