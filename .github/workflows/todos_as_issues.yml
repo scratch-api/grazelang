@@ -20,6 +20,7 @@ jobs:
           INSERT_ISSUE_URLS: "true"
           CLOSE_ISSUES: "true"
           AUTO_ASSIGN: "true"
+          ESCAPE: "false"
           
       - name: Commit issue urls
         run: |
