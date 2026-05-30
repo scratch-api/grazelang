@@ -78,16 +78,16 @@ pub enum GrazeSb3GeneratorError {
 }
 // TODO: add pos range data for all errors
 // Issue URL: https://github.com/scratch-api/grazelang/issues/41
-//  [x] UnknownIdentifier
-//  [x] IdentifierIsNotABlock
-//  [ ] UnexpectedInputMenu
-//  [ ] IncorrectParamCount
-//  [x] ListAccessForNonLists
-//  [ ] RepeatedStageInitialization
-//  [x] BlockIsNotCBlock
-//  [ ] PassedNormalParamAsBlockStack
-//  [ ] TriedGetKnownBlockOfBlockStack
-//  [x] ShadowedSprite
+//  - [x] UnknownIdentifier
+//  - [x] IdentifierIsNotABlock
+//  - [ ] UnexpectedInputMenu
+//  - [ ] IncorrectParamCount
+//  - [x] ListAccessForNonLists
+//  - [ ] RepeatedStageInitialization
+//  - [x] BlockIsNotCBlock
+//  - [ ] PassedNormalParamAsBlockStack
+//  - [ ] TriedGetKnownBlockOfBlockStack
+//  - [x] ShadowedSprite
 
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
