@@ -77,19 +77,7 @@ pub enum GrazeSb3GeneratorError {
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
 }
-// TODO: add pos range data for all errors
-//  Variants:
-//  - [x] UnknownIdentifier
-//  - [x] IdentifierIsNotABlock
-//  - [ ] UnexpectedInputMenu
-//  - [ ] IncorrectParamCount
-//  - [x] ListAccessForNonLists
-//  - [x] RepeatedStageInitialization
-//  - [x] BlockIsNotCBlock
-//  - [ ] PassedNormalParamAsBlockStack
-//  - [ ] TriedGetKnownBlockOfBlockStack
-//  - [x] ShadowedSprite
-// Issue URL: https://github.com/scratch-api/grazelang/issues/41
+
 
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
