@@ -28,8 +28,8 @@ use crate::{
     names::Namespace,
     parser::{
         context::{
-            IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable,
-            Target, TargetSymbolDescriptor,
+            GrazeMessage, GrazeMessageSetting, IdString, KnownBlock, ParseContext,
+            ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
             BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope,
@@ -71,22 +71,18 @@ pub enum GrazeSb3GeneratorError {
     BlockIsNotCBlock { identifier: Identifier },
     #[error("tried to pass normal parameter {param:?} as a block stack")]
     PassedNormalParamAsBlockStack { param: Param },
+    #[error("tried to get the known block of a block stack")]
+    TriedGetKnownBlockOfBlockStack,
 }
 
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
     #[error("io error: {error:?}")]
-    IoError { error: std::io::Error },
+    IoError { #[from] error: std::io::Error },
     #[error("you cannot call two sprites the same name: {name:?}")]
     ShadowedSprite { name: String },
     #[error("you cannot call a sprite \"stage\", try using a canonical name")]
     ShadowedStage,
-}
-
-impl From<std::io::Error> for GrazeSb3GeneratorCreationError {
-    fn from(value: std::io::Error) -> Self {
-        Self::IoError { error: value }
-    }
 }
 
 pub struct GrazeSb3Generator;
@@ -110,6 +106,7 @@ pub struct GrazeSb3GeneratorContext {
     pub target_attachments: HashMap<IString, Vec<TargetAttachment>>,
     pub asset_files: HashMap<String, IString>,
     pub settings: GrazeSettings,
+    pub messages: Vec<GrazeMessage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -410,6 +407,7 @@ impl GrazeSb3GeneratorContext {
             target_attachments,
             asset_files,
             settings: std::mem::take(&mut parse_context.settings),
+            messages: Vec::new(),
         })
     }
 
@@ -566,8 +564,7 @@ macro_rules! with_known_block {
                 $action
             }
             Param::BlockStack(_) => {
-                todo!() // TODO: warn user about incorrect usage
-                // Issue URL: https://github.com/scratch-api/grazelang/issues/3
+                return Err(GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack)
             }
         }
     };
@@ -703,8 +700,7 @@ pub fn add_param_to_params(
             );
         }
         CallBlockParamKind::BlockStack => {
-            todo!() // TODO: warn user about incorrect usage
-            // Issue URL: https://github.com/scratch-api/grazelang/issues/2
+            return Err(GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack);
         }
     }
     Ok(())
@@ -870,6 +866,16 @@ where
         ),
     );
     Ok(())
+}
+
+pub fn emit_message(
+    context: &mut GrazeSb3GeneratorContext,
+    message: GrazeMessage,
+    message_type: GrazeMessageSetting,
+) {
+    if context.settings.message_setting >= message_type {
+        context.messages.push(message);
+    };
 }
 
 impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3Generator {
