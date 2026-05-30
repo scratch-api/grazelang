@@ -206,7 +206,7 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::FieldValue { value } => value.clone(),
             KnownBlock::BlockRef { id } => {
                 Sb3FieldValue::Normal(id.into()) // TODO: warn user about probably incorrect usage.
-                                                 // Issue URL: https://github.com/scratch-api/grazelang/issues/16
+                // Issue URL: https://github.com/scratch-api/grazelang/issues/16
             }
             KnownBlock::PrimitiveBlock { value } => {
                 // TODO: warn user about possibly incorrect usage
@@ -329,7 +329,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::Empty => todo!(), // warn user about incorrect usage
         } // TODO: Implement assignment of x, y etc
-          // Issue URL: https://github.com/scratch-api/grazelang/issues/12
+        // Issue URL: https://github.com/scratch-api/grazelang/issues/12
     }
 }
 
@@ -760,7 +760,7 @@ impl TargetSymbolDescriptor {
                                 md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
                                 bitmap_resolution: Some(1.0), // TODO: better default and more control
-                                                              // Issue URL: https://github.com/scratch-api/grazelang/issues/8
+                                // Issue URL: https://github.com/scratch-api/grazelang/issues/8
                                 rotation_center_x: 0.0,
                                 rotation_center_y: 0.0,
                             },
@@ -778,7 +778,7 @@ impl TargetSymbolDescriptor {
                                 md5ext: md5ext.clone(),
                                 data_format: file_ext.to_string(),
                                 rate: 48000.0, // TODO: better default and more control
-                                               // Issue URL: https://github.com/scratch-api/grazelang/issues/7
+                                // Issue URL: https://github.com/scratch-api/grazelang/issues/7
                                 sample_count: 1124,
                             },
                         ))
@@ -860,7 +860,7 @@ impl TargetSymbolDescriptor {
                                 canonical_name: canonical_name.clone(),
                                 id,
                             })), // TODO: add list length as method
-                                 // Issue URL: https://github.com/scratch-api/grazelang/issues/6
+                            // Issue URL: https://github.com/scratch-api/grazelang/issues/6
                             namespace: HashMap::new(),
                             parent: Default::default(),
                         },
@@ -954,26 +954,22 @@ impl Target {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, thiserror::Error)]
 pub enum GrazeError {
-    Plain(String, PosRange),
-    ParseError(ParseError),
-}
-
-impl From<ParseError> for GrazeError {
-    fn from(value: ParseError) -> Self {
-        Self::ParseError(value)
-    }
+    #[error("{0}")]
+    Plain(IString, PosRange),
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GrazeWarning {
-    Plain(String, PosRange),
+    Plain(IString, PosRange),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GrazeInfo {
-    Plain(String, PosRange),
+    Plain(IString, PosRange),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1053,7 +1049,6 @@ pub struct ParseContext {
     pub global_symbols: HashMap<IString, TargetSymbolDescriptor>,
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
     pub messages: Vec<GrazeMessage>,
-    pub message_setting: GrazeMessageSetting,
     pub settings: GrazeSettings,
     pub successful: bool,
 }
@@ -1076,7 +1071,6 @@ impl ParseContext {
             next_target: None,
             random_seed,
             messages: Vec::new(),
-            message_setting: settings.message_setting,
             successful: true,
             settings,
         }
