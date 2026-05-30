@@ -73,7 +73,20 @@ pub enum GrazeSb3GeneratorError {
     PassedNormalParamAsBlockStack { param: Param },
     #[error("tried to get the known block of a block stack")]
     TriedGetKnownBlockOfBlockStack,
+    #[error("tried to name two separate sprites , try canonical names")]
+    ShadowedSprite { identifier: Identifier },
 }
+// TODO: add pos range data for all errors
+//  [x] UnknownIdentifier
+//  [x] IdentifierIsNotABlock
+//  [ ] UnexpectedInputMenu
+//  [ ] IncorrectParamCount
+//  [x] ListAccessForNonLists
+//  [ ] RepeatedStageInitialization
+//  [x] BlockIsNotCBlock
+//  [ ] PassedNormalParamAsBlockStack
+//  [ ] TriedGetKnownBlockOfBlockStack
+//  [x] ShadowedSprite
 
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
@@ -2789,12 +2802,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .as_ref()
             .map(|value| value.name.clone())
             .unwrap_or_else(|| value.2.fields.last().unwrap().0.clone());
-        // TODO: explicitly error when multiple sprites have the same name
-        // Issue URL: https://github.com/scratch-api/grazelang/issues/1
         let assets = context
             .target_attachments
             .remove(&value.2.to_single().unwrap().0)
-            .unwrap();
+            .ok_or_else(|| {
+                GrazeSb3GeneratorError::ShadowedSprite { identifier: value.2.clone() }
+            })?;
         let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
         let my_blocks_symbol_id = context
             .symbol_table
