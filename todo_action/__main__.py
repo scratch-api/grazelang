@@ -1,3 +1,4 @@
+import traceback
 import subprocess
 import os
 import json
@@ -54,20 +55,25 @@ def get_indentation(content: str, end_index: int) -> str:
     return line_str[: len(line_str) - len(line_str.lstrip(" \t"))]
 
 
-def get_changed_files() -> tuple[dict[str, str], set[str]]:
+def get_changed_files() -> tuple[dict[str, str], dict[str, str]]:
     with open(EVENT_PATH or "", "r", encoding="utf-8") as f:
         event = json.load(f)
 
-    files_to_scan = {}
-    removed_files = set()
+    files_to_scan: dict[str, str] = {}
+    removed_files: dict[str, str] = {}
 
-    before_sha = event.get("before")
-    after_sha = event.get("after")
+    commits = event.get("commits", [])
+    if not commits:
+        return files_to_scan, removed_files
 
-    if before_sha and after_sha and before_sha != "0000000000000000000000000000000000000000":
+    for commit in commits:
+        commit_sha = commit.get("id")
+        if not commit_sha:
+            continue
+
         try:
             diff_output = subprocess.check_output(
-                ["git", "diff", "--name-status", before_sha, after_sha], text=True
+                ["git", "show", "--name-status", "--pretty=", commit_sha], text=True
             )
 
             for line in diff_output.strip().split("\n"):
@@ -79,24 +85,17 @@ def get_changed_files() -> tuple[dict[str, str], set[str]]:
                 filepath = parts[-1]
 
                 if status.startswith("D"):
-                    removed_files.add(filepath)
+                    removed_files[filepath] = commit_sha
+                    if filepath in files_to_scan:
+                        del files_to_scan[filepath]
                 else:
-                    files_to_scan[filepath] = after_sha
-                    removed_files.discard(filepath)
+                    files_to_scan[filepath] = commit_sha
+                    if filepath in removed_files:
+                        del removed_files[filepath]
 
-            return files_to_scan, removed_files
-        except subprocess.CalledProcessError as e:
-            pass
-
-    for commit in event.get("commits", ()):
-        for file in commit.get("added", ()) + commit.get("modified", ()):
-            files_to_scan[file] = commit.get("id", "")
-            removed_files.discard(file)
-
-        for file in commit.get("removed", ()):
-            removed_files.add(file)
-            if file in files_to_scan:
-                del files_to_scan[file]
+        except subprocess.CalledProcessError:
+            print(f"Failed to get diff for commit {commit_sha}:")
+            traceback.print_exc()
 
     return files_to_scan, removed_files
 
@@ -138,7 +137,7 @@ def main():
             line_starts.append(current_idx)
             current_idx += len(line)
 
-        for rule_name, rule in syntax[ext].items():
+        for _, rule in syntax[ext].items():
             todo_comment_pattern = re.compile(rule["comment_regex"])
             todo_name_pattern = re.compile(rule["name_regex"])
             todo_pattern = re.compile(rule["content_regex"])
@@ -191,7 +190,7 @@ def main():
                             "new_comment": map_match(match, rule["add_issue_sub"]),
                         }
                     )
-    
+
     print()
 
     for issue_num, data in tracker.items():
@@ -202,6 +201,12 @@ def main():
                 old_filepath in removed_files or old_filepath in files_to_scan
             ) and issue_num not in found_issues:
                 print(f"Closing issue #{issue_num}")
+                github_update_issue(
+                    issue_num,
+                    data["title"],
+                    f"{data['text']}\n\n{GITHUB_URL}/blob/{data['commit']}/{data['filepath']}#{data['lines']}\
+                    \n\nClosed in {GITHUB_URL}/commit/{removed_files.get(old_filepath, files_to_scan[old_filepath])}.",
+                )
                 github_close_issue(issue_num)
                 tracker[issue_num]["status"] = "closed"
 
