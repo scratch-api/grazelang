@@ -9,10 +9,10 @@
     },
     "44": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": "Error types:\n- [x] UnknownIdentifier\n- [x] IdentifierIsNotABlock\n- [x] UnexpectedInputMenu\n- [ ] IncorrectParamCount\n- [x] ListAccessForNonLists\n- [x] RepeatedStageInitialization\n- [x] BlockIsNotCBlock\n- [ ] PassedNormalParamAsBlockStack\n- [ ] TriedGetKnownBlockOfBlockStack\n- [x] ShadowedSprite",
+        "text": " Error types:\n - [x] UnknownIdentifier\n - [x] IdentifierIsNotABlock\n - [x] UnexpectedInputMenu\n - [ ] IncorrectParamCount\n - [x] ListAccessForNonLists\n - [x] RepeatedStageInitialization\n - [x] BlockIsNotCBlock\n - [ ] PassedNormalParamAsBlockStack\n - [ ] TriedGetKnownBlockOfBlockStack\n - [x] ShadowedSprite\n\nTODO: remove this test todo",
         "status": "open",
-        "lines": "L86-L98",
-        "commit": "8489906d00510f3680b3e68e34779eb3df9bc257",
+        "lines": "L86-L100",
+        "commit": "07cf1e0af8d921c1fb459bac27b7edb4f8042cb5",
         "title": "add pos range data for all errors"
     },
     "20": {
