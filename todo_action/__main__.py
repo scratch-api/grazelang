@@ -241,7 +241,7 @@ def main():
             print(f"Creating new issue for TODO in {filepath}")
             issue_num = github_create_issue(
                 todo["title"],
-                f"{todo['text']}\n\n{GITHUB_URL}/blob/{todo['commit']}/{todo['filepath']}#L{todo['lines']}",
+                f"{todo['text']}\n\n{GITHUB_URL}/blob/{todo['commit']}/{todo['filepath']}#{todo['lines']}",
             )
 
             start, end = todo["span"]
