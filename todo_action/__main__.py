@@ -174,7 +174,7 @@ def main():
                     found_issues[issue_num] = {
                         "filepath": filepath,
                         "text": todo_text,
-                        "lines": f"{start_line}-{end_line}",
+                        "lines": f"L{start_line}-L{end_line}",
                         "commit": commit,
                         "title": title,
                     }
@@ -184,7 +184,7 @@ def main():
                         {
                             "filepath": filepath,
                             "text": todo_text,
-                            "lines": f"{start_line}-{end_line}",
+                            "lines": f"L{start_line}-L{end_line}",
                             "commit": commit,
                             "title": title,
                             "span": match.span(),
@@ -217,7 +217,7 @@ def main():
                 github_update_issue(
                     issue_num,
                     data["title"],
-                    f"{data['text']}\n\n{GITHUB_URL}/blob/{data['commit']}/{data['filepath']}#L{data['lines']}",
+                    f"{data['text']}\n\n{GITHUB_URL}/blob/{data['commit']}/{data['filepath']}#{data['lines']}",
                 )
                 tracker[issue_num]["text"] = data["text"]
                 tracker[issue_num]["filepath"] = data["filepath"]
