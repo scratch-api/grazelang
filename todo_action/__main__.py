@@ -134,12 +134,14 @@ def main():
             line_starts.append(current_idx)
             current_idx += len(line)
 
-        for _, rule in syntax[ext].items():
+        for rule_name, rule in syntax[ext].items():
+            print(f"Trying rule {rule_name}")
             todo_comment_pattern = re.compile(rule["comment_regex"])
             todo_name_pattern = re.compile(rule["name_regex"])
             todo_pattern = re.compile(rule["content_regex"])
 
             for match in todo_comment_pattern.finditer(content):
+                print("Found todo match")
                 comment_text = match.group(1)
 
                 name_match = todo_name_pattern.search(comment_text)

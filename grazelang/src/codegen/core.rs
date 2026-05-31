@@ -84,6 +84,7 @@ pub enum GrazeSb3GeneratorError {
     ShadowedSprite { identifier: Identifier },
 }
 // TODO: add pos range data for all errors
+// Issue: #44
 //  Error types:
 //  - [x] UnknownIdentifier
 //  - [x] IdentifierIsNotABlock
@@ -95,7 +96,6 @@ pub enum GrazeSb3GeneratorError {
 //  - [ ] PassedNormalParamAsBlockStack
 //  - [ ] TriedGetKnownBlockOfBlockStack
 //  - [x] ShadowedSprite
-// Issue: #44
 
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
