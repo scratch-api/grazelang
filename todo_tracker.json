@@ -8,12 +8,12 @@
         "title": "Implement use statement"
     },
     "44": {
-        "filepath": "grazelang\\src\\codegen\\core.rs",
-        "text": "",
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "Error types:\n- [x] UnknownIdentifier\n- [x] IdentifierIsNotABlock\n- [x] UnexpectedInputMenu\n- [ ] IncorrectParamCount\n- [x] ListAccessForNonLists\n- [x] RepeatedStageInitialization\n- [x] BlockIsNotCBlock\n- [ ] PassedNormalParamAsBlockStack\n- [ ] TriedGetKnownBlockOfBlockStack\n- [x] ShadowedSprite",
         "status": "open",
-        "lines": "81-93",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
-        "title": "add pos range data for all errors - revision 4"
+        "lines": "86-98",
+        "commit": "fc05ca8fd7beed40e1cc5bbc2cc970d5fbd7dc05",
+        "title": "add pos range data for all errors"
     },
     "20": {
         "filepath": "grazelang\\src\\parser\\context.rs",
