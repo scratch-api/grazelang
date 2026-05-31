@@ -1,3 +1,4 @@
+import subprocess
 import os
 import json
 import re
@@ -61,6 +62,33 @@ def get_changed_files() -> tuple[dict[str, str], set[str]]:
 
     files_to_scan = {}
     removed_files = set()
+
+    before_sha = event.get("before")
+    after_sha = event.get("after")
+
+    if before_sha and after_sha and before_sha != "0000000000000000000000000000000000000000":
+        try:
+            diff_output = subprocess.check_output(
+                ["git", "diff", "--name-status", before_sha, after_sha], text=True
+            )
+
+            for line in diff_output.strip().split("\n"):
+                if not line:
+                    continue
+
+                parts = line.split("\t")
+                status = parts[0]
+                filepath = parts[-1]
+
+                if status.startswith("D"):
+                    removed_files.add(filepath)
+                else:
+                    files_to_scan[filepath] = after_sha
+                    removed_files.discard(filepath)
+
+            return files_to_scan, removed_files
+        except subprocess.CalledProcessError as e:
+            pass
 
     for commit in event.get("commits", ()):
         for file in commit.get("added", ()) + commit.get("modified", ()):
