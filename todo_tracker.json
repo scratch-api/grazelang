@@ -9,10 +9,10 @@
     },
     "44": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": " Error types:\n - [x] UnknownIdentifier\n - [x] IdentifierIsNotABlock\n - [x] UnexpectedInputMenu\n - [ ] IncorrectParamCount\n - [x] ListAccessForNonLists\n - [x] RepeatedStageInitialization\n - [x] BlockIsNotCBlock\n - [ ] PassedNormalParamAsBlockStack\n - [ ] TriedGetKnownBlockOfBlockStack\n - [x] ShadowedSprite\n\nTODO: remove this test todo",
+        "text": "Error types:\n- [x] UnknownIdentifier\n- [x] IdentifierIsNotABlock\n- [x] UnexpectedInputMenu\n- [ ] IncorrectParamCount\n- [x] ListAccessForNonLists\n- [x] RepeatedStageInitialization\n- [x] BlockIsNotCBlock\n- [ ] PassedNormalParamAsBlockStack\n- [ ] TriedGetKnownBlockOfBlockStack\n- [x] ShadowedSprite",
         "status": "open",
-        "lines": "L86-L100",
-        "commit": "07cf1e0af8d921c1fb459bac27b7edb4f8042cb5",
+        "lines": "L86-L98",
+        "commit": "a24fcf285e81f5362334ec2dc40f6cc4789a0434",
         "title": "add pos range data for all errors"
     },
     "20": {
@@ -302,5 +302,13 @@
         "lines": "330-331",
         "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
         "title": "warn about overlap"
+    },
+    "45": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L100-L100",
+        "commit": "a24fcf285e81f5362334ec2dc40f6cc4789a0434",
+        "title": "Remove this test todo"
     }
 }

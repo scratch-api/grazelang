@@ -98,6 +98,7 @@ pub enum GrazeSb3GeneratorError {
 // Issue: #44
 
 // TODO: Remove this test todo
+// Issue: #45
 
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
