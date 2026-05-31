@@ -143,7 +143,7 @@ def main():
                 comment_text = match.group(1)
 
                 name_match = todo_name_pattern.search(comment_text)
-                name = name_match.group(1).strip() if name_match else f"TODO in {filepath}"
+                title = name_match.group(1).strip() if name_match else f"TODO in {filepath}"
                 name_end = name_match.end() if name_match else 0
 
                 start_line = bisect.bisect_right(line_starts, match.start())
@@ -165,22 +165,24 @@ def main():
                 ).rstrip()
 
                 if issue_match:
+                    print(f"Found existing todo: #{issue_match.group(1)}")
                     issue_num = str(issue_match.group(1))
                     found_issues[issue_num] = {
                         "filepath": filepath,
                         "text": todo_text,
                         "lines": f"{start_line}-{end_line}",
                         "commit": commit,
-                        "title": name,
+                        "title": title,
                     }
                 else:
+                    print(f"Found new todo: {title!r}")
                     new_todos.append(
                         {
                             "filepath": filepath,
                             "text": todo_text,
                             "lines": f"{start_line}-{end_line}",
                             "commit": commit,
-                            "title": name,
+                            "title": title,
                             "span": match.span(),
                             "new_comment": map_match(match, rule["add_issue_sub"]),
                         }
