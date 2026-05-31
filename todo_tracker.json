@@ -9,7 +9,7 @@
     },
     "44": {
         "filepath": "grazelang\\src\\codegen\\core.rs",
-        "text": "Error types:\n - [x] UnknownIdentifier\n - [x] IdentifierIsNotABlock\n - [x] UnexpectedInputMenu\n - [ ] IncorrectParamCount\n - [x] ListAccessForNonLists\n - [x] RepeatedStageInitialization\n - [x] BlockIsNotCBlock\n - [ ] PassedNormalParamAsBlockStack\n - [ ] TriedGetKnownBlockOfBlockStack\n - [x] ShadowedSprite",
+        "text": "",
         "status": "open",
         "lines": "81-93",
         "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
