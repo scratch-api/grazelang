@@ -56,6 +56,8 @@ def get_indentation(content: str, end_index: int) -> str:
 def get_changed_files() -> tuple[dict[str, str], set[str]]:
     with open(EVENT_PATH or "", "r", encoding="utf-8") as f:
         event = json.load(f)
+    
+    print(event)
 
     files_to_scan = {}
     removed_files = set()
