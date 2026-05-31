@@ -1141,7 +1141,7 @@ pub mod statement {
                 ),
                 symbols => {
                     // TODO: warn about shadowing
-                    // Issue URL: https://github.com/scratch-api/grazelang/issues/29
+                    // Issue: #29
                     let name = &identifier.fields[0].0;
                     symbols.insert(
                         name.clone(),
@@ -1582,7 +1582,7 @@ pub mod statement {
             matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
                 // TODO: warn about shadowing
-                // Issue URL: https://github.com/scratch-api/grazelang/issues/28
+                // Issue: #28
                 let name = &identifier.fields[0].0;
                 symbols.insert(
                     name.clone(),
@@ -2105,7 +2105,7 @@ pub mod statement {
                     with_mut_next_target!(context, target => {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                         // TODO: Warn about shadowing
-                        // Issue URL: https://github.com/scratch-api/grazelang/issues/27
+                        // Issue: #27
                         let symbols = target.borrow_symbols_mut();
                         let name = &identifier.fields[0].0;
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
@@ -2198,7 +2198,7 @@ pub mod statement {
                     "')'"
                 );
                 // TODO: Warn about shadowing
-                // Issue URL: https://github.com/scratch-api/grazelang/issues/26
+                // Issue: #26
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
@@ -2253,7 +2253,7 @@ pub mod statement {
                     "')'"
                 );
                 // TODO: Warn about shadowing
-                // Issue URL: https://github.com/scratch-api/grazelang/issues/25
+                // Issue: #25
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
@@ -2401,7 +2401,7 @@ pub mod statement {
         };
         let code_block = parse_code_block(token_stream, context)?;
         // TODO: Warn about shadowing
-        // Issue URL: https://github.com/scratch-api/grazelang/issues/24
+        // Issue: #24
         with_mut_next_target!(context, target => {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
@@ -2520,7 +2520,7 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             find_statement_end_and_return_invalid!(token_stream, start, Statement)
         )),
         // TODO: Prevent users from naming variables "super" or possibly "root"
-        // Issue URL: https://github.com/scratch-api/grazelang/issues/23
+        // Issue: #23
         Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
             let identifier = try_or_emit_message!(
                 parse_full_identifier(token_stream, context),
@@ -2785,7 +2785,7 @@ pub fn parse_sprite_statement(
                             SpriteStatement
                         )
                     )) // TODO: capture error and replace message 
-                    // Issue URL: https://github.com/scratch-api/grazelang/issues/22
+                    // Issue: #22
                 }
             }
         }
@@ -3068,7 +3068,7 @@ pub fn parse_stage_statement(
                         expression,
                         start_pos,
                     ) // TODO: capture error and replace message
-                    // Issue URL: https://github.com/scratch-api/grazelang/issues/21
+                    // Issue: #21
                 }
             }
         }

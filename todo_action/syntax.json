@@ -1,27 +1,18 @@
 {
-    ".py": {
-      "single_line": {
-        "comment_regex": "(#\\s*TODO[^\\n]*(?:\\n\\s*#.*)*)",
-        "name_regex": "TODO\\s*[:-]?\\s*(.*)",
-        "content_regex": "#\\s?(.*)",
-        "content_sub": "$1\n",
-        "add_issue_sub": "$1\n{{ indent }}# {{ issue_str }}"
-      }
+  ".rs": {
+    "single_line": {
+      "comment_regex": "(//\\s*TODO:.*(?:\\n\\s*//.*)*)",
+      "name_regex": "TODO:\\s*(.*)",
+      "content_regex": "//(.*)",
+      "content_sub": "$1\n",
+      "add_issue_sub": "$1\n{{ indent }}// {{ issue_str }}"
     },
-    ".rs": {
-      "single_line": {
-        "comment_regex": "(//\\s*TODO[^\\n]*(?:\\n\\s*//.*)*)",
-        "name_regex": "TODO\\s*[:-]?\\s*(.*)",
-        "content_regex": "//\\s?(.*)",
-        "content_sub": "$1\n",
-        "add_issue_sub": "$1\n{{ indent }}// {{ issue_str }}"
-      },
-      "multi_line": {
-        "comment_regex": "(/\\*[\\s\\S]*?TODO[\\s\\S]*?\\*/)",
-        "name_regex": "TODO\\s*[:-]?\\s*([^\\n\\r*]*)",
-        "content_regex": "(?:^|\\n)\\s*(?:/\\*|\\*)?\\s?(.*?)(?=\\*/|\\n|$)",
-        "content_sub": "$1\n",
-        "add_issue_sub": "$1\n{{ indent }}// {{ issue_str }}"
-      }
+    "multi_line": {
+      "comment_regex": "(/\\*(\\s*TODO:[\\s\\S]*?)\\*/)",
+      "name_regex": "TODO:\\s*([^\\n\\r*]*)",
+      "content_regex": "(?:^|\\n)\\s*\\*?(.*?)(?=\\*/|\\n|$)",
+      "content_sub": "$1\n",
+      "add_issue_sub": "/*$2\n{{ indent }} {{ issue_str }}*/"
     }
   }
+}

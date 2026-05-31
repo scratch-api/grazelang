@@ -1408,7 +1408,7 @@ impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
 impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputValue {
     fn from(value: ((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)) -> Self {
         // TODO: Implement primitive block conversion (if default is a positive integer, so would a literal value be)
-        // Issue URL: https://github.com/scratch-api/grazelang/issues/33
+        // Issue: #33
         let ((input_repr, is_shadow), shadow) = value;
         if is_shadow == IsShadow::Yes {
             return Self::Shadow(input_repr);
@@ -1427,7 +1427,7 @@ impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputVal
 impl From<((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)> for Sb3InputValue {
     fn from(value: ((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)) -> Self {
         // TODO: Implement primitive block conversion (if default is a positive integer, so would a literal value be)
-        // Issue URL: https://github.com/scratch-api/grazelang/issues/32
+        // Issue: #32
         let ((input_repr, is_shadow), shadow) = value;
         if is_shadow == IsShadow::Yes {
             return Self::Shadow(input_repr);

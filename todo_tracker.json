@@ -1,1 +1,306 @@
-{}
+{
+    "4": {
+        "filepath": "grazelang\\src\\lexer.rs",
+        "text": "",
+        "status": "open",
+        "lines": "32-33",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Implement use statement"
+    },
+    "44": {
+        "filepath": "grazelang\\src\\codegen\\core.rs",
+        "text": "Error types:\n - [x] UnknownIdentifier\n - [x] IdentifierIsNotABlock\n - [x] UnexpectedInputMenu\n - [ ] IncorrectParamCount\n - [x] ListAccessForNonLists\n - [x] RepeatedStageInitialization\n - [x] BlockIsNotCBlock\n - [ ] PassedNormalParamAsBlockStack\n - [ ] TriedGetKnownBlockOfBlockStack\n - [x] ShadowedSprite",
+        "status": "open",
+        "lines": "81-93",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "add pos range data for all errors - revision 4"
+    },
+    "20": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "137-138",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "possibly set x and y"
+    },
+    "19": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "156-157",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "possibly set x and y"
+    },
+    "18": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "166-167",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn user about possibly incorrect usage in some cases"
+    },
+    "17": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "175-176",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn user about probably incorrect usage"
+    },
+    "16": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "208-209",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn user about probably incorrect usage."
+    },
+    "15": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "212-213",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn user about possibly incorrect usage"
+    },
+    "14": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "246-247",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn user about probably incorrect usage"
+    },
+    "13": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "257-258",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn user about incorrect usage if no field supplied"
+    },
+    "12": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "331-332",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Implement assignment of x, y etc"
+    },
+    "11": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "643-644",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "better ext detections"
+    },
+    "10": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "729-730",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "implement specific known blocks here"
+    },
+    "9": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "744-745",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "implement specific known blocks here"
+    },
+    "8": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "762-763",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "better default and more control"
+    },
+    "7": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "780-781",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "better default and more control"
+    },
+    "6": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "862-863",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "add list length as method"
+    },
+    "5": {
+        "filepath": "grazelang\\src\\parser\\context.rs",
+        "text": "",
+        "status": "open",
+        "lines": "940-941",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "check whether this is correct"
+    },
+    "29": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "1143-1144",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn about shadowing"
+    },
+    "28": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "1584-1585",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn about shadowing"
+    },
+    "27": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "2107-2108",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Warn about shadowing"
+    },
+    "26": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "2200-2201",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Warn about shadowing"
+    },
+    "25": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "2255-2256",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Warn about shadowing"
+    },
+    "24": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "2403-2404",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Warn about shadowing"
+    },
+    "23": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "2522-2523",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Prevent users from naming variables \"super\" or possibly \"root\""
+    },
+    "22": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "2787-2788",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "capture error and replace message"
+    },
+    "21": {
+        "filepath": "grazelang\\src\\parser\\core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "3070-3071",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "capture error and replace message"
+    },
+    "31": {
+        "filepath": "grazelang\\src\\parser\\cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "704-705",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "try to calculate the value or warn the user"
+    },
+    "30": {
+        "filepath": "grazelang\\src\\parser\\cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "1095-1096",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "convert into int if small enough"
+    },
+    "33": {
+        "filepath": "grazelang_library\\src\\project_json.rs",
+        "text": "",
+        "status": "open",
+        "lines": "1410-1411",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Implement primitive block conversion (if default is a positive integer, so would a literal value be)"
+    },
+    "32": {
+        "filepath": "grazelang_library\\src\\project_json.rs",
+        "text": "",
+        "status": "open",
+        "lines": "1429-1430",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Implement primitive block conversion (if default is a positive integer, so would a literal value be)"
+    },
+    "40": {
+        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "text": "",
+        "status": "open",
+        "lines": "26-27",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "implement these"
+    },
+    "39": {
+        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "text": "",
+        "status": "open",
+        "lines": "53-54",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "implement these"
+    },
+    "38": {
+        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "text": "",
+        "status": "open",
+        "lines": "81-82",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "implement these"
+    },
+    "37": {
+        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "text": "\"data_variable\" => Some(Sb3PrimitiveBlock::Variable(value)),\n\"data_listcontents\" => Some(Sb3PrimitiveBlock::List(value)),",
+        "status": "open",
+        "lines": "118-121",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "implement these"
+    },
+    "36": {
+        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "text": "",
+        "status": "open",
+        "lines": "135-136",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "Should this be used somehow?"
+    },
+    "35": {
+        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "text": "",
+        "status": "open",
+        "lines": "316-317",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "use opcodes"
+    },
+    "34": {
+        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "text": "",
+        "status": "open",
+        "lines": "330-331",
+        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "title": "warn about overlap"
+    }
+}
