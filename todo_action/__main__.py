@@ -119,6 +119,7 @@ def main():
 
     print(f"{files_to_scan=}")
     print(f"{removed_files=}")
+    print()
 
     for filepath, commit in files_to_scan.items():
         if not os.path.exists(filepath):
@@ -138,13 +139,11 @@ def main():
             current_idx += len(line)
 
         for rule_name, rule in syntax[ext].items():
-            print(f"Trying rule {rule_name}")
             todo_comment_pattern = re.compile(rule["comment_regex"])
             todo_name_pattern = re.compile(rule["name_regex"])
             todo_pattern = re.compile(rule["content_regex"])
 
             for match in todo_comment_pattern.finditer(content):
-                print("Found todo match")
                 comment_text = match.group(1)
 
                 name_match = todo_name_pattern.search(comment_text)
@@ -192,6 +191,8 @@ def main():
                             "new_comment": map_match(match, rule["add_issue_sub"]),
                         }
                     )
+    
+    print()
 
     for issue_num, data in tracker.items():
         if data["status"] == "open":
