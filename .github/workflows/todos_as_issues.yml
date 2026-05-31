@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: "actions/checkout@v6"
       - name: "TODO to issue"
-        uses: "alstr/todo-to-issue-action@v5"
+        uses: "thecommcraft/todo-to-issue-action@v5"
         with:
           INSERT_ISSUE_URLS: "true"
           CLOSE_ISSUES: "true"
