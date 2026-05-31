@@ -78,11 +78,11 @@ pub enum GrazeSb3GeneratorError {
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
 }
-// TODO: add pos range data for all errors
+// TODO: add pos range data for all errors - revision 2
 //  Error types:
 //  - [x] UnknownIdentifier
 //  - [x] IdentifierIsNotABlock
-//  - [ ] UnexpectedInputMenu
+//  - [x] UnexpectedInputMenu
 //  - [ ] IncorrectParamCount
 //  - [x] ListAccessForNonLists
 //  - [x] RepeatedStageInitialization
