@@ -97,6 +97,8 @@ pub enum GrazeSb3GeneratorError {
 //  - [x] ShadowedSprite
 // Issue: #44
 
+// TODO: remove this test todo
+
 #[derive(Debug, Error)]
 pub enum GrazeSb3GeneratorCreationError {
     #[error(transparent)]
