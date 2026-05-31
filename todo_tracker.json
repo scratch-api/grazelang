@@ -306,7 +306,7 @@
     "45": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L100-L101",
         "commit": "b397b114454699a7aa63d008b16e080660fe9428",
         "title": "remove this test todo"
