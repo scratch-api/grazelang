@@ -6,6 +6,7 @@ temps
 grazelang/schemas
 .vscode
 *.sb3
+__pycache__
 # Added by cargo
 
 /target
