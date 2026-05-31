@@ -61,8 +61,13 @@ pub enum GrazeSb3GeneratorError {
     UnknownIdentifier { identifier: Identifier },
     #[error("the identifier {identifier:?} is not a block")]
     IdentifierIsNotABlock { identifier: Identifier },
-    #[error("in this context, no menu input was expected, found {input_menu_value:?} at {pos_range:?}")]
-    UnexpectedInputMenu { input_menu_value: Sb3FieldValue, pos_range: PosRange },
+    #[error(
+        "in this context, no menu input was expected, found {input_menu_value:?} at {pos_range:?}"
+    )]
+    UnexpectedInputMenu {
+        input_menu_value: Sb3FieldValue,
+        pos_range: PosRange,
+    },
     #[error("the amount of parameters for this block was {unexpected:?}, expected {expected:?}")]
     IncorrectParamCount { unexpected: usize, expected: usize },
     #[error("tried to get a list item for a non list, {identifier:?}")]
@@ -788,7 +793,10 @@ pub fn known_block_to_input_repr_no_menu(
             IsShadow::No,
         ))),
         grazelang_library::KnownBlockInput::Menu(input_menu_value) => {
-            Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value, pos_range: known_block_pos_range })
+            Err(GrazeSb3GeneratorError::UnexpectedInputMenu {
+                input_menu_value,
+                pos_range: known_block_pos_range,
+            })
         }
         grazelang_library::KnownBlockInput::Empty => Ok(None),
     }
