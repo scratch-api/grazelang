@@ -130,15 +130,17 @@ def main():
                         else part.group(1)
                     )
 
-                todo_text = textwrap.dedent(todo_text).rstrip()
-
                 issue_match = re.search(r"Issue:\s*#(\d+)", todo_text)
+
+                todo_text = textwrap.dedent(
+                    re.sub(r"Issue:\s*#\d+", "", todo_text).rstrip().lstrip("\n\r")
+                ).rstrip()
 
                 if issue_match:
                     issue_num = str(issue_match.group(1))
                     found_issues[issue_num] = {
                         "filepath": filepath,
-                        "text": re.sub(r"Issue:\s*#\d+", "", todo_text).strip(),
+                        "text": todo_text,
                         "lines": f"{start_line}-{end_line}",
                         "commit": commit,
                         "title": name,
@@ -186,6 +188,8 @@ def main():
                 tracker[issue_num]["title"] = data["title"]
                 tracker[issue_num]["commit"] = data["commit"]
                 tracker[issue_num]["lines"] = data["lines"]
+            else:
+                print(f"Skipped {old_data["title"]}")
 
     todos_by_file = {}
     for todo in new_todos:
