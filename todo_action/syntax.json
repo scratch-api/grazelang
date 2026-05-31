@@ -1,8 +1,8 @@
 {
   ".rs": {
     "single_line": {
-      "comment_regex": "(//\\s*TODO:.*(?:\\n\\s*//.*)*)",
-      "name_regex": "TODO:\\s*(.*)",
+      "comment_regex": "(//[ \\t\\f\\v]*TODO:.*(?:\\n[ \\t\\f\\v]*//.*)*)",
+      "name_regex": "TODO:[ \\t\\f\\v]*(.*)",
       "content_regex": "//(.*)",
       "content_sub": "$1\n",
       "add_issue_sub": "$1\n{{ indent }}// {{ issue_str }}"
