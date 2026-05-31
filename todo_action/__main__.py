@@ -121,12 +121,16 @@ def main():
     print(f"{removed_files=}")
 
     for filepath, commit in files_to_scan.items():
+        print("Checking whether file exists")
         if not os.path.exists(filepath):
             continue
 
+        print("Checking whether syntax exists")
         _, ext = os.path.splitext(filepath)
         if ext not in syntax:
             continue
+        
+        print("Checking file")
 
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()

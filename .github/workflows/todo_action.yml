@@ -37,7 +37,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: uv run python -m todo_action
+        run: |
+          cd ${{ github.workspace }}
+          uv run python -m todo_action
         
       - name: Commit and Push Changes
         run: |
