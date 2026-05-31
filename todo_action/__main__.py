@@ -56,8 +56,8 @@ def get_indentation(content: str, end_index: int) -> str:
 def get_changed_files() -> tuple[dict[str, str], set[str]]:
     with open(EVENT_PATH or "", "r", encoding="utf-8") as f:
         event = json.load(f)
-    
-    print(event)
+
+    print(json.dumps(event, indent=4))
 
     files_to_scan = {}
     removed_files = set()
@@ -90,7 +90,7 @@ def main():
 
     found_issues = {}
     new_todos = []
-    
+
     print(f"{files_to_scan=}")
     print(f"{removed_files=}")
 
@@ -194,7 +194,7 @@ def main():
                 tracker[issue_num]["commit"] = data["commit"]
                 tracker[issue_num]["lines"] = data["lines"]
             else:
-                print(f"Skipped {old_data["title"]}")
+                print(f"Skipped {old_data['title']}")
 
     todos_by_file = {}
     for todo in new_todos:
