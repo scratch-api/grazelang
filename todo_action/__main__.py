@@ -7,7 +7,7 @@ import bisect
 import textwrap
 from typing import Any
 
-SYNTAX_FILE = f"{__file__}/../syntax.json"
+SYNTAX_FILE = f"todo_action/syntax.json"
 TRACKER_FILE = "todo_tracker.json"
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 REPO = os.environ.get("GITHUB_REPOSITORY")
@@ -121,16 +121,12 @@ def main():
     print(f"{removed_files=}")
 
     for filepath, commit in files_to_scan.items():
-        print("Checking whether file exists")
         if not os.path.exists(filepath):
             continue
 
-        print("Checking whether syntax exists")
         _, ext = os.path.splitext(filepath)
         if ext not in syntax:
             continue
-        
-        print("Checking file")
 
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
