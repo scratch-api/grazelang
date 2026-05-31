@@ -117,6 +117,9 @@ def main():
     found_issues = {}
     new_todos = []
 
+    print(f"{files_to_scan=}")
+    print(f"{removed_files=}")
+
     for filepath, commit in files_to_scan.items():
         if not os.path.exists(filepath):
             continue
