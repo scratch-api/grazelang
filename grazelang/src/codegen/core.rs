@@ -82,8 +82,8 @@ pub enum GrazeSb3GeneratorError {
 //  Error types:
 //  - [x] UnknownIdentifier
 //  - [x] IdentifierIsNotABlock
-//  - [x] UnexpectedInputMenu
-//  - [x] IncorrectParamCount
+//  - [ ] UnexpectedInputMenu
+//  - [ ] IncorrectParamCount
 //  - [x] ListAccessForNonLists
 //  - [x] RepeatedStageInitialization
 //  - [x] BlockIsNotCBlock
