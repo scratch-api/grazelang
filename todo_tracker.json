@@ -9,10 +9,10 @@
     },
     "44": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": "",
+        "text": "Error types:\n- [x] UnknownIdentifier\n- [x] IdentifierIsNotABlock\n- [x] UnexpectedInputMenu\n- [ ] IncorrectParamCount\n- [x] ListAccessForNonLists\n- [x] RepeatedStageInitialization\n- [x] BlockIsNotCBlock\n- [ ] PassedNormalParamAsBlockStack\n- [ ] TriedGetKnownBlockOfBlockStack\n- [x] ShadowedSprite",
         "status": "open",
-        "lines": "86-98",
-        "commit": "60ccad845a8290e6d25dabe2a8280573740299fd",
+        "lines": "L86-L98",
+        "commit": "8489906d00510f3680b3e68e34779eb3df9bc257",
         "title": "add pos range data for all errors"
     },
     "20": {
