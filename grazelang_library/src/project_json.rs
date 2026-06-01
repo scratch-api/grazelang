@@ -343,9 +343,16 @@ impl ToTokens for Sb3Primitive {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Sb3ListDeclaration(pub String, pub Vec<Sb3Primitive>);
 
+#[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
+pub enum Sb3Block {
+    Normal(Sb3NormalBlock),
+    Primitive(Sb3PrimitiveBlock),
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Sb3Block {
+pub struct Sb3NormalBlock {
     pub opcode: String,
     pub next: Option<String>,
     pub parent: Option<String>,
@@ -359,6 +366,54 @@ pub struct Sb3Block {
     pub x: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub y: Option<f64>,
+}
+
+impl Serialize for Sb3Block {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Sb3Block::Normal(normal_block) => normal_block.serialize(serializer),
+            Sb3Block::Primitive(primitive_block) => primitive_block.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Sb3Block {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Sb3BlockVisitor;
+
+        impl<'de> Visitor<'de> for Sb3BlockVisitor {
+            type Value = Sb3Block;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a normal block or a primitive block")
+            }
+
+            fn visit_map<V>(self, map: V) -> Result<Self::Value, V::Error>
+            where
+                V: de::MapAccess<'de>,
+            {
+                Ok(Sb3Block::Normal(Sb3NormalBlock::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(map),
+                )?))
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(Sb3Block::Primitive(
+                    sb3_primitive_block::Sb3PrimitiveBlockVisitor.visit_seq(seq)?,
+                ))
+            }
+        }
+        deserializer.deserialize_any(Sb3BlockVisitor)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

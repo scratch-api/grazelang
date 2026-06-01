@@ -8,7 +8,8 @@ use std::{
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
     BindInfo, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature, HasShadow,
-    SimpleCallableKnownBlockSignature, project_json::Sb3Primitive,
+    SimpleCallableKnownBlockSignature,
+    project_json::{Sb3NormalBlock, Sb3Primitive},
 };
 use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
@@ -524,7 +525,7 @@ pub fn make_block(
     mutation: Option<Sb3BlockMutation>,
 ) -> Sb3Block {
     let top_level = parent.is_none();
-    Sb3Block {
+    Sb3Block::Normal(Sb3NormalBlock {
         opcode,
         next: None,
         parent,
@@ -533,9 +534,9 @@ pub fn make_block(
         shadow,
         top_level,
         mutation,
-        x: None,
-        y: None,
-    }
+        x: top_level.then_some(0.0),
+        y: top_level.then_some(0.0),
+    })
 }
 
 pub fn make_top_level_block(
@@ -546,7 +547,7 @@ pub fn make_top_level_block(
     mutation: Option<Sb3BlockMutation>,
     pos: (f64, f64),
 ) -> Sb3Block {
-    Sb3Block {
+    Sb3Block::Normal(Sb3NormalBlock {
         opcode,
         next: None,
         parent: None,
@@ -557,6 +558,20 @@ pub fn make_top_level_block(
         mutation,
         x: Some(pos.0),
         y: Some(pos.1),
+    })
+}
+
+pub fn set_params_or_unreachable(
+    block: Option<&mut Sb3Block>,
+    inputs: HashMap<String, Sb3InputValue>,
+    fields: HashMap<String, Sb3FieldValue>,
+) {
+    match block {
+        Some(Sb3Block::Normal(block)) => {
+            block.inputs = inputs;
+            block.fields = fields;
+        }
+        _ => unreachable!(),
     }
 }
 
@@ -582,14 +597,18 @@ where
     let old_parent = context.current_parent.replace(block_id.to_string());
     context.new_block();
     if let Some(previous) = context.current_previous_block.take() {
-        context
+        match context
             .current_sb3_target
             .as_mut()
             .unwrap()
             .blocks
             .get_mut(previous.as_str())
-            .unwrap()
-            .next = Some(block_id.to_string());
+        {
+            Some(Sb3Block::Normal(block)) => {
+                block.next = Some(block_id.to_string());
+            }
+            _ => unreachable!(),
+        }
     } else if old_parent.is_some() {
         // First statement in block stack is used in STACK argument of parent or similar
         let value = Param::BlockStack(Some(block_id.to_string()));
@@ -2471,8 +2490,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             ),
         );
         default_visit_no_input_hat_statement(self, value, context)?;
-        let mut fields = HashMap::new();
         let mut inputs = HashMap::new();
+        let mut fields = HashMap::new();
         add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
         if !params.is_empty() {
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
@@ -2486,10 +2505,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .as_mut()
             .unwrap() // the visitor should always guarantee there is a target when blocks are added
             .blocks
-            .get_mut(this_id.as_str())
-            .unwrap();
-        block.fields = fields;
-        block.inputs = inputs;
+            .get_mut(this_id.as_str());
+        set_params_or_unreachable(block, inputs, fields);
         Ok(())
     }
 
@@ -2566,10 +2583,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .as_mut()
             .unwrap() // the visitor should always guarantee there is a target when blocks are added
             .blocks
-            .get_mut(this_id.as_str())
-            .unwrap();
-        block.fields = fields;
-        block.inputs = inputs;
+            .get_mut(this_id.as_str());
+        set_params_or_unreachable(block, inputs, fields);
         Ok(())
     }
 
@@ -2641,10 +2656,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .as_mut()
             .unwrap() // the visitor should always guarantee there is a target when blocks are added
             .blocks
-            .get_mut(this_id.as_str())
-            .unwrap();
-        block.fields = fields;
-        block.inputs = inputs;
+            .get_mut(this_id.as_str());
+        set_params_or_unreachable(block, inputs, fields);
         Ok(())
     }
 
@@ -2859,7 +2872,36 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_previous_block = None;
         context.current_parent = None;
         context.arg_stack.clear();
-        default_visit_isolated_expression(self, value, context)
+        default_visit_isolated_expression(self, value, context)?;
+        let param_pos_range = *value.1.get_position();
+        with_known_block!(context, context.pop_param().unwrap(), param_pos_range, value => {
+            match value.resolve_for_input(context) {
+                grazelang_library::KnownBlockInput::PrimitiveInput(mut sb3_primitive_block) => {
+                    match &mut sb3_primitive_block {
+                        Sb3PrimitiveBlock::Variable { name: _, id: _, x, y } |
+                        Sb3PrimitiveBlock::List { name: _, id: _, x, y } => {
+                            x.replace(0.0);
+                            y.replace(0.0);
+                        },
+                        _ => return Ok(())
+                    }
+                    wrap_in_reporter(context, |context, _, this_id| {
+                        add_block(
+                            context,
+                            &this_id,
+                            Sb3Block::Primitive(sb3_primitive_block)
+                        )
+                    })
+                },
+                grazelang_library::KnownBlockInput::BlockRef(_) => (),
+                grazelang_library::KnownBlockInput::SimpleBlock(opcode, params) => {
+                    introduce_input_simple_block(opcode, params.iter(), context)?;
+                },
+                grazelang_library::KnownBlockInput::Menu(input_menu_value) => return Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value, pos_range: param_pos_range }),
+                grazelang_library::KnownBlockInput::Empty => (),
+            }
+        });
+        Ok(())
     }
 
     // Assets:

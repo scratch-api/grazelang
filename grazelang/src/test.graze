@@ -22,9 +22,8 @@ sprite `Sprite1` sprite_1 {
         test = "";
         list_ = [1, 0, 0, 0, 0, 0, 0];
     }
-    (
-        "0b${list_}" + 10
-    )
+    ("0b${list_}" + 10)
+    (test)
     warp proc test_proc(str a, bool b, num c) {
         say("a = ${args.a}; b = ${args.b}; c = ${args.c}");
     }
