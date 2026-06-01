@@ -166,6 +166,7 @@ impl ResolveKnownBlock for KnownBlock {
             }
             KnownBlock::FieldValue { value } => {
                 // TODO: warn user about possibly incorrect usage in some cases
+                // Issue: #46
                 KnownBlockInput::Menu(value.clone())
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
