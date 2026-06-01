@@ -50,7 +50,7 @@
     "16": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L204-L205",
         "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about probably incorrect usage."
@@ -66,7 +66,7 @@
     "14": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L242-L243",
         "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about probably incorrect usage"
@@ -74,7 +74,7 @@
     "13": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L253-L254",
         "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about incorrect usage if no field supplied"
