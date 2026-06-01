@@ -9,17 +9,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::project_json::Sb3PrimitiveBlock;
 
-pub const NO_CATEGORY_ID: u32 = u32::MAX - 16;
-pub const VARIABLES_CATEGORY_ID: u32 = u32::MAX - 15;
-pub const LISTS_CATEGORY_ID: u32 = u32::MAX - 14;
-pub const BROADCASTS_CATEGORY_ID: u32 = u32::MAX - 13;
-pub const COSTUMES_CATEGORY_ID: u32 = u32::MAX - 12;
-pub const BACKDROPS_CATEGORY_ID: u32 = u32::MAX - 11;
-pub const SOUNDS_CATEGORY_ID: u32 = u32::MAX - 1;
-pub const PROPERTIES_CATEGORY_ID: u32 = u32::MAX - 9;
-pub const OBJECTS_CATEGORY_ID: u32 = u32::MAX - 8;
-pub const TARGETS_CATEGORY_ID: u32 = u32::MAX - 7;
-pub const LOCATIONS_CATEGORY_ID: u32 = u32::MAX - 6;
+pub const NO_CATEGORY_ID: u32 = 0;
+pub const VARIABLES_CATEGORY_ID: u32 = 1;
+pub const LISTS_CATEGORY_ID: u32 = 2;
+pub const BROADCASTS_CATEGORY_ID: u32 = 3;
+pub const COSTUMES_CATEGORY_ID: u32 = 4;
+pub const BACKDROPS_CATEGORY_ID: u32 = 5;
+pub const SOUNDS_CATEGORY_ID: u32 = 6;
+pub const PROPERTIES_CATEGORY_ID: u32 = 7;
+pub const OBJECTS_CATEGORY_ID: u32 = 8;
+pub const TARGETS_CATEGORY_ID: u32 = 9;
+pub const LOCATIONS_CATEGORY_ID: u32 = 10;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindInfo {
