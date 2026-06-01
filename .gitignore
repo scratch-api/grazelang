@@ -3,7 +3,6 @@ debug_out.txt
 std
 data.json
 temps
-grazelang/schemas
 .vscode
 *.sb3
 __pycache__

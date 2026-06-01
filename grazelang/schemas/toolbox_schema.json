@@ -1,0 +1,2832 @@
+[
+    {
+        "category": "%{BKY_CATEGORY_MOTION}",
+        "id": "motion",
+        "blocks": [
+            {
+                "type": "motion_movesteps",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "STEPS",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "move_steps"
+            },
+            {
+                "type": "motion_turnright",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "DEGREES",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "15",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "turn_right"
+            },
+            {
+                "type": "motion_turnleft",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "DEGREES",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "15",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "turn_left"
+            },
+            {
+                "type": "motion_goto",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "TO",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "motion_goto_menu",
+                            "defaultValue": "_random_",
+                            "options": [
+                                {
+                                    "label": "random position",
+                                    "altName": "random_position",
+                                    "value": "_random_"
+                                },
+                                {
+                                    "label": "mouse-pointer",
+                                    "altName": "mouse_pointer",
+                                    "value": "_mouse_"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "go_to"
+            },
+            {
+                "type": "motion_gotoxy",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "X",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "Y",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "go_to_xy"
+            },
+            {
+                "type": "motion_glideto",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "SECS",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "TO",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "motion_glideto_menu",
+                            "defaultValue": "_random_",
+                            "options": [
+                                {
+                                    "label": "random position",
+                                    "altName": "random_position",
+                                    "value": "_random_"
+                                },
+                                {
+                                    "label": "mouse-pointer",
+                                    "altName": "mouse_pointer",
+                                    "value": "_mouse_"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "glide_to"
+            },
+            {
+                "type": "motion_glidesecstoxy",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "SECS",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "X",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "Y",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "glide_to_xy"
+            },
+            {
+                "type": "motion_pointindirection",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "DIRECTION",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_angle",
+                            "defaultValue": "90",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "point_in_direction"
+            },
+            {
+                "type": "motion_pointtowards",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "TOWARDS",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "motion_pointtowards_menu",
+                            "defaultValue": "_mouse_",
+                            "options": [
+                                {
+                                    "label": "mouse-pointer",
+                                    "altName": "mouse_pointer",
+                                    "value": "_mouse_"
+                                },
+                                {
+                                    "label": "random direction",
+                                    "altName": "random_direction",
+                                    "value": "_random_"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "point_towards"
+            },
+            {
+                "type": "motion_changexby",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "DX",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_x_by"
+            },
+            {
+                "type": "motion_setx",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "X",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "set_x"
+            },
+            {
+                "type": "motion_changeyby",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "DY",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_y_by"
+            },
+            {
+                "type": "motion_sety",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "Y",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "set_y"
+            },
+            {
+                "type": "motion_ifonedgebounce",
+                "args": [],
+                "altName": "if_on_edge_bounce"
+            },
+            {
+                "type": "motion_setrotationstyle",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "STYLE",
+                        "fieldType": "field_dropdown",
+                        "value": "left-right",
+                        "options": [
+                            {
+                                "label": "left-right",
+                                "altName": "left_right",
+                                "value": "left-right"
+                            },
+                            {
+                                "label": "don't rotate",
+                                "altName": "dont_rotate",
+                                "value": "don't rotate"
+                            },
+                            {
+                                "label": "all around",
+                                "altName": "all_around",
+                                "value": "all around"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "set_rotation_style"
+            },
+            {
+                "type": "motion_xposition",
+                "args": [],
+                "altName": "x_position"
+            },
+            {
+                "type": "motion_yposition",
+                "args": [],
+                "altName": "y_position"
+            },
+            {
+                "type": "motion_direction",
+                "args": [],
+                "altName": "get_direction"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_LOOKS}",
+        "id": "looks",
+        "blocks": [
+            {
+                "type": "looks_sayforsecs",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "MESSAGE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "Hello!",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "SECS",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "2",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "say_for"
+            },
+            {
+                "type": "looks_say",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "MESSAGE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "Hello!",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "say"
+            },
+            {
+                "type": "looks_thinkforsecs",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "MESSAGE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "Hmm...",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "SECS",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "2",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "think_for"
+            },
+            {
+                "type": "looks_think",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "MESSAGE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "Hmm...",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "think"
+            },
+            {
+                "type": "looks_switchcostumeto",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "COSTUME",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "looks_costume",
+                            "defaultValue": "",
+                            "options": []
+                        }
+                    }
+                ],
+                "altName": "switch_costume_to"
+            },
+            {
+                "type": "looks_nextcostume",
+                "args": [],
+                "altName": "next_costume"
+            },
+            {
+                "type": "looks_switchbackdropto",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "BACKDROP",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "looks_backdrops",
+                            "defaultValue": "next backdrop",
+                            "options": [
+                                {
+                                    "label": "next backdrop",
+                                    "altName": "next_backdrop",
+                                    "value": "next backdrop"
+                                },
+                                {
+                                    "label": "previous backdrop",
+                                    "altName": "previous_backdrop",
+                                    "value": "previous backdrop"
+                                },
+                                {
+                                    "label": "random backdrop",
+                                    "altName": "random_backdrop",
+                                    "value": "random backdrop"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "switch_backdrop_to"
+            },
+            {
+                "type": "looks_nextbackdrop",
+                "args": [],
+                "altName": "next_backdrop"
+            },
+            {
+                "type": "looks_changesizeby",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "CHANGE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_size_by"
+            },
+            {
+                "type": "looks_setsizeto",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "SIZE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "100",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "set_size_to"
+            },
+            {
+                "type": "looks_changeeffectby",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "EFFECT",
+                        "fieldType": "field_dropdown",
+                        "value": "COLOR",
+                        "options": [
+                            {
+                                "label": "color",
+                                "value": "COLOR"
+                            },
+                            {
+                                "label": "fisheye",
+                                "value": "FISHEYE"
+                            },
+                            {
+                                "label": "whirl",
+                                "value": "WHIRL"
+                            },
+                            {
+                                "label": "pixelate",
+                                "value": "PIXELATE"
+                            },
+                            {
+                                "label": "mosaic",
+                                "value": "MOSAIC"
+                            },
+                            {
+                                "label": "brightness",
+                                "value": "BRIGHTNESS"
+                            },
+                            {
+                                "label": "ghost",
+                                "value": "GHOST"
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "CHANGE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "25",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_graphic_effect_by"
+            },
+            {
+                "type": "looks_seteffectto",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "EFFECT",
+                        "fieldType": "field_dropdown",
+                        "value": "COLOR",
+                        "options": [
+                            {
+                                "label": "color",
+                                "value": "COLOR"
+                            },
+                            {
+                                "label": "fisheye",
+                                "value": "FISHEYE"
+                            },
+                            {
+                                "label": "whirl",
+                                "value": "WHIRL"
+                            },
+                            {
+                                "label": "pixelate",
+                                "value": "PIXELATE"
+                            },
+                            {
+                                "label": "mosaic",
+                                "value": "MOSAIC"
+                            },
+                            {
+                                "label": "brightness",
+                                "value": "BRIGHTNESS"
+                            },
+                            {
+                                "label": "ghost",
+                                "value": "GHOST"
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "VALUE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "set_graphic_effect_to"
+            },
+            {
+                "type": "looks_cleargraphiceffects",
+                "args": [],
+                "altName": "clear_graphic_effects"
+            },
+            {
+                "type": "looks_show",
+                "args": [],
+                "altName": "show"
+            },
+            {
+                "type": "looks_hide",
+                "args": [],
+                "altName": "hide"
+            },
+            {
+                "type": "looks_gotofrontback",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "FRONT_BACK",
+                        "fieldType": "field_dropdown",
+                        "value": "front",
+                        "options": [
+                            {
+                                "label": "front",
+                                "value": "front"
+                            },
+                            {
+                                "label": "back",
+                                "value": "back"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "go_to_layer"
+            },
+            {
+                "type": "looks_goforwardbackwardlayers",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "FORWARD_BACKWARD",
+                        "fieldType": "field_dropdown",
+                        "value": "forward",
+                        "options": [
+                            {
+                                "label": "forward",
+                                "value": "forward"
+                            },
+                            {
+                                "label": "backward",
+                                "value": "backward"
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_integer",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_layer"
+            },
+            {
+                "type": "looks_costumenumbername",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "NUMBER_NAME",
+                        "fieldType": "field_dropdown",
+                        "value": "number",
+                        "options": [
+                            {
+                                "label": "number",
+                                "value": "number"
+                            },
+                            {
+                                "label": "name",
+                                "value": "name"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "get_costume"
+            },
+            {
+                "type": "looks_backdropnumbername",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "NUMBER_NAME",
+                        "fieldType": "field_dropdown",
+                        "value": "number",
+                        "options": [
+                            {
+                                "label": "number",
+                                "value": "number"
+                            },
+                            {
+                                "label": "name",
+                                "value": "name"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "get_backdrop"
+            },
+            {
+                "type": "looks_size",
+                "args": [],
+                "altName": "get_size"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_SOUND}",
+        "id": "sound",
+        "blocks": [
+            {
+                "type": "sound_playuntildone",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "SOUND_MENU",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "sound_sounds_menu",
+                            "defaultValue": "",
+                            "options": []
+                        }
+                    }
+                ],
+                "altName": "play_sound_until_done"
+            },
+            {
+                "type": "sound_play",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "SOUND_MENU",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "sound_sounds_menu",
+                            "defaultValue": "",
+                            "options": []
+                        }
+                    }
+                ],
+                "altName": "start_sound"
+            },
+            {
+                "type": "sound_stopallsounds",
+                "args": [],
+                "altName": "stop_all_sounds"
+            },
+            {
+                "type": "sound_changeeffectby",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "EFFECT",
+                        "fieldType": "field_dropdown",
+                        "value": "PITCH",
+                        "options": [
+                            {
+                                "label": "pitch",
+                                "value": "PITCH"
+                            },
+                            {
+                                "label": "pan left/right",
+                                "altName": "pan_left_right",
+                                "value": "PAN"
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "VALUE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_sound_effect_by"
+            },
+            {
+                "type": "sound_seteffectto",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "EFFECT",
+                        "fieldType": "field_dropdown",
+                        "value": "PITCH",
+                        "options": [
+                            {
+                                "label": "pitch",
+                                "value": "PITCH"
+                            },
+                            {
+                                "label": "pan left/right",
+                                "altName": "pan_left_right",
+                                "value": "PAN"
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "VALUE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "100",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "set_sound_effect_to"
+            },
+            {
+                "type": "sound_cleareffects",
+                "args": [],
+                "altName": "clear_sound_effects"
+            },
+            {
+                "type": "sound_changevolumeby",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "VOLUME",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "-10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_volume_by"
+            },
+            {
+                "type": "sound_setvolumeto",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "VOLUME",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "100",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "set_volume_to"
+            },
+            {
+                "type": "sound_volume",
+                "args": [],
+                "altName": "get_volume"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_EVENTS}",
+        "id": "events",
+        "blocks": [
+            {
+                "type": "event_whenflagclicked",
+                "args": [],
+                "altName": "when_green_flag_clicked"
+            },
+            {
+                "type": "event_whenkeypressed",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "KEY_OPTION",
+                        "fieldType": "field_dropdown",
+                        "value": "space",
+                        "options": [
+                            {
+                                "label": "space",
+                                "value": "space"
+                            },
+                            {
+                                "label": "up arrow",
+                                "altName": "up_arrow",
+                                "value": "up arrow"
+                            },
+                            {
+                                "label": "down arrow",
+                                "altName": "down_arrow",
+                                "value": "down arrow"
+                            },
+                            {
+                                "label": "right arrow",
+                                "altName": "right_arrow",
+                                "value": "right arrow"
+                            },
+                            {
+                                "label": "left arrow",
+                                "altName": "left_arrow",
+                                "value": "left arrow"
+                            },
+                            {
+                                "label": "any",
+                                "value": "any"
+                            },
+                            {
+                                "label": "a",
+                                "altName": "key_a",
+                                "value": "a"
+                            },
+                            {
+                                "label": "b",
+                                "altName": "key_b",
+                                "value": "b"
+                            },
+                            {
+                                "label": "c",
+                                "altName": "key_c",
+                                "value": "c"
+                            },
+                            {
+                                "label": "d",
+                                "altName": "key_d",
+                                "value": "d"
+                            },
+                            {
+                                "label": "e",
+                                "altName": "key_e",
+                                "value": "e"
+                            },
+                            {
+                                "label": "f",
+                                "altName": "key_f",
+                                "value": "f"
+                            },
+                            {
+                                "label": "g",
+                                "altName": "key_g",
+                                "value": "g"
+                            },
+                            {
+                                "label": "h",
+                                "altName": "key_h",
+                                "value": "h"
+                            },
+                            {
+                                "label": "i",
+                                "altName": "key_i",
+                                "value": "i"
+                            },
+                            {
+                                "label": "j",
+                                "altName": "key_j",
+                                "value": "j"
+                            },
+                            {
+                                "label": "k",
+                                "altName": "key_k",
+                                "value": "k"
+                            },
+                            {
+                                "label": "l",
+                                "altName": "key_l",
+                                "value": "l"
+                            },
+                            {
+                                "label": "m",
+                                "altName": "key_m",
+                                "value": "m"
+                            },
+                            {
+                                "label": "n",
+                                "altName": "key_n",
+                                "value": "n"
+                            },
+                            {
+                                "label": "o",
+                                "altName": "key_o",
+                                "value": "o"
+                            },
+                            {
+                                "label": "p",
+                                "altName": "key_p",
+                                "value": "p"
+                            },
+                            {
+                                "label": "q",
+                                "altName": "key_q",
+                                "value": "q"
+                            },
+                            {
+                                "label": "r",
+                                "altName": "key_r",
+                                "value": "r"
+                            },
+                            {
+                                "label": "s",
+                                "altName": "key_s",
+                                "value": "s"
+                            },
+                            {
+                                "label": "t",
+                                "altName": "key_t",
+                                "value": "t"
+                            },
+                            {
+                                "label": "u",
+                                "altName": "key_u",
+                                "value": "u"
+                            },
+                            {
+                                "label": "v",
+                                "altName": "key_v",
+                                "value": "v"
+                            },
+                            {
+                                "label": "w",
+                                "altName": "key_w",
+                                "value": "w"
+                            },
+                            {
+                                "label": "x",
+                                "altName": "key_x",
+                                "value": "x"
+                            },
+                            {
+                                "label": "y",
+                                "altName": "key_y",
+                                "value": "y"
+                            },
+                            {
+                                "label": "z",
+                                "altName": "key_z",
+                                "value": "z"
+                            },
+                            {
+                                "label": "0",
+                                "altName": "key_0",
+                                "value": "0"
+                            },
+                            {
+                                "label": "1",
+                                "altName": "key_1",
+                                "value": "1"
+                            },
+                            {
+                                "label": "2",
+                                "altName": "key_2",
+                                "value": "2"
+                            },
+                            {
+                                "label": "3",
+                                "altName": "key_3",
+                                "value": "3"
+                            },
+                            {
+                                "label": "4",
+                                "altName": "key_4",
+                                "value": "4"
+                            },
+                            {
+                                "label": "5",
+                                "altName": "key_5",
+                                "value": "5"
+                            },
+                            {
+                                "label": "6",
+                                "altName": "key_6",
+                                "value": "6"
+                            },
+                            {
+                                "label": "7",
+                                "altName": "key_7",
+                                "value": "7"
+                            },
+                            {
+                                "label": "8",
+                                "altName": "key_8",
+                                "value": "8"
+                            },
+                            {
+                                "label": "9",
+                                "altName": "key_9",
+                                "value": "9"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "when_key_pressed"
+            },
+            {
+                "type": "event_whenthisspriteclicked",
+                "args": [],
+                "altName": "when_this_sprite_clicked"
+            },
+            {
+                "type": "event_whenbackdropswitchesto",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "BACKDROP",
+                        "fieldType": "field_dropdown",
+                        "value": "",
+                        "options": []
+                    }
+                ],
+                "altName": "when_backdrop_switches_to"
+            },
+            {
+                "type": "event_whengreaterthan",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "WHENGREATERTHANMENU",
+                        "fieldType": "field_dropdown",
+                        "value": "LOUDNESS",
+                        "options": [
+                            {
+                                "label": "loudness",
+                                "value": "LOUDNESS"
+                            },
+                            {
+                                "label": "timer",
+                                "value": "TIMER"
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "VALUE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "when_greater_than"
+            },
+            {
+                "type": "event_whenbroadcastreceived",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "BROADCAST_OPTION",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "when_broadcast_received"
+            },
+            {
+                "type": "event_broadcast",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "BROADCAST_INPUT",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "event_broadcast_menu",
+                            "defaultValue": null,
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "broadcast"
+            },
+            {
+                "type": "event_broadcastandwait",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "BROADCAST_INPUT",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "event_broadcast_menu",
+                            "defaultValue": null,
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "broadcast_and_wait"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_CONTROL}",
+        "id": "control",
+        "blocks": [
+            {
+                "type": "control_wait",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "DURATION",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_positive_number",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "wait_seconds"
+            },
+            {
+                "type": "control_repeat",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "TIMES",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_whole_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "SUBSTACK",
+                        "inputType": "statement",
+                        "check": null,
+                        "shadow": null
+                    }
+                ],
+                "altName": "repeat"
+            },
+            {
+                "type": "control_forever",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "SUBSTACK",
+                        "inputType": "statement",
+                        "check": null,
+                        "shadow": null
+                    }
+                ],
+                "altName": "forever_loop"
+            },
+            {
+                "type": "control_if",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "CONDITION",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "SUBSTACK",
+                        "inputType": "statement",
+                        "check": null,
+                        "shadow": null
+                    }
+                ],
+                "altName": "if"
+            },
+            {
+                "type": "control_if_else",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "CONDITION",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "SUBSTACK",
+                        "inputType": "statement",
+                        "check": null,
+                        "shadow": null
+                    }
+                ],
+                "altName": "if_else"
+            },
+            {
+                "type": "control_wait_until",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "CONDITION",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    }
+                ],
+                "altName": "wait_until"
+            },
+            {
+                "type": "control_repeat_until",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "CONDITION",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "SUBSTACK",
+                        "inputType": "statement",
+                        "check": null,
+                        "shadow": null
+                    }
+                ],
+                "altName": "repeat_until"
+            },
+            {
+                "type": "control_while",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "CONDITION",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "SUBSTACK",
+                        "inputType": "statement",
+                        "check": null,
+                        "shadow": null
+                    }
+                ],
+                "altName": "while_loop"
+            },
+            {
+                "type": "control_stop",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "STOP_OPTION",
+                        "fieldType": "field_dropdown",
+                        "value": "all",
+                        "options": [
+                            {
+                                "label": "all",
+                                "value": "all"
+                            },
+                            {
+                                "label": "this script",
+                                "altName": "this_script",
+                                "value": "this script"
+                            },
+                            {
+                                "label": "other scripts in sprite",
+                                "altName": "other_scripts_in_sprite",
+                                "value": "other scripts in sprite"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "stop"
+            },
+            {
+                "type": "control_start_as_clone",
+                "args": [],
+                "altName": "when_start_as_clone"
+            },
+            {
+                "type": "control_create_clone_of",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "CLONE_OPTION",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "control_create_clone_of_menu",
+                            "defaultValue": "_myself_",
+                            "options": [
+                                {
+                                    "label": "myself",
+                                    "value": "_myself_"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "create_clone_of"
+            },
+            {
+                "type": "control_delete_this_clone",
+                "args": [],
+                "altName": "delete_this_clone"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_SENSING}",
+        "id": "sensing",
+        "blocks": [
+            {
+                "type": "sensing_touchingobject",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "TOUCHINGOBJECTMENU",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "sensing_touchingobjectmenu",
+                            "defaultValue": "_mouse_",
+                            "options": [
+                                {
+                                    "label": "mouse-pointer",
+                                    "altName": "mouse_pointer",
+                                    "value": "_mouse_"
+                                },
+                                {
+                                    "label": "edge",
+                                    "value": "_edge_"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "is_touching_object"
+            },
+            {
+                "type": "sensing_touchingcolor",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "COLOR",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "colour_picker",
+                            "defaultValue": null,
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "is_touching_color"
+            },
+            {
+                "type": "sensing_coloristouchingcolor",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "COLOR",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "colour_picker",
+                            "defaultValue": null,
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "COLOR2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "colour_picker",
+                            "defaultValue": null,
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "color_is_touching_color"
+            },
+            {
+                "type": "sensing_distanceto",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "DISTANCETOMENU",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "sensing_distancetomenu",
+                            "defaultValue": "_mouse_",
+                            "options": [
+                                {
+                                    "label": "mouse-pointer",
+                                    "altName": "mouse_pointer",
+                                    "value": "_mouse_"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "distance_to"
+            },
+            {
+                "type": "sensing_askandwait",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "QUESTION",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "What's your name?",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "ask_and_wait"
+            },
+            {
+                "type": "sensing_answer",
+                "args": [],
+                "altName": "get_answer"
+            },
+            {
+                "type": "sensing_keypressed",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "KEY_OPTION",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "sensing_keyoptions",
+                            "defaultValue": "space",
+                            "options": [
+                                {
+                                    "label": "space",
+                                    "value": "space"
+                                },
+                                {
+                                    "label": "up arrow",
+                                    "altName": "up_arrow",
+                                    "value": "up arrow"
+                                },
+                                {
+                                    "label": "down arrow",
+                                    "altName": "down_arrow",
+                                    "value": "down arrow"
+                                },
+                                {
+                                    "label": "right arrow",
+                                    "altName": "right_arrow",
+                                    "value": "right arrow"
+                                },
+                                {
+                                    "label": "left arrow",
+                                    "altName": "left_arrow",
+                                    "value": "left arrow"
+                                },
+                                {
+                                    "label": "any",
+                                    "value": "any"
+                                },
+                                {
+                                    "label": "a",
+                                    "altName": "key_a",
+                                    "value": "a"
+                                },
+                                {
+                                    "label": "b",
+                                    "altName": "key_b",
+                                    "value": "b"
+                                },
+                                {
+                                    "label": "c",
+                                    "altName": "key_c",
+                                    "value": "c"
+                                },
+                                {
+                                    "label": "d",
+                                    "altName": "key_d",
+                                    "value": "d"
+                                },
+                                {
+                                    "label": "e",
+                                    "altName": "key_e",
+                                    "value": "e"
+                                },
+                                {
+                                    "label": "f",
+                                    "altName": "key_f",
+                                    "value": "f"
+                                },
+                                {
+                                    "label": "g",
+                                    "altName": "key_g",
+                                    "value": "g"
+                                },
+                                {
+                                    "label": "h",
+                                    "altName": "key_h",
+                                    "value": "h"
+                                },
+                                {
+                                    "label": "i",
+                                    "altName": "key_i",
+                                    "value": "i"
+                                },
+                                {
+                                    "label": "j",
+                                    "altName": "key_j",
+                                    "value": "j"
+                                },
+                                {
+                                    "label": "k",
+                                    "altName": "key_k",
+                                    "value": "k"
+                                },
+                                {
+                                    "label": "l",
+                                    "altName": "key_l",
+                                    "value": "l"
+                                },
+                                {
+                                    "label": "m",
+                                    "altName": "key_m",
+                                    "value": "m"
+                                },
+                                {
+                                    "label": "n",
+                                    "altName": "key_n",
+                                    "value": "n"
+                                },
+                                {
+                                    "label": "o",
+                                    "altName": "key_o",
+                                    "value": "o"
+                                },
+                                {
+                                    "label": "p",
+                                    "altName": "key_p",
+                                    "value": "p"
+                                },
+                                {
+                                    "label": "q",
+                                    "altName": "key_q",
+                                    "value": "q"
+                                },
+                                {
+                                    "label": "r",
+                                    "altName": "key_r",
+                                    "value": "r"
+                                },
+                                {
+                                    "label": "s",
+                                    "altName": "key_s",
+                                    "value": "s"
+                                },
+                                {
+                                    "label": "t",
+                                    "altName": "key_t",
+                                    "value": "t"
+                                },
+                                {
+                                    "label": "u",
+                                    "altName": "key_u",
+                                    "value": "u"
+                                },
+                                {
+                                    "label": "v",
+                                    "altName": "key_v",
+                                    "value": "v"
+                                },
+                                {
+                                    "label": "w",
+                                    "altName": "key_w",
+                                    "value": "w"
+                                },
+                                {
+                                    "label": "x",
+                                    "altName": "key_x",
+                                    "value": "x"
+                                },
+                                {
+                                    "label": "y",
+                                    "altName": "key_y",
+                                    "value": "y"
+                                },
+                                {
+                                    "label": "z",
+                                    "altName": "key_z",
+                                    "value": "z"
+                                },
+                                {
+                                    "label": "0",
+                                    "altName": "key_0",
+                                    "value": "0"
+                                },
+                                {
+                                    "label": "1",
+                                    "altName": "key_1",
+                                    "value": "1"
+                                },
+                                {
+                                    "label": "2",
+                                    "altName": "key_2",
+                                    "value": "2"
+                                },
+                                {
+                                    "label": "3",
+                                    "altName": "key_3",
+                                    "value": "3"
+                                },
+                                {
+                                    "label": "4",
+                                    "altName": "key_4",
+                                    "value": "4"
+                                },
+                                {
+                                    "label": "5",
+                                    "altName": "key_5",
+                                    "value": "5"
+                                },
+                                {
+                                    "label": "6",
+                                    "altName": "key_6",
+                                    "value": "6"
+                                },
+                                {
+                                    "label": "7",
+                                    "altName": "key_7",
+                                    "value": "7"
+                                },
+                                {
+                                    "label": "8",
+                                    "altName": "key_8",
+                                    "value": "8"
+                                },
+                                {
+                                    "label": "9",
+                                    "altName": "key_9",
+                                    "value": "9"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "is_key_pressed"
+            },
+            {
+                "type": "sensing_mousedown",
+                "args": [],
+                "altName": "is_mouse_down"
+            },
+            {
+                "type": "sensing_mousex",
+                "args": [],
+                "altName": "get_mouse_x"
+            },
+            {
+                "type": "sensing_mousey",
+                "args": [],
+                "altName": "get_mouse_y"
+            },
+            {
+                "type": "sensing_setdragmode",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "DRAG_MODE",
+                        "fieldType": "field_dropdown",
+                        "value": "draggable",
+                        "options": [
+                            {
+                                "label": "draggable",
+                                "value": "draggable"
+                            },
+                            {
+                                "label": "not draggable",
+                                "altName": "not_draggable",
+                                "value": "not draggable"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "set_drag_mode"
+            },
+            {
+                "type": "sensing_loudness",
+                "args": [],
+                "altName": "get_loudness"
+            },
+            {
+                "type": "sensing_timer",
+                "args": [],
+                "altName": "get_timer"
+            },
+            {
+                "type": "sensing_resettimer",
+                "args": [],
+                "altName": "reset_timer"
+            },
+            {
+                "type": "sensing_of",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "PROPERTY",
+                        "fieldType": "field_dropdown",
+                        "value": "",
+                        "options": [
+                            {
+                                "label": "",
+                                "value": ""
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "OBJECT",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "sensing_of_object_menu",
+                            "defaultValue": "_stage_",
+                            "options": [
+                                {
+                                    "label": "Stage",
+                                    "value": "_stage_",
+                                    "altName": "stage"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "altName": "property_of_object"
+            },
+            {
+                "type": "sensing_current",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "CURRENTMENU",
+                        "fieldType": "field_dropdown",
+                        "value": "YEAR",
+                        "options": [
+                            {
+                                "label": "year",
+                                "value": "YEAR"
+                            },
+                            {
+                                "label": "month",
+                                "value": "MONTH"
+                            },
+                            {
+                                "label": "date",
+                                "value": "DATE"
+                            },
+                            {
+                                "label": "day of week",
+                                "altName": "day_of_week",
+                                "value": "DAYOFWEEK"
+                            },
+                            {
+                                "label": "hour",
+                                "value": "HOUR"
+                            },
+                            {
+                                "label": "minute",
+                                "value": "MINUTE"
+                            },
+                            {
+                                "label": "second",
+                                "value": "SECOND"
+                            }
+                        ]
+                    }
+                ],
+                "altName": "current_time_unit"
+            },
+            {
+                "type": "sensing_dayssince2000",
+                "args": [],
+                "altName": "days_since_2000"
+            },
+            {
+                "type": "sensing_online",
+                "args": [],
+                "altName": "is_online"
+            },
+            {
+                "type": "sensing_username",
+                "args": [],
+                "altName": "get_username"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_OPERATORS}",
+        "id": "operators",
+        "blocks": [
+            {
+                "type": "operator_add",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "NUM2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "add_values"
+            },
+            {
+                "type": "operator_subtract",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "NUM2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "subtract_values"
+            },
+            {
+                "type": "operator_multiply",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "NUM2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "multiply_values"
+            },
+            {
+                "type": "operator_divide",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "NUM2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "divide_values"
+            },
+            {
+                "type": "operator_random",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "FROM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "TO",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "10",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "pick_random_number"
+            },
+            {
+                "type": "operator_gt",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "OPERAND1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "OPERAND2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "50",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "is_greater_than"
+            },
+            {
+                "type": "operator_lt",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "OPERAND1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "OPERAND2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "50",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "is_less_than"
+            },
+            {
+                "type": "operator_equals",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "OPERAND1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "OPERAND2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "50",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "is_equal_to"
+            },
+            {
+                "type": "operator_and",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "OPERAND1",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "OPERAND2",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    }
+                ],
+                "altName": "logical_and"
+            },
+            {
+                "type": "operator_or",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "OPERAND1",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "OPERAND2",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    }
+                ],
+                "altName": "logical_or"
+            },
+            {
+                "type": "operator_not",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "OPERAND",
+                        "inputType": "value",
+                        "check": "Boolean",
+                        "shadow": null
+                    }
+                ],
+                "altName": "logical_not"
+            },
+            {
+                "type": "operator_join",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "STRING1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "apple ",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "STRING2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "banana",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "join_strings"
+            },
+            {
+                "type": "operator_letter_of",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "LETTER",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_whole_number",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "STRING",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "apple",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "letter_of_string"
+            },
+            {
+                "type": "operator_length",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "STRING",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "apple",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "string_length"
+            },
+            {
+                "type": "operator_contains",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "STRING1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "apple",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "STRING2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "a",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "string_contains"
+            },
+            {
+                "type": "operator_mod",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM1",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "NUM2",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "math_mod"
+            },
+            {
+                "type": "operator_round",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "math_round"
+            },
+            {
+                "type": "operator_mathop",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "OPERATOR",
+                        "fieldType": "field_dropdown",
+                        "value": "abs",
+                        "options": [
+                            {
+                                "label": "abs",
+                                "value": "abs"
+                            },
+                            {
+                                "label": "floor",
+                                "value": "floor"
+                            },
+                            {
+                                "label": "ceiling",
+                                "value": "ceiling"
+                            },
+                            {
+                                "label": "sqrt",
+                                "value": "sqrt"
+                            },
+                            {
+                                "label": "sin",
+                                "value": "sin"
+                            },
+                            {
+                                "label": "cos",
+                                "value": "cos"
+                            },
+                            {
+                                "label": "tan",
+                                "value": "tan"
+                            },
+                            {
+                                "label": "asin",
+                                "value": "asin"
+                            },
+                            {
+                                "label": "acos",
+                                "value": "acos"
+                            },
+                            {
+                                "label": "atan",
+                                "value": "atan"
+                            },
+                            {
+                                "label": "ln",
+                                "value": "ln"
+                            },
+                            {
+                                "label": "log",
+                                "value": "log"
+                            },
+                            {
+                                "label": "e ^",
+                                "altName": "exp",
+                                "value": "e ^"
+                            },
+                            {
+                                "label": "10 ^",
+                                "altName": "pow",
+                                "value": "10 ^"
+                            }
+                        ]
+                    },
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "math_function"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_VARIABLES}",
+        "id": "data",
+        "blocks": [
+            {
+                "type": "data_variable",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "VARIABLE",
+                        "fieldType": "field_variable_getter",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "get_variable_value"
+            },
+            {
+                "type": "data_setvariableto",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "VARIABLE",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "VALUE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "set_variable_to"
+            },
+            {
+                "type": "data_changevariableby",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "VARIABLE",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "VALUE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "change_variable_by"
+            },
+            {
+                "type": "data_showvariable",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "VARIABLE",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "show_variable"
+            },
+            {
+                "type": "data_hidevariable",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "VARIABLE",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "hide_variable"
+            },
+            {
+                "type": "data_listcontents",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable_getter",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "get_list_contents"
+            },
+            {
+                "type": "data_addtolist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "ITEM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "thing",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "add_to_list"
+            },
+            {
+                "type": "data_deleteoflist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "INDEX",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_integer",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "delete_item_of_list"
+            },
+            {
+                "type": "data_deletealloflist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "delete_all_of_list"
+            },
+            {
+                "type": "data_insertatlist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "INDEX",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_integer",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "ITEM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "thing",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "insert_at_list"
+            },
+            {
+                "type": "data_replaceitemoflist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "INDEX",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_integer",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    },
+                    {
+                        "kind": "input",
+                        "name": "ITEM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "thing",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "replace_item_of_list"
+            },
+            {
+                "type": "data_itemoflist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "INDEX",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_integer",
+                            "defaultValue": "1",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "get_item_of_list"
+            },
+            {
+                "type": "data_itemnumoflist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "ITEM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "thing",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "get_index_of_item_in_list"
+            },
+            {
+                "type": "data_lengthoflist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "get_list_length"
+            },
+            {
+                "type": "data_listcontainsitem",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    },
+                    {
+                        "kind": "input",
+                        "name": "ITEM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "text",
+                            "defaultValue": "thing",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "list_contains_item"
+            },
+            {
+                "type": "data_showlist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "show_list"
+            },
+            {
+                "type": "data_hidelist",
+                "args": [
+                    {
+                        "kind": "field",
+                        "name": "LIST",
+                        "fieldType": "field_variable",
+                        "value": null,
+                        "options": null
+                    }
+                ],
+                "altName": "hide_list"
+            }
+        ]
+    },
+    {
+        "category": "%{BKY_CATEGORY_MYBLOCKS}",
+        "id": "myBlocks",
+        "blocks": [],
+        "altName": "my_blocks"
+    }
+]
