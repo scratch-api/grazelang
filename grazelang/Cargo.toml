@@ -17,3 +17,4 @@ grazelang_library_parser = { path = "../grazelang_library_parser" }
 grazelang_library = { path = "../grazelang_library" }
 md5 = "0.8.0"
 zip = "8.6.0"
+enum-assoc = "1.3.0"

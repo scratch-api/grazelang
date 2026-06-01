@@ -208,6 +208,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum-assoc"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ed8956bd5c1f0415200516e78ff07ec9e16415ade83c056c230d7b7ea0d55b7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -298,6 +309,7 @@ name = "grazelang"
 version = "0.1.0"
 dependencies = [
  "arcstr",
+ "enum-assoc",
  "grazelang_library",
  "grazelang_library_parser",
  "logos",

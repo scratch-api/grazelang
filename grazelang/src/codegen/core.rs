@@ -24,13 +24,9 @@ use super::{
 };
 
 use crate::{
-    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment},
-    lexer::PosRange,
-    library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
-    names::Namespace,
-    parser::{
+    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment}, lexer::PosRange, library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols}, messages::GrazeMessage, names::Namespace, parser::{
         context::{
-            GrazeMessage, GrazeMessageSetting, IdString, KnownBlock, ParseContext,
+            GrazeMessageSetting, IdString, KnownBlock, ParseContext,
             ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
@@ -38,9 +34,7 @@ use crate::{
             DataDeclarationScope, Expression, FormattedStringContent, GetPos, Identifier,
             ListEntry, Literal, UnOpDescriptor,
         },
-    },
-    settings::{GrazeSettings, UseShadows},
-    visitor::{
+    }, settings::{GrazeSettings, UseShadows}, visitor::{
         GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
         default_visit_expression_binary_operation, default_visit_expression_call,
         default_visit_expression_formatted_string, default_visit_expression_get_item,
@@ -53,7 +47,7 @@ use crate::{
         default_visit_statement_forever, default_visit_statement_multi_input_control,
         default_visit_statement_set_item, default_visit_statement_single_input_control,
         default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
-    },
+    }
 };
 
 #[derive(Debug, Clone, Error)]

@@ -28,8 +28,9 @@ use crate::{
         ids::generate_random_id_as_string,
     },
     lexer::PosRange,
+    messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
     names::Namespace,
-    parser::cst::{CustomBlockParamKindValue, ParseError},
+    parser::cst::CustomBlockParamKindValue,
     settings::GrazeSettings,
 };
 
@@ -177,9 +178,14 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. } => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(GrazeWarning::Plain(
-                        format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead.").into(),
-                    pos_range), None),
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            GrazeWarningKind::CallableAsInput,
+                            format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead.").into(),
+                            pos_range
+                        ),
+                        None
+                    ),
                     GrazeMessageSetting::Warnings,
                 );
                 KnownBlockInput::PrimitiveInput("".into())
@@ -216,9 +222,14 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::BlockRef { id } => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(GrazeWarning::Plain(
-                        format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
-                    pos_range), None),
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            GrazeWarningKind::BlockRefAsField,
+                            format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                            pos_range
+                        ),
+                        None
+                    ),
                     GrazeMessageSetting::Warnings,
                 );
                 Sb3FieldValue::Normal(id.into())
@@ -259,9 +270,14 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. } => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(GrazeWarning::Plain(
-                        format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead.").into(),
-                    pos_range), None),
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            GrazeWarningKind::CallableAsField,
+                            format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead.").into(),
+                            pos_range
+                        ),
+                        None
+                    ),
                     GrazeMessageSetting::Warnings,
                 );
                 Sb3FieldValue::Normal("".into())
@@ -269,9 +285,14 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::Empty => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(GrazeWarning::Plain(
-                        format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
-                    pos_range), None),
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            GrazeWarningKind::EmptyExpressionAsField,
+                            format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                            pos_range
+                        ),
+                        None
+                    ),
                     GrazeMessageSetting::Warnings,
                 );
                 Sb3FieldValue::Normal("".into())
@@ -288,9 +309,14 @@ impl ResolveKnownBlock for KnownBlock {
                     .unwrap_or_else(|| {
                         emit_message(
                             context,
-                            GrazeMessage::Warning(GrazeWarning::Plain(
-                                format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
-                            pos_range), None),
+                            GrazeMessage::Warning(
+                                GrazeWarning::Specific(
+                                    GrazeWarningKind::NonFieldSingletonAsField,
+                                    format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                                    pos_range
+                                ),
+                                None
+                            ),
                             GrazeMessageSetting::Warnings,
                         );
                         codegen::project_json::Sb3FieldValue::Normal("".into())
@@ -990,45 +1016,6 @@ impl Target {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, thiserror::Error)]
-pub enum GrazeError {
-    #[error("{0}")]
-    Plain(IString, PosRange),
-    #[error(transparent)]
-    ParseError(#[from] ParseError),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum GrazeWarning {
-    Plain(IString, PosRange),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum GrazeInfo {
-    Plain(IString, PosRange),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum GrazeSuggestion {
-    SimpleCodeChange {
-        replace_pos_range: PosRange,
-        replace_text: String,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum GrazeMessage {
-    Error(GrazeError, Option<GrazeSuggestion>),
-    Warning(GrazeWarning, Option<GrazeSuggestion>),
-    Info(GrazeInfo, Option<GrazeSuggestion>),
-}
-
-impl From<ParseError> for GrazeMessage {
-    fn from(value: ParseError) -> Self {
-        Self::Error(value.into(), None)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum GrazeMessageSetting {
     // Maybe there will be settings inbetween later
@@ -1080,7 +1067,6 @@ pub struct ParseContext {
     // If stage is in this, it should be the first element
     pub parsed_targets: VecDeque<Target>,
     pub broadcasts: HashMap<IString, BroadcastDescriptor>,
-    // pub root_symbol: ActualSymbol<'static>,
     pub next_target: Option<Target>,
     pub global_symbols: HashMap<IString, TargetSymbolDescriptor>,
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
@@ -1099,10 +1085,6 @@ impl ParseContext {
                 symbols: HashMap::new(),
             }]),
             broadcasts: HashMap::new(),
-            // root_symbol: ActualSymbol::Namespace(HashMap::from([(
-            //     literal!("sprites"),
-            //     Rc::new(RefCell::new(ActualSymbol::Sprites)),
-            // )])),
             global_symbols: HashMap::new(),
             next_target: None,
             random_seed,
@@ -1111,13 +1093,6 @@ impl ParseContext {
             settings,
         }
     }
-
-    // pub fn get_stage_mut(&mut self) -> &mut Target {
-    //     if matches!(self.next_target, Some(Target::Stage { symbols: _ })) {
-    //         return self.next_target.as_mut().unwrap();
-    //     }
-    //     &mut self.parsed_targets[0]
-    // }
 }
 
 impl Default for ParseContext {

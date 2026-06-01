@@ -6,11 +6,10 @@ use super::{
     },
 };
 use crate::{
-    lexer::{self, PosRange, Token, get_pos_range as internal_get_pos_range},
-    parser::{
-        context::{self, BroadcastDescriptor, GrazeMessage},
+    lexer::{self, PosRange, Token, get_pos_range as internal_get_pos_range}, messages::GrazeMessage, parser::{
+        context::{self, BroadcastDescriptor},
         cst::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
-    },
+    }
 };
 use arcstr::{ArcStr as IString, literal};
 use logos::{Lexer, Logos};
