@@ -68,8 +68,14 @@ pub enum GrazeSb3GeneratorError {
         input_menu_value: Sb3FieldValue,
         pos_range: PosRange,
     },
-    #[error("the amount of parameters for this block was {unexpected:?}, expected {expected:?}")]
-    IncorrectParamCount { unexpected: usize, expected: usize },
+    #[error(
+        "the amount of parameters for this block was {unexpected:?} at {pos_range:?}, expected {expected:?}"
+    )]
+    IncorrectParamCount {
+        unexpected: usize,
+        expected: usize,
+        pos_range: PosRange,
+    },
     #[error("tried to get a list item for a non list, {identifier:?}")]
     ListAccessForNonLists { identifier: Identifier },
     #[error("cannot initialize stage multiple times")]
@@ -88,7 +94,7 @@ pub enum GrazeSb3GeneratorError {
 //  - [x] UnknownIdentifier
 //  - [x] IdentifierIsNotABlock
 //  - [x] UnexpectedInputMenu
-//  - [ ] IncorrectParamCount
+//  - [x] IncorrectParamCount
 //  - [x] ListAccessForNonLists
 //  - [x] RepeatedStageInitialization
 //  - [x] BlockIsNotCBlock
@@ -836,6 +842,7 @@ pub fn create_control_block<I>(
     identifier: &Identifier,
     args: I,
     arg_count: usize,
+    args_pos_range: PosRange,
     substack: Param,
     parent: Option<String>,
     this_id: IString,
@@ -853,8 +860,9 @@ where
     add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
     if params.len() != arg_count + 1 {
         return Err(GrazeSb3GeneratorError::IncorrectParamCount {
-            unexpected: arg_count + 1,
-            expected: params.len(),
+            unexpected: arg_count,
+            expected: params.len() - 1,
+            pos_range: args_pos_range,
         });
     }
     let substack_input_name = if let CallBlockParam {
@@ -1032,6 +1040,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
+                    pos_range: (value.0.get_position().0, value.3.0.1),
                 });
             }
             for (param, (value, (expr, _))) in
@@ -1500,6 +1509,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     .rev()
                     .zip(value.2.iter().map(|(expr, _)| *expr.get_position())),
                 arg_count,
+                (value.0.pos_range.0, value.3.0.1),
                 substack,
                 parent,
                 this_id,
@@ -1527,6 +1537,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 value.0,
                 iter::once((arg, *value.1.get_position())),
                 1,
+                (value.0.pos_range.0, value.1.get_position().1),
                 substack,
                 parent,
                 this_id,
@@ -1563,6 +1574,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
+                    pos_range: (value.0.pos_range.0, value.3.0.1),
                 });
             }
             for (param, (value, pos_range)) in zip(
@@ -1610,6 +1622,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 value.0,
                 iter::empty(),
                 0,
+                value.0.pos_range,
                 substack,
                 parent,
                 this_id,
@@ -2408,6 +2421,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: 0,
                 expected: params.len(),
+                pos_range: value.0.pos_range,
             });
         }
         let block = context
@@ -2466,6 +2480,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: 1,
                     expected: params.len(),
+                    pos_range: (value.0.pos_range.0, value.1.get_position().1),
                 });
             }
         } else {
@@ -2540,6 +2555,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: reversed_args.len(),
                 expected: params.len(),
+                pos_range: (value.0.get_position().0, value.3.get_position().1),
             });
         }
         let prev_parent = if let Some(parent) = parent {
