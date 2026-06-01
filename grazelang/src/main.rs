@@ -14,11 +14,10 @@ fn main() {
 
     let parsed = parser::parse_graze_program(&mut PeekableLexer::new(lexer), &mut context).unwrap();
 
-    for message in &context.messages {
-        dbg!(message);
-    }
-
     if !context.successful {
+        for message in &context.messages {
+            dbg!(message);
+        }
         dbg!(parsed);
         panic!("Parsing unsuccessful.");
     }
@@ -27,6 +26,10 @@ fn main() {
     let visitor = codegen::core::GrazeSb3Generator;
 
     visitor.visit_graze_program(&parsed, &mut context).unwrap();
+
+    for message in &context.messages {
+        dbg!(message);
+    }
 
     dbg!(&context.asset_files);
 
