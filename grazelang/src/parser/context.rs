@@ -112,6 +112,7 @@ pub trait ResolveKnownBlock {
 
     fn resolve_for_field(
         &self,
+        pos_range: PosRange,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> codegen::project_json::Sb3FieldValue;
 
@@ -176,10 +177,10 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. } => {
                 emit_message(
                     context,
-                    GrazeMessage::Error(GrazeError::Plain(
+                    GrazeMessage::Warning(GrazeWarning::Plain(
                         format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead.").into(),
                     pos_range), None),
-                    GrazeMessageSetting::Errors,
+                    GrazeMessageSetting::Warnings,
                 );
                 KnownBlockInput::PrimitiveInput("".into())
             }
@@ -196,6 +197,7 @@ impl ResolveKnownBlock for KnownBlock {
 
     fn resolve_for_field(
         &self,
+        pos_range: PosRange,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> codegen::project_json::Sb3FieldValue {
         use codegen::project_json::{Sb3FieldValue, Sb3Primitive};
@@ -212,8 +214,14 @@ impl ResolveKnownBlock for KnownBlock {
             },
             KnownBlock::FieldValue { value } => value.clone(),
             KnownBlock::BlockRef { id } => {
-                Sb3FieldValue::Normal(id.into()) // TODO: warn user about probably incorrect usage.
-                // Issue: #16
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(GrazeWarning::Plain(
+                        format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                    pos_range), None),
+                    GrazeMessageSetting::Warnings,
+                );
+                Sb3FieldValue::Normal(id.into())
             }
             KnownBlock::PrimitiveBlock { value } => {
                 // TODO: warn user about possibly incorrect usage
@@ -248,10 +256,24 @@ impl ResolveKnownBlock for KnownBlock {
             }
             KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
-            | KnownBlock::CustomBlock { .. }
-            | KnownBlock::Empty => {
-                // TODO: warn user about probably incorrect usage
-                // Issue: #14
+            | KnownBlock::CustomBlock { .. } => {
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(GrazeWarning::Plain(
+                        format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead.").into(),
+                    pos_range), None),
+                    GrazeMessageSetting::Warnings,
+                );
+                Sb3FieldValue::Normal("".into())
+            }
+            KnownBlock::Empty => {
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(GrazeWarning::Plain(
+                        format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                    pos_range), None),
+                    GrazeMessageSetting::Warnings,
+                );
                 Sb3FieldValue::Normal("".into())
             }
             KnownBlock::SingletonReporter {
@@ -261,11 +283,18 @@ impl ResolveKnownBlock for KnownBlock {
                 assign: _,
                 bind_info: _,
             } => {
-                // TODO: warn user about incorrect usage if no field supplied
-                // Issue: #13
                 field
                     .clone()
-                    .unwrap_or_else(|| codegen::project_json::Sb3FieldValue::Normal("".into()))
+                    .unwrap_or_else(|| {
+                        emit_message(
+                            context,
+                            GrazeMessage::Warning(GrazeWarning::Plain(
+                                format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                            pos_range), None),
+                            GrazeMessageSetting::Warnings,
+                        );
+                        codegen::project_json::Sb3FieldValue::Normal("".into())
+                    })
             }
         }
     }

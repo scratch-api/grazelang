@@ -728,14 +728,19 @@ pub fn add_known_block_to_params(
             }
         }
         CallBlockParamKind::Field { .. } => {
-            fields.insert(param_name, value.resolve_for_field(context));
+            fields.insert(
+                param_name,
+                value.resolve_for_field(known_block_pos_range, context),
+            );
         }
         CallBlockParamKind::MenuInput {
             opcode,
             field_name,
             default,
         } => {
-            let (input_repr, is_menu) = match value.resolve_for_input(known_block_pos_range, context) {
+            let (input_repr, is_menu) = match value
+                .resolve_for_input(known_block_pos_range, context)
+            {
                 grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
                     (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), false)
                 }
