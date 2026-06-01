@@ -165,13 +165,7 @@ impl ResolveKnownBlock for KnownBlock {
                 })
             }
             KnownBlock::FieldValue { value } => {
-                emit_message(
-                    context,
-                    GrazeMessage::Error(GrazeError::Plain(
-                        format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to use it as a different parameter.").into(),
-                    pos_range), None),
-                    GrazeMessageSetting::Errors,
-                );
+                // TODO: warn user about possibly incorrect usage in some cases
                 KnownBlockInput::Menu(value.clone())
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
