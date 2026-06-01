@@ -301,7 +301,7 @@ impl ResolveKnownBlock for KnownBlock {
 
     fn resolve_for_call_block<'a>(
         &'a self,
-        context: &mut codegen::core::GrazeSb3GeneratorContext,
+        _context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> CallableKnownBlockSignature<'a> {
         const NO_PARTIALS: &Vec<(CallBlockParam, KnownBlock)> = &Vec::new();
         match self {
@@ -339,7 +339,7 @@ impl ResolveKnownBlock for KnownBlock {
 
     fn resolve_for_assignment<'a>(
         &'a self,
-        context: &mut codegen::core::GrazeSb3GeneratorContext,
+        _context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> &'a SimpleCallableKnownBlockSignature {
         match self {
             KnownBlock::Variable {
@@ -823,18 +823,18 @@ impl TargetSymbolDescriptor {
                 },
                 match self {
                     TargetSymbolDescriptor::Costume(CostumeDescriptor {
-                        name,
-                        canonical_name,
+                        name: _,
+                        canonical_name: _,
                         source,
                     })
                     | TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
-                        name,
-                        canonical_name,
+                        name: _,
+                        canonical_name: _,
                         source,
                     })
                     | TargetSymbolDescriptor::Sound(SoundDescriptor {
-                        name,
-                        canonical_name,
+                        name: _,
+                        canonical_name: _,
                         source,
                     }) => Some(AssetFile {
                         file_name: md5ext,

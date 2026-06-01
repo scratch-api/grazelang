@@ -617,7 +617,7 @@ pub fn parse_graze_program(
 
 pub fn parse_single_identifier(
     token_stream: ParseIn,
-    context: &mut ParseContext,
+    _context: &mut ParseContext,
 ) -> ParseOut<IString> {
     Ok(match next_token!(token_stream) {
         Token::Identifier(value) => value,
@@ -708,7 +708,7 @@ pub fn parse_full_identifier(
 
 pub fn parse_full_identifier_starting_with(
     token_stream: ParseIn,
-    context: &mut ParseContext,
+    _context: &mut ParseContext,
     value: IString,
 ) -> ParseOut<Identifier> {
     let mut names: Vec<(IString, PosRange)> = vec![(value, get_token_pos_range(token_stream))];
@@ -784,7 +784,7 @@ pub mod statement {
 
     pub fn parse_literal(
         token_stream: ParseIn,
-        context: &mut ParseContext,
+        _context: &mut ParseContext,
     ) -> ParseOut<cst::Literal> {
         let token = next_token!(token_stream);
         use cst::Literal as LLiteral;
@@ -2486,7 +2486,6 @@ pub mod statement {
 
     pub fn find_top_level_statement_end(token_stream: ParseIn) -> Result<(), ParseError> {
         let mut layers = 0_i32;
-        let mut step_back = false;
         find_next_token(token_stream, |token| match token {
             Token::Semicolon => layers == 0,
             Token::LeftBrace => {
@@ -2503,9 +2502,6 @@ pub mod statement {
             }
             _ => false,
         })?;
-        if step_back {
-            token_stream.step_back_if_unpeeked();
-        }
         Ok(())
     }
 }
@@ -3527,7 +3523,7 @@ pub mod expression {
 
     pub fn parse_binary_operation(
         token_stream: ParseIn,
-        context: &mut ParseContext,
+        _context: &mut ParseContext,
     ) -> ParseOut<Option<BinOp>> {
         use super::super::cst::BinOp;
         Ok(Some(match_token_or_return_none!(token_stream, {
