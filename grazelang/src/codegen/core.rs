@@ -2882,6 +2882,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             x.replace(0.0);
                             y.replace(0.0);
                         },
+                        // TODO: Warn user when trying to create a top level shadow expression
                         _ => return Ok(())
                     }
                     wrap_in_reporter(context, |context, _, this_id| {
