@@ -10,6 +10,13 @@ use thiserror::Error;
 
 pub trait GetPos {
     fn get_position(&self) -> &PosRange;
+
+    fn from_to<T>(&self, other: &T) -> PosRange
+    where
+        T: GetPos,
+    {
+        (self.get_position().0, other.get_position().1)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1093,7 +1100,7 @@ impl Literal {
 impl From<&Literal> for Sb3Primitive {
     fn from(value: &Literal) -> Self {
         value.get_string_value().into() // TODO: convert into int if small enough
-                                        // Issue: #30
+        // Issue: #30
     }
 }
 

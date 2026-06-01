@@ -82,8 +82,11 @@ pub enum GrazeSb3GeneratorError {
     RepeatedStageInitialization { stage_keyword: cst::StageKeyword },
     #[error("tried to call the identifier {identifier:?} as a c block when it was not possible")]
     BlockIsNotCBlock { identifier: Identifier },
-    #[error("tried to pass normal parameter {param:?} as a block stack")]
-    PassedNormalParamAsBlockStack { param: Param },
+    // This should only be able to happen if the transpiler has a bug
+    #[error(
+        "tried to pass normal parameter {param:?} as a block stack, this is likely a bug in graze"
+    )]
+    PassedNormalParamAsBlockStack { param: Box<Param>, pos_range: PosRange },
     #[error("tried to get the known block of a block stack")]
     TriedGetKnownBlockOfBlockStack,
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
@@ -98,7 +101,7 @@ pub enum GrazeSb3GeneratorError {
 //  - [x] ListAccessForNonLists
 //  - [x] RepeatedStageInitialization
 //  - [x] BlockIsNotCBlock
-//  - [ ] PassedNormalParamAsBlockStack
+//  - [x] PassedNormalParamAsBlockStack
 //  - [ ] TriedGetKnownBlockOfBlockStack
 //  - [x] ShadowedSprite
 // Issue: #44
@@ -840,16 +843,17 @@ pub fn add_block(context: &mut GrazeSb3GeneratorContext, id: &IdString, block: S
 pub fn create_control_block<I>(
     context: &mut GrazeSb3GeneratorContext,
     identifier: &Identifier,
-    args: I,
-    arg_count: usize,
+    args: (I, usize),
     args_pos_range: PosRange,
-    substack: Param,
+    substack: (Param, PosRange),
     parent: Option<String>,
     this_id: IString,
 ) -> Result<(), GrazeSb3GeneratorError>
 where
     I: Iterator<Item = (Param, PosRange)>,
 {
+    let (args, arg_count) = args;
+    let (substack, substack_pos_range) = substack;
     let symbol_id = get_symbol_id(context, identifier)?;
     let symbol = &context.symbol_table[symbol_id];
     let known_block = get_known_block(symbol, identifier)?.clone();
@@ -879,7 +883,10 @@ where
     let substack = if let Param::BlockStack(block_ref) = substack {
         block_ref
     } else {
-        return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack { param: substack });
+        return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+            param: Box::new(substack),
+            pos_range: substack_pos_range,
+        });
     };
     for (param, (value, pos_range)) in zip(params.iter(), args) {
         with_known_block!(context, value, value => {
@@ -1040,7 +1047,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
-                    pos_range: (value.0.get_position().0, value.3.0.1),
+                    pos_range: value.0.from_to(value.3),
                 });
             }
             for (param, (value, (expr, _))) in
@@ -1504,13 +1511,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             create_control_block(
                 context,
                 value.0,
-                reversed_args
-                    .into_iter()
-                    .rev()
-                    .zip(value.2.iter().map(|(expr, _)| *expr.get_position())),
-                arg_count,
-                (value.0.pos_range.0, value.3.0.1),
-                substack,
+                (
+                    reversed_args
+                        .into_iter()
+                        .rev()
+                        .zip(value.2.iter().map(|(expr, _)| *expr.get_position())),
+                    arg_count,
+                ),
+                value.0.from_to(value.3),
+                (substack, *value.4.get_position()),
                 parent,
                 this_id,
             )
@@ -1535,10 +1544,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             create_control_block(
                 context,
                 value.0,
-                iter::once((arg, *value.1.get_position())),
-                1,
-                (value.0.pos_range.0, value.1.get_position().1),
-                substack,
+                (iter::once((arg, *value.1.get_position())), 1),
+                value.0.from_to(value.1),
+                (substack, *value.2.get_position()),
                 parent,
                 this_id,
             )
@@ -1574,7 +1582,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
-                    pos_range: (value.0.pos_range.0, value.3.0.1),
+                    pos_range: value.0.from_to(value.3),
                 });
             }
             for (param, (value, pos_range)) in zip(
@@ -1620,10 +1628,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             create_control_block(
                 context,
                 value.0,
-                iter::empty(),
-                0,
-                value.0.pos_range,
-                substack,
+                (iter::empty(), 0),
+                *value.0.get_position(),
+                (substack, *value.1.get_position()),
                 parent,
                 this_id,
             )
@@ -2254,7 +2261,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     block_ref
                 } else {
                     return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
-                        param: first_branch,
+                        param: Box::new(first_branch),
+                        pos_range: *else_ifs[0].3.get_position(),
                     });
                 };
                 if let Some(first_branch) = first_branch {
@@ -2282,7 +2290,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             block_ref
                         } else {
                             return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
-                                param: else_branch,
+                                param: Box::new(else_branch),
+                                pos_range: *else_value.1.get_position(),
                             });
                         };
                         if let Some(else_branch) = else_branch {
@@ -2331,7 +2340,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 block_ref
             } else {
                 return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
-                    param: first_branch,
+                    param: Box::new(first_branch),
+                    pos_range: *value.0.2.get_position(),
                 });
             };
             if let Some(first_branch) = first_branch {
@@ -2421,7 +2431,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: 0,
                 expected: params.len(),
-                pos_range: value.0.pos_range,
+                pos_range: *value.0.get_position(),
             });
         }
         let block = context
@@ -2480,7 +2490,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: 1,
                     expected: params.len(),
-                    pos_range: (value.0.pos_range.0, value.1.get_position().1),
+                    pos_range: value.0.from_to(value.1),
                 });
             }
         } else {
@@ -2555,7 +2565,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: reversed_args.len(),
                 expected: params.len(),
-                pos_range: (value.0.get_position().0, value.3.get_position().1),
+                pos_range: value.0.from_to(value.3),
             });
         }
         let prev_parent = if let Some(parent) = parent {
