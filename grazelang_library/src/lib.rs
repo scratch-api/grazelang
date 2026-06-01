@@ -1,13 +1,25 @@
 pub mod project_json;
 
 use proc_macro2::TokenStream;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use arcstr::{ArcStr as IString, literal};
 use quote::{ToTokens, TokenStreamExt, quote};
 use serde::{Deserialize, Serialize};
 
-use crate::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
+use crate::project_json::Sb3PrimitiveBlock;
+
+pub const NO_CATEGORY_ID: u32 = u32::MAX - 16;
+pub const VARIABLES_CATEGORY_ID: u32 = u32::MAX - 15;
+pub const LISTS_CATEGORY_ID: u32 = u32::MAX - 14;
+pub const BROADCASTS_CATEGORY_ID: u32 = u32::MAX - 13;
+pub const COSTUMES_CATEGORY_ID: u32 = u32::MAX - 12;
+pub const BACKDROPS_CATEGORY_ID: u32 = u32::MAX - 11;
+pub const SOUNDS_CATEGORY_ID: u32 = u32::MAX - 1;
+pub const PROPERTIES_CATEGORY_ID: u32 = u32::MAX - 9;
+pub const OBJECTS_CATEGORY_ID: u32 = u32::MAX - 8;
+pub const TARGETS_CATEGORY_ID: u32 = u32::MAX - 7;
+pub const LOCATIONS_CATEGORY_ID: u32 = u32::MAX - 6;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindInfo {
@@ -52,6 +64,7 @@ pub enum KnownBlock {
     /// Cannot be used for variables in the context of an input
     FieldValue {
         value: project_json::Sb3FieldValue,
+        categories: HashSet<u32>,
     },
     BlockRef {
         id: IString,
@@ -133,11 +146,13 @@ pub enum CallBlockParamKind {
     },
     Field {
         default: Option<project_json::Sb3FieldValue>,
+        category: u32,
     },
     MenuInput {
         opcode: IString,
         field_name: IString,
         default: project_json::Sb3FieldValue,
+        category: u32,
     },
     BlockStack,
 }
@@ -150,14 +165,16 @@ impl ToTokens for CallBlockParamKind {
                 let default = quote_option(default.as_ref());
                 tokens.append_all(quote!(#prefix::Input { default: #default }));
             }
-            CallBlockParamKind::Field { default } => {
+            CallBlockParamKind::Field { default, category } => {
                 let default = quote_option(default.as_ref());
-                tokens.append_all(quote!(#prefix::Field { default: #default }));
+                tokens
+                    .append_all(quote!(#prefix::Field { default: #default, category: #category }));
             }
             CallBlockParamKind::MenuInput {
                 opcode,
                 field_name,
                 default,
+                category,
             } => {
                 let opcode = opcode.as_str();
                 let field_name = field_name.as_str();
@@ -166,6 +183,7 @@ impl ToTokens for CallBlockParamKind {
                         opcode: ::arcstr::literal!(#opcode),
                         field_name: ::arcstr::literal!(#field_name),
                         default: #default,
+                        category: #category,
                     }
                 });
             }
@@ -229,7 +247,10 @@ impl KnownBlock {
             },
             vec![(
                 CallBlockParam {
-                    kind: CallBlockParamKind::Field { default: None },
+                    kind: CallBlockParamKind::Field {
+                        default: None,
+                        category: VARIABLES_CATEGORY_ID,
+                    },
                     name: literal!("VARIABLE"),
                 },
                 KnownBlock::FieldValue {
@@ -237,6 +258,7 @@ impl KnownBlock {
                         value: (&canonical_name as &str).into(),
                         id: id.to_string(),
                     },
+                    categories: HashSet::from([VARIABLES_CATEGORY_ID]),
                 },
             )],
         );
@@ -253,13 +275,6 @@ impl From<IString> for KnownBlock {
     #[inline]
     fn from(value: IString) -> Self {
         Self::BlockRef { id: value }
-    }
-}
-
-impl From<Sb3FieldValue> for KnownBlock {
-    #[inline]
-    fn from(value: Sb3FieldValue) -> Self {
-        Self::FieldValue { value }
     }
 }
 
@@ -300,8 +315,12 @@ impl ToTokens for KnownBlock {
                     }
                 });
             }
-            KnownBlock::FieldValue { value } => {
-                tokens.append_all(quote!(#prefix::FieldValue { value: #value }))
+            KnownBlock::FieldValue { value, categories } => {
+                let categories = categories.iter();
+                tokens.append_all(quote!(#prefix::FieldValue {
+                    value: #value,
+                    categories: ::std::collections::HashSet::from([#( #categories ),*])
+                }))
             }
             KnownBlock::BlockRef { id } => {
                 let id = id.as_str();

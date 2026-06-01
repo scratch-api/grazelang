@@ -1,6 +1,6 @@
 #![allow(clippy::result_large_err)]
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     iter::{self, zip},
     rc::Rc,
 };
@@ -8,7 +8,8 @@ use std::{
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
     BindInfo, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature, HasShadow,
-    SimpleCallableKnownBlockSignature,
+    LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
+    TARGETS_CATEGORY_ID,
     project_json::{Sb3NormalBlock, Sb3Primitive},
 };
 use rand::SeedableRng;
@@ -24,17 +25,24 @@ use super::{
 };
 
 use crate::{
-    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment}, lexer::PosRange, library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols}, messages::GrazeMessage, names::Namespace, parser::{
+    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment},
+    lexer::PosRange,
+    library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
+    messages::GrazeMessage,
+    names::Namespace,
+    parser::{
         context::{
-            GrazeMessageSetting, IdString, KnownBlock, ParseContext,
-            ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
+            GrazeMessageSetting, IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol,
+            SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
             DataDeclarationScope, Expression, FormattedStringContent, GetPos, Identifier,
             ListEntry, Literal, UnOpDescriptor,
         },
-    }, settings::{GrazeSettings, UseShadows}, visitor::{
+    },
+    settings::{GrazeSettings, UseShadows},
+    visitor::{
         GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
         default_visit_expression_binary_operation, default_visit_expression_call,
         default_visit_expression_formatted_string, default_visit_expression_get_item,
@@ -47,7 +55,7 @@ use crate::{
         default_visit_statement_forever, default_visit_statement_multi_input_control,
         default_visit_statement_set_item, default_visit_statement_single_input_control,
         default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
-    }
+    },
 };
 
 #[derive(Debug, Clone, Error)]
@@ -193,7 +201,10 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
                     property_of_params: vec![
                         (
                             CallBlockParam {
-                                kind: CallBlockParamKind::Field { default: None },
+                                kind: CallBlockParamKind::Field {
+                                    default: None,
+                                    category: NO_CATEGORY_ID,
+                                },
                                 name: literal!("PROPERTY"),
                             },
                             KnownBlock::FieldValue {
@@ -201,6 +212,7 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
                                     value: Sb3Primitive::String(canonical_name.to_string()),
                                     id: id.to_string(),
                                 },
+                                categories: HashSet::from([NO_CATEGORY_ID]),
                             },
                         ),
                         {
@@ -211,11 +223,13 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
                                         opcode: literal!("sensing_of_object_menu"),
                                         field_name: name.clone(),
                                         default: Sb3FieldValue::Normal("_stage_".into()),
+                                        category: NO_CATEGORY_ID,
                                     },
                                     name,
                                 },
                                 KnownBlock::FieldValue {
                                     value: Sb3FieldValue::Normal(parent_target.as_str().into()),
+                                    categories: HashSet::from([NO_CATEGORY_ID]),
                                 },
                             )
                         },
@@ -315,6 +329,17 @@ impl GrazeSb3GeneratorContext {
                     value: Sb3FieldValue::Normal(super::project_json::Sb3Primitive::String(
                         target.get_field_name(),
                     )),
+                    categories: <&[u32]>::into_iter(if is_stage {
+                        &[OBJECTS_CATEGORY_ID]
+                    } else {
+                        &[
+                            OBJECTS_CATEGORY_ID,
+                            TARGETS_CATEGORY_ID,
+                            LOCATIONS_CATEGORY_ID,
+                        ]
+                    })
+                    .copied()
+                    .collect(),
                 })),
                 symbol_count,
             );
@@ -505,7 +530,7 @@ impl GrazeSb3GeneratorContext {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Param {
-    Owned(KnownBlock),
+    Owned(Box<KnownBlock>),
     LazyIdentifier(Identifier),
     BlockStack(Option<String>),
 }
@@ -731,6 +756,7 @@ pub fn add_known_block_to_params(
             opcode,
             field_name,
             default,
+            category: _,
         } => {
             let (input_repr, is_menu) = match value
                 .resolve_for_input(known_block_pos_range, context)
@@ -1052,7 +1078,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         None,
                     ),
                 );
-                context.push_param(Param::Owned(this_id.into()));
+                context.push_param(Param::Owned(Box::new(this_id.into())));
                 return Ok(());
             }
 
@@ -1068,7 +1094,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     None,
                 ),
             );
-            context.push_param(Param::Owned(this_id.into()));
+            context.push_param(Param::Owned(Box::new(this_id.into())));
             Ok(())
         })
     }
@@ -1131,7 +1157,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     mutation.map(make_proc_call_mutation),
                 ),
             );
-            context.push_param(Param::Owned(this_id.into()));
+            context.push_param(Param::Owned(Box::new(this_id.into())));
             Ok(())
         })
     }
@@ -1223,13 +1249,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     Ok((context.pop_param().unwrap(), pos_range))
                 }
                 FormattedStringTree::String(string) => Ok((
-                    Param::Owned(KnownBlock::PrimitiveBlock {
+                    Param::Owned(Box::new(KnownBlock::PrimitiveBlock {
                         value: string.into(),
-                    }),
+                    })),
                     Default::default(),
                 )),
                 FormattedStringTree::EmptyString => Ok((
-                    Param::Owned(KnownBlock::PrimitiveBlock { value: "".into() }),
+                    Param::Owned(Box::new(KnownBlock::PrimitiveBlock { value: "".into() })),
                     Default::default(),
                 )),
                 FormattedStringTree::Joined(left, right, parent, this_id) => {
@@ -1274,7 +1300,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     );
                     add_block(context, &this_id, make_join(parent, left, right));
                     Ok((
-                        Param::Owned(KnownBlock::BlockRef { id: this_id }),
+                        Param::Owned(Box::new(KnownBlock::BlockRef { id: this_id })),
                         Default::default(),
                     ))
                 }
@@ -1300,16 +1326,16 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
             FormattedStringTree::String(string) => {
                 default_visit_expression_formatted_string(self, value, context)?;
-                context.push_param(Param::Owned(KnownBlock::PrimitiveBlock {
+                context.push_param(Param::Owned(Box::new(KnownBlock::PrimitiveBlock {
                     value: string.into(),
-                }));
+                })));
                 return Ok(());
             }
             FormattedStringTree::EmptyString => {
                 default_visit_expression_formatted_string(self, value, context)?;
-                context.push_param(Param::Owned(KnownBlock::PrimitiveBlock {
+                context.push_param(Param::Owned(Box::new(KnownBlock::PrimitiveBlock {
                     value: "".into(),
-                }));
+                })));
                 return Ok(());
             }
             FormattedStringTree::Joined(left, right, parent, this_id) => {
@@ -1385,7 +1411,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     None,
                 ),
             );
-            context.push_param(Param::Owned(this_id.into()));
+            context.push_param(Param::Owned(Box::new(this_id.into())));
             Ok(())
         })
     }
@@ -1434,7 +1460,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     None,
                 ),
             );
-            context.push_param(Param::Owned(this_id.into()));
+            context.push_param(Param::Owned(Box::new(this_id.into())));
             Ok(())
         })
     }
@@ -1484,7 +1510,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     None,
                 ),
             );
-            context.push_param(Param::Owned(this_id.into()));
+            context.push_param(Param::Owned(Box::new(this_id.into())));
             Ok(())
         })
     }
@@ -1506,10 +1532,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     ) -> Result<(), GrazeSb3GeneratorError> {
         default_visit_expression_literal(self, value, context)?;
         context.push_param(match value {
-            Literal::EmptyExpression(..) => Param::Owned(KnownBlock::Empty),
-            _ => Param::Owned(KnownBlock::PrimitiveBlock {
+            Literal::EmptyExpression(..) => Param::Owned(Box::new(KnownBlock::Empty)),
+            _ => Param::Owned(Box::new(KnownBlock::PrimitiveBlock {
                 value: value.into(),
-            }),
+            })),
         });
         Ok(())
     }
@@ -2805,11 +2831,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             },
                             params: vec![(
                                 CallBlockParam {
-                                    kind: CallBlockParamKind::Field { default: None },
+                                    kind: CallBlockParamKind::Field {
+                                        default: None,
+                                        category: NO_CATEGORY_ID,
+                                    },
                                     name: literal!("VALUE"),
                                 },
                                 KnownBlock::FieldValue {
                                     value: Sb3FieldValue::Normal(Sb3Primitive::String(name)),
+                                    categories: HashSet::from([NO_CATEGORY_ID]),
                                 },
                             )],
                             field: None,

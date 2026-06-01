@@ -1,6 +1,6 @@
 use std::{
     borrow::Borrow,
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     hash::Hash,
     io::Read,
     ops::{Index, IndexMut},
@@ -10,12 +10,10 @@ use std::{
 use arcstr::{ArcStr as IString, literal};
 pub use grazelang_library::KnownBlock;
 use grazelang_library::{
-    CallBlockParam, CallableKnownBlockSignature, HasShadow, KnownBlockInput,
-    SimpleCallableKnownBlockSignature,
-    project_json::{
+    BACKDROPS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam, CallableKnownBlockSignature, HasShadow, KnownBlockInput, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature, project_json::{
         Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock, Sb3VariableDeclaration,
         TargetAttachment,
-    },
+    }
 };
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -166,7 +164,7 @@ impl ResolveKnownBlock for KnownBlock {
                     y: None,
                 })
             }
-            KnownBlock::FieldValue { value } => {
+            KnownBlock::FieldValue { value, categories } => {
                 // TODO: warn user about possibly incorrect usage in some cases
                 // Issue: #46
                 KnownBlockInput::Menu(value.clone())
@@ -218,7 +216,7 @@ impl ResolveKnownBlock for KnownBlock {
                 value: Sb3Primitive::String(canonical_name.to_string()),
                 id: id.to_string(),
             },
-            KnownBlock::FieldValue { value } => value.clone(),
+            KnownBlock::FieldValue { value, categories } => value.clone(),
             KnownBlock::BlockRef { id } => {
                 emit_message(
                     context,
@@ -790,12 +788,23 @@ impl TargetSymbolDescriptor {
                     known_block: Some(Rc::new(match self {
                         // TODO: implement specific known blocks here
                         // Issue: #10
-                        TargetSymbolDescriptor::Costume(..)
-                        | TargetSymbolDescriptor::Backdrop(..)
-                        | TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
+                        TargetSymbolDescriptor::Costume(..) => KnownBlock::FieldValue {
                             value: codegen::project_json::Sb3FieldValue::Normal(
                                 codegen::project_json::Sb3Primitive::String(value.clone()),
                             ),
+                            categories: HashSet::from([COSTUMES_CATEGORY_ID]),
+                        },
+                        TargetSymbolDescriptor::Backdrop(..) => KnownBlock::FieldValue {
+                            value: codegen::project_json::Sb3FieldValue::Normal(
+                                codegen::project_json::Sb3Primitive::String(value.clone()),
+                            ),
+                            categories: HashSet::from([BACKDROPS_CATEGORY_ID]),
+                        },
+                        TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
+                            value: codegen::project_json::Sb3FieldValue::Normal(
+                                codegen::project_json::Sb3Primitive::String(value.clone()),
+                            ),
+                            categories: HashSet::from([SOUNDS_CATEGORY_ID]),
                         },
                         _ => unreachable!(),
                     })),

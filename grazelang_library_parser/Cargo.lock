@@ -82,6 +82,7 @@ dependencies = [
 name = "grazelang_library_parser"
 version = "0.1.0"
 dependencies = [
+ "arcstr",
  "base16ct",
  "grazelang_library",
  "quote",
