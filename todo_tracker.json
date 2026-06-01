@@ -32,115 +32,115 @@
         "title": "possibly set x and y"
     },
     "18": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "166-167",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L162-L163",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about possibly incorrect usage in some cases"
     },
     "17": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "175-176",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L171-L172",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about probably incorrect usage"
     },
     "16": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "208-209",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L204-L205",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about probably incorrect usage."
     },
     "15": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "212-213",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L208-L209",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about possibly incorrect usage"
     },
     "14": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "246-247",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L242-L243",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about probably incorrect usage"
     },
     "13": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "257-258",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L253-L254",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about incorrect usage if no field supplied"
     },
     "12": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "331-332",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L327-L328",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "Implement assignment of x, y etc"
     },
     "11": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "643-644",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L639-L640",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "better ext detections"
     },
     "10": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "729-730",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L725-L726",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "implement specific known blocks here"
     },
     "9": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "744-745",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L740-L741",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "implement specific known blocks here"
     },
     "8": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "762-763",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L758-L759",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "better default and more control"
     },
     "7": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "780-781",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L776-L777",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "better default and more control"
     },
     "6": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "862-863",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L858-L859",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "add list length as method"
     },
     "5": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
-        "lines": "940-941",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L936-L937",
+        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "check whether this is correct"
     },
     "29": {
