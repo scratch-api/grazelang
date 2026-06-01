@@ -1110,7 +1110,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
-                    pos_range: value.0.from_to(value.3),
+                    pos_range: value.0.range_to(value.3),
                 });
             }
             for (param, (value, (expr, _))) in
@@ -1591,7 +1591,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         .zip(value.2.iter().map(|(expr, _)| *expr.get_position())),
                     arg_count,
                 ),
-                value.0.from_to(value.3),
+                value.0.range_to(value.3),
                 (substack, *value.4.get_position()),
                 parent,
                 this_id,
@@ -1618,7 +1618,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 value.0,
                 (iter::once((arg, *value.1.get_position())), 1),
-                value.0.from_to(value.1),
+                value.0.range_to(value.1),
                 (substack, *value.2.get_position()),
                 parent,
                 this_id,
@@ -1655,7 +1655,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
-                    pos_range: value.0.from_to(value.3),
+                    pos_range: value.0.range_to(value.3),
                 });
             }
             for (param, (value, pos_range)) in zip(
@@ -2559,7 +2559,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: 1,
                     expected: params.len(),
-                    pos_range: value.0.from_to(value.1),
+                    pos_range: value.0.range_to(value.1),
                 });
             }
         } else {
@@ -2638,7 +2638,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: reversed_args.len(),
                 expected: params.len(),
-                pos_range: value.0.from_to(value.3),
+                pos_range: value.0.range_to(value.3),
             });
         }
         let prev_parent = if let Some(parent) = parent {

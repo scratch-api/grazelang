@@ -11,7 +11,7 @@ use thiserror::Error;
 pub trait GetPos {
     fn get_position(&self) -> &PosRange;
 
-    fn from_to<T>(&self, other: &T) -> PosRange
+    fn range_to<T>(&self, other: &T) -> PosRange
     where
         T: GetPos,
     {
