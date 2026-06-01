@@ -34,7 +34,7 @@
     "18": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L162-L163",
         "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about possibly incorrect usage in some cases"
@@ -42,7 +42,7 @@
     "17": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L171-L172",
         "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about probably incorrect usage"
