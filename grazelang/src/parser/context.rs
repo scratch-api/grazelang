@@ -134,8 +134,6 @@ impl ResolveKnownBlock for KnownBlock {
                 assign: _,
                 bind_info,
             } => {
-                // TODO: possibly set x and y
-                // Issue: #20
                 if let Some(bind_info) = bind_info
                     && let Some(target) = context.current_sb3_target.as_ref()
                     && bind_info.parent_target.as_str() != target.name.as_str()
