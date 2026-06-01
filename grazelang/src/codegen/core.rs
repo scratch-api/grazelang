@@ -95,19 +95,6 @@ pub enum GrazeSb3GeneratorError {
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
 }
-// TODO: add pos range data for all errors
-//  Error types:
-//  - [x] UnknownIdentifier
-//  - [x] IdentifierIsNotABlock
-//  - [x] UnexpectedInputMenu
-//  - [x] IncorrectParamCount
-//  - [x] ListAccessForNonLists
-//  - [x] RepeatedStageInitialization
-//  - [x] BlockIsNotCBlock
-//  - [x] PassedNormalParamAsBlockStack
-//  - [x] TriedGetKnownBlockOfBlockStack
-//  - [x] ShadowedSprite
-// Issue: #44
 
 impl GetPos for GrazeSb3GeneratorError {
     fn get_position(&self) -> &PosRange {
