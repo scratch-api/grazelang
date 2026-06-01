@@ -248,43 +248,43 @@
         "title": "Implement primitive block conversion (if default is a positive integer, so would a literal value be)"
     },
     "40": {
-        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
         "status": "open",
-        "lines": "26-27",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L30-L31",
+        "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
     },
     "39": {
-        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
         "status": "open",
-        "lines": "53-54",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L57-L58",
+        "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
     },
     "38": {
-        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
         "status": "open",
-        "lines": "81-82",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L85-L86",
+        "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
     },
     "37": {
-        "filepath": "grazelang_library_parser\\src\\parser.rs",
-        "text": "\"data_variable\" => Some(Sb3PrimitiveBlock::Variable(value)),\n\"data_listcontents\" => Some(Sb3PrimitiveBlock::List(value)),",
+        "filepath": "grazelang_library_parser/src/parser.rs",
+        "text": "\n\"data_variable\" => Some(Sb3PrimitiveBlock::Variable(value)),\n\"data_listcontents\" => Some(Sb3PrimitiveBlock::List(value)),",
         "status": "open",
-        "lines": "118-121",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L123-L126",
+        "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
     },
     "36": {
-        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
         "status": "open",
-        "lines": "135-136",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L158-L159",
+        "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "Should this be used somehow?"
     },
     "35": {
@@ -296,11 +296,11 @@
         "title": "use opcodes"
     },
     "34": {
-        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
         "status": "open",
-        "lines": "330-331",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L417-L418",
+        "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "warn about overlap"
     },
     "45": {
