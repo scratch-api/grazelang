@@ -22,7 +22,11 @@ use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen::{self, core::AssetFile, ids::generate_random_id_as_string},
+    codegen::{
+        self,
+        core::{AssetFile, emit_message},
+        ids::generate_random_id_as_string,
+    },
     lexer::PosRange,
     names::Namespace,
     parser::cst::{CustomBlockParamKindValue, ParseError},
@@ -102,6 +106,7 @@ pub struct SoundDescriptor {
 pub trait ResolveKnownBlock {
     fn resolve_for_input<'a>(
         &'a self,
+        pos_range: PosRange,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a>;
 
@@ -124,6 +129,7 @@ pub trait ResolveKnownBlock {
 impl ResolveKnownBlock for KnownBlock {
     fn resolve_for_input<'a>(
         &'a self,
+        pos_range: PosRange,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a> {
         use codegen::project_json::Sb3PrimitiveBlock;
@@ -159,8 +165,13 @@ impl ResolveKnownBlock for KnownBlock {
                 })
             }
             KnownBlock::FieldValue { value } => {
-                // TODO: warn user about possibly incorrect usage in some cases
-                // Issue: #18
+                emit_message(
+                    context,
+                    GrazeMessage::Error(GrazeError::Plain(
+                        format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to use it as a different parameter.").into(),
+                    pos_range), None),
+                    GrazeMessageSetting::Errors,
+                );
                 KnownBlockInput::Menu(value.clone())
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
@@ -168,8 +179,13 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. } => {
-                // TODO: warn user about probably incorrect usage
-                // Issue: #17
+                emit_message(
+                    context,
+                    GrazeMessage::Error(GrazeError::Plain(
+                        format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead.").into(),
+                    pos_range), None),
+                    GrazeMessageSetting::Errors,
+                );
                 KnownBlockInput::PrimitiveInput("".into())
             }
             KnownBlock::SingletonReporter {

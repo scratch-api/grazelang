@@ -735,7 +735,7 @@ pub fn add_known_block_to_params(
             field_name,
             default,
         } => {
-            let (input_repr, is_menu) = match value.resolve_for_input(context) {
+            let (input_repr, is_menu) = match value.resolve_for_input(known_block_pos_range, context) {
                 grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
                     (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), false)
                 }
@@ -828,7 +828,7 @@ pub fn known_block_to_input_repr_no_menu(
     known_block_pos_range: PosRange,
     context: &mut GrazeSb3GeneratorContext,
 ) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
-    let known_block_input = known_block.resolve_for_input(context);
+    let known_block_input = known_block.resolve_for_input(known_block_pos_range, context);
     match known_block_input {
         grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
             let is_shadow = sb3_primitive_block.is_shadow();
@@ -2875,7 +2875,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         default_visit_isolated_expression(self, value, context)?;
         let param_pos_range = *value.1.get_position();
         with_known_block!(context, context.pop_param().unwrap(), param_pos_range, value => {
-            match value.resolve_for_input(context) {
+            match value.resolve_for_input(param_pos_range, context) {
                 grazelang_library::KnownBlockInput::PrimitiveInput(mut sb3_primitive_block) => {
                     match &mut sb3_primitive_block {
                         Sb3PrimitiveBlock::Variable { name: _, id: _, x, y } |
