@@ -151,8 +151,6 @@ impl ResolveKnownBlock for KnownBlock {
                 })
             }
             KnownBlock::List { canonical_name, id } => {
-                // TODO: possibly set x and y
-                // Issue: #19
                 KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::List {
                     name: canonical_name.to_string(),
                     id: id.to_string(),
