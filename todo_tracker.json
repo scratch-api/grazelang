@@ -144,75 +144,75 @@
         "title": "check whether this is correct"
     },
     "29": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "1143-1144",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L1143-L1144",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "warn about shadowing"
     },
     "28": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "1584-1585",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L1584-L1585",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "warn about shadowing"
     },
     "27": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "2107-2108",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L2107-L2108",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
     },
     "26": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "2200-2201",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L2200-L2201",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
     },
     "25": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "2255-2256",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L2255-L2256",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
     },
     "24": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "2403-2404",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L2403-L2404",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
     },
     "23": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "2522-2523",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L2518-L2519",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Prevent users from naming variables \"super\" or possibly \"root\""
     },
     "22": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "2787-2788",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L2783-L2784",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "capture error and replace message"
     },
     "21": {
-        "filepath": "grazelang\\src\\parser\\core.rs",
+        "filepath": "grazelang/src/parser/core.rs",
         "text": "",
         "status": "open",
-        "lines": "3070-3071",
-        "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
+        "lines": "L3066-L3067",
+        "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "capture error and replace message"
     },
     "31": {
