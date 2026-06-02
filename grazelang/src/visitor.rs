@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::{
     lexer::PosRange,
     parser::cst::{
@@ -716,15 +714,15 @@ where
 }
 
 pub fn default_visit_top_level_statement_broadcast_declaration<V, C, E>(
-    visitor: &V,
-    value: (
+    _visitor: &V,
+    _value: (
         &BroadcastKeyword,
         Option<&CanonicalIdentifier>,
         &Identifier,
         &Semicolon,
         &PosRange,
     ),
-    context: &mut C,
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -733,9 +731,9 @@ where
 }
 
 pub fn default_visit_empty_statement<V, C, E>(
-    visitor: &V,
-    value: &Semicolon,
-    context: &mut C,
+    _visitor: &V,
+    _value: &Semicolon,
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -1036,9 +1034,9 @@ where
 }
 
 pub fn default_visit_stage_statement_backdrop_declaration<V, C, E>(
-    visitor: &V,
-    value: (&BackdropKeyword, &AssetDeclaration, &Semicolon, &PosRange),
-    context: &mut C,
+    _visitor: &V,
+    _value: (&BackdropKeyword, &AssetDeclaration, &Semicolon, &PosRange),
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -1047,9 +1045,9 @@ where
 }
 
 pub fn default_visit_sound_declaration<V, C, E>(
-    visitor: &V,
-    value: (&SoundKeyword, &AssetDeclaration, &Semicolon, &PosRange),
-    context: &mut C,
+    _visitor: &V,
+    _value: (&SoundKeyword, &AssetDeclaration, &Semicolon, &PosRange),
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -1182,9 +1180,9 @@ where
 }
 
 pub fn default_visit_sprite_statement_costume_declaration<V, C, E>(
-    visitor: &V,
-    value: (&CostumeKeyword, &AssetDeclaration, &Semicolon, &PosRange),
-    context: &mut C,
+    _visitor: &V,
+    _value: (&CostumeKeyword, &AssetDeclaration, &Semicolon, &PosRange),
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -1618,7 +1616,7 @@ where
     for item in value {
         match &item.0 {
             ListEntry::Expression(expression) => visitor.visit_expression(expression, context)?,
-            ListEntry::Unwrap(literal, _) => (),
+            ListEntry::Unwrap(..) => (),
         }
     }
     Ok(())
@@ -1878,15 +1876,15 @@ where
 }
 
 pub fn default_visit_single_empty_variable_declaration<V, C, E>(
-    visitor: &V,
-    value: (
+    _visitor: &V,
+    _value: (
         Option<&VarKeyword>,
         &DataDeclarationScope,
         Option<&CanonicalIdentifier>,
         &Identifier,
         &PosRange,
     ),
-    context: &mut C,
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -1917,15 +1915,15 @@ where
 }
 
 pub fn default_visit_single_empty_list_declaration<V, C, E>(
-    visitor: &V,
-    value: (
+    _visitor: &V,
+    _value: (
         Option<&ListKeyword>,
         &DataDeclarationScope,
         Option<&CanonicalIdentifier>,
         &Identifier,
         &PosRange,
     ),
-    context: &mut C,
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -1934,9 +1932,9 @@ where
 }
 
 pub fn default_visit_expression_literal<V, C, E>(
-    visitor: &V,
-    value: &Literal,
-    context: &mut C,
+    _visitor: &V,
+    _value: &Literal,
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
@@ -1984,9 +1982,9 @@ where
 }
 
 pub fn default_visit_expression_identifier<V, C, E>(
-    visitor: &V,
-    value: &Identifier,
-    context: &mut C,
+    _visitor: &V,
+    _value: &Identifier,
+    _context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
