@@ -1,6 +1,6 @@
 {
     "4": {
-        "filepath": "grazelang\\src\\lexer.rs",
+        "filepath": "grazelang/src/lexer.rs",
         "text": "",
         "status": "open",
         "lines": "32-33",
@@ -16,7 +16,7 @@
         "title": "add pos range data for all errors"
     },
     "20": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
         "lines": "137-138",
@@ -24,7 +24,7 @@
         "title": "possibly set x and y"
     },
     "19": {
-        "filepath": "grazelang\\src\\parser\\context.rs",
+        "filepath": "grazelang/src/parser/context.rs",
         "text": "",
         "status": "open",
         "lines": "156-157",
@@ -288,7 +288,7 @@
         "title": "Should this be used somehow?"
     },
     "35": {
-        "filepath": "grazelang_library_parser\\src\\parser.rs",
+        "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
         "status": "open",
         "lines": "316-317",
