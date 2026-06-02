@@ -518,7 +518,7 @@ impl GrazeSb3GeneratorContext {
                             .derive_related_data(&mut rng, &mut global_namespace)
                             .unwrap();
                         // TODO: Add variables, lists, broadcasts, sprites etc to corresponding field categories
-                        // Implement if necessary:
+                        //  Implement if necessary:
                         //  - [ ] variables
                         //  - [ ] lists
                         //  - [ ] broadcasts
