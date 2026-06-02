@@ -97,6 +97,8 @@ pub enum GrazeSb3GeneratorError {
     TriedGetKnownBlockOfBlockStack { pos_range: PosRange },
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
+    #[error("the identifier {identifier:?} is not callable")]
+    IdentifierNotCallable { identifier: Identifier },
 }
 
 impl GetPos for GrazeSb3GeneratorError {
@@ -128,6 +130,9 @@ impl GetPos for GrazeSb3GeneratorError {
             } => pos_range,
             GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack { pos_range } => pos_range,
             GrazeSb3GeneratorError::ShadowedSprite { identifier } => identifier.get_position(),
+            GrazeSb3GeneratorError::IdentifierNotCallable { identifier } => {
+                identifier.get_position()
+            }
         }
     }
 }
@@ -997,8 +1002,11 @@ where
     let symbol_id = get_symbol_id(context, identifier)?;
     let symbol = &context.symbol_table[symbol_id];
     let known_block = get_known_block(symbol, identifier)?.clone();
-    let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-        known_block.resolve_for_call_block(context);
+    let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
+        .resolve_for_call_block(context)
+        .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+            identifier: identifier.clone(),
+        })?;
     let mut fields = HashMap::new();
     let mut inputs = HashMap::new();
     add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
@@ -1176,8 +1184,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let symbol_id = get_symbol_id(context, value.0)?;
             let symbol = &context.symbol_table[symbol_id];
             let known_block = get_known_block(symbol, value.0)?.clone();
-            let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-                known_block.resolve_for_call_block(context);
+            let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
+                .resolve_for_call_block(context)
+                .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+                    identifier: value.0.clone(),
+                })?;
             let mut fields = HashMap::new();
             let mut inputs = HashMap::new();
             add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
@@ -1721,8 +1732,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let symbol_id = get_symbol_id(context, value.0)?;
             let symbol = &context.symbol_table[symbol_id];
             let known_block = get_known_block(symbol, value.0)?.clone();
-            let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-                known_block.resolve_for_call_block(context);
+            let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
+                .resolve_for_call_block(context)
+                .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+                    identifier: value.0.clone(),
+                })?;
             let mut fields = HashMap::new();
             let mut inputs = HashMap::new();
             add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
@@ -2555,8 +2569,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let symbol_id = get_symbol_id(context, value.0)?;
         let symbol = &context.symbol_table[symbol_id];
         let known_block = get_known_block(symbol, value.0)?.clone();
-        let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-            known_block.resolve_for_call_block(context);
+        let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
+            .resolve_for_call_block(context)
+            .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+                identifier: value.0.clone(),
+            })?;
         add_block(
             context,
             &this_id,
@@ -2609,7 +2626,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let symbol = &context.symbol_table[symbol_id];
         let known_block = get_known_block(symbol, value.0)?.clone();
         let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-            known_block.resolve_for_call_block(context);
+            known_block.resolve_for_call_block(context).ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+                identifier: value.0.clone(),
+            })?;
         add_block(
             context,
             &this_id,
@@ -2689,7 +2708,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let symbol = &context.symbol_table[symbol_id];
         let known_block = get_known_block(symbol, value.0)?.clone();
         let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-            known_block.resolve_for_call_block(context);
+            known_block.resolve_for_call_block(context).ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+                identifier: value.0.clone(),
+            })?;
         add_block(
             context,
             &this_id,

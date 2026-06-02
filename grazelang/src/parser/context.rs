@@ -147,7 +147,7 @@ pub trait ResolveKnownBlock {
     fn resolve_for_call_block<'a>(
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> CallableKnownBlockSignature<'a>;
+    ) -> Option<CallableKnownBlockSignature<'a>>;
 
     fn resolve_for_assignment<'a>(
         &'a self,
@@ -269,57 +269,55 @@ impl ResolveKnownBlock for KnownBlock {
                 // No need for a second warning, therefore `ANY_CATEGORIES` is used
                 (Sb3FieldValue::Normal(id.into()), &*ANY_CATEGORIES)
             }
-            KnownBlock::PrimitiveBlock { value } => {
-                match value {
-                    codegen::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
-                    | codegen::project_json::Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
-                    | codegen::project_json::Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
-                    | codegen::project_json::Sb3PrimitiveBlock::Integer(sb3_primitive)
-                    | codegen::project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
-                    | codegen::project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
-                    | codegen::project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
-                        let cow_str = sb3_primitive.as_cow_str();
-                        (
-                            Sb3FieldValue::Normal(sb3_primitive.clone()),
-                            context
-                                .field_entry_categories
-                                .get(&*cow_str)
-                                .unwrap_or_else(|| &*NO_CATEGORIES),
-                        )
-                    }
-                    codegen::project_json::Sb3PrimitiveBlock::Broadcast { name, id } => (
-                        Sb3FieldValue::WithId {
-                            value: Sb3Primitive::String(name.clone()),
-                            id: id.clone(),
-                        },
-                        &*BROADCAST_CATEGORIES,
-                    ),
-                    codegen::project_json::Sb3PrimitiveBlock::Variable {
-                        name,
-                        id,
-                        x: _,
-                        y: _,
-                    } => (
-                        Sb3FieldValue::WithId {
-                            value: Sb3Primitive::String(name.clone()),
-                            id: id.clone(),
-                        },
-                        &*VARIABLE_CATEGORIES,
-                    ),
-                    codegen::project_json::Sb3PrimitiveBlock::List {
-                        name,
-                        id,
-                        x: _,
-                        y: _,
-                    } => (
-                        Sb3FieldValue::WithId {
-                            value: Sb3Primitive::String(name.clone()),
-                            id: id.clone(),
-                        },
-                        &*LIST_CATEGORIES,
-                    ),
+            KnownBlock::PrimitiveBlock { value } => match value {
+                codegen::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
+                | codegen::project_json::Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
+                | codegen::project_json::Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
+                | codegen::project_json::Sb3PrimitiveBlock::Integer(sb3_primitive)
+                | codegen::project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
+                | codegen::project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
+                | codegen::project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
+                    let cow_str = sb3_primitive.as_cow_str();
+                    (
+                        Sb3FieldValue::Normal(sb3_primitive.clone()),
+                        context
+                            .field_entry_categories
+                            .get(&*cow_str)
+                            .unwrap_or_else(|| &*NO_CATEGORIES),
+                    )
                 }
-            }
+                codegen::project_json::Sb3PrimitiveBlock::Broadcast { name, id } => (
+                    Sb3FieldValue::WithId {
+                        value: Sb3Primitive::String(name.clone()),
+                        id: id.clone(),
+                    },
+                    &*BROADCAST_CATEGORIES,
+                ),
+                codegen::project_json::Sb3PrimitiveBlock::Variable {
+                    name,
+                    id,
+                    x: _,
+                    y: _,
+                } => (
+                    Sb3FieldValue::WithId {
+                        value: Sb3Primitive::String(name.clone()),
+                        id: id.clone(),
+                    },
+                    &*VARIABLE_CATEGORIES,
+                ),
+                codegen::project_json::Sb3PrimitiveBlock::List {
+                    name,
+                    id,
+                    x: _,
+                    y: _,
+                } => (
+                    Sb3FieldValue::WithId {
+                        value: Sb3Primitive::String(name.clone()),
+                        id: id.clone(),
+                    },
+                    &*LIST_CATEGORIES,
+                ),
+            },
             KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. } => {
@@ -389,38 +387,43 @@ impl ResolveKnownBlock for KnownBlock {
     fn resolve_for_call_block<'a>(
         &'a self,
         _context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> CallableKnownBlockSignature<'a> {
+    ) -> Option<CallableKnownBlockSignature<'a>> {
         const NO_PARTIALS: &Vec<(CallBlockParam, KnownBlock)> = &Vec::new();
         match self {
-            KnownBlock::Callable(opcode, params) => {
-                CallableKnownBlockSignature(opcode, params, NO_PARTIALS, None)
-            }
-            KnownBlock::PartialCallable(opcode, values, params) => {
-                CallableKnownBlockSignature(opcode, params, values, None)
-            }
-            KnownBlock::SingletonReporter { opcode, params, .. } => CallableKnownBlockSignature(
+            KnownBlock::Callable(opcode, params) => Some(CallableKnownBlockSignature(
                 opcode,
-                static_ref_of_const!(Vec::new(), Vec<CallBlockParam>),
                 params,
+                NO_PARTIALS,
                 None,
-            ),
+            )),
+            KnownBlock::PartialCallable(opcode, values, params) => {
+                Some(CallableKnownBlockSignature(opcode, params, values, None))
+            }
+            KnownBlock::SingletonReporter { opcode, params, .. } => {
+                Some(CallableKnownBlockSignature(
+                    opcode,
+                    static_ref_of_const!(Vec::new(), Vec<CallBlockParam>),
+                    params,
+                    None,
+                ))
+            }
             KnownBlock::CustomBlock {
                 proccode,
                 call_params,
                 params,
                 is_warp,
-            } => CallableKnownBlockSignature(
+            } => Some(CallableKnownBlockSignature(
                 static_ref_of_const!(literal!("procedures_call"), IString),
                 call_params,
                 NO_PARTIALS,
                 Some((proccode, params, is_warp)),
-            ),
+            )),
             KnownBlock::Variable { .. }
             | KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
             | KnownBlock::PrimitiveBlock { .. }
-            | KnownBlock::Empty => todo!(), // warn user about incorrect usage
+            | KnownBlock::Empty => None,
         }
     }
 
