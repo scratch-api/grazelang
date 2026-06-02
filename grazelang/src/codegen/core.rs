@@ -427,6 +427,7 @@ impl GrazeSb3GeneratorContext {
                             .derive_related_data(&mut rng, &mut global_namespace)
                             .unwrap();
                         // TODO: Add variables, lists, broadcasts, sprites etc to corresponding field categories
+                        // Issue: #50
                         if let Some(AssetFile {
                             file_name,
                             file_path,

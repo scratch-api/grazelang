@@ -342,5 +342,13 @@
         "lines": "L790-L790",
         "commit": "2306654977eab3716ab9fef06fb466439906d766",
         "title": "Warn if primitive block is a shadow and has an unfitting value for the category"
+    },
+    "50": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L429-L429",
+        "commit": "dee1b5c9c54fd279c6b7612e1a6cd3c6b7b09abe",
+        "title": "Add variables, lists, broadcasts, sprites etc to corresponding field categories"
     }
 }
