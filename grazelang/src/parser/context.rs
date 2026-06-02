@@ -270,8 +270,6 @@ impl ResolveKnownBlock for KnownBlock {
                 (Sb3FieldValue::Normal(id.into()), &*ANY_CATEGORIES)
             }
             KnownBlock::PrimitiveBlock { value } => {
-                // TODO: warn user about possibly incorrect usage
-                // Issue: #15
                 match value {
                     codegen::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
                     | codegen::project_json::Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
