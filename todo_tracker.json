@@ -58,7 +58,7 @@
     "15": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L208-L209",
         "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
         "title": "warn user about possibly incorrect usage"
