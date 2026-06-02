@@ -765,8 +765,13 @@ pub fn add_known_block_to_params(
                             context,
                             GrazeMessage::Warning(
                                 GrazeWarning::Specific(
-                                    GrazeWarningKind::NonFieldSingletonAsField,
-                                    format!("Cannot reasonably use KnownBlock {value:?} as a field parameter in this context, maybe you meant to use it as a different parameter.").into(),
+                                    GrazeWarningKind::LiteralFieldValueIncorrect,
+                                    format!(
+                                        concat!("Cannot reasonably use KnownBlock {:?} as a field parameter in this context, ",
+                                        "maybe you meant to use it as a different parameter or you misspelt it. ", 
+                                        "It is recommended to use singleton values instead of literal strings for fields."), 
+                                        value
+                                    ).into(),
                                     known_block_pos_range
                                 ),
                                 None
@@ -808,8 +813,13 @@ pub fn add_known_block_to_params(
                             context,
                             GrazeMessage::Warning(
                                 GrazeWarning::Specific(
-                                    GrazeWarningKind::NonFieldSingletonAsField,
-                                    format!("Cannot reasonably use KnownBlock {value:?} as a menu input parameter in this context, maybe you meant to use it as a different parameter.").into(),
+                                    GrazeWarningKind::LiteralFieldValueIncorrect,
+                                    format!(
+                                        concat!("Cannot reasonably use KnownBlock {:?} as a field parameter in this context, ",
+                                        "maybe you meant to use it as a different parameter or you misspelt it. ", 
+                                        "It is recommended to use singleton values instead of literal strings for fields."), 
+                                        value
+                                    ).into(),
                                     known_block_pos_range
                                 ),
                                 None
