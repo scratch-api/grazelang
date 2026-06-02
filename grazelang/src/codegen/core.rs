@@ -788,6 +788,7 @@ pub fn add_known_block_to_params(
                 grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
                     let is_shadow = sb3_primitive_block.is_shadow();
                     // TODO: Warn if primitive block is a shadow and has an unfitting value for the category
+                    // Issue: #49
                     (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow)
                 }
                 grazelang_library::KnownBlockInput::BlockRef(id) => {

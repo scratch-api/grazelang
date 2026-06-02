@@ -334,5 +334,13 @@
         "lines": "L367-L367",
         "commit": "2a53e9a1077483a2ae06c00743a9d5d8a5521df4",
         "title": "Check what categories might fit"
+    },
+    "49": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L790-L790",
+        "commit": "2306654977eab3716ab9fef06fb466439906d766",
+        "title": "Warn if primitive block is a shadow and has an unfitting value for the category"
     }
 }
