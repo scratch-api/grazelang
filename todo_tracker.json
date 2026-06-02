@@ -345,10 +345,10 @@
     },
     "50": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": "",
+        "text": "Implement if necessary:\n - [ ] variables\n - [ ] lists\n - [ ] broadcasts\n - [x] sprites\n - [x] costumes\n - [x] backdrops\n - [x] sounds",
         "status": "open",
-        "lines": "L429-L429",
-        "commit": "dee1b5c9c54fd279c6b7612e1a6cd3c6b7b09abe",
+        "lines": "L520-L529",
+        "commit": "489e69969bdcf23196ae0edf1e988fc3b7d3b91d",
         "title": "Add variables, lists, broadcasts, sprites etc to corresponding field categories"
     }
 }
