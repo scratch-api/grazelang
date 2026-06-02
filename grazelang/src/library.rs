@@ -7,7 +7,7 @@ use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
     AliasSegment, BACKDROPS_CATEGORY_ID, BindInfo, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID,
-    OBJECTS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
+    SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3PrimitiveBlock},
 };
 use grazelang_library_parser::generate_library;

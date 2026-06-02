@@ -47,6 +47,8 @@ pub enum GrazeWarningKind {
     EmptyExpressionAsField,
     #[assoc(internal_lint_id = "non_field_singleton_as_field")]
     NonFieldSingletonAsField,
+    #[assoc(internal_lint_id = "incorrect_field_category")]
+    IncorrectFieldCategory,
 }
 
 impl GetLintId for GrazeWarningKind {

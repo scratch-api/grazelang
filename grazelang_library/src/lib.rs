@@ -15,11 +15,17 @@ pub const LISTS_CATEGORY_ID: u32 = 2;
 pub const BROADCASTS_CATEGORY_ID: u32 = 3;
 pub const COSTUMES_CATEGORY_ID: u32 = 4;
 pub const BACKDROPS_CATEGORY_ID: u32 = 5;
-pub const SOUNDS_CATEGORY_ID: u32 = 6;
-pub const PROPERTIES_CATEGORY_ID: u32 = 7;
-pub const OBJECTS_CATEGORY_ID: u32 = 8;
-pub const TARGETS_CATEGORY_ID: u32 = 9;
-pub const LOCATIONS_CATEGORY_ID: u32 = 10;
+pub const BACKDROP_TARGETS_CATEGORY_ID: u32 = 6;
+pub const SOUNDS_CATEGORY_ID: u32 = 7;
+pub const DESTINATIONS_CATEGORY_ID: u32 = 8; // sprites or mouse pointer or random position
+pub const DIRECTIONS_CATEGORY_ID: u32 = 9; // sprites or mouse pointer or random direction
+pub const CLONABLES_CATEGORY_ID: u32 = 10; // sprites or myself
+pub const COLLIDERS_CATEGORY_ID: u32 = 11; // sprites or mouse pointer or edge
+pub const LOCATIONS_CATEGORY_ID: u32 = 12; // sprites or mouse pointer
+pub const PROPERTIES_CATEGORY_ID: u32 = 13;
+pub const OBJECTS_CATEGORY_ID: u32 = 14; // sprites or the stage
+pub const PEN_PROPERTIES_CATEGORY_ID: u32 = 15;
+
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindInfo {
@@ -101,7 +107,7 @@ pub enum KnownBlockInput<'a> {
     PrimitiveInput(project_json::Sb3PrimitiveBlock),
     BlockRef(IString),
     SimpleBlock(&'a IString, &'a [(CallBlockParam, KnownBlock)]),
-    Menu(project_json::Sb3FieldValue),
+    Menu(project_json::Sb3FieldValue, &'a HashSet<u32>),
     Empty,
 }
 

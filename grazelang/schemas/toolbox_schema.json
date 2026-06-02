@@ -76,7 +76,8 @@
                                     "altName": "mouse_pointer",
                                     "value": "_mouse_"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "destinations"
                         }
                     }
                 ],
@@ -143,7 +144,8 @@
                                     "altName": "mouse_pointer",
                                     "value": "_mouse_"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "destinations"
                         }
                     }
                 ],
@@ -227,7 +229,8 @@
                                     "altName": "random_direction",
                                     "value": "_random_"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "directions"
                         }
                     }
                 ],
@@ -330,7 +333,8 @@
                                 "altName": "all_around",
                                 "value": "all around"
                             }
-                        ]
+                        ],
+                        "optionCategory": "rotation_styles"
                     }
                 ],
                 "altName": "set_rotation_style"
@@ -457,7 +461,8 @@
                         "shadow": {
                             "type": "looks_costume",
                             "defaultValue": "",
-                            "options": []
+                            "options": [],
+                            "optionCategory": "costumes"
                         }
                     }
                 ],
@@ -495,7 +500,8 @@
                                     "altName": "random_backdrop",
                                     "value": "random backdrop"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "backdrop_targets"
                         }
                     }
                 ],
@@ -577,7 +583,8 @@
                                 "label": "ghost",
                                 "value": "GHOST"
                             }
-                        ]
+                        ],
+                        "optionCategory": "effects"
                     },
                     {
                         "kind": "input",
@@ -630,7 +637,8 @@
                                 "label": "ghost",
                                 "value": "GHOST"
                             }
-                        ]
+                        ],
+                        "optionCategory": "effects"
                     },
                     {
                         "kind": "input",
@@ -678,7 +686,8 @@
                                 "label": "back",
                                 "value": "back"
                             }
-                        ]
+                        ],
+                        "optionCategory": "front_back"
                     }
                 ],
                 "altName": "go_to_layer"
@@ -700,7 +709,8 @@
                                 "label": "backward",
                                 "value": "backward"
                             }
-                        ]
+                        ],
+                        "optionCategory": "forward_backward"
                     },
                     {
                         "kind": "input",
@@ -733,7 +743,8 @@
                                 "label": "name",
                                 "value": "name"
                             }
-                        ]
+                        ],
+                        "optionCategory": "number_name"
                     }
                 ],
                 "altName": "get_costume"
@@ -755,7 +766,8 @@
                                 "label": "name",
                                 "value": "name"
                             }
-                        ]
+                        ],
+                        "optionCategory": "number_name"
                     }
                 ],
                 "altName": "get_backdrop"
@@ -782,7 +794,8 @@
                         "shadow": {
                             "type": "sound_sounds_menu",
                             "defaultValue": "",
-                            "options": []
+                            "options": [],
+                            "optionCategory": "sounds"
                         }
                     }
                 ],
@@ -799,7 +812,8 @@
                         "shadow": {
                             "type": "sound_sounds_menu",
                             "defaultValue": "",
-                            "options": []
+                            "options": [],
+                            "optionCategory": "sounds"
                         }
                     }
                 ],
@@ -828,7 +842,8 @@
                                 "altName": "pan_left_right",
                                 "value": "PAN"
                             }
-                        ]
+                        ],
+                        "optionCategory": "sound_effects"
                     },
                     {
                         "kind": "input",
@@ -862,7 +877,8 @@
                                 "altName": "pan_left_right",
                                 "value": "PAN"
                             }
-                        ]
+                        ],
+                        "optionCategory": "sound_effects"
                     },
                     {
                         "kind": "input",
@@ -1150,7 +1166,8 @@
                                 "altName": "key_9",
                                 "value": "9"
                             }
-                        ]
+                        ],
+                        "optionCategory": "keys"
                     }
                 ],
                 "altName": "when_key_pressed"
@@ -1168,7 +1185,8 @@
                         "name": "BACKDROP",
                         "fieldType": "field_dropdown",
                         "value": "",
-                        "options": []
+                        "options": [],
+                        "optionCategory": "backdrops"
                     }
                 ],
                 "altName": "when_backdrop_switches_to"
@@ -1190,7 +1208,8 @@
                                 "label": "timer",
                                 "value": "TIMER"
                             }
-                        ]
+                        ],
+                        "optionCategory": "when_greater_than_target"
                     },
                     {
                         "kind": "input",
@@ -1429,7 +1448,8 @@
                                 "altName": "other_scripts_in_sprite",
                                 "value": "other scripts in sprite"
                             }
-                        ]
+                        ],
+                        "optionCategory": "stop_target"
                     }
                 ],
                 "altName": "stop"
@@ -1455,7 +1475,8 @@
                                     "label": "myself",
                                     "value": "_myself_"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "clonables"
                         }
                     }
                 ],
@@ -1493,7 +1514,8 @@
                                     "label": "edge",
                                     "value": "_edge_"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "colliders"
                         }
                     }
                 ],
@@ -1561,7 +1583,8 @@
                                     "altName": "mouse_pointer",
                                     "value": "_mouse_"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "locations"
                         }
                     }
                 ],
@@ -1809,7 +1832,8 @@
                                     "altName": "key_9",
                                     "value": "9"
                                 }
-                            ]
+                            ],
+                            "optionCategory": "keys"
                         }
                     }
                 ],
@@ -1848,7 +1872,8 @@
                                 "altName": "not_draggable",
                                 "value": "not draggable"
                             }
-                        ]
+                        ],
+                        "optionCategory": "draggable"
                     }
                 ],
                 "altName": "set_drag_mode"
@@ -1876,12 +1901,8 @@
                         "name": "PROPERTY",
                         "fieldType": "field_dropdown",
                         "value": "",
-                        "options": [
-                            {
-                                "label": "",
-                                "value": ""
-                            }
-                        ]
+                        "options": [],
+                        "optionCategory": "properties"
                     },
                     {
                         "kind": "input",
@@ -1890,15 +1911,10 @@
                         "check": null,
                         "shadow": {
                             "type": "sensing_of_object_menu",
-                            "defaultValue": "_stage_",
-                            "options": [
-                                {
-                                    "label": "Stage",
-                                    "value": "_stage_",
-                                    "altName": "stage"
-                                }
-                            ]
-                        }
+                            "defaultValue": "",
+                            "options": []
+                        },
+                        "optionCategory": "objects"
                     }
                 ],
                 "altName": "property_of_object"
@@ -1941,7 +1957,8 @@
                                 "label": "second",
                                 "value": "SECOND"
                             }
-                        ]
+                        ],
+                        "optionCategory": "time_units"
                     }
                 ],
                 "altName": "current_time_unit"
@@ -2457,7 +2474,8 @@
                                 "altName": "pow",
                                 "value": "10 ^"
                             }
-                        ]
+                        ],
+                        "optionCategory": "math_ops"
                     },
                     {
                         "kind": "input",
@@ -2487,7 +2505,8 @@
                         "name": "VARIABLE",
                         "fieldType": "field_variable_getter",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "variables"
                     }
                 ],
                 "altName": "get_variable_value"
@@ -2500,7 +2519,8 @@
                         "name": "VARIABLE",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "variables"
                     },
                     {
                         "kind": "input",
@@ -2524,7 +2544,8 @@
                         "name": "VARIABLE",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "variables"
                     },
                     {
                         "kind": "input",
@@ -2548,7 +2569,8 @@
                         "name": "VARIABLE",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "variables"
                     }
                 ],
                 "altName": "show_variable"
@@ -2561,7 +2583,8 @@
                         "name": "VARIABLE",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "variables"
                     }
                 ],
                 "altName": "hide_variable"
@@ -2587,7 +2610,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     },
                     {
                         "kind": "input",
@@ -2611,7 +2635,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     },
                     {
                         "kind": "input",
@@ -2635,7 +2660,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     }
                 ],
                 "altName": "delete_all_of_list"
@@ -2648,7 +2674,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     },
                     {
                         "kind": "input",
@@ -2718,7 +2745,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     },
                     {
                         "kind": "input",
@@ -2742,7 +2770,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     },
                     {
                         "kind": "input",
@@ -2766,7 +2795,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     }
                 ],
                 "altName": "get_list_length"
@@ -2779,7 +2809,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     },
                     {
                         "kind": "input",
@@ -2803,7 +2834,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     }
                 ],
                 "altName": "show_list"
@@ -2816,7 +2848,8 @@
                         "name": "LIST",
                         "fieldType": "field_variable",
                         "value": null,
-                        "options": null
+                        "options": null,
+                        "optionCategory": "lists"
                     }
                 ],
                 "altName": "hide_list"

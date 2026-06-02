@@ -2,11 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
-    AliasSegment, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID, COSTUMES_CATEGORY_ID,
-    CallBlockParam, CallBlockParamKind, KnownBlock, LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID,
-    LibraryItem, LibraryItemValue, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, PROPERTIES_CATEGORY_ID,
-    SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature, TARGETS_CATEGORY_ID,
-    VARIABLES_CATEGORY_ID,
+    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
+    CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
+    CallBlockParamKind, DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, KnownBlock,
+    LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID, LibraryItem, LibraryItemValue, NO_CATEGORY_ID,
+    OBJECTS_CATEGORY_ID, PEN_PROPERTIES_CATEGORY_ID, PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID,
+    SimpleCallableKnownBlockSignature, VARIABLES_CATEGORY_ID,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
 use serde::{Deserialize, Serialize};
@@ -352,16 +353,22 @@ pub fn process_toolbox_category(
         alt_name,
     } = value;
     let mut menu_category_ids = HashMap::<IString, u32>::from([
+        (literal!(""), NO_CATEGORY_ID),
         (literal!("variables"), VARIABLES_CATEGORY_ID),
         (literal!("lists"), LISTS_CATEGORY_ID),
         (literal!("broadcasts"), BROADCASTS_CATEGORY_ID),
         (literal!("costumes"), COSTUMES_CATEGORY_ID),
         (literal!("backdrops"), BACKDROPS_CATEGORY_ID),
+        (literal!("backdrop_targets"), BACKDROP_TARGETS_CATEGORY_ID),
         (literal!("sounds"), SOUNDS_CATEGORY_ID),
+        (literal!("destinations"), DESTINATIONS_CATEGORY_ID),
+        (literal!("directions"), DIRECTIONS_CATEGORY_ID),
+        (literal!("clonables"), CLONABLES_CATEGORY_ID),
+        (literal!("colliders"), COLLIDERS_CATEGORY_ID),
+        (literal!("locations"), LOCATIONS_CATEGORY_ID),
         (literal!("properties"), PROPERTIES_CATEGORY_ID),
         (literal!("objects"), OBJECTS_CATEGORY_ID),
-        (literal!("targets"), TARGETS_CATEGORY_ID),
-        (literal!("locations"), LOCATIONS_CATEGORY_ID),
+        (literal!("pen_properties"), PEN_PROPERTIES_CATEGORY_ID),
     ]);
     let mut associated_items = HashMap::<String, (Sb3FieldValue, HashSet<u32>)>::new();
     let mut namespace = HashMap::<String, LibraryItem>::with_capacity(blocks.len());
@@ -418,17 +425,17 @@ pub fn process_toolbox_category(
                 // Issue: #34
             }
         } else {
-            namespace.insert(
-                name.clone(),
-                LibraryItem {
-                    namespace: HashMap::new(),
-                    value: Some(LibraryItemValue::Alias(vec![
-                        AliasSegment::Super,
-                        AliasSegment::Child("menus".to_string()),
-                        AliasSegment::Child(name.clone()),
-                    ])),
-                },
-            );
+            // namespace.insert(
+            //     name.clone(),
+            //     LibraryItem {
+            //         namespace: HashMap::new(),
+            //         value: Some(LibraryItemValue::Alias(vec![
+            //             AliasSegment::Super,
+            //             AliasSegment::Child("menus".to_string()),
+            //             AliasSegment::Child(name.clone()),
+            //         ])),
+            //     },
+            // );
         }
         processed_associated_items.push((
             name,

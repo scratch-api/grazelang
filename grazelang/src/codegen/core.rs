@@ -7,9 +7,9 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
-    BindInfo, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature, HasShadow,
+    BindInfo, CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, CallBlockParam, CallBlockParamKind,
+    CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, HasShadow,
     LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
-    TARGETS_CATEGORY_ID,
     project_json::{Sb3NormalBlock, Sb3Primitive},
 };
 use rand::SeedableRng;
@@ -28,7 +28,7 @@ use crate::{
     codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment},
     lexer::PosRange,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
-    messages::GrazeMessage,
+    messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
     names::Namespace,
     parser::{
         context::{
@@ -333,9 +333,12 @@ impl GrazeSb3GeneratorContext {
                         &[OBJECTS_CATEGORY_ID]
                     } else {
                         &[
-                            OBJECTS_CATEGORY_ID,
-                            TARGETS_CATEGORY_ID,
+                            DESTINATIONS_CATEGORY_ID,
+                            DIRECTIONS_CATEGORY_ID,
+                            CLONABLES_CATEGORY_ID,
+                            COLLIDERS_CATEGORY_ID,
                             LOCATIONS_CATEGORY_ID,
+                            OBJECTS_CATEGORY_ID,
                         ]
                     })
                     .copied()
@@ -746,51 +749,85 @@ pub fn add_known_block_to_params(
                 inputs.insert(param_name, input_value);
             }
         }
-        CallBlockParamKind::Field { .. } => {
+        CallBlockParamKind::Field { category, .. } => {
             fields.insert(
                 param_name,
-                value.resolve_for_field(known_block_pos_range, context),
+                {
+                    let (field_value, categories) = value.resolve_for_field(known_block_pos_range, context);
+                    if !categories.contains(category) {
+                        emit_message(
+                            context,
+                            GrazeMessage::Warning(
+                                GrazeWarning::Specific(
+                                    GrazeWarningKind::NonFieldSingletonAsField,
+                                    format!("Cannot reasonably use KnownBlock {value:?} as a field parameter in this context, maybe you meant to use it as a different parameter.").into(),
+                                    known_block_pos_range
+                                ),
+                                None
+                            ),
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                    field_value
+                },
             );
         }
         CallBlockParamKind::MenuInput {
             opcode,
             field_name,
             default,
-            category: _,
+            category,
         } => {
-            let (input_repr, is_menu) = match value
+            let (input_repr, is_shadow) = match value
                 .resolve_for_input(known_block_pos_range, context)
             {
                 grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
-                    (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), false)
+                    let is_shadow = sb3_primitive_block.is_shadow();
+                    (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow)
                 }
                 grazelang_library::KnownBlockInput::BlockRef(id) => {
-                    (Sb3InputRepr::Reference(id.to_string()), false)
+                    (Sb3InputRepr::Reference(id.to_string()), IsShadow::No)
                 }
                 grazelang_library::KnownBlockInput::SimpleBlock(opcode, params) => (
                     Sb3InputRepr::Reference(
                         introduce_input_simple_block(opcode, params.iter(), context)?.to_string(),
                     ),
-                    false,
+                    IsShadow::No,
                 ),
-                grazelang_library::KnownBlockInput::Menu(input_menu_value) => (
-                    Sb3InputRepr::Reference(
-                        introduce_input_menu(opcode, field_name, input_menu_value, context)
-                            .to_string(),
-                    ),
-                    true,
-                ),
+                grazelang_library::KnownBlockInput::Menu(input_menu_value, categories) => {
+                    if !categories.contains(category) {
+                        emit_message(
+                            context,
+                            GrazeMessage::Warning(
+                                GrazeWarning::Specific(
+                                    GrazeWarningKind::NonFieldSingletonAsField,
+                                    format!("Cannot reasonably use KnownBlock {value:?} as a menu input parameter in this context, maybe you meant to use it as a different parameter.").into(),
+                                    known_block_pos_range
+                                ),
+                                None
+                            ),
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                    (
+                        Sb3InputRepr::Reference(
+                            introduce_input_menu(opcode, field_name, input_menu_value, context)
+                                .to_string(),
+                        ),
+                        IsShadow::Yes,
+                    )
+                }
                 grazelang_library::KnownBlockInput::Empty => (
                     Sb3InputRepr::Reference(
                         introduce_input_menu(opcode, field_name, default.clone(), context)
                             .to_string(),
                     ),
-                    true,
+                    IsShadow::Yes,
                 ),
             };
             inputs.insert(
                 param_name,
-                if is_menu {
+                if is_shadow == IsShadow::Yes {
                     Sb3InputValue::Shadow(input_repr)
                 } else {
                     Sb3InputValue::ObscuredShadow {
@@ -872,7 +909,7 @@ pub fn known_block_to_input_repr_no_menu(
             ),
             IsShadow::No,
         ))),
-        grazelang_library::KnownBlockInput::Menu(input_menu_value) => {
+        grazelang_library::KnownBlockInput::Menu(input_menu_value, _) => {
             Err(GrazeSb3GeneratorError::UnexpectedInputMenu {
                 input_menu_value,
                 pos_range: known_block_pos_range,
@@ -2928,7 +2965,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 grazelang_library::KnownBlockInput::SimpleBlock(opcode, params) => {
                     introduce_input_simple_block(opcode, params.iter(), context)?;
                 },
-                grazelang_library::KnownBlockInput::Menu(input_menu_value) => return Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value, pos_range: param_pos_range }),
+                grazelang_library::KnownBlockInput::Menu(input_menu_value, _) => return Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value, pos_range: param_pos_range }),
                 grazelang_library::KnownBlockInput::Empty => (),
             }
         });

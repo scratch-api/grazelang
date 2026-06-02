@@ -9,6 +9,7 @@ sprite `Sprite1` sprite_1 {
     let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
     events.when_green_flag_clicked {
         delete_all_of_list(list_);
+        say(is_key_pressed("list_"));
         test = 10 + 5 * 2;
         if "test = 20" == "test = ${test}" {
             test = 5;

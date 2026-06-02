@@ -5,15 +5,20 @@ use std::{
     io::Read,
     ops::{Index, IndexMut},
     rc::Rc,
+    sync::LazyLock,
 };
 
 use arcstr::{ArcStr as IString, literal};
 pub use grazelang_library::KnownBlock;
 use grazelang_library::{
-    BACKDROPS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam, CallableKnownBlockSignature, HasShadow, KnownBlockInput, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature, project_json::{
+    BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
+    CallableKnownBlockSignature, HasShadow, KnownBlockInput, LISTS_CATEGORY_ID,
+    PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
+    VARIABLES_CATEGORY_ID,
+    project_json::{
         Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock, Sb3VariableDeclaration,
         TargetAttachment,
-    }
+    },
 };
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -40,6 +45,30 @@ macro_rules! static_ref_of_const {
         VALUE
     }};
 }
+
+macro_rules! static_ref_hashset {
+    ($name:ident, [$($x:expr),* $(,)?]) => {
+        static $name: LazyLock<HashSet<u32>> = LazyLock::new(|| {
+            HashSet::from([$($x),*])
+        });
+    };
+}
+
+static_ref_hashset!(NO_CATEGORIES, []);
+static_ref_hashset!(
+    VARIABLE_CATEGORIES,
+    [VARIABLES_CATEGORY_ID, PROPERTIES_CATEGORY_ID]
+);
+static_ref_hashset!(LIST_CATEGORIES, [LISTS_CATEGORY_ID]);
+static_ref_hashset!(BROADCAST_CATEGORIES, [BROADCASTS_CATEGORY_ID]);
+static_ref_hashset!(
+    ANY_CATEGORIES,
+    [
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+        25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+        48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63
+    ]
+);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Primitive {
@@ -109,11 +138,11 @@ pub trait ResolveKnownBlock {
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a>;
 
-    fn resolve_for_field(
-        &self,
+    fn resolve_for_field<'a>(
+        &'a self,
         pos_range: PosRange,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> codegen::project_json::Sb3FieldValue;
+    ) -> (codegen::project_json::Sb3FieldValue, &'a HashSet<u32>);
 
     fn resolve_for_call_block<'a>(
         &'a self,
@@ -167,7 +196,7 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::FieldValue { value, categories } => {
                 // TODO: warn user about possibly incorrect usage in some cases
                 // Issue: #46
-                KnownBlockInput::Menu(value.clone())
+                KnownBlockInput::Menu(value.clone(), categories)
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
             KnownBlock::PrimitiveBlock { value } => KnownBlockInput::PrimitiveInput(value.clone()),
@@ -199,11 +228,11 @@ impl ResolveKnownBlock for KnownBlock {
         }
     }
 
-    fn resolve_for_field(
-        &self,
+    fn resolve_for_field<'a>(
+        &'a self,
         pos_range: PosRange,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> codegen::project_json::Sb3FieldValue {
+    ) -> (codegen::project_json::Sb3FieldValue, &'a HashSet<u32>) {
         use codegen::project_json::{Sb3FieldValue, Sb3Primitive};
         match self {
             KnownBlock::Variable {
@@ -211,12 +240,21 @@ impl ResolveKnownBlock for KnownBlock {
                 id,
                 assign: _,
                 bind_info: _,
-            }
-            | KnownBlock::List { canonical_name, id } => Sb3FieldValue::WithId {
-                value: Sb3Primitive::String(canonical_name.to_string()),
-                id: id.to_string(),
-            },
-            KnownBlock::FieldValue { value, categories } => value.clone(),
+            } => (
+                Sb3FieldValue::WithId {
+                    value: Sb3Primitive::String(canonical_name.to_string()),
+                    id: id.to_string(),
+                },
+                &*VARIABLE_CATEGORIES,
+            ),
+            KnownBlock::List { canonical_name, id } => (
+                Sb3FieldValue::WithId {
+                    value: Sb3Primitive::String(canonical_name.to_string()),
+                    id: id.to_string(),
+                },
+                &*LIST_CATEGORIES,
+            ),
+            KnownBlock::FieldValue { value, categories } => (value.clone(), categories),
             KnownBlock::BlockRef { id } => {
                 emit_message(
                     context,
@@ -230,7 +268,8 @@ impl ResolveKnownBlock for KnownBlock {
                     ),
                     GrazeMessageSetting::Warnings,
                 );
-                Sb3FieldValue::Normal(id.into())
+                // No need for a second warning, therefore `ANY_CATEGORIES` is used
+                (Sb3FieldValue::Normal(id.into()), &*ANY_CATEGORIES)
             }
             KnownBlock::PrimitiveBlock { value } => {
                 // TODO: warn user about possibly incorrect usage
@@ -243,24 +282,43 @@ impl ResolveKnownBlock for KnownBlock {
                     | codegen::project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
                     | codegen::project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
                     | codegen::project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
-                        Sb3FieldValue::Normal(sb3_primitive.clone())
+                        // No warning implemented yet, therefore `NO_CATEGORIES` is used to trigger a placeholder warning
+                        (
+                            Sb3FieldValue::Normal(sb3_primitive.clone()),
+                            &*NO_CATEGORIES,
+                        )
                     }
-                    codegen::project_json::Sb3PrimitiveBlock::Broadcast { name, id }
-                    | codegen::project_json::Sb3PrimitiveBlock::Variable {
+                    codegen::project_json::Sb3PrimitiveBlock::Broadcast { name, id } => (
+                        Sb3FieldValue::WithId {
+                            value: Sb3Primitive::String(name.clone()),
+                            id: id.clone(),
+                        },
+                        &*BROADCAST_CATEGORIES,
+                    ),
+                    codegen::project_json::Sb3PrimitiveBlock::Variable {
                         name,
                         id,
                         x: _,
                         y: _,
-                    }
-                    | codegen::project_json::Sb3PrimitiveBlock::List {
+                    } => (
+                        Sb3FieldValue::WithId {
+                            value: Sb3Primitive::String(name.clone()),
+                            id: id.clone(),
+                        },
+                        &*VARIABLE_CATEGORIES,
+                    ),
+                    codegen::project_json::Sb3PrimitiveBlock::List {
                         name,
                         id,
                         x: _,
                         y: _,
-                    } => Sb3FieldValue::WithId {
-                        value: Sb3Primitive::String(name.clone()),
-                        id: id.clone(),
-                    },
+                    } => (
+                        Sb3FieldValue::WithId {
+                            value: Sb3Primitive::String(name.clone()),
+                            id: id.clone(),
+                        },
+                        &*LIST_CATEGORIES,
+                    ),
                 }
             }
             KnownBlock::Callable(..)
@@ -278,7 +336,8 @@ impl ResolveKnownBlock for KnownBlock {
                     ),
                     GrazeMessageSetting::Warnings,
                 );
-                Sb3FieldValue::Normal("".into())
+                // No need for a second warning, therefore `ANY_CATEGORIES` is used
+                (Sb3FieldValue::Normal("".into()), &*ANY_CATEGORIES)
             }
             KnownBlock::Empty => {
                 emit_message(
@@ -293,7 +352,8 @@ impl ResolveKnownBlock for KnownBlock {
                     ),
                     GrazeMessageSetting::Warnings,
                 );
-                Sb3FieldValue::Normal("".into())
+                // No need for a second warning, therefore `ANY_CATEGORIES` is used
+                (Sb3FieldValue::Normal("".into()), &*ANY_CATEGORIES)
             }
             KnownBlock::SingletonReporter {
                 opcode: _,
@@ -304,6 +364,8 @@ impl ResolveKnownBlock for KnownBlock {
             } => {
                 field
                     .clone()
+                    // TODO: Check what categories might fit
+                    .map(|value| (value, &* NO_CATEGORIES))
                     .unwrap_or_else(|| {
                         emit_message(
                             context,
@@ -317,7 +379,8 @@ impl ResolveKnownBlock for KnownBlock {
                             ),
                             GrazeMessageSetting::Warnings,
                         );
-                        codegen::project_json::Sb3FieldValue::Normal("".into())
+                        // No need for a second warning, therefore `ANY_CATEGORIES` is used
+                        (Sb3FieldValue::Normal("".into()), &* ANY_CATEGORIES)
                     })
             }
         }
