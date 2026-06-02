@@ -365,6 +365,7 @@ impl ResolveKnownBlock for KnownBlock {
                 field
                     .clone()
                     // TODO: Check what categories might fit
+                    // Issue: #48
                     .map(|value| (value, &* NO_CATEGORIES))
                     .unwrap_or_else(|| {
                         emit_message(
