@@ -7,9 +7,11 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
-    BindInfo, CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, CallBlockParam, CallBlockParamKind,
+    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BindInfo, CLONABLES_CATEGORY_ID,
+    COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam, CallBlockParamKind,
     CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, HasShadow,
-    LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
+    LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID,
+    SimpleCallableKnownBlockSignature,
     project_json::{Sb3NormalBlock, Sb3Primitive},
 };
 use rand::SeedableRng;
@@ -291,6 +293,47 @@ impl GrazeSb3GeneratorContext {
     pub fn without_standard_namespaces(
         mut parse_context: ParseContext,
     ) -> Result<Self, GrazeSb3GeneratorCreationError> {
+        fn extend_categories_for_field_value<I>(
+            categories: I,
+            field_name_istring: IString,
+            field_category_entries: &mut HashMap<u32, HashSet<IString>>,
+            field_entry_categories: &mut HashMap<IString, HashSet<u32>>,
+        ) where
+            I: Iterator<Item = u32>,
+        {
+            let categories = categories.collect::<HashSet<_>>();
+            for &category in &categories {
+                if let Some(current) = field_category_entries.get_mut(&category) {
+                    current.insert(field_name_istring.clone());
+                } else {
+                    field_category_entries
+                        .insert(category, HashSet::from([field_name_istring.clone()]));
+                }
+            }
+            if let Some(current) = field_entry_categories.get_mut(&field_name_istring) {
+                current.extend(categories);
+            } else {
+                field_entry_categories.insert(field_name_istring, categories);
+            }
+        }
+        fn add_category_for_field_value(
+            category: u32,
+            field_name_istring: IString,
+            field_category_entries: &mut HashMap<u32, HashSet<IString>>,
+            field_entry_categories: &mut HashMap<IString, HashSet<u32>>,
+        ) {
+            if let Some(current) = field_entry_categories.get_mut(&field_name_istring) {
+                current.insert(category);
+            } else {
+                field_entry_categories
+                    .insert(field_name_istring.clone(), HashSet::from([category]));
+            }
+            if let Some(current) = field_category_entries.get_mut(&category) {
+                current.insert(field_name_istring);
+            } else {
+                field_category_entries.insert(category, HashSet::from([field_name_istring]));
+            }
+        }
         let mut rng = Xoshiro256StarStar::from_seed(parse_context.random_seed);
         let targets: Vec<Target> = parse_context.parsed_targets.into();
         let standard_library_namespace_count = library::get_standard_library_namespace_count();
@@ -308,6 +351,9 @@ impl GrazeSb3GeneratorContext {
             None,
             targets.len(),
         );
+        let mut field_category_entries = HashMap::<u32, HashSet<IString>>::with_capacity(32);
+        let mut field_entry_categories =
+            HashMap::<IString, HashSet<u32>>::with_capacity(targets.len());
         let mut asset_files = HashMap::new();
         let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
@@ -330,31 +376,36 @@ impl GrazeSb3GeneratorContext {
                 } else {
                     7
                 };
+            let categories: &[u32] = if is_stage {
+                &[OBJECTS_CATEGORY_ID]
+            } else {
+                &[
+                    DESTINATIONS_CATEGORY_ID,
+                    DIRECTIONS_CATEGORY_ID,
+                    CLONABLES_CATEGORY_ID,
+                    COLLIDERS_CATEGORY_ID,
+                    LOCATIONS_CATEGORY_ID,
+                    OBJECTS_CATEGORY_ID,
+                ]
+            };
+            extend_categories_for_field_value(
+                categories.iter().copied(),
+                target.get_field_name().into(),
+                &mut field_category_entries,
+                &mut field_entry_categories,
+            );
             let target_symbol = symbol_table.new_child_symbol(
                 targets_symbol,
                 target.get_namespace_name().clone(),
                 Some(Rc::new(KnownBlock::FieldValue {
                     value: Sb3FieldValue::Normal(super::project_json::Sb3Primitive::String(
-                        target.get_field_name(),
+                        target.get_field_name().to_string(),
                     )),
-                    categories: <&[u32]>::into_iter(if is_stage {
-                        &[OBJECTS_CATEGORY_ID]
-                    } else {
-                        &[
-                            DESTINATIONS_CATEGORY_ID,
-                            DIRECTIONS_CATEGORY_ID,
-                            CLONABLES_CATEGORY_ID,
-                            COLLIDERS_CATEGORY_ID,
-                            LOCATIONS_CATEGORY_ID,
-                            OBJECTS_CATEGORY_ID,
-                        ]
-                    })
-                    .copied()
-                    .collect(),
+                    categories: categories.iter().copied().collect(),
                 })),
                 symbol_count,
             );
-            let (mut symbols, assets) = target
+            let (mut symbols, attachments) = target
                 .borrow_symbols()
                 .iter()
                 .map(|(key, value)| {
@@ -388,8 +439,42 @@ impl GrazeSb3GeneratorContext {
             } else {
                 create_sprite_dependent_symbols(target.get_namespace_name())
             });
+            for attachment in &attachments {
+                match attachment {
+                    TargetAttachment::Costume(sb3_costume) => {
+                        let field_name_istring: IString = sb3_costume.name.as_str().into();
+                        if is_stage {
+                            extend_categories_for_field_value(
+                                [BACKDROPS_CATEGORY_ID, BACKDROP_TARGETS_CATEGORY_ID].into_iter(),
+                                field_name_istring,
+                                &mut field_category_entries,
+                                &mut field_entry_categories,
+                            );
+                        } else {
+                            add_category_for_field_value(
+                                COSTUMES_CATEGORY_ID,
+                                field_name_istring,
+                                &mut field_category_entries,
+                                &mut field_entry_categories,
+                            );
+                        }
+                    }
+                    TargetAttachment::Sound(sb3_sound) => {
+                        add_category_for_field_value(
+                            SOUNDS_CATEGORY_ID,
+                            sb3_sound.name.as_str().into(),
+                            &mut field_category_entries,
+                            &mut field_entry_categories,
+                        );
+                    }
+                    TargetAttachment::Var(..)
+                    | TargetAttachment::List(..)
+                    | TargetAttachment::CustomBlock(..)
+                    | TargetAttachment::Broadcast { .. } => (),
+                }
+            }
             if target_attachments
-                .insert(target.get_namespace_name().clone(), assets)
+                .insert(target.get_namespace_name().clone(), attachments)
                 .is_some()
             {
                 return Err(GrazeSb3GeneratorCreationError::ShadowedSprite {
@@ -433,6 +518,14 @@ impl GrazeSb3GeneratorContext {
                             .derive_related_data(&mut rng, &mut global_namespace)
                             .unwrap();
                         // TODO: Add variables, lists, broadcasts, sprites etc to corresponding field categories
+                        // Implement if necessary:
+                        //  - [ ] variables
+                        //  - [ ] lists
+                        //  - [ ] broadcasts
+                        //  - [x] sprites
+                        //  - [x] costumes
+                        //  - [x] backdrops
+                        //  - [x] sounds
                         // Issue: #50
                         if let Some(AssetFile {
                             file_name,
@@ -485,8 +578,8 @@ impl GrazeSb3GeneratorContext {
             sb3: Sb3Root::default(),
             targets,
             symbol_table,
-            field_category_entries: Default::default(),
-            field_entry_categories: Default::default(),
+            field_category_entries,
+            field_entry_categories,
             block_counter,
             arg_stack: Vec::new(),
             current_block_id: next_block_id,

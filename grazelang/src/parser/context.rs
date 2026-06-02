@@ -1067,14 +1067,14 @@ impl Target {
         }
     }
 
-    pub fn get_field_name(&self) -> String {
+    pub fn get_field_name(&self) -> &str {
         match self {
             Target::Sprite {
                 name,
                 canonical_name: _,
                 symbols: _,
-            } => name.to_string(),
-            Target::Stage { symbols: _ } => "_stage_".to_string(), // TODO: check whether this is correct
+            } => name.as_str(),
+            Target::Stage { symbols: _ } => "_stage_", // TODO: check whether this is correct
                                                                    // Issue: #5
         }
     }
