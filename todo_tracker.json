@@ -18,7 +18,7 @@
     "20": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "137-138",
         "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
         "title": "possibly set x and y"
@@ -26,7 +26,7 @@
     "19": {
         "filepath": "grazelang/src/parser/context.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "156-157",
         "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
         "title": "possibly set x and y"
@@ -338,7 +338,7 @@
     "49": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L790-L790",
         "commit": "2306654977eab3716ab9fef06fb466439906d766",
         "title": "Warn if primitive block is a shadow and has an unfitting value for the category"
