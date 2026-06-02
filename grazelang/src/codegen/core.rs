@@ -32,8 +32,9 @@ use crate::{
     names::Namespace,
     parser::{
         context::{
-            GrazeMessageSetting, IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol,
-            SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
+            BROADCAST_CATEGORIES, GrazeMessageSetting, IdString, KnownBlock, NO_CATEGORIES,
+            ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target,
+            TargetSymbolDescriptor,
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
@@ -750,6 +751,15 @@ pub fn add_known_block_to_params(
     inputs: &mut HashMap<String, Sb3InputValue>,
     fields: &mut HashMap<String, Sb3FieldValue>,
 ) -> Result<(), GrazeSb3GeneratorError> {
+    macro_rules! LITERAL_FIELD_VALUE_INCORRECT_MSG {
+        () => {
+            concat!(
+                "Cannot reasonably use KnownBlock {:?} as a field parameter in this context, ",
+                "maybe you meant to use it as a different parameter or you misspelt it. ",
+                "It is recommended to use singleton values instead of literal strings for fields."
+            )
+        };
+    }
     let param_name = param.name.to_string();
     match &param.kind {
         CallBlockParamKind::Input { default } => {
@@ -761,32 +771,25 @@ pub fn add_known_block_to_params(
             }
         }
         CallBlockParamKind::Field { category, .. } => {
-            fields.insert(
-                param_name,
-                {
-                    let (field_value, categories) = value.resolve_for_field(known_block_pos_range, context);
-                    if !categories.contains(category) {
-                        emit_message(
-                            context,
-                            GrazeMessage::Warning(
-                                GrazeWarning::Specific(
-                                    GrazeWarningKind::LiteralFieldValueIncorrect,
-                                    format!(
-                                        concat!("Cannot reasonably use KnownBlock {:?} as a field parameter in this context, ",
-                                        "maybe you meant to use it as a different parameter or you misspelt it. ", 
-                                        "It is recommended to use singleton values instead of literal strings for fields."), 
-                                        value
-                                    ).into(),
-                                    known_block_pos_range
-                                ),
-                                None
+            fields.insert(param_name, {
+                let (field_value, categories) =
+                    value.resolve_for_field(known_block_pos_range, context);
+                if !categories.contains(category) {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                GrazeWarningKind::LiteralFieldValueIncorrect,
+                                format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value).into(),
+                                known_block_pos_range,
                             ),
-                            GrazeMessageSetting::Warnings,
-                        );
-                    }
-                    field_value
-                },
-            );
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                field_value
+            });
         }
         CallBlockParamKind::MenuInput {
             opcode,
@@ -799,8 +802,54 @@ pub fn add_known_block_to_params(
             {
                 grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
                     let is_shadow = sb3_primitive_block.is_shadow();
-                    // TODO: Warn if primitive block is a shadow and has an unfitting value for the category
-                    // Issue: #49
+                    match &sb3_primitive_block {
+                        Sb3PrimitiveBlock::Number(sb3_primitive)
+                        | Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
+                        | Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
+                        | Sb3PrimitiveBlock::Integer(sb3_primitive)
+                        | Sb3PrimitiveBlock::Angle(sb3_primitive)
+                        | Sb3PrimitiveBlock::Color(sb3_primitive)
+                        | Sb3PrimitiveBlock::String(sb3_primitive) => {
+                            let cow_str = sb3_primitive.as_cow_str();
+                            let categories = context
+                                .field_entry_categories
+                                .get(&*cow_str)
+                                .unwrap_or_else(|| &*NO_CATEGORIES);
+                            if !categories.contains(category) {
+                                emit_message(
+                                    context,
+                                    GrazeMessage::Warning(
+                                        GrazeWarning::Specific(
+                                            GrazeWarningKind::LiteralFieldValueIncorrect,
+                                            format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value)
+                                                .into(),
+                                            known_block_pos_range,
+                                        ),
+                                        None,
+                                    ),
+                                    GrazeMessageSetting::Warnings,
+                                );
+                            }
+                        }
+                        Sb3PrimitiveBlock::Broadcast { .. } => {
+                            if !BROADCAST_CATEGORIES.contains(category) {
+                                emit_message(
+                                    context,
+                                    GrazeMessage::Warning(
+                                        GrazeWarning::Specific(
+                                            GrazeWarningKind::LiteralFieldValueIncorrect,
+                                            format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value)
+                                                .into(),
+                                            known_block_pos_range,
+                                        ),
+                                        None,
+                                    ),
+                                    GrazeMessageSetting::Warnings,
+                                );
+                            }
+                        }
+                        _ => (),
+                    }
                     (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow)
                 }
                 grazelang_library::KnownBlockInput::BlockRef(id) => {
@@ -819,15 +868,10 @@ pub fn add_known_block_to_params(
                             GrazeMessage::Warning(
                                 GrazeWarning::Specific(
                                     GrazeWarningKind::LiteralFieldValueIncorrect,
-                                    format!(
-                                        concat!("Cannot reasonably use KnownBlock {:?} as a field parameter in this context, ",
-                                        "maybe you meant to use it as a different parameter or you misspelt it. ", 
-                                        "It is recommended to use singleton values instead of literal strings for fields."), 
-                                        value
-                                    ).into(),
-                                    known_block_pos_range
+                                    format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value).into(),
+                                    known_block_pos_range,
                                 ),
-                                None
+                                None,
                             ),
                             GrazeMessageSetting::Warnings,
                         );
@@ -2625,8 +2669,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let symbol_id = get_symbol_id(context, value.0)?;
         let symbol = &context.symbol_table[symbol_id];
         let known_block = get_known_block(symbol, value.0)?.clone();
-        let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-            known_block.resolve_for_call_block(context).ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+        let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
+            .resolve_for_call_block(context)
+            .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                 identifier: value.0.clone(),
             })?;
         add_block(
@@ -2707,8 +2752,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let symbol_id = get_symbol_id(context, value.0)?;
         let symbol = &context.symbol_table[symbol_id];
         let known_block = get_known_block(symbol, value.0)?.clone();
-        let CallableKnownBlockSignature(opcode, params, known_params, mutation) =
-            known_block.resolve_for_call_block(context).ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+        let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
+            .resolve_for_call_block(context)
+            .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                 identifier: value.0.clone(),
             })?;
         add_block(

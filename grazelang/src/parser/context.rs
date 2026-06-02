@@ -48,7 +48,7 @@ macro_rules! static_ref_of_const {
 
 macro_rules! static_ref_hashset {
     ($name:ident, [$($x:expr),* $(,)?]) => {
-        static $name: LazyLock<HashSet<u32>> = LazyLock::new(|| {
+        pub static $name: LazyLock<HashSet<u32>> = LazyLock::new(|| {
             HashSet::from([$($x),*])
         });
     };
