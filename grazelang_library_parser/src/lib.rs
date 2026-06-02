@@ -1,12 +1,23 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
 
+use arcstr::{ArcStr as IString, literal};
+use grazelang_library::{
+    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
+    CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, DESTINATIONS_CATEGORY_ID,
+    DIRECTIONS_CATEGORY_ID, LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID, LibraryItem, NO_CATEGORY_ID,
+    OBJECTS_CATEGORY_ID, PEN_PROPERTIES_CATEGORY_ID, PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID,
+    VARIABLES_CATEGORY_ID,
+};
 use proc_macro::TokenStream;
 use quote::quote;
 use sha3::{Digest, Sha3_256};
 use syn::{LitStr, parse_macro_input};
-use grazelang_library::LibraryItem;
 
-use crate::parser::{LibraryCache, process_toolbox_category};
+use crate::parser::{LibraryCache, merge_associated_item, process_toolbox_category};
 mod parser;
 
 macro_rules! implement_generate_library {
@@ -35,15 +46,41 @@ macro_rules! implement_generate_library {
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
+        let mut menu_category_ids = HashMap::<IString, u32>::from([
+            (literal!(""), NO_CATEGORY_ID),
+            (literal!("variables"), VARIABLES_CATEGORY_ID),
+            (literal!("lists"), LISTS_CATEGORY_ID),
+            (literal!("broadcasts"), BROADCASTS_CATEGORY_ID),
+            (literal!("costumes"), COSTUMES_CATEGORY_ID),
+            (literal!("backdrops"), BACKDROPS_CATEGORY_ID),
+            (literal!("backdrop_targets"), BACKDROP_TARGETS_CATEGORY_ID),
+            (literal!("sounds"), SOUNDS_CATEGORY_ID),
+            (literal!("destinations"), DESTINATIONS_CATEGORY_ID),
+            (literal!("directions"), DIRECTIONS_CATEGORY_ID),
+            (literal!("clonables"), CLONABLES_CATEGORY_ID),
+            (literal!("colliders"), COLLIDERS_CATEGORY_ID),
+            (literal!("locations"), LOCATIONS_CATEGORY_ID),
+            (literal!("properties"), PROPERTIES_CATEGORY_ID),
+            (literal!("objects"), OBJECTS_CATEGORY_ID),
+            (literal!("pen_properties"), PEN_PROPERTIES_CATEGORY_ID),
+        ]);
+        let mut category_entries = HashMap::<u32, HashSet<String>>::new();
 
         for namespace in v {
-            let (category_name, category, associated_menus) = process_toolbox_category(namespace);
+            let (category_name, category, associated_menus) = process_toolbox_category(namespace, &mut category_entries, &mut menu_category_ids);
             for (key, value) in associated_menus {
-                menus.insert(key, value);
+                match menus.entry(key) {
+                    std::collections::hash_map::Entry::Vacant(v) => {
+                        v.insert(value);
+                    }
+                    std::collections::hash_map::Entry::Occupied(mut o) => {
+                        merge_associated_item(o.get_mut(), value);
+                    }
+                }
             }
             library.insert(category_name, category);
         }
-        
+
         library.insert("menus".to_string(), LibraryItem {
             namespace: menus,
             value: None,
@@ -52,14 +89,32 @@ macro_rules! implement_generate_library {
         let library_keys = library.keys();
         let library_values = library.values();
 
+        let category_entry_stream = expand_category_entries(category_entries);
+
         let expanded = quote! {
-            ::std::collections::HashMap::from([#( (#library_keys.to_string(), #library_values) ),*])
+            (::std::collections::HashMap::from([#( (#library_keys.to_string(), #library_values) ),*]), #category_entry_stream)
         };
 
         implement_create_cache!(output_cache_path, hex_hash, expanded, $create_cache);
 
         TokenStream::from(expanded)
     }};
+}
+
+fn expand_category_entries(
+    category_entries: HashMap<u32, HashSet<String>>,
+) -> proc_macro2::TokenStream {
+    let keys = category_entries.keys();
+    let mut values = Vec::with_capacity(category_entries.len());
+    for value in category_entries.values() {
+        let value = value.iter();
+        values.push(quote! {
+            ::std::collections::HashSet::from([#( ::arcstr::literal!(#value) ),*])
+        });
+    }
+    quote! {
+        ::std::collections::HashMap::from([#( (#keys, #values) ),*])
+    }
 }
 
 macro_rules! implement_create_hash_and_cache_path {

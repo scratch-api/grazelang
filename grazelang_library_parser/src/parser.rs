@@ -1,13 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use arcstr::{ArcStr as IString, literal};
+use arcstr::ArcStr as IString;
 use grazelang_library::{
-    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
-    CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
-    CallBlockParamKind, DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, KnownBlock,
-    LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID, LibraryItem, LibraryItemValue, NO_CATEGORY_ID,
-    OBJECTS_CATEGORY_ID, PEN_PROPERTIES_CATEGORY_ID, PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID,
-    SimpleCallableKnownBlockSignature, VARIABLES_CATEGORY_ID,
+    CallBlockParam, CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID,
+    SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
 use serde::{Deserialize, Serialize};
@@ -97,7 +93,7 @@ pub enum InputType {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssociatedLibraryItem {
     pub name: String,
-    pub field_value: Sb3FieldValue,
+    pub field_value: Sb3Primitive,
     pub category: Option<IString>,
 }
 
@@ -166,7 +162,7 @@ impl BlockEntry {
                         options.iter().flatten().for_each(|value| {
                             associated_items.push(AssociatedLibraryItem {
                                 name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
-                                field_value: Sb3FieldValue::Normal(value.value.clone().into()),
+                                field_value: value.value.clone().into(),
                                 category: option_category.clone(),
                             })
                         })
@@ -204,9 +200,8 @@ impl BlockEntry {
                                             .as_ref()
                                             .unwrap_or(&value.label)
                                             .clone(),
-                                        field_value: Sb3FieldValue::Normal(
-                                            value.value.clone().into(),
-                                        ),
+                                        field_value: value.value.clone().into(),
+
                                         category: option_category.clone(),
                                     })
                                 })
@@ -343,8 +338,39 @@ impl BlockEntry {
     }
 }
 
+pub fn merge_associated_item(item_a: &mut LibraryItem, item_b: LibraryItem) {
+    let LibraryItem {
+        namespace: _,
+        value: value_a,
+    } = item_a;
+    let LibraryItem {
+        namespace: _,
+        value: value_b,
+    } = item_b;
+    let categories_b = if let Some(LibraryItemValue::KnownBlock(known_block)) = value_b
+        && let KnownBlock::FieldValue {
+            value: _,
+            categories,
+        } = *known_block
+    {
+        categories
+    } else {
+        return;
+    };
+    if let Some(LibraryItemValue::KnownBlock(known_block)) = value_a
+        && let KnownBlock::FieldValue {
+            value: _,
+            categories,
+        } = known_block.as_mut()
+    {
+        categories.extend(categories_b);
+    }
+}
+
 pub fn process_toolbox_category(
     value: ToolboxCategory,
+    category_entries: &mut HashMap<u32, HashSet<String>>,
+    menu_category_ids: &mut HashMap<IString, u32>,
 ) -> (String, LibraryItem, Vec<(String, LibraryItem)>) {
     let ToolboxCategory {
         category: _,
@@ -352,25 +378,7 @@ pub fn process_toolbox_category(
         blocks,
         alt_name,
     } = value;
-    let mut menu_category_ids = HashMap::<IString, u32>::from([
-        (literal!(""), NO_CATEGORY_ID),
-        (literal!("variables"), VARIABLES_CATEGORY_ID),
-        (literal!("lists"), LISTS_CATEGORY_ID),
-        (literal!("broadcasts"), BROADCASTS_CATEGORY_ID),
-        (literal!("costumes"), COSTUMES_CATEGORY_ID),
-        (literal!("backdrops"), BACKDROPS_CATEGORY_ID),
-        (literal!("backdrop_targets"), BACKDROP_TARGETS_CATEGORY_ID),
-        (literal!("sounds"), SOUNDS_CATEGORY_ID),
-        (literal!("destinations"), DESTINATIONS_CATEGORY_ID),
-        (literal!("directions"), DIRECTIONS_CATEGORY_ID),
-        (literal!("clonables"), CLONABLES_CATEGORY_ID),
-        (literal!("colliders"), COLLIDERS_CATEGORY_ID),
-        (literal!("locations"), LOCATIONS_CATEGORY_ID),
-        (literal!("properties"), PROPERTIES_CATEGORY_ID),
-        (literal!("objects"), OBJECTS_CATEGORY_ID),
-        (literal!("pen_properties"), PEN_PROPERTIES_CATEGORY_ID),
-    ]);
-    let mut associated_items = HashMap::<String, (Sb3FieldValue, HashSet<u32>)>::new();
+    let mut associated_items = HashMap::<String, (Sb3Primitive, HashSet<u32>)>::new();
     let mut namespace = HashMap::<String, LibraryItem>::with_capacity(blocks.len());
     for block in blocks {
         let ProcessedBlockEntry {
@@ -378,29 +386,25 @@ pub fn process_toolbox_category(
             opcode: _,
             library_item: item,
             associated_items: new_associated_items,
-        } = block.process(&mut menu_category_ids);
+        } = block.process(menu_category_ids);
         for AssociatedLibraryItem {
             name: associated_item_name,
             field_value: associated_item_field_value,
             category,
         } in new_associated_items
         {
+            let category_id = get_menu_category_id(menu_category_ids, category.as_ref());
+            category_entries
+                .entry(category_id)
+                .or_default()
+                .insert(associated_item_field_value.to_string());
             if let Some(current) = associated_items.get_mut(&associated_item_name) {
                 assert_eq!(&current.0, &associated_item_field_value);
-                current.1.insert(get_menu_category_id(
-                    &mut menu_category_ids,
-                    category.as_ref(),
-                ));
+                current.1.insert(category_id);
             } else {
                 associated_items.insert(
                     associated_item_name,
-                    (
-                        associated_item_field_value,
-                        HashSet::from([get_menu_category_id(
-                            &mut menu_category_ids,
-                            category.as_ref(),
-                        )]),
-                    ),
+                    (associated_item_field_value, HashSet::from([category_id])),
                 );
             }
         }
@@ -409,41 +413,41 @@ pub fn process_toolbox_category(
     let mut processed_associated_items =
         Vec::<(String, LibraryItem)>::with_capacity(associated_items.len());
     for (name, (field_value, categories)) in associated_items {
-        if let Some(current) = namespace.get_mut(&name) {
-            if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
-                && let KnownBlock::SingletonReporter {
-                    opcode: _,
-                    params: _,
-                    field,
-                    assign: _,
-                    bind_info: _,
-                } = known_block.as_mut()
-            {
-                field.replace(field_value.clone());
-            } else {
-                todo!() // TODO: warn about overlap
-                // Issue: #34
-            }
-        } else {
-            // namespace.insert(
-            //     name.clone(),
-            //     LibraryItem {
-            //         namespace: HashMap::new(),
-            //         value: Some(LibraryItemValue::Alias(vec![
-            //             AliasSegment::Super,
-            //             AliasSegment::Child("menus".to_string()),
-            //             AliasSegment::Child(name.clone()),
-            //         ])),
-            //     },
-            // );
-        }
+        // if let Some(current) = namespace.get_mut(&name) {
+        //     if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
+        //         && let KnownBlock::SingletonReporter {
+        //             opcode: _,
+        //             params: _,
+        //             field,
+        //             assign: _,
+        //             bind_info: _,
+        //         } = known_block.as_mut()
+        //     {
+        //         field.replace(field_value.clone());
+        //     } else {
+        //         todo!() // TODO: warn about overlap
+        //         // Issue: #34
+        //     }
+        // } else {
+        //     // namespace.insert(
+        //     //     name.clone(),
+        //     //     LibraryItem {
+        //     //         namespace: HashMap::new(),
+        //     //         value: Some(LibraryItemValue::Alias(vec![
+        //     //             AliasSegment::Super,
+        //     //             AliasSegment::Child("menus".to_string()),
+        //     //             AliasSegment::Child(name.clone()),
+        //     //         ])),
+        //     //     },
+        //     // );
+        // }
         processed_associated_items.push((
             name,
             LibraryItem {
                 namespace: HashMap::new(),
                 value: Some(LibraryItemValue::KnownBlock(Box::new(
                     KnownBlock::FieldValue {
-                        value: field_value,
+                        value: Sb3FieldValue::Normal(field_value),
                         categories,
                     },
                 ))),

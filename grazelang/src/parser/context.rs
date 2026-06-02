@@ -141,7 +141,7 @@ pub trait ResolveKnownBlock {
     fn resolve_for_field<'a>(
         &'a self,
         pos_range: PosRange,
-        context: &mut codegen::core::GrazeSb3GeneratorContext,
+        context: &'a mut codegen::core::GrazeSb3GeneratorContext,
     ) -> (codegen::project_json::Sb3FieldValue, &'a HashSet<u32>);
 
     fn resolve_for_call_block<'a>(
@@ -194,8 +194,6 @@ impl ResolveKnownBlock for KnownBlock {
                 })
             }
             KnownBlock::FieldValue { value, categories } => {
-                // TODO: warn user about possibly incorrect usage in some cases
-                // Issue: #46
                 KnownBlockInput::Menu(value.clone(), categories)
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
@@ -231,7 +229,7 @@ impl ResolveKnownBlock for KnownBlock {
     fn resolve_for_field<'a>(
         &'a self,
         pos_range: PosRange,
-        context: &mut codegen::core::GrazeSb3GeneratorContext,
+        context: &'a mut codegen::core::GrazeSb3GeneratorContext,
     ) -> (codegen::project_json::Sb3FieldValue, &'a HashSet<u32>) {
         use codegen::project_json::{Sb3FieldValue, Sb3Primitive};
         match self {
@@ -282,10 +280,13 @@ impl ResolveKnownBlock for KnownBlock {
                     | codegen::project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
                     | codegen::project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
                     | codegen::project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
-                        // No warning implemented yet, therefore `NO_CATEGORIES` is used to trigger a placeholder warning
+                        let cow_str = sb3_primitive.as_cow_str();
                         (
                             Sb3FieldValue::Normal(sb3_primitive.clone()),
-                            &*NO_CATEGORIES,
+                            context
+                                .field_entry_categories
+                                .get(&*cow_str)
+                                .unwrap_or_else(|| &*NO_CATEGORIES),
                         )
                     }
                     codegen::project_json::Sb3PrimitiveBlock::Broadcast { name, id } => (

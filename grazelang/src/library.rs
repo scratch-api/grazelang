@@ -12,9 +12,12 @@ use grazelang_library::{
 };
 use grazelang_library_parser::generate_library;
 
-use crate::parser::context::{Symbol, SymbolId, SymbolTable};
+use crate::{
+    codegen::core::GrazeSb3GeneratorContext,
+    parser::context::{Symbol, SymbolId, SymbolTable},
+};
 
-pub fn get_generated_library() -> HashMap<String, LibraryItem> {
+pub fn get_generated_library() -> (HashMap<String, LibraryItem>, HashMap<u32, HashSet<IString>>) {
     generate_library!("schemas/toolbox_schema.json")
 }
 
@@ -90,8 +93,32 @@ pub fn get_standard_library_namespace_count() -> usize {
     10
 }
 
-pub fn add_standard_library_namespaces(symbol_table: &mut SymbolTable, root_symbol: SymbolId) {
-    convert_generated_library(get_generated_library(), symbol_table, root_symbol)
+pub fn add_standard_library_namespaces(
+    context: &mut GrazeSb3GeneratorContext,
+    root_symbol: SymbolId,
+) {
+    let (raw_library, category_entries) = get_generated_library();
+    convert_generated_library(raw_library, &mut context.symbol_table, root_symbol);
+    for (key, values) in category_entries {
+        match context.field_category_entries.entry(key) {
+            std::collections::hash_map::Entry::Vacant(v) => {
+                v.insert(values.clone());
+            }
+            std::collections::hash_map::Entry::Occupied(mut o) => {
+                o.get_mut().extend(values.iter().cloned());
+            }
+        }
+        for value in values {
+            match context.field_entry_categories.entry(value) {
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    v.insert(HashSet::from([key]));
+                }
+                std::collections::hash_map::Entry::Occupied(mut o) => {
+                    o.get_mut().insert(key);
+                },
+            }
+        }
+    }
 }
 
 /// Creates symbols like `sprites.<sprite_name>.x` that are to be accessed as `sensing_of` blocks for a sprite

@@ -6,7 +6,7 @@ use serde::{
     ser::{SerializeMap, SerializeSeq},
 };
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use crate::{KnownBlock, quote_option};
 
@@ -188,6 +188,28 @@ pub enum Sb3Primitive {
     Float(f64), // f128 is not stable i guess
                 // Bool(bool),
                 // Null,
+}
+
+impl Sb3Primitive {
+    pub fn as_cow_str(&self) -> Cow<'_, str> {
+        match self {
+            Sb3Primitive::String(value) => Cow::Borrowed(value.as_str()),
+            Sb3Primitive::Int128(value) => Cow::Owned(value.to_string()),
+            Sb3Primitive::Int(value) => Cow::Owned(value.to_string()),
+            Sb3Primitive::Float(value) => Cow::Owned(value.to_string()),
+        }
+    }
+}
+
+impl Display for Sb3Primitive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Sb3Primitive::String(value) => value.fmt(f),
+            Sb3Primitive::Int128(value) => value.fmt(f),
+            Sb3Primitive::Int(value) => value.fmt(f),
+            Sb3Primitive::Float(value) => value.fmt(f),
+        }
+    }
 }
 
 impl From<String> for Sb3Primitive {

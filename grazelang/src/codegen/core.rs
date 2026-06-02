@@ -153,6 +153,8 @@ pub struct GrazeSb3GeneratorContext {
     pub targets: Vec<Target>,
     // Root symbol is always 0.
     pub symbol_table: SymbolTable,
+    pub field_category_entries: HashMap<u32, HashSet<IString>>,
+    pub field_entry_categories: HashMap<IString, HashSet<u32>>,
     pub block_counter: IdCounter,
     pub arg_stack: Vec<Param>,
     pub current_block_id: IdString,
@@ -256,7 +258,7 @@ pub const MY_BLOCKS_ISTRING: &IString = &literal!("my_blocks");
 impl GrazeSb3GeneratorContext {
     pub fn new(parse_context: ParseContext) -> Result<Self, GrazeSb3GeneratorCreationError> {
         let mut this = Self::without_standard_namespaces(parse_context)?;
-        library::add_standard_library_namespaces(&mut this.symbol_table, Default::default());
+        library::add_standard_library_namespaces(&mut this, Default::default());
         Self::alias_standard_namespaces(&mut this.symbol_table, Default::default());
         Ok(this)
     }
@@ -475,6 +477,8 @@ impl GrazeSb3GeneratorContext {
             sb3: Sb3Root::default(),
             targets,
             symbol_table,
+            field_category_entries: Default::default(),
+            field_entry_categories: Default::default(),
             block_counter,
             arg_stack: Vec::new(),
             current_block_id: next_block_id,

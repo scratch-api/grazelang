@@ -342,6 +342,7 @@ dependencies = [
  "arcstr",
  "base16ct",
  "grazelang_library",
+ "proc-macro2",
  "quote",
  "serde",
  "serde_json",
