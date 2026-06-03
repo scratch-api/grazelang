@@ -508,6 +508,40 @@
                 "altName": "switch_backdrop_to"
             },
             {
+                "type": "looks_switchbackdroptoandwait",
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "BACKDROP",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "looks_backdrops",
+                            "defaultValue": "next backdrop",
+                            "options": [
+                                {
+                                    "label": "next backdrop",
+                                    "altName": "next_backdrop",
+                                    "value": "next backdrop"
+                                },
+                                {
+                                    "label": "previous backdrop",
+                                    "altName": "previous_backdrop",
+                                    "value": "previous backdrop"
+                                },
+                                {
+                                    "label": "random backdrop",
+                                    "altName": "random_backdrop",
+                                    "value": "random backdrop"
+                                }
+                            ],
+                            "optionCategory": "backdrop_targets"
+                        }
+                    }
+                ],
+                "altName": "switch_backdrop_to_and_wait"
+            },
+            {
                 "type": "looks_nextbackdrop",
                 "args": [],
                 "altName": "next_backdrop"

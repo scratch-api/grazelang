@@ -1,6 +1,12 @@
 
 stage {
     backdrop test_costume("src/empty.svg");
+    {
+        switch_backdrop_to_and_wait(stage.test_costume);
+    }
+    {
+        switch_backdrop_to(stage.test_costume);
+    }
 }
 
 sprite `Sprite1` sprite_1 {
