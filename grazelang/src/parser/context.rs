@@ -11,10 +11,10 @@ use std::{
 use arcstr::{ArcStr as IString, literal};
 pub use grazelang_library::KnownBlock;
 use grazelang_library::{
-    BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
-    CallableKnownBlockSignature, HasShadow, KnownBlockInput, LISTS_CATEGORY_ID,
-    PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
-    VARIABLES_CATEGORY_ID,
+    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
+    COSTUMES_CATEGORY_ID, CallBlockParam, CallableKnownBlockSignature, HasShadow, KnownBlockInput,
+    LISTS_CATEGORY_ID, PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID,
+    SimpleCallableKnownBlockSignature, VARIABLES_CATEGORY_ID,
     project_json::{
         Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock, Sb3VariableDeclaration,
         TargetAttachment,
@@ -854,21 +854,42 @@ impl TargetSymbolDescriptor {
                     known_block: Some(Rc::new(match self {
                         // TODO: implement specific known blocks here
                         // Issue: #10
-                        TargetSymbolDescriptor::Costume(..) => KnownBlock::FieldValue {
+                        TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                            name,
+                            canonical_name,
+                            source: _,
+                        }) => KnownBlock::FieldValue {
                             value: codegen::project_json::Sb3FieldValue::Normal(
-                                codegen::project_json::Sb3Primitive::String(value.clone()),
+                                codegen::project_json::Sb3Primitive::String(
+                                    canonical_name.as_ref().unwrap_or(name).to_string(),
+                                ),
                             ),
                             categories: HashSet::from([COSTUMES_CATEGORY_ID]),
                         },
-                        TargetSymbolDescriptor::Backdrop(..) => KnownBlock::FieldValue {
+                        TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                            name,
+                            canonical_name,
+                            source: _,
+                        }) => KnownBlock::FieldValue {
                             value: codegen::project_json::Sb3FieldValue::Normal(
-                                codegen::project_json::Sb3Primitive::String(value.clone()),
+                                codegen::project_json::Sb3Primitive::String(
+                                    canonical_name.as_ref().unwrap_or(name).to_string(),
+                                ),
                             ),
-                            categories: HashSet::from([BACKDROPS_CATEGORY_ID]),
+                            categories: HashSet::from([
+                                BACKDROPS_CATEGORY_ID,
+                                BACKDROP_TARGETS_CATEGORY_ID,
+                            ]),
                         },
-                        TargetSymbolDescriptor::Sound(..) => KnownBlock::FieldValue {
+                        TargetSymbolDescriptor::Sound(SoundDescriptor {
+                            name,
+                            canonical_name,
+                            source: _,
+                        }) => KnownBlock::FieldValue {
                             value: codegen::project_json::Sb3FieldValue::Normal(
-                                codegen::project_json::Sb3Primitive::String(value.clone()),
+                                codegen::project_json::Sb3Primitive::String(
+                                    canonical_name.as_ref().unwrap_or(name).to_string(),
+                                ),
                             ),
                             categories: HashSet::from([SOUNDS_CATEGORY_ID]),
                         },
@@ -1075,7 +1096,7 @@ impl Target {
                 symbols: _,
             } => name.as_str(),
             Target::Stage { symbols: _ } => "_stage_", // TODO: check whether this is correct
-                                                                   // Issue: #5
+                                                       // Issue: #5
         }
     }
 

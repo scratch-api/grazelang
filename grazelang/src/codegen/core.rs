@@ -2962,6 +2962,46 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         };
         wrap_in_statement(context, |context, parent, this_id| {
             let prototype_id = wrap_in_statement(context, |context, parent, this_id| {
+                // let mut inputs = HashMap::<String, Sb3InputValue>::with_capacity(value.5.len());
+                // for ((param_id, has_shadow), (_, canonical_identifier, identifier, _)) in
+                //     zip(params, value.5)
+                // {
+                //     let block_ref = Sb3InputRepr::Reference(
+                //         wrap_in_statement(context, |context, parent, this_id| {
+                //             add_block(
+                //                 context,
+                //                 &this_id,
+                //                 make_block(
+                //                     parent.clone(),
+                //                     if has_shadow == &HasShadow::No {
+                //                         "argument_reporter_string_number"
+                //                     } else {
+                //                         "argument_reporter_boolean"
+                //                     }
+                //                     .to_string(),
+                //                     HashMap::new(),
+                //                     HashMap::from([(
+                //                         "VALUE".to_string(),
+                //                         Sb3FieldValue::Normal(
+                //                             canonical_identifier
+                //                                 .as_ref()
+                //                                 .map(|value| value.name.to_string())
+                //                                 .unwrap_or_else(|| {
+                //                                     identifier.to_single().unwrap().0.to_string()
+                //                                 })
+                //                                 .into(),
+                //                         ),
+                //                     )]),
+                //                     false,
+                //                     None,
+                //                 ),
+                //             );
+                //             this_id
+                //         })
+                //         .to_string(),
+                //     );
+                //     inputs.insert(param_id.to_string(), Sb3InputValue::NoShadow(block_ref));
+                // }
                 add_block(
                     context,
                     &this_id,
