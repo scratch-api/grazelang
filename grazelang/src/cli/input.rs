@@ -54,6 +54,7 @@ impl Cli {
                 path,
             } => {
                 // TODO: Implement project directories
+                // Issue: #51
                 let graze_code = {
                     let mut file = File::open(path.join("main.graze")).unwrap();
                     let mut buf = String::new();

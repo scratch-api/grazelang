@@ -90,7 +90,7 @@
     "11": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L716-L717",
         "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "better ext detections"
@@ -98,7 +98,7 @@
     "10": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L807-L808",
         "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "implement specific known blocks here"
@@ -106,7 +106,7 @@
     "9": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L848-L849",
         "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "implement specific known blocks here"
@@ -350,5 +350,13 @@
         "lines": "L520-L529",
         "commit": "99443ea405ab5a422924b4ea77a32f3874db5453",
         "title": "Add variables, lists, broadcasts, sprites etc to corresponding field categories"
+    },
+    "51": {
+        "filepath": "grazelang/src/cli/input.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L56-L56",
+        "commit": "29284101714e72d76cbbb0fe5e08b0bb173e1643",
+        "title": "Implement project directories"
     }
 }
