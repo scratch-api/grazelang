@@ -34,7 +34,7 @@ use crate::{
     names::Namespace,
     parser::{
         context::{
-            BROADCAST_CATEGORIES, GrazeMessageSetting, IdString, KnownBlock, NO_CATEGORIES,
+            BROADCAST_CATEGORIES, IdString, KnownBlock, NO_CATEGORIES,
             ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target,
             TargetSymbolDescriptor,
         },
@@ -44,7 +44,7 @@ use crate::{
             ListEntry, Literal, UnOpDescriptor,
         },
     },
-    settings::{GrazeSettings, UseShadows},
+    settings::{GrazeSettings, UseShadows, GrazeMessageSetting},
     visitor::{
         GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
         default_visit_expression_binary_operation, default_visit_expression_call,

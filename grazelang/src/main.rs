@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use clap::Parser;
+use grazelang::cli::input::Cli;
 use grazelang::parser::context::ParseContext;
 use grazelang::visitor::GrazeVisitor;
 use grazelang::zipper;
@@ -9,31 +11,33 @@ use grazelang::{
 };
 
 fn main() {
-    let lexer = lexer::create_lexer(include_str!("./test.graze"));
-    let mut context = ParseContext::new(Default::default(), Default::default());
 
-    let parsed = parser::parse_graze_program(&mut PeekableLexer::new(lexer), &mut context).unwrap();
+    let cli = Cli::parse();
+    // let lexer = lexer::create_lexer(include_str!("./test.graze"));
+    // let mut context = ParseContext::new(Default::default(), Default::default());
 
-    if !context.successful {
-        for message in &context.messages {
-            dbg!(message);
-        }
-        dbg!(parsed);
-        panic!("Parsing unsuccessful.");
-    }
+    // let parsed = parser::parse_graze_program(&mut PeekableLexer::new(lexer), &mut context).unwrap();
 
-    let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
-    let visitor = codegen::core::GrazeSb3Generator;
+    // if !context.successful {
+    //     for message in &context.messages {
+    //         dbg!(message);
+    //     }
+    //     dbg!(parsed);
+    //     panic!("Parsing unsuccessful.");
+    // }
 
-    visitor.visit_graze_program(&parsed, &mut context).unwrap();
+    // let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
+    // let visitor = codegen::core::GrazeSb3Generator;
 
-    for message in &context.messages {
-        dbg!(message);
-    }
+    // visitor.visit_graze_program(&parsed, &mut context).unwrap();
 
-    dbg!(&context.asset_files);
+    // for message in &context.messages {
+    //     dbg!(message);
+    // }
 
-    println!("{}", serde_json::to_string(&context.sb3).unwrap());
+    // dbg!(&context.asset_files);
 
-    zipper::write_to_zip_path(Path::new("./test.sb3"), &context).unwrap();
+    // println!("{}", serde_json::to_string(&context.sb3).unwrap());
+
+    // zipper::write_to_zip_path(Path::new("./test.sb3"), &context).unwrap();
 }
