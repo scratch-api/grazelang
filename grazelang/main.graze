@@ -1,6 +1,6 @@
 
 stage {
-    backdrop test_costume("src/empty.svg");
+    backdrop test_costume("empty.svg");
     {
         switch_backdrop_to_and_wait(stage.test_costume);
     }
@@ -10,7 +10,7 @@ stage {
 }
 
 sprite `Sprite1` sprite_1 {
-    costume test_costume("src/empty.svg");
+    costume test_costume("empty.svg");
     let global test;
     let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
     events.when_green_flag_clicked {

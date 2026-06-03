@@ -1,8 +1,14 @@
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use clap::{Parser, Subcommand};
 
-use crate::settings::{GrazeMessageSetting, UseShadows};
+use crate::{
+    codegen, lexer, parser::{self, context::ParseContext, core::PeekableLexer}, settings::{GrazeMessageSetting, GrazeSettings, UseShadows}, visitor::GrazeVisitor, zipper
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -35,4 +41,54 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: PathBuf,
     },
+}
+
+impl Cli {
+    pub fn execute(&self) {
+        match &self.command {
+            Commands::Build {
+                shadows,
+                logging,
+                target,
+                resources,
+                path,
+            } => {
+                // TODO: Implement project directories
+                let graze_code = {
+                    let mut file = File::open(path.join("main.graze")).unwrap();
+                    let mut buf = String::new();
+                    file.read_to_string(&mut buf).unwrap();
+                    buf
+                };
+                let lexer = lexer::create_lexer(&graze_code);
+                let mut context = ParseContext::new(
+                    GrazeSettings {
+                        message_setting: *logging,
+                        use_shadows: *shadows,
+                        resources_path: resources.clone(),
+                    },
+                    Default::default(),
+                );
+                let parsed =
+                    parser::parse_graze_program(&mut PeekableLexer::new(lexer), &mut context)
+                        .unwrap();
+                if !context.successful {
+                    for message in &context.messages {
+                        dbg!(message);
+                    }
+                    dbg!(parsed);
+                    panic!("Parsing unsuccessful.");
+                }
+                let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
+                let visitor = codegen::core::GrazeSb3Generator;
+                visitor.visit_graze_program(&parsed, &mut context).unwrap();
+                for message in &context.messages {
+                    dbg!(message);
+                }
+                // dbg!(&context.asset_files);
+                // println!("{}", serde_json::to_string(&context.sb3).unwrap());
+                zipper::write_to_zip_path(&target.as_ref().unwrap_or(path).join("main.sb3"), &context).unwrap();
+            }
+        }
+    }
 }

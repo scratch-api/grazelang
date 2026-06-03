@@ -13,6 +13,7 @@ use grazelang::{
 fn main() {
 
     let cli = Cli::parse();
+    cli.execute();
     // let lexer = lexer::create_lexer(include_str!("./test.graze"));
     // let mut context = ParseContext::new(Default::default(), Default::default());
 

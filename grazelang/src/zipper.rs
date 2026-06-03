@@ -74,7 +74,7 @@ pub fn write_into_zip<W>(
 where
     W: Write + Seek,
 {
-    pub fn extend_path_safely<'a>(
+    pub fn extend_path_safely(
         buf: &mut PathBuf,
         base: &Path,
         path: &str,
