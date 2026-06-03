@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{
-    codegen::project_json::{Sb3Primitive, Sb3PrimitiveBlock},
-    lexer::PosRange,
-};
+use crate::lexer::PosRange;
 use arcstr::ArcStr as IString; // Immutable string
+use grazelang_library::project_json::{Sb3Primitive, Sb3PrimitiveBlock};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -1008,14 +1006,14 @@ impl GetPos for UnOp {
 pub struct UnOpDescriptor {
     pub opcode: String,
     pub operand_input_name: String,
-    pub extra_inputs: HashMap<String, crate::codegen::project_json::Sb3PrimitiveBlock>,
-    pub field_values: HashMap<String, crate::codegen::project_json::Sb3FieldValue>,
-    pub default: Option<crate::codegen::project_json::Sb3PrimitiveBlock>,
+    pub extra_inputs: HashMap<String, grazelang_library::project_json::Sb3PrimitiveBlock>,
+    pub field_values: HashMap<String, grazelang_library::project_json::Sb3FieldValue>,
+    pub default: Option<grazelang_library::project_json::Sb3PrimitiveBlock>,
 }
 
 impl UnOp {
     pub fn get_descriptor(&self) -> UnOpDescriptor {
-        use crate::codegen::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
+        use grazelang_library::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
 
         match self {
             UnOp::Minus(_) => UnOpDescriptor {

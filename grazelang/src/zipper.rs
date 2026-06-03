@@ -1,12 +1,12 @@
 use std::{
     fs::{File, OpenOptions},
     io::{self, Read, Seek, Write, copy},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use zip::{CompressionMethod, ZipWriter, result::ZipError, write::SimpleFileOptions};
 
-use crate::codegen::core::GrazeSb3GeneratorContext;
+use crate::codegen::core::{CURRENT_DIRECTORY_STR, GrazeSb3GeneratorContext};
 
 #[derive(Debug, thiserror::Error)]
 pub enum WriteIntoZipError {
@@ -16,6 +16,8 @@ pub enum WriteIntoZipError {
     IoError(#[from] io::Error),
     #[error(transparent)]
     SerdeJsonError(#[from] serde_json::Error),
+    #[error("path {path:?} tries to escape the resource directory")]
+    PathTriesToEscapeResourceDirectory { path: PathBuf },
 }
 
 pub fn write_to_zip_path(
@@ -72,6 +74,26 @@ pub fn write_into_zip<W>(
 where
     W: Write + Seek,
 {
+    pub fn extend_path_safely<'a>(
+        buf: &mut PathBuf,
+        base: &Path,
+        path: &str,
+    ) -> Result<PathBuf, WriteIntoZipError> {
+        buf.clear();
+        buf.push(base);
+        buf.push(path);
+        let buf = buf.canonicalize()?;
+        if !buf.starts_with(base) {
+            return Err(WriteIntoZipError::PathTriesToEscapeResourceDirectory { path: buf });
+        }
+        Ok(buf)
+    }
+    let resources_directory = codegen_context
+        .settings
+        .resources_path
+        .as_deref()
+        .unwrap_or(Path::new(CURRENT_DIRECTORY_STR));
+    let mut path_buf = PathBuf::new();
     let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Stored)
         .unix_permissions(0o644);
@@ -79,7 +101,14 @@ where
     zip.write_all(serde_json::to_string(&codegen_context.sb3)?.as_bytes())?;
     for (name, path) in &codegen_context.asset_files {
         zip.start_file(name, options)?;
-        copy(&mut File::open(path.as_str())?, zip)?;
+        copy(
+            &mut File::open(extend_path_safely(
+                &mut path_buf,
+                resources_directory,
+                path.as_str(),
+            )?)?,
+            zip,
+        )?;
     }
     Ok(())
 }

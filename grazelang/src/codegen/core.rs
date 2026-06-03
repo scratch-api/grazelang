@@ -1,7 +1,9 @@
 #![allow(clippy::result_large_err)]
 use std::{
     collections::{HashMap, HashSet},
+    io::Read,
     iter::{self, zip},
+    path::{Path, PathBuf},
     rc::Rc,
 };
 
@@ -12,31 +14,30 @@ use grazelang_library::{
     CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, HasShadow,
     LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID,
     SimpleCallableKnownBlockSignature,
-    project_json::{Sb3NormalBlock, Sb3Primitive},
+    project_json::{
+        IsShadow, Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
+        Sb3InputValue, Sb3ListDeclaration, Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock,
+        Sb3Root, Sb3Sound, Sb3Target, Sb3VariableDeclaration, TargetAttachment,
+    },
 };
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::{
-    ids::IdCounter,
-    project_json::{
-        Sb3Block, Sb3BlockMutation, Sb3FieldValue, Sb3InputValue, Sb3PrimitiveBlock, Sb3Root,
-    },
-};
+use super::ids::IdCounter;
 
 use crate::{
-    codegen::project_json::{IsShadow, Sb3InputRepr, Sb3Target, TargetAttachment},
+    codegen::ids::generate_random_id_string,
     lexer::PosRange,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
     names::Namespace,
     parser::{
         context::{
-            BROADCAST_CATEGORIES, IdString, KnownBlock, NO_CATEGORIES,
-            ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target,
-            TargetSymbolDescriptor,
+            BROADCAST_CATEGORIES, BackdropDescriptor, CostumeDescriptor, IdString, KnownBlock,
+            NO_CATEGORIES, ParseContext, ResolveKnownBlock, SoundDescriptor, Symbol, SymbolId,
+            SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
@@ -44,7 +45,7 @@ use crate::{
             ListEntry, Literal, UnOpDescriptor,
         },
     },
-    settings::{GrazeSettings, UseShadows, GrazeMessageSetting},
+    settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
     visitor::{
         GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
         default_visit_expression_binary_operation, default_visit_expression_call,
@@ -151,6 +152,8 @@ pub enum GrazeSb3GeneratorCreationError {
     ShadowedSprite { name: String },
     #[error("you cannot call a sprite \"stage\", try using a canonical name")]
     ShadowedStage,
+    #[error("path {path:?} tries to escape the resource directory")]
+    PathTriesToEscapeResourceDirectory { path: PathBuf },
 }
 
 pub struct GrazeSb3Generator;
@@ -262,6 +265,7 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
 pub const STAGE_ISTRING: &IString = &literal!("stage");
 pub const SPRITES_ISTRING: &IString = &literal!("sprites");
 pub const MY_BLOCKS_ISTRING: &IString = &literal!("my_blocks");
+pub const CURRENT_DIRECTORY_STR: &str = ".";
 
 impl GrazeSb3GeneratorContext {
     pub fn new(parse_context: ParseContext) -> Result<Self, GrazeSb3GeneratorCreationError> {
@@ -398,7 +402,7 @@ impl GrazeSb3GeneratorContext {
                 targets_symbol,
                 target.get_namespace_name().clone(),
                 Some(Rc::new(KnownBlock::FieldValue {
-                    value: Sb3FieldValue::Normal(super::project_json::Sb3Primitive::String(
+                    value: Sb3FieldValue::Normal(Sb3Primitive::String(
                         target.get_field_name().to_string(),
                     )),
                     categories: categories.iter().copied().collect(),
@@ -409,21 +413,29 @@ impl GrazeSb3GeneratorContext {
                 .borrow_symbols()
                 .iter()
                 .map(|(key, value)| {
-                    value.derive_related_data(&mut rng, &mut namespace).map(
-                        |(mut symbol, attachment, asset_file)| {
-                            add_bind_info(&mut symbol, target.get_namespace_name());
-                            if let Some(AssetFile {
-                                file_name,
-                                file_path,
-                            }) = asset_file
-                            {
-                                asset_files.insert(file_name, file_path);
-                            }
-                            ((key.clone(), symbol), attachment)
-                        },
+                    derive_related_data_of_target_symbol(
+                        value,
+                        &mut rng,
+                        &mut namespace,
+                        parse_context
+                            .settings
+                            .resources_path
+                            .as_deref()
+                            .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
                     )
+                    .map(|(mut symbol, attachment, asset_file)| {
+                        add_bind_info(&mut symbol, target.get_namespace_name());
+                        if let Some(AssetFile {
+                            file_name,
+                            file_path,
+                        }) = asset_file
+                        {
+                            asset_files.insert(file_name, file_path);
+                        }
+                        ((key.clone(), symbol), attachment)
+                    })
                 })
-                .try_fold::<_, _, Result<_, std::io::Error>>(
+                .try_fold::<_, _, Result<_, GrazeSb3GeneratorCreationError>>(
                     (HashMap::with_capacity(symbol_count), Vec::new()),
                     |(mut symbols, mut target_attachments), item| {
                         let ((key, symbol), asset) = item?;
@@ -514,8 +526,17 @@ impl GrazeSb3GeneratorContext {
             for (name, symbol) in parse_context.global_symbols.drain() {
                 match &symbol {
                     TargetSymbolDescriptor::Var(_) => {
-                        let (symbol, attachment, asset_file) = symbol
-                            .derive_related_data(&mut rng, &mut global_namespace)
+                        let (symbol, attachment, asset_file) =
+                            derive_related_data_of_target_symbol(
+                                &symbol,
+                                &mut rng,
+                                &mut global_namespace,
+                                parse_context
+                                    .settings
+                                    .resources_path
+                                    .as_deref()
+                                    .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
+                            )
                             .unwrap();
                         // TODO: Add variables, lists, broadcasts, sprites etc to corresponding field categories
                         //  Implement if necessary:
@@ -552,8 +573,17 @@ impl GrazeSb3GeneratorContext {
                         symbol_table.insert_child(variables_symbol, name, symbol);
                     }
                     TargetSymbolDescriptor::List(_) => {
-                        let (symbol, attachment, asset_file) = symbol
-                            .derive_related_data(&mut rng, &mut global_namespace)
+                        let (symbol, attachment, asset_file) =
+                            derive_related_data_of_target_symbol(
+                                &symbol,
+                                &mut rng,
+                                &mut global_namespace,
+                                parse_context
+                                    .settings
+                                    .resources_path
+                                    .as_deref()
+                                    .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
+                            )
                             .unwrap();
                         if let Some(AssetFile {
                             file_name,
@@ -634,6 +664,326 @@ impl GrazeSb3GeneratorContext {
                 .map(|(next, _)| next),
         )
     }
+}
+
+pub fn compute_hash(path: &Path) -> Result<String, std::io::Error> {
+    use std::fs::File;
+    let mut file = File::open(path)?;
+    let mut data: Vec<u8> = Vec::new();
+    file.read_to_end(&mut data)?;
+    let digest = md5::compute(data);
+    let hex_digest = format!("{:x}", digest);
+    Ok(hex_digest)
+}
+
+pub fn derive_related_data_of_target_symbol<T: Rng>(
+    this: &TargetSymbolDescriptor,
+    rng: &mut T,
+    namespace: &mut Namespace,
+    resources_directory: &Path,
+) -> Result<(Symbol, Option<TargetAttachment>, Option<AssetFile>), GrazeSb3GeneratorCreationError> {
+    pub fn extend_path_safely(
+        directory: &Path,
+        rest: &str,
+    ) -> Result<PathBuf, GrazeSb3GeneratorCreationError> {
+        let new_path = directory.join(rest).canonicalize()?;
+        if !new_path.starts_with(directory) {
+            return Err(
+                GrazeSb3GeneratorCreationError::PathTriesToEscapeResourceDirectory {
+                    path: new_path,
+                },
+            );
+        }
+        Ok(new_path)
+    }
+    pub fn get_file_extension_unwrapped(this: &TargetSymbolDescriptor) -> &str {
+        match this {
+            TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                name: _,
+                canonical_name: _,
+                source,
+            })
+            | TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                name: _,
+                canonical_name: _,
+                source,
+            })
+            | TargetSymbolDescriptor::Sound(SoundDescriptor {
+                name: _,
+                canonical_name: _,
+                source,
+            }) => {
+                // TODO: better ext detections
+                // Issue: #11
+                source.as_str().rsplit_once('.').unwrap_or(("", "")).1
+            }
+            _ => unreachable!(),
+        }
+    }
+    if let TargetSymbolDescriptor::CustomBlockDescriptor(descriptor) = this {
+        let proccode = descriptor.canonical_name.clone().unwrap_or_else(|| {
+            if descriptor.args.is_empty() {
+                return descriptor.name.clone();
+            }
+            let mut proccode =
+                String::with_capacity(descriptor.name.len() + 3 * descriptor.args.len());
+            proccode.push_str(descriptor.name.as_str());
+            for arg in &descriptor.args {
+                proccode.push_str(" %");
+                proccode.push(match &arg.kind {
+                    CustomBlockParamKindValue::Number => 'n',
+                    CustomBlockParamKindValue::String => 's',
+                    CustomBlockParamKindValue::Boolean => 'b',
+                });
+            }
+            proccode.into()
+        });
+        let mut call_params = Vec::with_capacity(descriptor.args.len());
+        let mut params = Vec::with_capacity(descriptor.args.len());
+        for arg in &descriptor.args {
+            let is_bool = arg.kind == CustomBlockParamKindValue::Boolean;
+            let arg_id = generate_random_id_string(rng);
+            call_params.push(CallBlockParam {
+                kind: grazelang_library::CallBlockParamKind::Input {
+                    default: (!is_bool).then(|| {
+                        grazelang_library::project_json::Sb3PrimitiveBlock::String("".into())
+                    }),
+                },
+                name: arg_id.clone(),
+            });
+            params.push((
+                arg_id,
+                if is_bool {
+                    HasShadow::No
+                } else {
+                    HasShadow::Yes
+                },
+            ));
+        }
+        return Ok((
+            Symbol {
+                known_block: Some(Rc::new(KnownBlock::CustomBlock {
+                    proccode: proccode.clone(),
+                    call_params: call_params.clone(),
+                    params: params.clone(),
+                    is_warp: descriptor.is_warp,
+                })),
+                namespace: HashMap::new(),
+                parent: Default::default(),
+            },
+            Some(
+                grazelang_library::project_json::TargetAttachment::CustomBlock(
+                    descriptor.name.clone(),
+                    KnownBlock::CustomBlock {
+                        proccode,
+                        call_params,
+                        params,
+                        is_warp: descriptor.is_warp,
+                    },
+                ),
+            ),
+            None,
+        ));
+    }
+    match this {
+        TargetSymbolDescriptor::Costume(descriptor) => Some(&descriptor.source),
+        TargetSymbolDescriptor::Backdrop(descriptor) => Some(&descriptor.source),
+        TargetSymbolDescriptor::Sound(descriptor) => Some(&descriptor.source),
+        _ => None,
+    }
+    .map(|value| {
+        Ok::<_, GrazeSb3GeneratorCreationError>(compute_hash(&extend_path_safely(
+            resources_directory,
+            value.as_str(),
+        )?)?)
+    })
+    .transpose()?
+    .map(|value| {
+        let file_ext = get_file_extension_unwrapped(this);
+        let md5ext = format!("{}.{}", value, file_ext);
+        Ok((
+            Symbol {
+                known_block: Some(Rc::new(match this {
+                    // TODO: implement specific known blocks here
+                    // Issue: #10
+                    TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                        name,
+                        canonical_name,
+                        source: _,
+                    }) => KnownBlock::FieldValue {
+                        value: Sb3FieldValue::Normal(Sb3Primitive::String(
+                            canonical_name.as_ref().unwrap_or(name).to_string(),
+                        )),
+                        categories: HashSet::from([COSTUMES_CATEGORY_ID]),
+                    },
+                    TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                        name,
+                        canonical_name,
+                        source: _,
+                    }) => KnownBlock::FieldValue {
+                        value: Sb3FieldValue::Normal(Sb3Primitive::String(
+                            canonical_name.as_ref().unwrap_or(name).to_string(),
+                        )),
+                        categories: HashSet::from([
+                            BACKDROPS_CATEGORY_ID,
+                            BACKDROP_TARGETS_CATEGORY_ID,
+                        ]),
+                    },
+                    TargetSymbolDescriptor::Sound(SoundDescriptor {
+                        name,
+                        canonical_name,
+                        source: _,
+                    }) => KnownBlock::FieldValue {
+                        value: Sb3FieldValue::Normal(Sb3Primitive::String(
+                            canonical_name.as_ref().unwrap_or(name).to_string(),
+                        )),
+                        categories: HashSet::from([SOUNDS_CATEGORY_ID]),
+                    },
+                    _ => unreachable!(),
+                })),
+                namespace: HashMap::new(),
+                parent: Default::default(),
+            },
+            match this {
+                // TODO: implement specific known blocks here
+                // Issue: #9
+                TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                    name,
+                    canonical_name,
+                    source: _,
+                })
+                | TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                    name,
+                    canonical_name,
+                    source: _,
+                }) => {
+                    Some(TargetAttachment::Costume(Sb3Costume {
+                        asset_id: value.clone(),
+                        name: canonical_name.as_ref().unwrap_or(name).to_string(),
+                        md5ext: md5ext.clone(),
+                        data_format: file_ext.to_string(),
+                        bitmap_resolution: Some(1.0), // TODO: better default and more control
+                        // Issue: #8
+                        rotation_center_x: 0.0,
+                        rotation_center_y: 0.0,
+                    }))
+                }
+                TargetSymbolDescriptor::Sound(SoundDescriptor {
+                    name,
+                    canonical_name,
+                    source: _,
+                }) => {
+                    Some(TargetAttachment::Sound(Sb3Sound {
+                        asset_id: value.clone(),
+                        name: canonical_name.as_ref().unwrap_or(name).to_string(),
+                        md5ext: md5ext.clone(),
+                        data_format: file_ext.to_string(),
+                        rate: 48000.0, // TODO: better default and more control
+                        // Issue: #7
+                        sample_count: 1124,
+                    }))
+                }
+                _ => unreachable!(),
+            },
+            match this {
+                TargetSymbolDescriptor::Costume(CostumeDescriptor {
+                    name: _,
+                    canonical_name: _,
+                    source,
+                })
+                | TargetSymbolDescriptor::Backdrop(BackdropDescriptor {
+                    name: _,
+                    canonical_name: _,
+                    source,
+                })
+                | TargetSymbolDescriptor::Sound(SoundDescriptor {
+                    name: _,
+                    canonical_name: _,
+                    source,
+                }) => Some(AssetFile {
+                    file_name: md5ext,
+                    file_path: source.clone(),
+                }),
+                _ => unreachable!(),
+            },
+        ))
+    })
+    .unwrap_or_else(|| {
+        let id = generate_random_id_string(rng);
+        match this {
+            TargetSymbolDescriptor::Var(var_descriptor) => {
+                let canonical_name = namespace.introduce_new_symbol(
+                    var_descriptor
+                        .canonical_name
+                        .as_ref()
+                        .map(|value| value.to_string()),
+                    var_descriptor.name.clone(),
+                );
+                let id_string = id.to_string();
+                Ok((
+                    Symbol {
+                        known_block: Some(Rc::new(KnownBlock::new_variable(
+                            canonical_name.clone(),
+                            id,
+                            None,
+                        ))),
+                        namespace: HashMap::new(),
+                        parent: Default::default(),
+                    },
+                    Some(grazelang_library::project_json::TargetAttachment::Var(
+                        id_string,
+                        Sb3VariableDeclaration {
+                            name: canonical_name,
+                            value: if var_descriptor.value_is_initial_value {
+                                var_descriptor.value.clone()
+                            } else {
+                                "".into()
+                            },
+                            is_cloud: var_descriptor.is_cloud,
+                        },
+                    )),
+                    None,
+                ))
+            }
+            TargetSymbolDescriptor::List(list_descriptor) => {
+                let canonical_name = namespace.introduce_new_symbol(
+                    list_descriptor
+                        .canonical_name
+                        .as_ref()
+                        .map(|value| value.to_string()),
+                    list_descriptor.name.clone(),
+                );
+                let id_string = id.to_string();
+                Ok((
+                    Symbol {
+                        known_block: Some(Rc::new(KnownBlock::List {
+                            canonical_name: canonical_name.clone(),
+                            id,
+                        })), // TODO: add list length as method
+                        // Issue: #6
+                        namespace: HashMap::new(),
+                        parent: Default::default(),
+                    },
+                    Some(grazelang_library::project_json::TargetAttachment::List(
+                        id_string,
+                        Sb3ListDeclaration(
+                            canonical_name.clone(),
+                            if list_descriptor.value_is_initial_value {
+                                list_descriptor.value.clone()
+                            } else {
+                                Vec::new()
+                            },
+                        ),
+                    )),
+                    None,
+                ))
+            }
+            TargetSymbolDescriptor::CustomBlockDescriptor(_)
+            | TargetSymbolDescriptor::Costume(_)
+            | TargetSymbolDescriptor::Backdrop(_)
+            | TargetSymbolDescriptor::Sound(_) => unreachable!(),
+        }
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1635,9 +1985,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let index = context.pop_param().unwrap();
             let index_input_value = create_input_value(
                 param_to_input_repr_no_menu(index, *value.2.get_position(), context)?,
-                Some(Sb3PrimitiveBlock::PositiveInteger(
-                    super::project_json::Sb3Primitive::Int128(1),
-                )),
+                Some(Sb3PrimitiveBlock::PositiveInteger(Sb3Primitive::Int128(1))),
             );
             let string = context.pop_param().unwrap();
             let string_input_value = create_input_value::<Sb3PrimitiveBlock>(

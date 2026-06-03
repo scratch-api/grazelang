@@ -1,10 +1,16 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct GrazeSettings {
     pub message_setting: GrazeMessageSetting,
     pub use_shadows: UseShadows,
+    /// Path for the resources of the project or None if the resources are in the current directory
+    pub resources_path: Option<PathBuf>,
 }
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, clap::ValueEnum)]
 pub enum GrazeMessageSetting {
