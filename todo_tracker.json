@@ -88,51 +88,51 @@
         "title": "Implement assignment of x, y etc"
     },
     "11": {
-        "filepath": "grazelang/src/parser/context.rs",
+        "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
         "status": "open",
-        "lines": "L639-L640",
-        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
+        "lines": "L716-L717",
+        "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "better ext detections"
     },
     "10": {
-        "filepath": "grazelang/src/parser/context.rs",
+        "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
         "status": "open",
-        "lines": "L725-L726",
-        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
+        "lines": "L807-L808",
+        "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "implement specific known blocks here"
     },
     "9": {
-        "filepath": "grazelang/src/parser/context.rs",
+        "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
         "status": "open",
-        "lines": "L740-L741",
-        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
+        "lines": "L848-L849",
+        "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "implement specific known blocks here"
     },
     "8": {
-        "filepath": "grazelang/src/parser/context.rs",
+        "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
         "status": "open",
-        "lines": "L758-L759",
-        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
+        "lines": "L865-L866",
+        "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "better default and more control"
     },
     "7": {
-        "filepath": "grazelang/src/parser/context.rs",
+        "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
         "status": "open",
-        "lines": "L776-L777",
-        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
+        "lines": "L881-L882",
+        "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "better default and more control"
     },
     "6": {
-        "filepath": "grazelang/src/parser/context.rs",
+        "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
         "status": "open",
-        "lines": "L858-L859",
-        "commit": "fb043a7e4d27ed48e35646220c5ed45f9217b8aa",
+        "lines": "L962-L963",
+        "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "add list length as method"
     },
     "5": {
