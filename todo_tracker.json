@@ -386,9 +386,25 @@
     "55": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L757-L757",
         "commit": "bbaefbc20ae368c0851b2af646837cb41133a93b",
         "title": "Allow user to control the rotation center of a costume or backdrop"
+    },
+    "56": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L929-L929",
+        "commit": "57c306d18bc115f7f812edf8adbefc6a4f929717",
+        "title": "Allow user to control the rotation center of a costume or backdrop"
+    },
+    "57": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L737-L737",
+        "commit": "57c306d18bc115f7f812edf8adbefc6a4f929717",
+        "title": "Lower memory usage by moving shared data of these methods into Rc"
     }
 }
