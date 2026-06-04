@@ -125,6 +125,7 @@ impl Cli {
         path: &Path,
     ) {
         // TODO: Use source files for errors
+        // Issue: #54
         let is_file = path.is_file();
         let mut context = ParseContext::new(
             GrazeSettings {
@@ -150,6 +151,7 @@ impl Cli {
             )
         } else {
             // TODO: Better error message
+            // Issue: #53
             panic!();
         };
         if !context.successful {

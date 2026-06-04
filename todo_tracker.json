@@ -354,7 +354,7 @@
     "51": {
         "filepath": "grazelang/src/cli/input.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L56-L56",
         "commit": "29284101714e72d76cbbb0fe5e08b0bb173e1643",
         "title": "Implement project directories"
@@ -366,5 +366,21 @@
         "lines": "L97-L97",
         "commit": "40282eddc0379746324c64a9cf92c463e68cdf32",
         "title": "Check unwraps and possibly replace"
+    },
+    "53": {
+        "filepath": "grazelang/src/cli/input.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L152-L152",
+        "commit": "ceafab8be46fe43f74064f186dc0d5fc30872cfb",
+        "title": "Better error message"
+    },
+    "54": {
+        "filepath": "grazelang/src/cli/input.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L127-L127",
+        "commit": "ceafab8be46fe43f74064f186dc0d5fc30872cfb",
+        "title": "Use source files for errors"
     }
 }
