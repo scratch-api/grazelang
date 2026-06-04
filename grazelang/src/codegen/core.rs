@@ -888,7 +888,7 @@ pub mod symbol_data_derivation {
                 literal!("hide"),
                 KnownBlock::PartialCallable(
                     literal!("data_hidelist"),
-                    vec![list_select_param.clone()],
+                    vec![list_select_param],
                     vec![],
                 ),
             ),
