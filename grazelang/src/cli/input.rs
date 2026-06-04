@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    ffi::OsStr,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
@@ -62,7 +63,7 @@ pub fn parse_project_directory(
     let mut source_files = HashMap::new();
     for i in path.read_dir()? {
         let current_file = i?.path();
-        if current_file.extension().and_then(|value| value.to_str()) == Some("graze") {
+        if current_file.extension().and_then(OsStr::to_str) != Some("graze") {
             continue;
         }
         let graze_code = {
@@ -106,39 +107,76 @@ impl Cli {
                 target,
                 resources,
                 path,
-            } => {
-                // TODO: Implement project directories
-                // Issue: #51
-                let mut context = ParseContext::new(
-                    GrazeSettings {
-                        message_setting: *logging,
-                        use_shadows: *shadows,
-                        resources_path: resources.clone(),
-                    },
-                    Default::default(),
-                );
-                let parsed = parse_single_file(&path.join("main.graze"), &mut context).unwrap();
-                if !context.successful {
-                    for message in &context.messages {
-                        dbg!(message);
-                    }
-                    dbg!(parsed);
-                    panic!("Parsing unsuccessful.");
-                }
-                let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
-                let visitor = codegen::core::GrazeSb3Generator;
-                visitor.visit_graze_program(&parsed, &mut context).unwrap();
-                for message in &context.messages {
-                    dbg!(message);
-                }
-                // dbg!(&context.asset_files);
-                // println!("{}", serde_json::to_string(&context.sb3).unwrap());
-                zipper::write_to_zip_path(
-                    &target.as_ref().unwrap_or(path).join("main.sb3"),
-                    &context,
-                )
-                .unwrap();
-            }
+            } => Self::build(shadows, logging, target.as_ref(), resources.as_ref(), path),
         }
+    }
+
+    pub fn build(
+        shadows: &UseShadows,
+        logging: &GrazeMessageSetting,
+        target: Option<&PathBuf>,
+        resources: Option<&PathBuf>,
+        path: &Path,
+    ) {
+        // TODO: Use source files for errors
+        let is_file = path.is_file();
+        let mut context = ParseContext::new(
+            GrazeSettings {
+                message_setting: *logging,
+                use_shadows: *shadows,
+                resources_path: Some(resources.cloned().unwrap_or_else(|| {
+                    if is_file {
+                        path.parent().unwrap().to_path_buf()
+                    } else {
+                        path.to_path_buf()
+                    }
+                })),
+            },
+            Default::default(),
+        );
+        let path = path.canonicalize().unwrap();
+        let (parsed, _source_files) = if path.is_dir() {
+            parse_project_directory(&path, &mut context).unwrap()
+        } else if is_file {
+            (
+                parse_single_file(&path, &mut context).unwrap(),
+                HashMap::from([(0, path.clone())]),
+            )
+        } else {
+            // TODO: Better error message
+            panic!();
+        };
+        if !context.successful {
+            for message in &context.messages {
+                dbg!(message);
+            }
+            dbg!(parsed);
+            panic!("Parsing unsuccessful.");
+        }
+        let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
+        let visitor = codegen::core::GrazeSb3Generator;
+        visitor.visit_graze_program(&parsed, &mut context).unwrap();
+        for message in &context.messages {
+            dbg!(message);
+        }
+        let mut output_path = if is_file {
+            target
+                .map(|value| {
+                    value.join(
+                        path.file_name()
+                            .and_then(OsStr::to_str)
+                            .unwrap_or("project"),
+                    )
+                })
+                .unwrap_or(path)
+        } else {
+            target.unwrap_or(&path).join(
+                path.file_name()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or("project"),
+            )
+        };
+        output_path.set_extension("sb3");
+        zipper::write_to_zip_path(&output_path, &context).unwrap();
     }
 }

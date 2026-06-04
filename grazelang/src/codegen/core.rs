@@ -19,7 +19,7 @@ use grazelang_library::{
         Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock, Sb3Root, Sb3Target, TargetAttachment,
     },
 };
-use rand::{Rng, SeedableRng};
+use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -27,15 +27,14 @@ use thiserror::Error;
 use super::ids::IdCounter;
 
 use crate::{
-    codegen::ids::generate_random_id_string,
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
     names::Namespace,
     parser::{
         context::{
-            BROADCAST_CATEGORIES, BackdropDescriptor, CostumeDescriptor, IdString, KnownBlock,
-            NO_CATEGORIES, ParseContext, ResolveKnownBlock, SoundDescriptor, Symbol, SymbolId,
+            BROADCAST_CATEGORIES, IdString, KnownBlock,
+            NO_CATEGORIES, ParseContext, ResolveKnownBlock, Symbol, SymbolId,
             SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
@@ -690,9 +689,7 @@ pub fn compute_hash(path: &Path) -> Result<String, std::io::Error> {
 pub use symbol_data_derivation::derive_related_data_of_target_symbol;
 pub mod symbol_data_derivation {
     use std::{
-        collections::{HashMap, HashSet},
-        path::{Path, PathBuf},
-        rc::Rc,
+        collections::{HashMap, HashSet}, ffi::OsStr, path::{Path, PathBuf}, rc::Rc
     };
 
     use arcstr::ArcStr as IString;
@@ -827,7 +824,7 @@ pub mod symbol_data_derivation {
         let asset_id = compute_hash(&path)?;
         let ext = Path::new(source)
             .extension()
-            .and_then(|value| value.to_str())
+            .and_then(OsStr::to_str)
             .unwrap_or("");
         let md5ext = format!("{}.{}", asset_id, ext);
         let canonical_name = canonical_name

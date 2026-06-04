@@ -1,17 +1,7 @@
-use std::path::Path;
-
 use clap::Parser;
 use grazelang::cli::input::Cli;
-use grazelang::parser::context::ParseContext;
-use grazelang::visitor::GrazeVisitor;
-use grazelang::zipper;
-use grazelang::{
-    codegen, lexer,
-    parser::{self, core::PeekableLexer},
-};
 
 fn main() {
-
     let cli = Cli::parse();
     cli.execute();
     // let lexer = lexer::create_lexer(include_str!("./test.graze"));
