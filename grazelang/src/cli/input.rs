@@ -95,6 +95,7 @@ pub fn parse_single_file(
 }
 
 // TODO: Check unwraps and possibly replace
+// Issue: #52
 
 impl Cli {
     pub fn execute(&self) {
