@@ -734,6 +734,7 @@ pub mod symbol_data_derivation {
     pub type TargetSymbolData = (Symbol, Option<TargetAttachment>, Option<AssetFile>);
 
     pub fn patch_in_list_methods(symbol_table: &mut SymbolTable, symbol_id: SymbolId) {
+        // TODO: Lower memory usage by moving shared data of these methods into Rc
         let known_block = symbol_table[symbol_id]
             .known_block
             .as_ref()
@@ -883,9 +884,9 @@ pub mod symbol_data_derivation {
                 ),
             ),
             (
-                literal!("data_hidelist"),
+                literal!("hide"),
                 KnownBlock::PartialCallable(
-                    literal!("data_lengthoflist"),
+                    literal!("data_hidelist"),
                     vec![list_select_param.clone()],
                     vec![],
                 ),
@@ -926,7 +927,6 @@ pub mod symbol_data_derivation {
                         data_format,
                         bitmap_resolution: Some(2.0),
                         rotation_center_x: 0.0, // TODO: Allow user to control the rotation center of a costume or backdrop
-                        // Issue: #55
                         rotation_center_y: 0.0,
                     })
                 },
