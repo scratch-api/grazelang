@@ -489,7 +489,7 @@ impl SymbolTable {
             namespace,
             parent,
         });
-        self.insert_child(parent, child_name, symbol);
+        self.insert_symbol_as_child(parent, child_name, symbol);
         symbol
     }
 
@@ -507,8 +507,8 @@ impl SymbolTable {
         child_name: IString,
         child: SymbolId,
     ) -> Option<SymbolId> {
-        self[child].parent = symbol;
-        self[symbol].namespace.insert(child_name, child)
+        self.set_parent(symbol, child);
+        self.insert_symbol_as_child(symbol, child_name, child)
     }
 
     pub fn insert_alias(
@@ -517,7 +517,22 @@ impl SymbolTable {
         child_name: IString,
         child: SymbolId,
     ) -> Option<SymbolId> {
-        self[symbol].namespace.insert(child_name, child)
+        self.insert_symbol_as_child(symbol, child_name, child)
+    }
+
+    #[inline]
+    fn set_parent(&mut self, parent: SymbolId, child: SymbolId) {
+        self[child].parent = parent;
+    }
+
+    #[inline]
+    fn insert_symbol_as_child(
+        &mut self,
+        parent: SymbolId,
+        child_name: IString,
+        child: SymbolId,
+    ) -> Option<SymbolId> {
+        self[parent].namespace.insert(child_name, child)
     }
 }
 

@@ -506,7 +506,15 @@ impl GrazeSb3GeneratorContext {
                 });
             }
             for (key, symbol) in symbols {
+                let is_list = symbol
+                    .known_block
+                    .as_ref()
+                    .map(|value| matches!(value.as_ref(), KnownBlock::List { .. }))
+                    .unwrap_or(false);
                 let symbol = symbol_table.new_symbol(symbol);
+                if is_list {
+                    patch_in_list_methods(&mut symbol_table, symbol);
+                }
                 symbol_table.insert_child(target_symbol, key, symbol);
             }
         }
@@ -608,6 +616,7 @@ impl GrazeSb3GeneratorContext {
                             stage_target_attachments.push(attachment);
                         }
                         let symbol = symbol_table.new_symbol(symbol);
+                        patch_in_list_methods(&mut symbol_table, symbol);
                         symbol_table.insert_child(lists_symbol, name, symbol);
                     }
                     _ => (), // Handled just to be sure although it shouldn't happen
@@ -688,7 +697,7 @@ pub fn compute_hash(path: &Path) -> Result<String, std::io::Error> {
     Ok(hex_digest)
 }
 
-pub use symbol_data_derivation::derive_related_data_of_target_symbol;
+pub use symbol_data_derivation::{derive_related_data_of_target_symbol, patch_in_list_methods};
 pub mod symbol_data_derivation {
     use std::{
         collections::{HashMap, HashSet},
@@ -697,13 +706,13 @@ pub mod symbol_data_derivation {
         rc::Rc,
     };
 
-    use arcstr::ArcStr as IString;
+    use arcstr::{ArcStr as IString, literal};
     use grazelang_library::{
         BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
-        HasShadow, SOUNDS_CATEGORY_ID,
+        CallBlockParamKind, HasShadow, LISTS_CATEGORY_ID, SOUNDS_CATEGORY_ID,
         project_json::{
-            Sb3Costume, Sb3FieldValue, Sb3ListDeclaration, Sb3Primitive, Sb3Sound,
-            Sb3VariableDeclaration, TargetAttachment,
+            Sb3Costume, Sb3FieldValue, Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock,
+            Sb3Sound, Sb3VariableDeclaration, TargetAttachment,
         },
     };
     use rand::Rng;
@@ -716,13 +725,175 @@ pub mod symbol_data_derivation {
         names::Namespace,
         parser::{
             context::{
-                CustomBlockDescriptor, KnownBlock, ListDescriptor, Symbol, TargetSymbolDescriptor,
-                VarDescriptor,
+                CustomBlockDescriptor, KnownBlock, ListDescriptor, Symbol, SymbolId, SymbolTable,
+                TargetSymbolDescriptor, VarDescriptor,
             },
             cst::CustomBlockParamKindValue,
         },
     };
     pub type TargetSymbolData = (Symbol, Option<TargetAttachment>, Option<AssetFile>);
+
+    pub fn patch_in_list_methods(symbol_table: &mut SymbolTable, symbol_id: SymbolId) {
+        let known_block = symbol_table[symbol_id]
+            .known_block
+            .as_ref()
+            .unwrap()
+            .as_ref()
+            .clone();
+        let list_select_param = (
+            CallBlockParam {
+                kind: CallBlockParamKind::Field {
+                    default: None,
+                    category: LISTS_CATEGORY_ID,
+                },
+                name: literal!("LIST"),
+            },
+            known_block,
+        );
+        for (name, known_block) in [
+            (
+                literal!("push"),
+                KnownBlock::PartialCallable(
+                    literal!("data_addtolist"),
+                    vec![list_select_param.clone()],
+                    vec![CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some("thing".into()),
+                        },
+                        name: literal!("ITEM"),
+                    }],
+                ),
+            ),
+            (
+                literal!("remove"),
+                KnownBlock::PartialCallable(
+                    literal!("data_deleteoflist"),
+                    vec![list_select_param.clone()],
+                    vec![CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                        },
+                        name: literal!("INDEX"),
+                    }],
+                ),
+            ),
+            (
+                literal!("clear"),
+                KnownBlock::PartialCallable(
+                    literal!("data_deletealloflist"),
+                    vec![list_select_param.clone()],
+                    vec![],
+                ),
+            ),
+            (
+                literal!("insert"),
+                KnownBlock::PartialCallable(
+                    literal!("data_insertatlist"),
+                    vec![list_select_param.clone()],
+                    vec![
+                        CallBlockParam {
+                            kind: CallBlockParamKind::Input {
+                                default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                            },
+                            name: literal!("INDEX"),
+                        },
+                        CallBlockParam {
+                            kind: CallBlockParamKind::Input {
+                                default: Some("thing".into()),
+                            },
+                            name: literal!("ITEM"),
+                        },
+                    ],
+                ),
+            ),
+            (
+                literal!("set"),
+                KnownBlock::PartialCallable(
+                    literal!("data_replaceitemoflist"),
+                    vec![list_select_param.clone()],
+                    vec![
+                        CallBlockParam {
+                            kind: CallBlockParamKind::Input {
+                                default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                            },
+                            name: literal!("INDEX"),
+                        },
+                        CallBlockParam {
+                            kind: CallBlockParamKind::Input {
+                                default: Some("thing".into()),
+                            },
+                            name: literal!("ITEM"),
+                        },
+                    ],
+                ),
+            ),
+            (
+                literal!("get"),
+                KnownBlock::PartialCallable(
+                    literal!("data_itemoflist"),
+                    vec![list_select_param.clone()],
+                    vec![CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                        },
+                        name: literal!("INDEX"),
+                    }],
+                ),
+            ),
+            (
+                literal!("find"),
+                KnownBlock::PartialCallable(
+                    literal!("data_itemnumoflist"),
+                    vec![list_select_param.clone()],
+                    vec![CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some("thing".into()),
+                        },
+                        name: literal!("ITEM"),
+                    }],
+                ),
+            ),
+            (
+                literal!("len"),
+                KnownBlock::PartialCallable(
+                    literal!("data_lengthoflist"),
+                    vec![list_select_param.clone()],
+                    vec![],
+                ),
+            ),
+            (
+                literal!("contains"),
+                KnownBlock::PartialCallable(
+                    literal!("data_listcontainsitem"),
+                    vec![list_select_param.clone()],
+                    vec![CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some("thing".into()),
+                        },
+                        name: literal!("ITEM"),
+                    }],
+                ),
+            ),
+            (
+                literal!("show"),
+                KnownBlock::PartialCallable(
+                    literal!("data_showlist"),
+                    vec![list_select_param.clone()],
+                    vec![],
+                ),
+            ),
+            (
+                literal!("data_hidelist"),
+                KnownBlock::PartialCallable(
+                    literal!("data_lengthoflist"),
+                    vec![list_select_param.clone()],
+                    vec![],
+                ),
+            ),
+        ] {
+            symbol_table.new_child_symbol(symbol_id, name, Some(Rc::new(known_block)), 0);
+        }
+    }
 
     pub fn derive_related_data_of_target_symbol<T>(
         this: &TargetSymbolDescriptor,

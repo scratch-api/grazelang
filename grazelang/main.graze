@@ -6,7 +6,6 @@ stage {
     }
     {
         switch_backdrop_to(stage.test_costume);
-        say(sprite_1.test_2);
     }
 }
 
@@ -14,16 +13,18 @@ sprite `Sprite1` sprite_1 {
     costume `Costume 1` test_costume("empty.svg");
     let global test;
     let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
-    let local test_2;
+    let local list list_2;
     events.when_green_flag_clicked {
-        delete_all_of_list(list_);
-        say(test_2);
+        list_.clear();
+        list_2.clear();
+        // delete_all_of_list(list_);
         test = 10 + 5 * 2;
         if "test = 20" == "test = ${test}" {
             test = 5;
         }
         repeat 10 {
-            add_to_list(list_, 0);
+            list_.push(0);
+            // add_to_list(list_, 0);
         }
         list_[test] = 1;
     }
