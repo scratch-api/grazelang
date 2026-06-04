@@ -172,34 +172,29 @@ impl Cli {
         //         .and_then(OsStr::to_str)
         //         .unwrap_or("project"),
         // )
-        let output_path = match (target, is_file) {
-            (Some(target), _) => match target.is_file() {
-                true => target.to_path_buf(),
-                false => {
-                    let mut output_path = target.join(
-                        path.file_name()
-                            .and_then(OsStr::to_str)
-                            .unwrap_or("project"),
-                    );
-                    output_path.set_extension("sb3");
-                    output_path
-                }
-            },
-            (None, true) => {
-                let mut output_path = path;
-                output_path.set_extension("sb3");
-                output_path
-            }
-            (None, false) => {
-                let mut output_path = path.join(
+        let (mut output_path, set_extension) = match target {
+            Some(target) if target.is_file() => (target.to_path_buf(), false),
+            Some(target) => (
+                target.join(
                     path.file_name()
                         .and_then(OsStr::to_str)
                         .unwrap_or("project"),
-                );
-                output_path.set_extension("sb3");
-                output_path
-            }
+                ),
+                true,
+            ),
+            None if is_file => (path, true),
+            None => (
+                path.join(
+                    path.file_name()
+                        .and_then(OsStr::to_str)
+                        .unwrap_or("project"),
+                ),
+                true,
+            ),
         };
+        if set_extension {
+            output_path.set_extension("sb3");
+        }
         zipper::write_to_zip_path(&output_path, &context).unwrap();
     }
 }
