@@ -127,6 +127,7 @@ macro_rules! peek_token {
             None => {
                 return Err(ParseError::UnexpectedEndOfInput {
                     context: literal!(static_current_context!()),
+                    source_span: get_token_source_span($token_stream),
                 })
             }
         }
@@ -172,11 +173,13 @@ macro_rules! peek_back {
             Some(None) => {
                 return Err(ParseError::UnexpectedEndOfInput {
                     context: literal!(static_current_context!()),
+                    source_span: get_token_source_span($token_stream),
                 })
             }
             None => {
                 return Err(ParseError::PeekedBackAtBeginning {
                     context: literal!(static_current_context!()),
+                    source_span: (Default::default(), $token_stream.source_file_id),
                 })
             }
         }
@@ -220,6 +223,7 @@ macro_rules! next_token {
             None => {
                 return Err(ParseError::UnexpectedEndOfInput {
                     context: literal!(static_current_context!()),
+                    source_span: get_token_source_span($token_stream),
                 });
             }
         }
@@ -265,12 +269,6 @@ pub fn get_token_source_span(token_stream: ParseIn) -> SourceSpan {
     (token_stream.span_memoize(), token_stream.source_file_id)
 }
 
-// macro_rules! get_token_position {
-//     ($token_stream:expr) => {
-//         $token_stream.span()
-//     };
-// }
-
 pub fn get_token_start(token_stream: ParseIn) -> (usize, usize) {
     token_stream.span_memoize().0
 }
@@ -278,18 +276,6 @@ pub fn get_token_start(token_stream: ParseIn) -> (usize, usize) {
 pub fn get_token_end(token_stream: ParseIn) -> (usize, usize) {
     token_stream.span_memoize().1
 }
-
-// macro_rules! get_token_start_2 {
-//     ($token_stream:expr) => {
-//         $token_stream.span().0
-//     };
-// }
-
-// macro_rules! get_token_end_2 {
-//     ($token_stream:expr) => {
-//         $token_stream.span().1
-//     };
-// }
 
 macro_rules! emit_unexpected_token {
     ($token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
@@ -425,53 +411,6 @@ pub fn emit_unexpected_token_message(
     );
     Ok(())
 }
-
-// macro_rules! emit_unexpected_token_message {
-//     ($context:expr, $token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {{
-//         $context.successful = false;
-//         let message = literal!($msg_1);
-//         let expected = literal!($msg_2);
-//         let context = literal!(static_current_context!());
-//         let found = $found;
-//         let pos_range = get_token_pos_range($token_stream);
-//         if matches!(
-//             $context.message_setting,
-//             GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
-//         ) {
-//             if $context.message_setting == GrazeMessageSetting::ExitOnError {
-//                 $context.messages.push(
-//                     ParseError::UnexpectedToken {
-//                         message: message.clone(),
-//                         expected: expected.clone(),
-//                         context: context.clone(),
-//                         found: found.clone(),
-//                         pos_range,
-//                     }
-//                     .into(),
-//                 );
-//             }
-//             return Err(ParseError::UnexpectedToken {
-//                 message,
-//                 expected,
-//                 context,
-//                 found,
-//                 pos_range,
-//             });
-//         }
-//         if $context.message_setting >= GrazeMessageSetting::ExitOnError {
-//             $context.messages.push(
-//                 ParseError::UnexpectedToken {
-//                     message,
-//                     expected,
-//                     context,
-//                     found,
-//                     pos_range,
-//                 }
-//                 .into(),
-//             );
-//         }
-//     }};
-// }
 
 macro_rules! from_stream_pos {
     ($token_stream:expr => $node:path) => {

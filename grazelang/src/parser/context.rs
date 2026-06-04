@@ -128,13 +128,13 @@ pub struct SoundDescriptor {
 pub trait ResolveKnownBlock {
     fn resolve_for_input<'a>(
         &'a self,
-        pos_range: SourceSpan,
+        source_span: SourceSpan,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a>;
 
     fn resolve_for_field<'a>(
         &'a self,
-        pos_range: SourceSpan,
+        source_span: SourceSpan,
         context: &'a mut codegen::core::GrazeSb3GeneratorContext,
     ) -> (Sb3FieldValue, &'a HashSet<u32>);
 
@@ -152,7 +152,7 @@ pub trait ResolveKnownBlock {
 impl ResolveKnownBlock for KnownBlock {
     fn resolve_for_input<'a>(
         &'a self,
-        pos_range: SourceSpan,
+        source_span: SourceSpan,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a> {
         match self {
@@ -200,7 +200,7 @@ impl ResolveKnownBlock for KnownBlock {
                         GrazeWarning::Specific(
                             GrazeWarningKind::CallableAsInput,
                             format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead.").into(),
-                            pos_range
+                            source_span
                         ),
                         None
                     ),
@@ -221,7 +221,7 @@ impl ResolveKnownBlock for KnownBlock {
 
     fn resolve_for_field<'a>(
         &'a self,
-        pos_range: SourceSpan,
+        source_span: SourceSpan,
         context: &'a mut codegen::core::GrazeSb3GeneratorContext,
     ) -> (Sb3FieldValue, &'a HashSet<u32>) {
         match self {
@@ -252,7 +252,7 @@ impl ResolveKnownBlock for KnownBlock {
                         GrazeWarning::Specific(
                             GrazeWarningKind::BlockRefAsField,
                             format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
-                            pos_range
+                            source_span
                         ),
                         None
                     ),
@@ -323,7 +323,7 @@ impl ResolveKnownBlock for KnownBlock {
                         GrazeWarning::Specific(
                             GrazeWarningKind::CallableAsField,
                             format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead.").into(),
-                            pos_range
+                            source_span
                         ),
                         None
                     ),
@@ -339,7 +339,7 @@ impl ResolveKnownBlock for KnownBlock {
                         GrazeWarning::Specific(
                             GrazeWarningKind::EmptyExpressionAsField,
                             format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
-                            pos_range
+                            source_span
                         ),
                         None
                     ),
@@ -367,7 +367,7 @@ impl ResolveKnownBlock for KnownBlock {
                                 GrazeWarning::Specific(
                                     GrazeWarningKind::NonFieldSingletonAsField,
                                     format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
-                                    pos_range
+                                    source_span
                                 ),
                                 None
                             ),

@@ -1,7 +1,11 @@
 use arcstr::ArcStr as IString;
 use serde::{Deserialize, Serialize};
 
-use crate::{lexer::SourceSpan, parser::cst::ParseError};
+use crate::{
+    codegen::core::GrazeSb3GeneratorError,
+    lexer::SourceSpan,
+    parser::cst::{GetPos, ParseError},
+};
 
 pub trait GetLintId {
     fn get_lint_id(&self) -> &'static str;
@@ -15,6 +19,18 @@ pub enum GrazeError {
     Plain(IString, SourceSpan),
     #[error(transparent)]
     ParseError(#[from] ParseError),
+    #[error(transparent)]
+    CodegenError(#[from] GrazeSb3GeneratorError),
+}
+
+impl GetPos for GrazeError {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            GrazeError::Plain(_, source_span) => source_span,
+            GrazeError::ParseError(error) => error.get_source_span(),
+            GrazeError::CodegenError(error) => error.get_source_span(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +80,7 @@ pub enum GrazeInfo {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GrazeSuggestion {
     SimpleCodeChange {
-        replace_pos_range: SourceSpan,
+        replace_source_span: SourceSpan,
         replace_text: String,
     },
 }

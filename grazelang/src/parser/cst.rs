@@ -1219,7 +1219,10 @@ pub enum ParseError {
     #[error(
         "the lexer reached the end of input without the parser completing (context: {context})"
     )]
-    UnexpectedEndOfInput { context: IString },
+    UnexpectedEndOfInput {
+        context: IString,
+        source_span: SourceSpan,
+    },
     #[error("unexpected token at {source_span:?}, expected {expected} (context: {context})")]
     UnexpectedToken {
         expected: IString,
@@ -1239,13 +1242,48 @@ pub enum ParseError {
         source_span: SourceSpan,
     },
     #[error("tried to peek back at the beginning of the content (context: {context:?})")]
-    PeekedBackAtBeginning { context: IString },
-    #[error(transparent)]
-    IoError(#[from] std::rc::Rc<std::io::Error>),
+    PeekedBackAtBeginning {
+        context: IString,
+        source_span: SourceSpan,
+    },
+    #[error("{source}")]
+    IoError {
+        #[source]
+        source: std::rc::Rc<std::io::Error>,
+        source_span: SourceSpan,
+    },
 }
 
-impl From<std::io::Error> for ParseError {
-    fn from(value: std::io::Error) -> Self {
-        std::rc::Rc::new(value).into()
+impl GetPos for ParseError {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            ParseError::UnexpectedEndOfInput {
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::UnexpectedToken {
+                expected: _,
+                message: _,
+                context: _,
+                found: _,
+                source_span,
+            } => source_span,
+            ParseError::LexerStuck {
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::LocalSymbolInStage {
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::PeekedBackAtBeginning {
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::IoError {
+                source: _,
+                source_span,
+            } => source_span,
+        }
     }
 }

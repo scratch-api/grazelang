@@ -1,10 +1,5 @@
 use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-    time::Instant,
+    collections::HashMap, ffi::OsStr, fs::File, io::Read, path::{Path, PathBuf}, rc::Rc, time::Instant
 };
 
 use clap::{Parser, Subcommand};
@@ -64,15 +59,30 @@ pub fn parse_project_directory(
     let mut program = Vec::new();
     let mut file_id = 0_u32;
     let mut source_files = HashMap::new();
-    for i in path.read_dir()? {
-        let current_file = i?.path();
+    for i in path.read_dir().map_err(|value| ParseError::IoError {
+        source: Rc::new(value),
+        source_span: Default::default(),
+    })? {
+        let current_file = i
+            .map_err(|value| ParseError::IoError {
+                source: Rc::new(value),
+                source_span: Default::default(),
+            })?
+            .path();
         if current_file.extension().and_then(OsStr::to_str) != Some("graze") {
             continue;
         }
         let graze_code = {
-            let mut file = File::open(&current_file)?;
+            let mut file = File::open(&current_file).map_err(|value| ParseError::IoError {
+                source: Rc::new(value),
+                source_span: (Default::default(), file_id),
+            })?;
             let mut buf = String::new();
-            file.read_to_string(&mut buf)?;
+            file.read_to_string(&mut buf)
+                .map_err(|value| ParseError::IoError {
+                    source: Rc::new(value),
+                    source_span: (Default::default(), file_id),
+                })?;
             buf
         };
         let lexer = lexer::create_lexer(&graze_code);
@@ -89,9 +99,15 @@ pub fn parse_single_file(
     context: &mut ParseContext,
 ) -> Result<GrazeProgram, ParseError> {
     let graze_code = {
-        let mut file = File::open(path)?;
+        let mut file = File::open(path).map_err(|value| ParseError::IoError {
+            source: Rc::new(value),
+            source_span: Default::default(),
+        })?;
         let mut buf = String::new();
-        file.read_to_string(&mut buf)?;
+        file.read_to_string(&mut buf).map_err(|value| ParseError::IoError {
+            source: Rc::new(value),
+            source_span: Default::default(),
+        })?;
         buf
     };
     let lexer = lexer::create_lexer(&graze_code);

@@ -67,19 +67,19 @@ pub enum GrazeSb3GeneratorError {
     #[error("the identifier {identifier:?} is not a block")]
     IdentifierIsNotABlock { identifier: Identifier },
     #[error(
-        "in this context, no menu input was expected, found {input_menu_value:?} at {pos_range:?}"
+        "in this context, no menu input was expected, found {input_menu_value:?} at {source_span:?}"
     )]
     UnexpectedInputMenu {
         input_menu_value: Sb3FieldValue,
-        pos_range: SourceSpan,
+        source_span: SourceSpan,
     },
     #[error(
-        "the amount of parameters for this block was {unexpected:?} at {pos_range:?}, expected {expected:?}"
+        "the amount of parameters for this block was {unexpected:?} at {source_span:?}, expected {expected:?}"
     )]
     IncorrectParamCount {
         unexpected: usize,
         expected: usize,
-        pos_range: SourceSpan,
+        source_span: SourceSpan,
     },
     #[error("tried to get a list item for a non list, {identifier:?}")]
     ListAccessForNonLists { identifier: Identifier },
@@ -93,10 +93,10 @@ pub enum GrazeSb3GeneratorError {
     )]
     PassedNormalParamAsBlockStack {
         param: Box<Param>,
-        pos_range: SourceSpan,
+        source_span: SourceSpan,
     },
     #[error("tried to get the known block of a block stack")]
-    TriedGetKnownBlockOfBlockStack { pos_range: SourceSpan },
+    TriedGetKnownBlockOfBlockStack { source_span: SourceSpan },
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
     #[error("the identifier {identifier:?} is not callable")]
@@ -112,13 +112,13 @@ impl GetPos for GrazeSb3GeneratorError {
             }
             GrazeSb3GeneratorError::UnexpectedInputMenu {
                 input_menu_value: _,
-                pos_range,
-            } => pos_range,
+                source_span,
+            } => source_span,
             GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: _,
                 expected: _,
-                pos_range,
-            } => pos_range,
+                source_span,
+            } => source_span,
             GrazeSb3GeneratorError::ListAccessForNonLists { identifier } => {
                 identifier.get_source_span()
             }
@@ -128,9 +128,9 @@ impl GetPos for GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::BlockIsNotCBlock { identifier } => identifier.get_source_span(),
             GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                 param: _,
-                pos_range,
-            } => pos_range,
-            GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack { pos_range } => pos_range,
+                source_span,
+            } => source_span,
+            GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack { source_span } => source_span,
             GrazeSb3GeneratorError::ShadowedSprite { identifier } => identifier.get_source_span(),
             GrazeSb3GeneratorError::IdentifierNotCallable { identifier } => {
                 identifier.get_source_span()
@@ -1114,7 +1114,7 @@ where
 }
 
 macro_rules! with_known_block {
-    ($context:expr, $param:expr, $param_pos_range:expr, $known_block:ident => $action:expr) => {
+    ($context:expr, $param:expr, $param_source_span:expr, $known_block:ident => $action:expr) => {
         match $param {
             Param::Owned(ref $known_block) => $action,
             Param::LazyIdentifier(value) => {
@@ -1134,7 +1134,7 @@ macro_rules! with_known_block {
             }
             Param::BlockStack(_) => {
                 return Err(GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack {
-                    pos_range: $param_pos_range,
+                    source_span: $param_source_span,
                 })
             }
         }
@@ -1206,7 +1206,7 @@ pub fn add_known_block_to_params(
     context: &mut GrazeSb3GeneratorContext,
     param: &CallBlockParam,
     value: &KnownBlock,
-    known_block_pos_range: SourceSpan,
+    known_block_source_span: SourceSpan,
     inputs: &mut HashMap<String, Sb3InputValue>,
     fields: &mut HashMap<String, Sb3FieldValue>,
 ) -> Result<(), GrazeSb3GeneratorError> {
@@ -1223,7 +1223,7 @@ pub fn add_known_block_to_params(
     match &param.kind {
         CallBlockParamKind::Input { default } => {
             if let Some(input_value) = create_input_value(
-                known_block_to_input_repr_no_menu(value, known_block_pos_range, context)?,
+                known_block_to_input_repr_no_menu(value, known_block_source_span, context)?,
                 default.as_ref(),
             ) {
                 inputs.insert(param_name, input_value);
@@ -1232,7 +1232,7 @@ pub fn add_known_block_to_params(
         CallBlockParamKind::Field { category, .. } => {
             fields.insert(param_name, {
                 let (field_value, categories) =
-                    value.resolve_for_field(known_block_pos_range, context);
+                    value.resolve_for_field(known_block_source_span, context);
                 if !categories.contains(category) {
                     emit_message(
                         context,
@@ -1240,7 +1240,7 @@ pub fn add_known_block_to_params(
                             GrazeWarning::Specific(
                                 GrazeWarningKind::LiteralFieldValueIncorrect,
                                 format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value).into(),
-                                known_block_pos_range,
+                                known_block_source_span,
                             ),
                             None,
                         ),
@@ -1257,7 +1257,7 @@ pub fn add_known_block_to_params(
             category,
         } => {
             let (input_repr, is_shadow) = match value
-                .resolve_for_input(known_block_pos_range, context)
+                .resolve_for_input(known_block_source_span, context)
             {
                 grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
                     let is_shadow = sb3_primitive_block.is_shadow();
@@ -1282,7 +1282,7 @@ pub fn add_known_block_to_params(
                                             GrazeWarningKind::LiteralFieldValueIncorrect,
                                             format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value)
                                                 .into(),
-                                            known_block_pos_range,
+                                            known_block_source_span,
                                         ),
                                         None,
                                     ),
@@ -1299,7 +1299,7 @@ pub fn add_known_block_to_params(
                                             GrazeWarningKind::LiteralFieldValueIncorrect,
                                             format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value)
                                                 .into(),
-                                            known_block_pos_range,
+                                            known_block_source_span,
                                         ),
                                         None,
                                     ),
@@ -1328,7 +1328,7 @@ pub fn add_known_block_to_params(
                                 GrazeWarning::Specific(
                                     GrazeWarningKind::LiteralFieldValueIncorrect,
                                     format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value).into(),
-                                    known_block_pos_range,
+                                    known_block_source_span,
                                 ),
                                 None,
                             ),
@@ -1368,7 +1368,7 @@ pub fn add_known_block_to_params(
         }
         CallBlockParamKind::BlockStack => {
             return Err(GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack {
-                pos_range: known_block_pos_range,
+                source_span: known_block_source_span,
             });
         }
     }
@@ -1413,10 +1413,10 @@ where
 
 pub fn known_block_to_input_repr_no_menu(
     known_block: &KnownBlock,
-    known_block_pos_range: SourceSpan,
+    known_block_source_span: SourceSpan,
     context: &mut GrazeSb3GeneratorContext,
 ) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
-    let known_block_input = known_block.resolve_for_input(known_block_pos_range, context);
+    let known_block_input = known_block.resolve_for_input(known_block_source_span, context);
     match known_block_input {
         grazelang_library::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
             let is_shadow = sb3_primitive_block.is_shadow();
@@ -1438,7 +1438,7 @@ pub fn known_block_to_input_repr_no_menu(
         grazelang_library::KnownBlockInput::Menu(input_menu_value, _) => {
             Err(GrazeSb3GeneratorError::UnexpectedInputMenu {
                 input_menu_value,
-                pos_range: known_block_pos_range,
+                source_span: known_block_source_span,
             })
         }
         grazelang_library::KnownBlockInput::Empty => Ok(None),
@@ -1447,11 +1447,11 @@ pub fn known_block_to_input_repr_no_menu(
 
 pub fn param_to_input_repr_no_menu(
     param: Param,
-    param_pos_range: SourceSpan,
+    param_source_span: SourceSpan,
     context: &mut GrazeSb3GeneratorContext,
 ) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
-    with_known_block!(context, param, param_pos_range, value => {
-        known_block_to_input_repr_no_menu(value, param_pos_range, context)
+    with_known_block!(context, param, param_source_span, value => {
+        known_block_to_input_repr_no_menu(value, param_source_span, context)
     })
 }
 
@@ -1459,12 +1459,12 @@ pub fn add_param_to_params(
     context: &mut GrazeSb3GeneratorContext,
     param: &CallBlockParam,
     value: Param,
-    known_block_pos_range: SourceSpan,
+    known_block_source_span: SourceSpan,
     inputs: &mut HashMap<String, Sb3InputValue>,
     fields: &mut HashMap<String, Sb3FieldValue>,
 ) -> Result<(), GrazeSb3GeneratorError> {
-    with_known_block!(context, value, known_block_pos_range, value => {
-        add_known_block_to_params(context, param, value, known_block_pos_range, inputs, fields)?;
+    with_known_block!(context, value, known_block_source_span, value => {
+        add_known_block_to_params(context, param, value, known_block_source_span, inputs, fields)?;
     });
     Ok(())
 }
@@ -1492,7 +1492,7 @@ pub fn create_control_block<I>(
     context: &mut GrazeSb3GeneratorContext,
     identifier: &Identifier,
     args: (I, usize),
-    args_pos_range: SourceSpan,
+    args_source_span: SourceSpan,
     substack: (Param, SourceSpan),
     parent: Option<String>,
     this_id: IString,
@@ -1501,7 +1501,7 @@ where
     I: Iterator<Item = (Param, SourceSpan)>,
 {
     let (args, arg_count) = args;
-    let (substack, substack_pos_range) = substack;
+    let (substack, substack_source_span) = substack;
     let symbol_id = get_symbol_id(context, identifier)?;
     let symbol = &context.symbol_table[symbol_id];
     let known_block = get_known_block(symbol, identifier)?.clone();
@@ -1517,7 +1517,7 @@ where
         return Err(GrazeSb3GeneratorError::IncorrectParamCount {
             unexpected: arg_count,
             expected: params.len() - 1,
-            pos_range: args_pos_range,
+            source_span: args_source_span,
         });
     }
     let substack_input_name = if let CallBlockParam {
@@ -1536,11 +1536,11 @@ where
     } else {
         return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
             param: Box::new(substack),
-            pos_range: substack_pos_range,
+            source_span: substack_source_span,
         });
     };
-    for (param, (value, pos_range)) in zip(params.iter(), args) {
-        add_param_to_params(context, param, value, pos_range, &mut inputs, &mut fields)?;
+    for (param, (value, source_span)) in zip(params.iter(), args) {
+        add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
     }
     if let Some(substack) = substack {
         inputs.insert(
@@ -1699,7 +1699,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
-                    pos_range: value.0.range_to(value.3),
+                    source_span: value.0.range_to(value.3),
                 });
             }
             for (param, (value, (expr, _))) in
@@ -1814,8 +1814,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             value: FormattedStringTree,
         ) -> Result<(Param, SourceSpan), GrazeSb3GeneratorError> {
             match value {
-                FormattedStringTree::Expression(pos_range) => {
-                    Ok((context.pop_param().unwrap(), pos_range))
+                FormattedStringTree::Expression(source_span) => {
+                    Ok((context.pop_param().unwrap(), source_span))
                 }
                 FormattedStringTree::String(string) => Ok((
                     Param::Owned(Box::new(KnownBlock::PrimitiveBlock {
@@ -2245,17 +2245,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: reversed_args.len(),
                     expected: params.len(),
-                    pos_range: value.0.range_to(value.3),
+                    source_span: value.0.range_to(value.3),
                 });
             }
-            for (param, (value, pos_range)) in zip(
+            for (param, (value, source_span)) in zip(
                 params.iter(),
                 reversed_args
                     .into_iter()
                     .rev()
                     .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
             ) {
-                add_param_to_params(context, param, value, pos_range, &mut inputs, &mut fields)?;
+                add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
             }
             add_block(
                 context,
@@ -2923,7 +2923,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } else {
                     return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                         param: Box::new(first_branch),
-                        pos_range: *else_ifs[0].3.get_source_span(),
+                        source_span: *else_ifs[0].3.get_source_span(),
                     });
                 };
                 if let Some(first_branch) = first_branch {
@@ -2952,7 +2952,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         } else {
                             return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                                 param: Box::new(else_branch),
-                                pos_range: *else_value.1.get_source_span(),
+                                source_span: *else_value.1.get_source_span(),
                             });
                         };
                         if let Some(else_branch) = else_branch {
@@ -3002,7 +3002,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             } else {
                 return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                     param: Box::new(first_branch),
-                    pos_range: *value.0.2.get_source_span(),
+                    source_span: *value.0.2.get_source_span(),
                 });
             };
             if let Some(first_branch) = first_branch {
@@ -3095,7 +3095,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: 0,
                 expected: params.len(),
-                pos_range: *value.0.get_source_span(),
+                source_span: *value.0.get_source_span(),
             });
         }
         let block = context
@@ -3155,7 +3155,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                     unexpected: 1,
                     expected: params.len(),
-                    pos_range: value.0.range_to(value.1),
+                    source_span: value.0.range_to(value.1),
                 });
             }
         } else {
@@ -3237,7 +3237,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             return Err(GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: reversed_args.len(),
                 expected: params.len(),
-                pos_range: value.0.range_to(value.3),
+                source_span: value.0.range_to(value.3),
             });
         }
         let prev_parent = if let Some(parent) = parent {
@@ -3245,14 +3245,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         } else {
             None
         };
-        for (param, (value, pos_range)) in zip(
+        for (param, (value, source_span)) in zip(
             params.iter(),
             reversed_args
                 .into_iter()
                 .rev()
                 .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
         ) {
-            add_param_to_params(context, param, value, pos_range, &mut inputs, &mut fields)?;
+            add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
         }
         context.current_parent = prev_parent;
         let block = context
@@ -3521,9 +3521,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_parent = None;
         context.arg_stack.clear();
         default_visit_isolated_expression(self, value, context)?;
-        let param_pos_range = *value.1.get_source_span();
-        with_known_block!(context, context.pop_param().unwrap(), param_pos_range, value => {
-            match value.resolve_for_input(param_pos_range, context) {
+        let param_source_span = *value.1.get_source_span();
+        with_known_block!(context, context.pop_param().unwrap(), param_source_span, value => {
+            match value.resolve_for_input(param_source_span, context) {
                 grazelang_library::KnownBlockInput::PrimitiveInput(mut sb3_primitive_block) => {
                     match &mut sb3_primitive_block {
                         Sb3PrimitiveBlock::Variable { name: _, id: _, x, y } |
@@ -3547,7 +3547,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 grazelang_library::KnownBlockInput::SimpleBlock(opcode, params) => {
                     introduce_input_simple_block(opcode, params.iter(), context)?;
                 },
-                grazelang_library::KnownBlockInput::Menu(input_menu_value, _) => return Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value, pos_range: param_pos_range }),
+                grazelang_library::KnownBlockInput::Menu(input_menu_value, _) => return Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value, source_span: param_source_span }),
                 grazelang_library::KnownBlockInput::Empty => (),
             }
         });
