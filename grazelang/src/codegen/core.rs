@@ -753,9 +753,8 @@ pub mod symbol_data_derivation {
                         name,
                         md5ext,
                         data_format,
-                        bitmap_resolution: Some(1.0), // TODO: better default and more control
-                        // Issue: #8
-                        rotation_center_x: 0.0,
+                        bitmap_resolution: Some(2.0),
+                        rotation_center_x: 0.0, // TODO: Allow user to control the rotation center of a costume or backdrop
                         rotation_center_y: 0.0,
                     })
                 },
@@ -772,7 +771,7 @@ pub mod symbol_data_derivation {
                         name,
                         md5ext,
                         data_format,
-                        bitmap_resolution: Some(1.0),
+                        bitmap_resolution: Some(2.0),
                         rotation_center_x: 0.0,
                         rotation_center_y: 0.0,
                     })
@@ -790,8 +789,7 @@ pub mod symbol_data_derivation {
                         name,
                         md5ext,
                         data_format,
-                        rate: 48000.0, // TODO: better default and more control
-                        // Issue: #7
+                        rate: 48000.0,
                         sample_count: 1124,
                     })
                 },
