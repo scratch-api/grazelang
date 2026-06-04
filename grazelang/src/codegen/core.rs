@@ -33,9 +33,8 @@ use crate::{
     names::Namespace,
     parser::{
         context::{
-            BROADCAST_CATEGORIES, IdString, KnownBlock,
-            NO_CATEGORIES, ParseContext, ResolveKnownBlock, Symbol, SymbolId,
-            SymbolTable, Target, TargetSymbolDescriptor,
+            BROADCAST_CATEGORIES, IdString, KnownBlock, NO_CATEGORIES, ParseContext,
+            ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
@@ -106,7 +105,9 @@ pub enum GrazeSb3GeneratorError {
 impl GetPos for GrazeSb3GeneratorError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeSb3GeneratorError::UnknownIdentifier { identifier } => identifier.get_source_span(),
+            GrazeSb3GeneratorError::UnknownIdentifier { identifier } => {
+                identifier.get_source_span()
+            }
             GrazeSb3GeneratorError::IdentifierIsNotABlock { identifier } => {
                 identifier.get_source_span()
             }
@@ -261,6 +262,7 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
 }
 
 pub const STAGE_ISTRING: &IString = &literal!("stage");
+pub const STAGE_FIELD_VALUE_ISTRING: &IString = &literal!("_stage_");
 pub const SPRITES_ISTRING: &IString = &literal!("sprites");
 pub const MY_BLOCKS_ISTRING: &IString = &literal!("my_blocks");
 pub const CURRENT_DIRECTORY_STR: &str = ".";
@@ -404,7 +406,7 @@ impl GrazeSb3GeneratorContext {
             };
             extend_categories_for_field_value(
                 categories.iter().copied(),
-                target.get_field_name().into(),
+                target.get_field_value().clone(),
                 &mut field_category_entries,
                 &mut field_entry_categories,
             );
@@ -413,7 +415,7 @@ impl GrazeSb3GeneratorContext {
                 target.get_namespace_name().clone(),
                 Some(Rc::new(KnownBlock::FieldValue {
                     value: Sb3FieldValue::Normal(Sb3Primitive::String(
-                        target.get_field_name().to_string(),
+                        target.get_field_value().to_string(),
                     )),
                     categories: categories.iter().copied().collect(),
                 })),
@@ -434,7 +436,7 @@ impl GrazeSb3GeneratorContext {
                             .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
                     )
                     .map(|(mut symbol, attachment, asset_file)| {
-                        add_bind_info(&mut symbol, target.get_namespace_name());
+                        add_bind_info(&mut symbol, target.get_field_value());
                         if let Some(AssetFile {
                             file_name,
                             file_path,
@@ -457,9 +459,9 @@ impl GrazeSb3GeneratorContext {
                     },
                 )?;
             symbols.extend(if is_stage {
-                create_stage_dependent_symbols(target.get_namespace_name())
+                create_stage_dependent_symbols(STAGE_FIELD_VALUE_ISTRING)
             } else {
-                create_sprite_dependent_symbols(target.get_namespace_name())
+                create_sprite_dependent_symbols(target.get_field_value())
             });
             for attachment in &attachments {
                 match attachment {
@@ -573,7 +575,7 @@ impl GrazeSb3GeneratorContext {
                             namespace: symbol.namespace.clone(),
                             parent: symbol.parent,
                         };
-                        add_bind_info(&mut symbol_for_stage, &literal!("_stage_"));
+                        add_bind_info(&mut symbol_for_stage, STAGE_FIELD_VALUE_ISTRING);
                         if let Some(attachment) = attachment {
                             stage_target_attachments.push(attachment);
                         }
@@ -689,7 +691,10 @@ pub fn compute_hash(path: &Path) -> Result<String, std::io::Error> {
 pub use symbol_data_derivation::derive_related_data_of_target_symbol;
 pub mod symbol_data_derivation {
     use std::{
-        collections::{HashMap, HashSet}, ffi::OsStr, path::{Path, PathBuf}, rc::Rc
+        collections::{HashMap, HashSet},
+        ffi::OsStr,
+        path::{Path, PathBuf},
+        rc::Rc,
     };
 
     use arcstr::ArcStr as IString;
@@ -1111,6 +1116,26 @@ where
     context.current_parent = Some(block_id.to_string());
     context.current_previous_block = Some(block_id);
     out
+}
+
+macro_rules! static_resolve_identifier {
+    ($context:expr, [$start:expr $(, $segments:expr)* $(,)?]) => {
+        static_resolve_identifier!(
+            $context,
+            $context.symbol_table.get_child(Default::default(), $start).unwrap(),
+            [$($segments)*]
+        )
+    };
+    ($context:expr, $current:expr, [$start:expr $(, $segments:expr)* $(,)?]) => {
+        static_resolve_identifier!(
+            $context,
+            $context.symbol_table.get_child($current, $start).unwrap(),
+            [$($segments)*]
+        )
+    };
+    ($context:expr, $current:expr, []) => {
+        $current
+    };
 }
 
 macro_rules! with_known_block {
@@ -2990,7 +3015,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             self.visit_expression(&value.0.1, context)?;
             let condition_value = context.pop_param().unwrap();
             if let Some(condition) = create_input_value(
-                param_to_input_repr_no_menu(condition_value, *value.0.1.get_source_span(), context)?,
+                param_to_input_repr_no_menu(
+                    condition_value,
+                    *value.0.1.get_source_span(),
+                    context,
+                )?,
                 None::<Sb3PrimitiveBlock>,
             ) {
                 inputs.insert("CONDITION".to_string(), condition);
@@ -3572,10 +3601,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             },
         )?;
         let assets = context.target_attachments.remove("stage").unwrap();
-        let my_blocks_symbol_id = context
-            .symbol_table
-            .get_child(Default::default(), MY_BLOCKS_ISTRING)
-            .unwrap();
+        let my_blocks_symbol_id = static_resolve_identifier!(context, [MY_BLOCKS_ISTRING]);
         for asset in assets {
             match asset {
                 TargetAttachment::Costume(costume) => stage.costumes.push(costume),
@@ -3634,10 +3660,29 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 identifier: value.2.clone(),
             })?;
         let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
-        let my_blocks_symbol_id = context
-            .symbol_table
-            .get_child(Default::default(), MY_BLOCKS_ISTRING)
-            .unwrap();
+        let my_blocks_symbol_id = static_resolve_identifier!(context, [MY_BLOCKS_ISTRING]);
+        let sprite_symbol_id =
+            static_resolve_identifier!(context, [SPRITES_ISTRING, &value.2.to_single().unwrap().0]);
+        let inserted_symbols = {
+            let mut insert_symbols = Vec::new();
+            let root_symbol_id = Default::default();
+            for (key, symbol_id) in &context.symbol_table[sprite_symbol_id].namespace {
+                if context
+                    .symbol_table
+                    .get_child(root_symbol_id, key)
+                    .is_some()
+                {
+                    continue;
+                }
+                insert_symbols.push((key.clone(), *symbol_id));
+            }
+            for (key, symbol_id) in &insert_symbols {
+                context
+                    .symbol_table
+                    .insert_alias(root_symbol_id, key.clone(), *symbol_id);
+            }
+            insert_symbols
+        };
         for asset in assets {
             match asset {
                 TargetAttachment::Costume(costume) => new_sprite.costumes.push(costume),
@@ -3674,6 +3719,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .sb3
             .targets
             .push(context.current_sb3_target.take().unwrap());
+        {
+            let root_symbol_id = Default::default();
+            for (key, _) in inserted_symbols {
+                context.symbol_table[root_symbol_id].namespace.remove(&key);
+            }
+        }
         context.symbol_table[my_blocks_symbol_id].namespace.clear();
         Ok(())
     }

@@ -122,6 +122,16 @@ impl Sb3Target {
     }
 }
 
+impl Sb3Target {
+    pub fn get_field_value(&self) -> &str {
+        if self.is_stage {
+            "_stage_"
+        } else {
+            &self.name
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sb3VariableDeclaration {
     pub name: String,

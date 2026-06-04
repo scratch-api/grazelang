@@ -20,11 +20,7 @@ use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen::{
-        self,
-        core::emit_message,
-        ids::generate_random_id_as_string,
-    },
+    codegen::{self, core::emit_message, ids::generate_random_id_as_string},
     lexer::SourceSpan,
     messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
     parser::cst::CustomBlockParamKindValue,
@@ -164,7 +160,7 @@ impl ResolveKnownBlock for KnownBlock {
             } => {
                 if let Some(bind_info) = bind_info
                     && let Some(target) = context.current_sb3_target.as_ref()
-                    && bind_info.parent_target.as_str() != target.name.as_str()
+                    && bind_info.parent_target.as_str() != target.get_field_value()
                 {
                     return KnownBlockInput::SimpleBlock(
                         static_ref_of_const!(literal!("sensing_of"), IString),
@@ -765,15 +761,15 @@ impl Target {
         }
     }
 
-    pub fn get_field_name(&self) -> &str {
+    pub fn get_field_value(&self) -> &IString {
         match self {
             Target::Sprite {
                 name,
-                canonical_name: _,
+                canonical_name,
                 symbols: _,
-            } => name.as_str(),
-            Target::Stage { symbols: _ } => "_stage_", // TODO: check whether this is correct
-                                                       // Issue: #5
+            } => canonical_name.as_ref().unwrap_or(name),
+            Target::Stage { symbols: _ } => codegen::core::STAGE_FIELD_VALUE_ISTRING, // TODO: check whether this is correct
+                                                                                      // Issue: #5
         }
     }
 

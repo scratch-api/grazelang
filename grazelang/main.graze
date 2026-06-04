@@ -6,6 +6,7 @@ stage {
     }
     {
         switch_backdrop_to(stage.test_costume);
+        say(sprite_1.test_2);
     }
 }
 
@@ -13,9 +14,10 @@ sprite `Sprite1` sprite_1 {
     costume test_costume("empty.svg");
     let global test;
     let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
+    let local test_2;
     events.when_green_flag_clicked {
         delete_all_of_list(list_);
-        say(is_key_pressed("a"));
+        say(test_2);
         test = 10 + 5 * 2;
         if "test = 20" == "test = ${test}" {
             test = 5;
