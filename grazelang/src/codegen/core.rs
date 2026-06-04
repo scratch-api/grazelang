@@ -755,6 +755,7 @@ pub mod symbol_data_derivation {
                         data_format,
                         bitmap_resolution: Some(2.0),
                         rotation_center_x: 0.0, // TODO: Allow user to control the rotation center of a costume or backdrop
+                        // Issue: #55
                         rotation_center_y: 0.0,
                     })
                 },

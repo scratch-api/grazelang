@@ -114,7 +114,7 @@
     "8": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L865-L866",
         "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "better default and more control"
@@ -122,7 +122,7 @@
     "7": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L881-L882",
         "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "better default and more control"
@@ -382,5 +382,13 @@
         "lines": "L127-L127",
         "commit": "ceafab8be46fe43f74064f186dc0d5fc30872cfb",
         "title": "Use source files for errors"
+    },
+    "55": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L757-L757",
+        "commit": "bbaefbc20ae368c0851b2af646837cb41133a93b",
+        "title": "Allow user to control the rotation center of a costume or backdrop"
     }
 }
