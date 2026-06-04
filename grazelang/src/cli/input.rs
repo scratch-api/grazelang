@@ -4,6 +4,7 @@ use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use clap::{Parser, Subcommand};
@@ -41,6 +42,8 @@ pub enum Commands {
         shadows: UseShadows,
         #[arg(value_enum, short, long, default_value = "all")]
         logging: GrazeMessageSetting,
+        #[arg(long)]
+        log_time: bool,
         /// Path for the sb3 file
         #[arg(value_enum, short, long)]
         target: Option<PathBuf>,
@@ -107,12 +110,14 @@ impl Cli {
                 target,
                 resources,
                 path,
+                log_time,
             } => Self::build(
                 shadows,
                 logging,
                 target.as_ref().map(PathBuf::as_path),
                 resources.as_ref().map(PathBuf::as_path),
                 path,
+                *log_time,
             ),
         }
     }
@@ -123,7 +128,9 @@ impl Cli {
         target: Option<&Path>,
         resources: Option<&Path>,
         path: &Path,
+        log_time: bool,
     ) {
+        let total_time = Instant::now();
         // TODO: Use source files for errors
         // Issue: #54
         let is_file = path.is_file();
@@ -141,6 +148,7 @@ impl Cli {
             },
             Default::default(),
         );
+        let parse_timer = Instant::now();
         let path = path.canonicalize().unwrap();
         let (parsed, _source_files) = if path.is_dir() {
             parse_project_directory(&path, &mut context).unwrap()
@@ -154,6 +162,9 @@ impl Cli {
             // Issue: #53
             panic!();
         };
+        if log_time {
+            println!("Parsing took: {:?}", parse_timer.elapsed());
+        }
         if !context.successful {
             for message in &context.messages {
                 dbg!(message);
@@ -161,9 +172,13 @@ impl Cli {
             dbg!(parsed);
             panic!("Parsing unsuccessful.");
         }
+        let codegen_timer = Instant::now();
         let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
         let visitor = codegen::core::GrazeSb3Generator;
         visitor.visit_graze_program(&parsed, &mut context).unwrap();
+        if log_time {
+            println!("Codegen took: {:?}", codegen_timer.elapsed());
+        }
         for message in &context.messages {
             dbg!(message);
         }
@@ -195,6 +210,11 @@ impl Cli {
         if set_extension {
             output_path.set_extension("sb3");
         }
+        let zip_timer = Instant::now();
         zipper::write_to_zip_path(&output_path, &context).unwrap();
+        if log_time {
+            println!("Zipping took: {:?}", zip_timer.elapsed());
+            println!("Total time: {:?}", total_time.elapsed());
+        }
     }
 }
