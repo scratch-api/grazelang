@@ -107,15 +107,21 @@ impl Cli {
                 target,
                 resources,
                 path,
-            } => Self::build(shadows, logging, target.as_ref(), resources.as_ref(), path),
+            } => Self::build(
+                shadows,
+                logging,
+                target.as_ref().map(PathBuf::as_path),
+                resources.as_ref().map(PathBuf::as_path),
+                path,
+            ),
         }
     }
 
     pub fn build(
         shadows: &UseShadows,
         logging: &GrazeMessageSetting,
-        target: Option<&PathBuf>,
-        resources: Option<&PathBuf>,
+        target: Option<&Path>,
+        resources: Option<&Path>,
         path: &Path,
     ) {
         // TODO: Use source files for errors
@@ -124,7 +130,7 @@ impl Cli {
             GrazeSettings {
                 message_setting: *logging,
                 use_shadows: *shadows,
-                resources_path: Some(resources.cloned().unwrap_or_else(|| {
+                resources_path: Some(resources.map(Path::to_path_buf).unwrap_or_else(|| {
                     if is_file {
                         path.parent().unwrap().to_path_buf()
                     } else {
@@ -159,24 +165,39 @@ impl Cli {
         for message in &context.messages {
             dbg!(message);
         }
-        let mut output_path = if is_file {
-            target
-                .map(|value| {
-                    value.join(
+        // target.unwrap_or(&path).join(
+        //     path.file_name()
+        //         .and_then(OsStr::to_str)
+        //         .unwrap_or("project"),
+        // )
+        let output_path = match (target, is_file) {
+            (Some(target), _) => match target.is_file() {
+                true => target.to_path_buf(),
+                false => {
+                    let mut output_path = target.join(
                         path.file_name()
                             .and_then(OsStr::to_str)
                             .unwrap_or("project"),
-                    )
-                })
-                .unwrap_or(path)
-        } else {
-            target.unwrap_or(&path).join(
-                path.file_name()
-                    .and_then(OsStr::to_str)
-                    .unwrap_or("project"),
-            )
+                    );
+                    output_path.set_extension("sb3");
+                    output_path
+                }
+            },
+            (None, true) => {
+                let mut output_path = path;
+                output_path.set_extension("sb3");
+                output_path
+            }
+            (None, false) => {
+                let mut output_path = path.join(
+                    path.file_name()
+                        .and_then(OsStr::to_str)
+                        .unwrap_or("project"),
+                );
+                output_path.set_extension("sb3");
+                output_path
+            }
         };
-        output_path.set_extension("sb3");
         zipper::write_to_zip_path(&output_path, &context).unwrap();
     }
 }
