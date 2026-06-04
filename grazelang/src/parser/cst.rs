@@ -1,19 +1,24 @@
 use std::collections::HashMap;
 
-use crate::lexer::PosRange;
+use crate::lexer::SourceSpan;
 use arcstr::ArcStr as IString; // Immutable string
 use grazelang_library::project_json::{Sb3Primitive, Sb3PrimitiveBlock};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub trait GetPos {
-    fn get_position(&self) -> &PosRange;
+    fn get_source_span(&self) -> &SourceSpan;
 
-    fn range_to<T>(&self, other: &T) -> PosRange
+    fn range_to<T>(&self, other: &T) -> SourceSpan
     where
         T: GetPos,
     {
-        (self.get_position().0, other.get_position().1)
+        self.range_to_end(other.get_source_span().0.1)
+    }
+
+    fn range_to_end(&self, end: (usize, usize)) -> SourceSpan {
+        let own_position = self.get_source_span();
+        ((own_position.0.0, end), own_position.1)
     }
 }
 
@@ -22,28 +27,28 @@ pub struct GrazeProgram(pub Vec<TopLevelStatement>);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TopLevelStatement {
-    Stage(StageKeyword, StageCodeBlock, Option<Semicolon>, PosRange),
+    Stage(StageKeyword, StageCodeBlock, Option<Semicolon>, SourceSpan),
     Sprite(
         SpriteKeyword,
         Option<CanonicalIdentifier>,
         Identifier,
         SpriteCodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     BroadcastDeclaration(
         BroadcastKeyword,
         Option<CanonicalIdentifier>,
         Identifier,
         Semicolon,
-        PosRange,
+        SourceSpan,
     ),
     EmptyStatement(Semicolon),
-    InvalidStatement(PosRange),
+    InvalidStatement(SourceSpan),
 }
 
 impl GetPos for TopLevelStatement {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             TopLevelStatement::Stage(_, _, _, p) => p,
             TopLevelStatement::Sprite(_, _, _, _, _, p) => p,
@@ -55,71 +60,71 @@ impl GetPos for TopLevelStatement {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SpriteKeyword(pub PosRange);
+pub struct SpriteKeyword(pub SourceSpan);
 
 impl GetPos for SpriteKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StageKeyword(pub PosRange);
+pub struct StageKeyword(pub SourceSpan);
 
 impl GetPos for StageKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CostumeKeyword(pub PosRange);
+pub struct CostumeKeyword(pub SourceSpan);
 
 impl GetPos for CostumeKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BroadcastKeyword(pub PosRange);
+pub struct BroadcastKeyword(pub SourceSpan);
 
 impl GetPos for BroadcastKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BackdropKeyword(pub PosRange);
+pub struct BackdropKeyword(pub SourceSpan);
 
 impl GetPos for BackdropKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SoundKeyword(pub PosRange);
+pub struct SoundKeyword(pub SourceSpan);
 
 impl GetPos for SoundKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ProcKeyword(pub PosRange);
+pub struct ProcKeyword(pub SourceSpan);
 
 impl GetPos for ProcKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
@@ -127,13 +132,13 @@ impl GetPos for ProcKeyword {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WarpSpecifier {
     pub is_warp: bool,
-    pub pos_range: PosRange,
+    pub source_span: SourceSpan,
 }
 
 impl GetPos for WarpSpecifier {
     #[inline]
-    fn get_position(&self) -> &PosRange {
-        &self.pos_range
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
     }
 }
 
@@ -147,13 +152,13 @@ pub enum CustomBlockParamKindValue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockParamKind {
     pub kind: CustomBlockParamKindValue,
-    pub pos_range: PosRange,
+    pub source_span: SourceSpan,
 }
 
 impl GetPos for CustomBlockParamKind {
     #[inline]
-    fn get_position(&self) -> &PosRange {
-        &self.pos_range
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
     }
 }
 
@@ -166,16 +171,16 @@ type CustomBlockParams = Vec<(
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StageStatement {
-    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
-    BackdropDeclaration(BackdropKeyword, AssetDeclaration, Semicolon, PosRange),
-    SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, PosRange),
-    NoInputHatStatement(Identifier, CodeBlock, Option<Semicolon>, PosRange),
+    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, SourceSpan),
+    BackdropDeclaration(BackdropKeyword, AssetDeclaration, Semicolon, SourceSpan),
+    SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, SourceSpan),
+    NoInputHatStatement(Identifier, CodeBlock, Option<Semicolon>, SourceSpan),
     SingleInputHatStatement(
         Identifier,
         Expression,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     MultiInputHatStatement(
         Identifier,
@@ -184,7 +189,7 @@ pub enum StageStatement {
         RightParens,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     CustomBlockDefinition(
         Option<WarpSpecifier>,
@@ -196,22 +201,22 @@ pub enum StageStatement {
         RightParens,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
-    IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
+    IsolatedBlock(CodeBlock, Option<Semicolon>, SourceSpan),
     IsolatedExpression(
         LeftParens,
         Expression,
         RightParens,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     EmptyStatement(Semicolon),
-    InvalidStatement(PosRange),
+    InvalidStatement(SourceSpan),
 }
 
 impl GetPos for StageStatement {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             StageStatement::DataDeclaration(_, _, _, p) => p,
             StageStatement::BackdropDeclaration(_, _, _, p) => p,
@@ -230,16 +235,16 @@ impl GetPos for StageStatement {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SpriteStatement {
-    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
-    CostumeDeclaration(CostumeKeyword, AssetDeclaration, Semicolon, PosRange),
-    SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, PosRange),
-    NoInputHatStatement(Identifier, CodeBlock, Option<Semicolon>, PosRange),
+    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, SourceSpan),
+    CostumeDeclaration(CostumeKeyword, AssetDeclaration, Semicolon, SourceSpan),
+    SoundDeclaration(SoundKeyword, AssetDeclaration, Semicolon, SourceSpan),
+    NoInputHatStatement(Identifier, CodeBlock, Option<Semicolon>, SourceSpan),
     SingleInputHatStatement(
         Identifier,
         Expression,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     MultiInputHatStatement(
         Identifier,
@@ -248,7 +253,7 @@ pub enum SpriteStatement {
         RightParens,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     CustomBlockDefinition(
         Option<WarpSpecifier>,
@@ -260,22 +265,22 @@ pub enum SpriteStatement {
         RightParens,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
-    IsolatedBlock(CodeBlock, Option<Semicolon>, PosRange),
+    IsolatedBlock(CodeBlock, Option<Semicolon>, SourceSpan),
     IsolatedExpression(
         LeftParens,
         Expression,
         RightParens,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     EmptyStatement(Semicolon),
-    InvalidStatement(PosRange),
+    InvalidStatement(SourceSpan),
 }
 
 impl GetPos for SpriteStatement {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             SpriteStatement::DataDeclaration(_, _, _, p) => p,
             SpriteStatement::CostumeDeclaration(_, _, _, p) => p,
@@ -298,16 +303,16 @@ pub enum AssetDeclaration {
         LeftParens,
         Vec<(SingleAssetDeclaration, Option<Comma>)>,
         RightParens,
-        PosRange,
+        SourceSpan,
     ),
     Single(SingleAssetDeclaration),
 }
 
 impl GetPos for AssetDeclaration {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             AssetDeclaration::Multiple(_, _, _, p) => p,
-            AssetDeclaration::Single(d) => d.get_position(),
+            AssetDeclaration::Single(d) => d.get_source_span(),
         }
     }
 }
@@ -317,27 +322,27 @@ pub struct SingleAssetDeclaration(
     pub Option<CanonicalIdentifier>,
     pub Identifier,
     pub LeftParens,
-    pub (IString, PosRange),
+    pub (IString, SourceSpan),
     pub RightParens,
-    pub PosRange,
+    pub SourceSpan,
 );
 
 impl GetPos for SingleAssetDeclaration {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.5
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Statement {
-    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, PosRange),
+    DataDeclaration(LetKeyword, DataDeclaration, Semicolon, SourceSpan),
     Assignment(
         Identifier,
         NormalAssignmentOperator,
         Expression,
         Semicolon,
-        PosRange,
+        SourceSpan,
     ),
     ListAssignment(
         Identifier,
@@ -346,7 +351,7 @@ pub enum Statement {
         Vec<(ListEntry, Option<Comma>)>,
         RightBracket,
         Semicolon,
-        PosRange,
+        SourceSpan,
     ),
     SetItem(
         Identifier,
@@ -356,7 +361,7 @@ pub enum Statement {
         NormalAssignmentOperator,
         Expression,
         Semicolon,
-        PosRange,
+        SourceSpan,
     ),
     Call(
         Identifier,
@@ -364,14 +369,14 @@ pub enum Statement {
         Vec<(Expression, Option<Comma>)>,
         RightParens,
         Semicolon,
-        PosRange,
+        SourceSpan,
     ),
     SingleInputControl(
         Identifier,
         Expression,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     MultiInputControl(
         Identifier,
@@ -380,22 +385,22 @@ pub enum Statement {
         RightParens,
         CodeBlock,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
-    Forever(Identifier, CodeBlock, Option<Semicolon>, PosRange),
+    Forever(Identifier, CodeBlock, Option<Semicolon>, SourceSpan),
     IfElse(
         (SyntacticIf, Expression, CodeBlock),
         Vec<(SyntacticElse, SyntacticIf, Expression, CodeBlock)>,
         Option<(SyntacticElse, CodeBlock)>,
         Option<Semicolon>,
-        PosRange,
+        SourceSpan,
     ),
     EmptyStatement(Semicolon),
-    InvalidStatement(PosRange),
+    InvalidStatement(SourceSpan),
 }
 
 impl GetPos for Statement {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             Statement::DataDeclaration(_, _, _, p) => p,
             Statement::Assignment(_, _, _, _, p) => p,
@@ -413,51 +418,51 @@ impl GetPos for Statement {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LetKeyword(pub PosRange);
+pub struct LetKeyword(pub SourceSpan);
 
 impl GetPos for LetKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct VarsKeyword(pub PosRange);
+pub struct VarsKeyword(pub SourceSpan);
 
 impl GetPos for VarsKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ListsKeyword(pub PosRange);
+pub struct ListsKeyword(pub SourceSpan);
 
 impl GetPos for ListsKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct VarKeyword(pub PosRange);
+pub struct VarKeyword(pub SourceSpan);
 
 impl GetPos for VarKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ListKeyword(pub PosRange);
+pub struct ListKeyword(pub SourceSpan);
 
 impl GetPos for ListKeyword {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
@@ -465,8 +470,8 @@ impl GetPos for ListKeyword {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleDataDeclarationType {
     Unset,
-    Var(PosRange),
-    List(PosRange),
+    Var(SourceSpan),
+    List(SourceSpan),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -476,7 +481,7 @@ pub enum DataDeclaration {
         LeftParens,
         Vec<(SingleDataDeclaration, Option<Comma>)>,
         RightParens,
-        PosRange,
+        SourceSpan,
     ),
     Vars(
         DataDeclarationScope,
@@ -484,7 +489,7 @@ pub enum DataDeclaration {
         LeftBrace,
         Vec<(SingleDataDeclaration, Option<Comma>)>,
         RightBrace,
-        PosRange,
+        SourceSpan,
     ),
     Lists(
         DataDeclarationScope,
@@ -492,18 +497,18 @@ pub enum DataDeclaration {
         LeftBrace,
         Vec<(SingleDataDeclaration, Option<Comma>)>,
         RightBrace,
-        PosRange,
+        SourceSpan,
     ),
     Single(Box<SingleDataDeclaration>),
 }
 
 impl GetPos for DataDeclaration {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             DataDeclaration::Mixed(_, _, _, _, p) => p,
             DataDeclaration::Vars(_, _, _, _, _, p) => p,
             DataDeclaration::Lists(_, _, _, _, _, p) => p,
-            DataDeclaration::Single(d) => d.get_position(),
+            DataDeclaration::Single(d) => d.get_source_span(),
         }
     }
 }
@@ -511,17 +516,17 @@ impl GetPos for DataDeclaration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DataDeclarationScope {
     Unset,
-    Global(PosRange),
-    Local(PosRange),
-    Cloud(PosRange),
+    Global(SourceSpan),
+    Local(SourceSpan),
+    Cloud(SourceSpan),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct NormalAssignmentOperator(pub PosRange);
+pub struct NormalAssignmentOperator(pub SourceSpan);
 
 impl GetPos for NormalAssignmentOperator {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
@@ -529,13 +534,13 @@ impl GetPos for NormalAssignmentOperator {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ListEntry {
     Expression(Expression),
-    Unwrap(Literal, PosRange),
+    Unwrap(Literal, SourceSpan),
 }
 
 impl GetPos for ListEntry {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
-            ListEntry::Expression(l) => l.get_position(),
+            ListEntry::Expression(l) => l.get_source_span(),
             ListEntry::Unwrap(_, p) => p,
         }
     }
@@ -550,14 +555,14 @@ pub enum SingleDataDeclaration {
         Identifier,
         NormalAssignmentOperator,
         Expression,
-        PosRange,
+        SourceSpan,
     ),
     EmptyVariable(
         Option<VarKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
-        PosRange,
+        SourceSpan,
     ),
     List(
         Option<ListKeyword>,
@@ -568,19 +573,19 @@ pub enum SingleDataDeclaration {
         LeftBracket,
         Vec<(ListEntry, Option<Comma>)>,
         RightBracket,
-        PosRange,
+        SourceSpan,
     ),
     EmptyList(
         Option<ListKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
         Identifier,
-        PosRange,
+        SourceSpan,
     ),
 }
 
 impl GetPos for SingleDataDeclaration {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             SingleDataDeclaration::Variable(_, _, _, _, _, _, p) => p,
             SingleDataDeclaration::EmptyVariable(_, _, _, _, p) => p,
@@ -591,31 +596,31 @@ impl GetPos for SingleDataDeclaration {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Comma(pub PosRange);
+pub struct Comma(pub SourceSpan);
 
 impl GetPos for Comma {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LeftBrace(pub PosRange);
+pub struct LeftBrace(pub SourceSpan);
 
 impl GetPos for LeftBrace {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RightBrace(pub PosRange);
+pub struct RightBrace(pub SourceSpan);
 
 impl GetPos for RightBrace {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
@@ -625,13 +630,13 @@ pub struct StageCodeBlock {
     pub left_brace: LeftBrace,
     pub statements: Vec<StageStatement>,
     pub right_brace: RightBrace,
-    pub pos_range: PosRange,
+    pub source_span: SourceSpan,
 }
 
 impl GetPos for StageCodeBlock {
     #[inline]
-    fn get_position(&self) -> &PosRange {
-        &self.pos_range
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
     }
 }
 
@@ -640,13 +645,13 @@ pub struct SpriteCodeBlock {
     pub left_brace: LeftBrace,
     pub statements: Vec<SpriteStatement>,
     pub right_brace: RightBrace,
-    pub pos_range: PosRange,
+    pub source_span: SourceSpan,
 }
 
 impl GetPos for SpriteCodeBlock {
     #[inline]
-    fn get_position(&self) -> &PosRange {
-        &self.pos_range
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
     }
 }
 
@@ -655,45 +660,45 @@ pub struct CodeBlock {
     pub left_brace: LeftBrace,
     pub statements: Vec<Statement>,
     pub right_brace: RightBrace,
-    pub pos_range: PosRange,
+    pub source_span: SourceSpan,
 }
 
 impl GetPos for CodeBlock {
     #[inline]
-    fn get_position(&self) -> &PosRange {
-        &self.pos_range
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Expression {
     Literal(Literal),
-    FormattedString(Vec<FormattedStringContent>, PosRange),
-    BinOp(Box<Expression>, BinOp, Box<Expression>, PosRange),
-    UnOp(UnOp, Box<Expression>, PosRange),
+    FormattedString(Vec<FormattedStringContent>, SourceSpan),
+    BinOp(Box<Expression>, BinOp, Box<Expression>, SourceSpan),
+    UnOp(UnOp, Box<Expression>, SourceSpan),
     Identifier(Identifier),
     Call(
         Identifier,
         LeftParens,
         Vec<(Expression, Option<Comma>)>,
         RightParens,
-        PosRange,
+        SourceSpan,
     ),
     GetItem(
         Identifier,
         LeftBracket,
         Box<Expression>,
         RightBracket,
-        PosRange,
+        SourceSpan,
     ),
     GetLetter(
         Box<Expression>,
         LetterAccessLeftBracket,
         Box<Expression>,
         RightBracket,
-        PosRange,
+        SourceSpan,
     ),
-    Parentheses(LeftParens, Box<Expression>, RightParens, PosRange),
+    Parentheses(LeftParens, Box<Expression>, RightParens, SourceSpan),
 }
 
 impl Expression {
@@ -714,73 +719,73 @@ impl Expression {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LeftParens(pub PosRange);
+pub struct LeftParens(pub SourceSpan);
 
 impl GetPos for LeftParens {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RightParens(pub PosRange);
+pub struct RightParens(pub SourceSpan);
 
 impl GetPos for RightParens {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LeftBracket(pub PosRange);
+pub struct LeftBracket(pub SourceSpan);
 
 impl GetPos for LeftBracket {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RightBracket(pub PosRange);
+pub struct RightBracket(pub SourceSpan);
 
 impl GetPos for RightBracket {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LetterAccessLeftBracket(pub PosRange);
+pub struct LetterAccessLeftBracket(pub SourceSpan);
 
 impl GetPos for LetterAccessLeftBracket {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Semicolon(pub PosRange);
+pub struct Semicolon(pub SourceSpan);
 
 impl GetPos for Semicolon {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 impl GetPos for Expression {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
-            Expression::Literal(l) => l.get_position(),
+            Expression::Literal(l) => l.get_source_span(),
             Expression::FormattedString(_, p) => p,
             Expression::BinOp(_, _, _, p) => p,
             Expression::UnOp(_, _, p) => p,
-            Expression::Identifier(i) => i.get_position(),
+            Expression::Identifier(i) => i.get_source_span(),
             Expression::Call(_, _, _, _, p) => p,
             Expression::GetItem(_, _, _, _, p) => p,
             Expression::GetLetter(_, _, _, _, p) => p,
@@ -791,24 +796,24 @@ impl GetPos for Expression {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum BinOp {
-    Plus(PosRange),
-    Minus(PosRange),
-    Times(PosRange),
-    Div(PosRange),
-    Mod(PosRange),
-    Join(PosRange),
-    And(PosRange),
-    Or(PosRange),
-    Equals(PosRange),
-    NotEquals(PosRange),
-    LessThan(PosRange),
-    GreaterThan(PosRange),
-    LessThanOrEqual(PosRange),
-    GreaterThanOrEqual(PosRange),
+    Plus(SourceSpan),
+    Minus(SourceSpan),
+    Times(SourceSpan),
+    Div(SourceSpan),
+    Mod(SourceSpan),
+    Join(SourceSpan),
+    And(SourceSpan),
+    Or(SourceSpan),
+    Equals(SourceSpan),
+    NotEquals(SourceSpan),
+    LessThan(SourceSpan),
+    GreaterThan(SourceSpan),
+    LessThanOrEqual(SourceSpan),
+    GreaterThanOrEqual(SourceSpan),
 }
 
 impl GetPos for BinOp {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             BinOp::Plus(p) => p,
             BinOp::Minus(p) => p,
@@ -985,14 +990,14 @@ impl BinOp {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum UnOp {
-    Minus(PosRange),
-    Not(PosRange),
-    Exp(PosRange),
-    Pow(PosRange),
+    Minus(SourceSpan),
+    Not(SourceSpan),
+    Exp(SourceSpan),
+    Pow(SourceSpan),
 }
 
 impl GetPos for UnOp {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             UnOp::Minus(p) => p,
             UnOp::Not(p) => p,
@@ -1059,13 +1064,13 @@ impl UnOp {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Literal {
-    String(IString, PosRange),
-    DecimalInt(IString, PosRange),
-    DecimalFloat(IString, PosRange),
-    HexadecimalInt(IString, PosRange),
-    OctalInt(IString, PosRange),
-    BinaryInt(IString, PosRange),
-    EmptyExpression(LeftParens, RightParens, PosRange),
+    String(IString, SourceSpan),
+    DecimalInt(IString, SourceSpan),
+    DecimalFloat(IString, SourceSpan),
+    HexadecimalInt(IString, SourceSpan),
+    OctalInt(IString, SourceSpan),
+    BinaryInt(IString, SourceSpan),
+    EmptyExpression(LeftParens, RightParens, SourceSpan),
 }
 
 const EMPTY_ISTRING_REF: &IString = &arcstr::literal!("");
@@ -1109,7 +1114,7 @@ impl From<&Literal> for Sb3PrimitiveBlock {
 }
 
 impl GetPos for Literal {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
             Literal::String(_, p) => p,
             Literal::DecimalInt(_, p) => p,
@@ -1125,13 +1130,13 @@ impl GetPos for Literal {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FormattedStringContent {
     Expression(Expression),
-    String(IString, PosRange),
+    String(IString, SourceSpan),
 }
 
 impl GetPos for FormattedStringContent {
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         match self {
-            FormattedStringContent::Expression(expression) => expression.get_position(),
+            FormattedStringContent::Expression(expression) => expression.get_source_span(),
             FormattedStringContent::String(_, p) => p,
         }
     }
@@ -1140,20 +1145,20 @@ impl GetPos for FormattedStringContent {
 /// Anything before a dot is a path
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Identifier {
-    pub path: Vec<(IString, PosRange)>,   // abc::def
-    pub fields: Vec<(IString, PosRange)>, // .ghi.jkl
-    pub pos_range: PosRange,
+    pub path: Vec<(IString, SourceSpan)>,   // abc::def
+    pub fields: Vec<(IString, SourceSpan)>, // .ghi.jkl
+    pub source_span: SourceSpan,
 }
 
 impl GetPos for Identifier {
     #[inline]
-    fn get_position(&self) -> &PosRange {
-        &self.pos_range
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
     }
 }
 
 impl Identifier {
-    pub fn to_single(&self) -> Option<&(IString, PosRange)> {
+    pub fn to_single(&self) -> Option<&(IString, SourceSpan)> {
         match (self.path.len(), self.fields.len()) {
             (0, 1) => self.fields.first(),
             (1, 0) => self.path.first(),
@@ -1164,34 +1169,34 @@ impl Identifier {
 
 impl Identifier {
     pub fn to_syntactic_if(&self) -> Option<SyntacticIf> {
-        self.to_single().and_then(|(value, pos_range)| {
-            (value.as_str() == "if").then_some(SyntacticIf(*pos_range))
+        self.to_single().and_then(|(value, source_span)| {
+            (value.as_str() == "if").then_some(SyntacticIf(*source_span))
         })
     }
 
     pub fn to_syntactic_else(&self) -> Option<SyntacticElse> {
-        self.to_single().and_then(|(value, pos_range)| {
-            (value.as_str() == "else").then_some(SyntacticElse(*pos_range))
+        self.to_single().and_then(|(value, source_span)| {
+            (value.as_str() == "else").then_some(SyntacticElse(*source_span))
         })
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SyntacticIf(pub PosRange);
+pub struct SyntacticIf(pub SourceSpan);
 
 impl GetPos for SyntacticIf {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SyntacticElse(pub PosRange);
+pub struct SyntacticElse(pub SourceSpan);
 
 impl GetPos for SyntacticElse {
     #[inline]
-    fn get_position(&self) -> &PosRange {
+    fn get_source_span(&self) -> &SourceSpan {
         &self.0
     }
 }
@@ -1199,40 +1204,48 @@ impl GetPos for SyntacticElse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanonicalIdentifier {
     pub name: IString,
-    pub pos_range: PosRange,
+    pub source_span: SourceSpan,
 }
 
 impl GetPos for CanonicalIdentifier {
     #[inline]
-    fn get_position(&self) -> &PosRange {
-        &self.pos_range
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Error, Serialize, Deserialize)]
+#[derive(Debug, Clone, Error)]
 pub enum ParseError {
     #[error(
         "the lexer reached the end of input without the parser completing (context: {context})"
     )]
     UnexpectedEndOfInput { context: IString },
-    #[error("unexpected token at {pos_range:?}, expected {expected} (context: {context})")]
+    #[error("unexpected token at {source_span:?}, expected {expected} (context: {context})")]
     UnexpectedToken {
         expected: IString,
         message: IString,
         context: IString,
         found: crate::lexer::Token,
-        pos_range: PosRange,
+        source_span: SourceSpan,
     },
-    #[error("the lexer got stuck after the token at {pos_range:?} (context: {context})")]
+    #[error("the lexer got stuck after the token at {source_span:?} (context: {context})")]
     LexerStuck {
         context: IString,
-        pos_range: PosRange,
+        source_span: SourceSpan,
     },
-    #[error("tried to declare a local symbol in stage at {pos_range:?} (context: {context})")]
+    #[error("tried to declare a local symbol in stage at {source_span:?} (context: {context})")]
     LocalSymbolInStage {
         context: IString,
-        pos_range: PosRange,
+        source_span: SourceSpan,
     },
     #[error("tried to peek back at the beginning of the content (context: {context:?})")]
     PeekedBackAtBeginning { context: IString },
+    #[error(transparent)]
+    IoError(#[from] std::rc::Rc<std::io::Error>),
+}
+
+impl From<std::io::Error> for ParseError {
+    fn from(value: std::io::Error) -> Self {
+        std::rc::Rc::new(value).into()
+    }
 }

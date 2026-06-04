@@ -1,7 +1,7 @@
 use arcstr::ArcStr as IString;
 use serde::{Deserialize, Serialize};
 
-use crate::{lexer::PosRange, parser::cst::ParseError};
+use crate::{lexer::SourceSpan, parser::cst::ParseError};
 
 pub trait GetLintId {
     fn get_lint_id(&self) -> &'static str;
@@ -9,27 +9,25 @@ pub trait GetLintId {
 
 // enum_assoc
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, thiserror::Error, enum_assoc::Assoc)]
+#[derive(Debug, Clone, thiserror::Error, enum_assoc::Assoc)]
 pub enum GrazeError {
     #[error("{0}")]
-    Plain(IString, PosRange),
+    Plain(IString, SourceSpan),
     #[error(transparent)]
     ParseError(#[from] ParseError),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum GrazeWarning {
-    Plain(IString, PosRange),
-    Specific(GrazeWarningKind, IString, PosRange),
+    Plain(IString, SourceSpan),
+    Specific(GrazeWarningKind, IString, SourceSpan),
 }
 
 impl GetLintId for GrazeWarning {
     fn get_lint_id(&self) -> &'static str {
         match self {
             GrazeWarning::Plain(_, _) => "plain_warning",
-            GrazeWarning::Specific(warning_kind, _, _) => {
-                warning_kind.get_lint_id()
-            }
+            GrazeWarning::Specific(warning_kind, _, _) => warning_kind.get_lint_id(),
         }
     }
 }
@@ -58,20 +56,20 @@ impl GetLintId for GrazeWarningKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum GrazeInfo {
-    Plain(IString, PosRange),
+    Plain(IString, SourceSpan),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum GrazeSuggestion {
     SimpleCodeChange {
-        replace_pos_range: PosRange,
+        replace_pos_range: SourceSpan,
         replace_text: String,
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum GrazeMessage {
     Error(GrazeError, Option<GrazeSuggestion>),
     Warning(GrazeWarning, Option<GrazeSuggestion>),

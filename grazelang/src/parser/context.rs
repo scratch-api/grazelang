@@ -25,7 +25,7 @@ use crate::{
         core::emit_message,
         ids::generate_random_id_as_string,
     },
-    lexer::PosRange,
+    lexer::SourceSpan,
     messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
     parser::cst::CustomBlockParamKindValue,
     settings::{GrazeMessageSetting, GrazeSettings},
@@ -128,13 +128,13 @@ pub struct SoundDescriptor {
 pub trait ResolveKnownBlock {
     fn resolve_for_input<'a>(
         &'a self,
-        pos_range: PosRange,
+        pos_range: SourceSpan,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a>;
 
     fn resolve_for_field<'a>(
         &'a self,
-        pos_range: PosRange,
+        pos_range: SourceSpan,
         context: &'a mut codegen::core::GrazeSb3GeneratorContext,
     ) -> (Sb3FieldValue, &'a HashSet<u32>);
 
@@ -152,7 +152,7 @@ pub trait ResolveKnownBlock {
 impl ResolveKnownBlock for KnownBlock {
     fn resolve_for_input<'a>(
         &'a self,
-        pos_range: PosRange,
+        pos_range: SourceSpan,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> KnownBlockInput<'a> {
         match self {
@@ -221,7 +221,7 @@ impl ResolveKnownBlock for KnownBlock {
 
     fn resolve_for_field<'a>(
         &'a self,
-        pos_range: PosRange,
+        pos_range: SourceSpan,
         context: &'a mut codegen::core::GrazeSb3GeneratorContext,
     ) -> (Sb3FieldValue, &'a HashSet<u32>) {
         match self {

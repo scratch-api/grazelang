@@ -30,7 +30,7 @@ pub enum Token {
     #[token("nowarp")]
     NowarpKeyword,
     #[token("use")] // TODO: Implement use statement
-                    // Issue: #4
+    // Issue: #4
     UseKeyword,
     #[token("let")]
     LetKeyword,
@@ -240,7 +240,9 @@ pub fn register_newlines_from_multiline_comment(lex: &mut Lexer<Token>) {
     lex.extras.0.extend(extras);
 }
 
-pub type PosRange = ((usize, usize), (usize, usize));
+pub type TextSpan = ((usize, usize), (usize, usize));
+pub type SourceFileId = u32;
+pub type SourceSpan = (((usize, usize), (usize, usize)), SourceFileId);
 
 pub fn get_position(lex: &Lexer<Token>, character_index: usize) -> (usize, usize) {
     let last_newline_index = *match lex.extras.0.last() {
@@ -255,7 +257,7 @@ pub fn get_position(lex: &Lexer<Token>, character_index: usize) -> (usize, usize
     (lex.extras.0.len(), character_index - last_newline_index)
 }
 
-pub fn get_pos_range(lex: &Lexer<Token>, character_range: Range<usize>) -> PosRange {
+pub fn get_source_span(lex: &Lexer<Token>, character_range: Range<usize>) -> TextSpan {
     (
         get_position(lex, character_range.start),
         get_position(lex, character_range.end),
