@@ -1080,73 +1080,66 @@ pub mod statement {
                 matches!(
                     (default_scope, &scope),
                     (
-                        DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset
+                        DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_),
+                        DataDeclarationScope::Unset
                     ) | (
-                        _, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)
+                        _,
+                        DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)
                     )
-                ) ||
-                matches!(
+                ) || matches!(
                     (default_scope, &scope, &context.next_target),
                     (
-                        DataDeclarationScope::Unset, DataDeclarationScope::Unset, Some(context::Target::Stage { .. })
+                        DataDeclarationScope::Unset,
+                        DataDeclarationScope::Unset,
+                        Some(context::Target::Stage { .. })
                     )
                 ),
                 symbols => {
-                    // TODO: warn about shadowing
-                    // Issue: #29
-                    let name = &identifier.fields[0].0;
-                    symbols.insert(
-                        name.clone(),
-                        if (
-                            matches!(dec_type, SingleDataDeclarationType::List(_)) ||
-                            (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)
-                        ) {
-                            context::TargetSymbolDescriptor::List(context::ListDescriptor {
-                                name: name.clone(),
-                                canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                                value_is_initial_value: values_are_initial_values,
-                                value: match &value {
-                                    DeclarationValue::List(_, _, value, _) => {
-                                        let mut expressions = Vec::with_capacity(value.len());
-                                        for (entry, _) in value {
-                                            match entry {
-                                                ListEntry::Expression(expression) => expressions.push(expression.calculate_value()),
-                                                ListEntry::Unwrap(literal, _) => literal
-                                                    .get_string_value()
-                                                    .as_str()
-                                                    .chars()
-                                                    .for_each(|c| expressions.push(
-                                                        grazelang_library::project_json::Sb3Primitive::String(c.to_string())
-                                                    )),
-                                            }
+                    let name = &identifier.to_single().unwrap().0;
+                    let previous_symbol = symbols.insert(name.clone(), if(matches!(dec_type, SingleDataDeclarationType::List(_)) || (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)) {
+                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
+                            name: name.clone(), canonical_name: canonical_identifier.as_ref().map(|value|value.name.clone()), value_is_initial_value: values_are_initial_values, value: match &value {
+                                DeclarationValue::List(_, _, value, _) => {
+                                    let mut expressions = Vec::with_capacity(value.len());
+                                    for(entry, _)in value {
+                                        match entry {
+                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value()),
+                                            ListEntry::Unwrap(literal, _) => literal.get_string_value().as_str().chars().for_each(|c| expressions.push(grazelang_library::project_json::Sb3Primitive::String(c.to_string()))),
                                         }
-                                        expressions
-                                    },
-                                    DeclarationValue::None => Vec::new(),
-                                    DeclarationValue::Var(..) => unreachable!()
-                                }
-                            })
-                        } else {
-                            context::TargetSymbolDescriptor::Var(context::VarDescriptor {
-                                name: name.clone(),
-                                canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                                value_is_initial_value: values_are_initial_values,
-                                value: match &value {
-                                    DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
-                                    DeclarationValue::Var(_, value) => {
-                                        value.calculate_value()
-                                    },
-                                    DeclarationValue::List(..) => unreachable!()
+                                    }
+                                    expressions
                                 },
-                                is_cloud: matches!((default_scope, &scope),
-                                (
-                                    DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset
-                                ) | (
-                                    _, DataDeclarationScope::Cloud(_)
-                                ))
-                            })
-                        }
-                    );
+                                DeclarationValue::None => Vec::new(),
+                                DeclarationValue::Var(..) => unreachable!()
+                            }
+                        })
+                    } else {
+                        context::TargetSymbolDescriptor::Var(context::VarDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier.as_ref().map(|value|value.name.clone()),
+                            value_is_initial_value: values_are_initial_values,
+                            value: match &value {
+                                DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
+                                DeclarationValue::Var(_,value) => {
+                                    value.calculate_value()
+                                },
+                                DeclarationValue::List(..) => unreachable!()
+                            },
+                            is_cloud: matches!(
+                                (default_scope, &scope),
+                                (DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset) | (_, DataDeclarationScope::Cloud(_))
+                            )
+                        })
+                    });
+                    if let Some(previous_symbol) = previous_symbol {
+                        symbols.insert(name.clone(), previous_symbol);
+                        let single_identifier = identifier.to_single().unwrap();
+                        return Err(ParseError::ShadowedSymbol {
+                            context: literal!(static_current_context!()),
+                            symbol: single_identifier.0.clone(),
+                            source_span: single_identifier.1,
+                        });
+                    }
                 }
             );
             let declaration = match value {
@@ -1533,10 +1526,8 @@ pub mod statement {
             matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) ||
             matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
-                // TODO: warn about shadowing
-                // Issue: #28
-                let name = &identifier.fields[0].0;
-                symbols.insert(
+                let name = &identifier.to_single().unwrap().0;
+                let previous_symbol = symbols.insert(
                     name.clone(),
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
                         context::TargetSymbolDescriptor::List(context::ListDescriptor {
@@ -1580,6 +1571,15 @@ pub mod statement {
                         })
                     }
                 );
+                if let Some(previous_symbol) = previous_symbol {
+                    symbols.insert(name.clone(), previous_symbol);
+                    let single_identifier = identifier.to_single().unwrap();
+                    return Err(ParseError::ShadowedSymbol {
+                        context: literal!(static_current_context!()),
+                        symbol: single_identifier.0.clone(),
+                        source_span: single_identifier.1,
+                    });
+                }
             }
         );
         let declaration = match value {
@@ -2056,12 +2056,10 @@ pub mod statement {
                     );
                     with_mut_next_target!(context, target => {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
-                        // TODO: Warn about shadowing
-                        // Issue: #27
                         let symbols = target.borrow_symbols_mut();
-                        let name = &identifier.fields[0].0;
+                        let name = &identifier.to_single().unwrap().0;
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
-                        symbols.insert(
+                        let previous_symbol = symbols.insert(
                             name.clone(),
                             match asset_type {
                                 AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
@@ -2087,6 +2085,15 @@ pub mod statement {
                                 ),
                             }
                         );
+                        if let Some(previous_symbol) = previous_symbol {
+                            symbols.insert(name.clone(), previous_symbol);
+                            let single_identifier = identifier.to_single().unwrap();
+                            return Err(ParseError::ShadowedSymbol {
+                                context: literal!(static_current_context!()),
+                                symbol: single_identifier.0.clone(),
+                                source_span: single_identifier.1,
+                            });
+                        }
                     });
                     declarations.push((
                         SingleAssetDeclaration(
@@ -2149,14 +2156,12 @@ pub mod statement {
                     "Expected ')'.",
                     "')'"
                 );
-                // TODO: Warn about shadowing
-                // Issue: #26
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
-                    let name = &identifier.fields[0].0;
+                    let name = &identifier.to_single().unwrap().0;
                     let canonical_name = Some(canonical_identifier.name.clone());
-                    symbols.insert(
+                    let previous_symbol = symbols.insert(
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
@@ -2173,6 +2178,15 @@ pub mod statement {
                             ),
                         }
                     );
+                    if let Some(previous_symbol) = previous_symbol {
+                        symbols.insert(name.clone(), previous_symbol);
+                        let single_identifier = identifier.to_single().unwrap();
+                        return Err(ParseError::ShadowedSymbol {
+                            context: literal!(static_current_context!()),
+                            symbol: single_identifier.0.clone(),
+                            source_span: single_identifier.1,
+                        });
+                    }
                 });
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     Some(canonical_identifier),
@@ -2204,14 +2218,12 @@ pub mod statement {
                     "Expected ')'.",
                     "')'"
                 );
-                // TODO: Warn about shadowing
-                // Issue: #25
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
-                    let name = &identifier.fields[0].0;
+                    let name = &identifier.to_single().unwrap().0;
                     let canonical_name = None;
-                    symbols.insert(
+                    let previous_symbol = symbols.insert(
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
@@ -2228,6 +2240,15 @@ pub mod statement {
                             ),
                         }
                     );
+                    if let Some(previous_symbol) = previous_symbol {
+                        symbols.insert(name.clone(), previous_symbol);
+                        let single_identifier = identifier.to_single().unwrap();
+                        return Err(ParseError::ShadowedSymbol {
+                            context: literal!(static_current_context!()),
+                            symbol: single_identifier.0.clone(),
+                            source_span: single_identifier.1,
+                        });
+                    }
                 });
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     None,
@@ -2352,13 +2373,11 @@ pub mod statement {
             params.push((param_kind, canonical_identifier, identifier, comma));
         };
         let code_block = parse_code_block(token_stream, context)?;
-        // TODO: Warn about shadowing
-        // Issue: #24
         with_mut_next_target!(context, target => {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
-            let name = &identifier.fields[0].0;
-            symbols.insert(
+            let name = &identifier.to_single().unwrap().0;
+            let previous_symbol = symbols.insert(
                 name.clone(),
                 TargetSymbolDescriptor::CustomBlockDescriptor(CustomBlockDescriptor {
                     name: identifier.to_single().unwrap().0.clone(),
@@ -2373,6 +2392,15 @@ pub mod statement {
                     is_warp: warp_specifier.as_ref().map(|value| value.is_warp).unwrap_or(false)
                 })
             );
+            if let Some(previous_symbol) = previous_symbol {
+                symbols.insert(name.clone(), previous_symbol);
+                let single_identifier = identifier.to_single().unwrap();
+                return Err(ParseError::ShadowedSymbol {
+                    context: literal!(static_current_context!()),
+                    symbol: single_identifier.0.clone(),
+                    source_span: single_identifier.1,
+                });
+            }
         });
         Ok((
             warp_specifier,
@@ -3129,7 +3157,7 @@ pub fn parse_top_level_statement(
                 )
             );
             context.next_target = Some(context::Target::new_sprite(
-                identifier.fields[0].0.clone(),
+                identifier.to_single().unwrap().0.clone(),
                 canonical_identifier
                     .as_ref()
                     .map(|value| value.name.clone()),
@@ -3173,7 +3201,7 @@ pub fn parse_top_level_statement(
                     TopLevelStatement
                 )
             );
-            let name = &identifier.fields[0].0;
+            let name = &identifier.to_single().unwrap().0;
             let canonical_name = canonical_identifier
                 .as_ref()
                 .map(|value| value.name.clone());

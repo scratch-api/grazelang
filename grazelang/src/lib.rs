@@ -1,11 +1,11 @@
+pub mod cli;
 pub mod codegen;
 pub mod lexer;
 pub mod library;
+pub mod messages;
 pub mod names;
 pub mod parser;
 pub mod settings;
 pub mod string_unescape;
 pub mod visitor;
 pub mod zipper;
-pub mod messages;
-pub mod cli;

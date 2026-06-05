@@ -1,5 +1,11 @@
 use std::{
-    collections::HashMap, ffi::OsStr, fs::File, io::Read, path::{Path, PathBuf}, rc::Rc, time::Instant
+    collections::HashMap,
+    ffi::OsStr,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    rc::Rc,
+    time::Instant,
 };
 
 use clap::{Parser, Subcommand};
@@ -104,10 +110,11 @@ pub fn parse_single_file(
             source_span: Default::default(),
         })?;
         let mut buf = String::new();
-        file.read_to_string(&mut buf).map_err(|value| ParseError::IoError {
-            source: Rc::new(value),
-            source_span: Default::default(),
-        })?;
+        file.read_to_string(&mut buf)
+            .map_err(|value| ParseError::IoError {
+                source: Rc::new(value),
+                source_span: Default::default(),
+            })?;
         buf
     };
     let lexer = lexer::create_lexer(&graze_code);

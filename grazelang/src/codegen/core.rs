@@ -2318,8 +2318,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let symbol_id = get_symbol_id(context, value.0)?;
             let symbol = &context.symbol_table[symbol_id];
             let known_block = get_known_block(symbol, value.0)?.clone();
-            let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
-                known_block.resolve_for_assignment(context).ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotAssignable {
+            let SimpleCallableKnownBlockSignature(opcode, param, known_params) = known_block
+                .resolve_for_assignment(context)
+                .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotAssignable {
                     identifier: value.0.clone(),
                 })?;
             let assignment_value = context.pop_param().unwrap();

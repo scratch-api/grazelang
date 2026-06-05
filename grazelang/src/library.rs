@@ -115,7 +115,7 @@ pub fn add_standard_library_namespaces(
                 }
                 std::collections::hash_map::Entry::Occupied(mut o) => {
                     o.get_mut().insert(key);
-                },
+                }
             }
         }
     }

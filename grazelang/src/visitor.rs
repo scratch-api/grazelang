@@ -1296,7 +1296,13 @@ where
                 context,
             )?;
         }
-        Statement::SingleInputControl(identifier, expression, code_block, semicolon, source_span) => {
+        Statement::SingleInputControl(
+            identifier,
+            expression,
+            code_block,
+            semicolon,
+            source_span,
+        ) => {
             visitor.visit_statement_single_input_control(
                 (
                     identifier,

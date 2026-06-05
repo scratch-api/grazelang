@@ -1214,6 +1214,8 @@ impl GetPos for CanonicalIdentifier {
     }
 }
 
+// TODO: Add feature that enables context in ParseErrors
+
 #[derive(Debug, Clone, Error)]
 pub enum ParseError {
     #[error(
@@ -1244,6 +1246,12 @@ pub enum ParseError {
     #[error("tried to peek back at the beginning of the content (context: {context:?})")]
     PeekedBackAtBeginning {
         context: IString,
+        source_span: SourceSpan,
+    },
+    #[error("tried to shadow symbol {symbol}")]
+    ShadowedSymbol {
+        context: IString,
+        symbol: IString,
         source_span: SourceSpan,
     },
     #[error("{source}")]
@@ -1278,6 +1286,11 @@ impl GetPos for ParseError {
             } => source_span,
             ParseError::PeekedBackAtBeginning {
                 context: _,
+                source_span,
+            } => source_span,
+            ParseError::ShadowedSymbol {
+                context: _,
+                symbol: _,
                 source_span,
             } => source_span,
             ParseError::IoError {
