@@ -258,7 +258,7 @@
     "39": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L57-L58",
         "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
@@ -266,7 +266,7 @@
     "38": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L85-L86",
         "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
@@ -290,7 +290,7 @@
     "35": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "316-317",
         "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
         "title": "use opcodes"
