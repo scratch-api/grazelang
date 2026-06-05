@@ -51,8 +51,7 @@ pub enum BlockArg {
         field_type: String,
         value: Option<Sb3Primitive>,
         options: Option<Vec<MenuOption>>,
-        option_category: Option<IString>, // TODO: implement these
-                                          // Issue: #39
+        option_category: Option<IString>,
     },
     #[serde(rename_all = "camelCase")]
     Input {
@@ -79,8 +78,7 @@ pub struct ShadowData {
     pub shadow_type: String,
     pub default_value: Option<String>,
     pub options: Option<Vec<MenuOption>>,
-    pub option_category: Option<IString>, // TODO: implement these
-                                          // Issue: #38
+    pub option_category: Option<IString>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
