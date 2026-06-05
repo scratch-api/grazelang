@@ -124,11 +124,7 @@ impl Sb3Target {
 
 impl Sb3Target {
     pub fn get_field_value(&self) -> &str {
-        if self.is_stage {
-            "_stage_"
-        } else {
-            &self.name
-        }
+        if self.is_stage { "_stage_" } else { &self.name }
     }
 }
 
@@ -1494,10 +1490,39 @@ impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
 
 impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputValue {
     fn from(value: ((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)) -> Self {
-        // TODO: Implement primitive block conversion (if default is a positive integer, so would a literal value be)
-        // Issue: #33
         let ((input_repr, is_shadow), shadow) = value;
         if is_shadow == IsShadow::Yes {
+            if let Some(shadow) = shadow
+                && let Sb3InputRepr::PrimitiveBlock(primitive_block) = input_repr
+            {
+                let sb3_primitive = match primitive_block {
+                    Sb3PrimitiveBlock::Number(sb3_primitive)
+                    | Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
+                    | Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
+                    | Sb3PrimitiveBlock::Integer(sb3_primitive)
+                    | Sb3PrimitiveBlock::Angle(sb3_primitive)
+                    | Sb3PrimitiveBlock::Color(sb3_primitive)
+                    | Sb3PrimitiveBlock::String(sb3_primitive) => sb3_primitive,
+                    Sb3PrimitiveBlock::Broadcast { .. } => {
+                        return Self::Shadow(Sb3InputRepr::PrimitiveBlock(primitive_block));
+                    }
+                    Sb3PrimitiveBlock::Variable { .. } => unreachable!(),
+                    Sb3PrimitiveBlock::List { .. } => unreachable!(),
+                };
+                return Self::Shadow(Sb3InputRepr::PrimitiveBlock(match shadow {
+                    Sb3PrimitiveBlock::Number(..) => Sb3PrimitiveBlock::Number(sb3_primitive),
+                    Sb3PrimitiveBlock::PositiveNumber(..) => {
+                        Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
+                    }
+                    Sb3PrimitiveBlock::PositiveInteger(..) => {
+                        Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
+                    }
+                    Sb3PrimitiveBlock::Integer(..) => Sb3PrimitiveBlock::Integer(sb3_primitive),
+                    Sb3PrimitiveBlock::Angle(..) => Sb3PrimitiveBlock::Angle(sb3_primitive),
+                    Sb3PrimitiveBlock::Color(..) => Sb3PrimitiveBlock::Color(sb3_primitive),
+                    Sb3PrimitiveBlock::String(..) | _ => Sb3PrimitiveBlock::String(sb3_primitive),
+                }));
+            }
             return Self::Shadow(input_repr);
         }
         if let Some(shadow) = shadow {
