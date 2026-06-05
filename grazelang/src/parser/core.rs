@@ -35,24 +35,24 @@ macro_rules! static_current_context {
 }
 
 macro_rules! expect_token {
-    ($token_stream:expr, $pattern:pat => $value:expr, $msg1:expr, $msg2:expr) => {{
+    ($token_stream:expr, $pattern:pat => $value:expr, $message:expr, $expected:expr) => {{
         match next_token!($token_stream) {
             $pattern => $value,
-            token => emit_unexpected_token!($token_stream, $msg1, $msg2, token),
+            token => emit_unexpected_token!($token_stream, $message, $expected, token),
         }
     }};
 }
 
 macro_rules! expect_token_or_message {
-    ($token_stream:expr, $context:expr, $pattern:pat => $value:expr, $msg1:expr, $msg2:expr, $default_value:expr) => {{
+    ($token_stream:expr, $context:expr, $pattern:pat => $value:expr, $message:expr, $expected:expr, $default_value:expr) => {{
         match next_token!($token_stream) {
             $pattern => $value,
             token => {
                 emit_unexpected_token_message(
                     $context,
                     $token_stream,
-                    literal!($msg1),
-                    literal!($msg2),
+                    literal!($message),
+                    literal!($expected),
                     literal!(static_current_context!()),
                     token,
                 )?;
@@ -279,25 +279,30 @@ pub fn get_token_end(token_stream: ParseIn) -> (usize, usize) {
 
 macro_rules! emit_unexpected_token {
     ($token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
-        return Err(create_unexpected_token_error!(
+        return Err(create_unexpected_token_error(
             $token_stream,
-            $msg_1,
-            $msg_2,
-            $found
+            literal!($msg_1),
+            literal!($msg_2),
+            literal!(static_current_context!()),
+            $found,
         ))
     };
 }
 
-macro_rules! create_unexpected_token_error {
-    ($token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
-        ParseError::UnexpectedToken {
-            message: literal!($msg_1),
-            expected: literal!($msg_2),
-            context: literal!(static_current_context!()),
-            found: $found,
-            source_span: get_token_source_span($token_stream),
-        }
-    };
+pub fn create_unexpected_token_error(
+    token_stream: ParseIn,
+    message: IString,
+    expected: IString,
+    context: IString,
+    found: Token,
+) -> ParseError {
+    ParseError::UnexpectedToken {
+        message,
+        expected,
+        context,
+        found,
+        source_span: get_token_source_span(token_stream),
+    }
 }
 
 macro_rules! try_or_emit_message {
@@ -366,8 +371,8 @@ where
 pub fn emit_unexpected_token_message(
     context: &mut ParseContext,
     token_stream: ParseIn,
-    msg_1: IString,
-    msg_2: IString,
+    message: IString,
+    expected: IString,
     code_context: IString,
     found: Token,
 ) -> ParseOut<()> {
@@ -380,8 +385,8 @@ pub fn emit_unexpected_token_message(
         if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
             context.messages.push(
                 ParseError::UnexpectedToken {
-                    message: msg_1.clone(),
-                    expected: msg_2.clone(),
+                    message: message.clone(),
+                    expected: expected.clone(),
                     context: code_context.clone(),
                     found: found.clone(),
                     source_span,
@@ -390,8 +395,8 @@ pub fn emit_unexpected_token_message(
             );
         }
         return Err(ParseError::UnexpectedToken {
-            message: msg_1,
-            expected: msg_2,
+            message,
+            expected,
             context: code_context,
             found,
             source_span,
@@ -400,8 +405,8 @@ pub fn emit_unexpected_token_message(
     emit_message(
         context,
         ParseError::UnexpectedToken {
-            message: msg_1,
-            expected: msg_2,
+            message,
+            expected,
             context: code_context,
             found,
             source_span,
@@ -552,6 +557,36 @@ impl<'a> PeekableLexer<'a> {
     }
 }
 
+impl<'a> PeekableLexer<'a> {
+    fn substitude_unexpected_token_message<F, T>(
+        &mut self,
+        action: F,
+        message: IString,
+        expected: IString,
+    ) -> ParseOut<T>
+    where
+        F: FnOnce(&mut Self) -> ParseOut<T>,
+    {
+        self.peek();
+        let peeked_span = internal_get_source_span(&self.lexer, self.lexer.span());
+        action(self).map_err(|mut err| {
+            if let ParseError::UnexpectedToken {
+                expected: current_expected,
+                message: current_message,
+                context: _,
+                found: _,
+                source_span,
+            } = &mut err
+                && source_span.0 == peeked_span
+            {
+                *current_expected = expected;
+                *current_message = message;
+            }
+            err
+        })
+    }
+}
+
 pub fn parse_graze_program(
     token_stream: ParseIn,
     context: &mut ParseContext,
@@ -615,12 +650,8 @@ pub fn parse_full_identifier(
         } {
             Token::ScopeResolution => {
                 if path.is_some() {
-                    emit_unexpected_token!(
-                        token_stream,
-                        "Expected a dot.",
-                        "a dot",
-                        next_token!(token_stream)
-                    );
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token!(token_stream, "Expected a dot.", "a dot", token);
                 }
             }
             Token::Dot => {
@@ -672,12 +703,8 @@ pub fn parse_full_identifier_starting_with(
         } {
             Token::ScopeResolution => {
                 if scope.is_some() {
-                    emit_unexpected_token!(
-                        token_stream,
-                        "Expected a dot.",
-                        "a dot",
-                        next_token!(token_stream)
-                    );
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token!(token_stream, "Expected a dot.", "a dot", token);
                 }
             }
             Token::Dot => {
@@ -818,7 +845,11 @@ pub mod statement {
                         "a simple string literal"
                     )
                 }
-                _ => ListEntry::Expression(parse_expression(token_stream, context)?),
+                _ => ListEntry::Expression(token_stream.substitude_unexpected_token_message(
+                    |token_stream| parse_expression(token_stream, context),
+                    literal!("Expected '}', \"..\" or an expression."),
+                    literal!("'}', \"..\" or an expression"),
+                )?),
             };
             entries.push((
                 list_entry,
@@ -829,11 +860,12 @@ pub mod statement {
                         Some(from_stream_pos!(token_stream => cst::Comma))
                     }
                     _ => {
+                        let token = next_token!(token_stream);
                         emit_unexpected_token!(
                             token_stream,
                             "Expected a comma or ']'.",
                             "a comma or ']'",
-                            next_token!(token_stream)
+                            token
                         );
                     }
                 },
@@ -1004,11 +1036,12 @@ pub mod statement {
                                 DefaultDataDeclarationType::List,
                                 SingleDataDeclarationType::Var(_),
                             ) => {
+                                let token = next_token!(token_stream);
                                 emit_unexpected_token!(
                                     token_stream,
                                     "Expected an expression.",
                                     "an expression",
-                                    next_token!(token_stream)
+                                    token
                                 );
                             }
                             _ => (),
@@ -1032,12 +1065,8 @@ pub mod statement {
                                 DefaultDataDeclarationType::Var,
                                 SingleDataDeclarationType::List(_),
                             ) => {
-                                emit_unexpected_token!(
-                                    token_stream,
-                                    "Expected '['.",
-                                    "'['",
-                                    next_token!(token_stream)
-                                );
+                                let token = next_token!(token_stream);
+                                emit_unexpected_token!(token_stream, "Expected '['.", "'['", token);
                             }
                             _ => (),
                         }
@@ -1050,12 +1079,15 @@ pub mod statement {
                 Token::Comma => DeclarationValue::None,
                 Token::RightBrace(lexer::LexedRightBrace::Normal) => DeclarationValue::None,
                 Token::RightParens => DeclarationValue::None,
-                _ => emit_unexpected_token!(
-                    token_stream,
-                    "Expected ',', '=', '}' or ')'",
-                    "',', '=', '}' or ')'",
-                    next_token!(token_stream)
-                ),
+                _ => {
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected ',', '=', '}' or ')'",
+                        "',', '=', '}' or ')'",
+                        token
+                    )
+                }
             };
 
             if matches!(
@@ -1224,11 +1256,12 @@ pub mod statement {
                     Token::RightBrace(lexer::LexedRightBrace::Normal) => None,
                     Token::RightParens => None,
                     _ => {
+                        let token = next_token!(token_stream);
                         emit_unexpected_token!(
                             token_stream,
                             "Expected ',', ')' or '}'.",
                             "',', ')' or '}'",
-                            next_token!(token_stream)
+                            token
                         )
                     }
                 },
@@ -1475,11 +1508,12 @@ pub mod statement {
 
                 if let Token::LeftBracket = peek_token!(token_stream) {
                     if !matches!(dec_type, SingleDataDeclarationType::List(_)) {
+                        let token = next_token!(token_stream);
                         emit_unexpected_token!(
                             token_stream,
                             "Expected an expression.",
                             "an expression",
-                            next_token!(token_stream)
+                            token
                         );
                     }
                     let (left_bracket, list_content, right_bracket) =
@@ -1492,12 +1526,8 @@ pub mod statement {
                     )
                 } else {
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
-                        emit_unexpected_token!(
-                            token_stream,
-                            "Expected '['.",
-                            "'['",
-                            next_token!(token_stream)
-                        );
+                        let token = next_token!(token_stream);
+                        emit_unexpected_token!(token_stream, "Expected '['.", "'['", token);
                     }
                     DeclarationValue::Var(
                         assignment_operator,
@@ -1507,12 +1537,8 @@ pub mod statement {
             }
             Token::Semicolon => DeclarationValue::None,
             _ => {
-                emit_unexpected_token!(
-                    token_stream,
-                    "Expected '=' or ';'",
-                    "'=' or ';'",
-                    next_token!(token_stream)
-                );
+                let token = next_token!(token_stream);
+                emit_unexpected_token!(token_stream, "Expected '=' or ';'", "'=' or ';'", token);
             }
         };
         if matches!(
@@ -1684,7 +1710,11 @@ pub mod statement {
         Ok(Statement::Assignment(
             identifier,
             assignment_operator,
-            parse_expression(token_stream, context)?,
+            token_stream.substitude_unexpected_token_message(
+                |token_stream| parse_expression(token_stream, context),
+                literal!("Expected '[' or an expression."),
+                literal!("'[' or an expression"),
+            )?,
             expect_token!(
                 token_stream,
                 Token::Semicolon => from_stream_pos!(token_stream => Semicolon),
@@ -1804,7 +1834,11 @@ pub mod statement {
         let (left_parens, expressions, right_parens) = match peek_token!(token_stream) {
             Token::LeftParens => parse_expression_list(token_stream, context)?,
             _ => {
-                let expression = parse_expression(token_stream, context)?;
+                let expression = token_stream.substitude_unexpected_token_message(
+                    |token_stream| parse_expression(token_stream, context),
+                    literal!("Expected '(' or an expression."),
+                    literal!("'(' or an expression"),
+                )?;
                 return parse_rest_of_single_input_control(
                     token_stream,
                     context,
@@ -1889,12 +1923,8 @@ pub mod statement {
     ) -> ParseOut<Statement> {
         let start_pos = get_token_start(token_stream);
         if peek_token!(token_stream) != &Token::LeftBrace {
-            emit_unexpected_token!(
-                token_stream,
-                "Expected '{'",
-                "'{'",
-                next_token!(token_stream)
-            );
+            let token = next_token!(token_stream);
+            emit_unexpected_token!(token_stream, "Expected '{'", "'{'", token);
         }
         let code_block = parse_code_block(token_stream, context)?;
         Ok(Statement::Forever(
@@ -1949,7 +1979,11 @@ pub mod statement {
                     token_stream.span_from_previous_to_current(start_pos),
                 ))
             }
-            _ => parse_call_or_control(token_stream, context, identifier),
+            _ => token_stream.substitude_unexpected_token_message(
+                |token_stream| parse_call_or_control(token_stream, context, identifier),
+                literal!("Expected '=', '(', '{', '[' or an expression."),
+                literal!("'=', '(', '{', '[' or an expression"),
+            ),
         }
     }
 
@@ -2129,12 +2163,15 @@ pub mod statement {
                                     Some(from_stream_pos!(token_stream => Comma))
                                 }
                                 Token::RightParens => None,
-                                _ => emit_unexpected_token!(
-                                    token_stream,
-                                    "Expected ',' or ')'.",
-                                    "',' or ')'",
-                                    next_token!(token_stream)
-                                ),
+                                _ => {
+                                    let token = next_token!(token_stream);
+                                    emit_unexpected_token!(
+                                        token_stream,
+                                        "Expected ',' or ')'.",
+                                        "',' or ')'",
+                                        token
+                                    )
+                                }
                             }
                         },
                     ));
@@ -2289,12 +2326,15 @@ pub mod statement {
                     token_stream.span_from_previous_to_current(start_pos),
                 )))
             }
-            _ => emit_unexpected_token!(
-                token_stream,
-                "Expected canonical identifier, identifier or '('.",
-                "canonical identifier, identifier or '('",
-                next_token!(token_stream)
-            ),
+            _ => {
+                let token = next_token!(token_stream);
+                emit_unexpected_token!(
+                    token_stream,
+                    "Expected canonical identifier, identifier or '('.",
+                    "canonical identifier, identifier or '('",
+                    token
+                )
+            }
         }
     }
 
@@ -2386,19 +2426,23 @@ pub mod statement {
                 name: value,
                 source_span: get_token_source_span(token_stream),
             });
-            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            let identifier = 
+            parse_single_identifier_as_identifier(token_stream, context)?;
             let comma = match peek_token!(token_stream) {
                 Token::Comma => Some({
                     skip_token!(token_stream);
                     from_stream_pos!(token_stream => cst::Comma)
                 }),
                 Token::RightParens => None,
-                _ => emit_unexpected_token!(
-                    token_stream,
-                    "Expected ',' or ')'.",
-                    "',' or ')'",
-                    next_token!(token_stream)
-                ),
+                _ => {
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected ',' or ')'.",
+                        "',' or ')'",
+                        token
+                    )
+                }
             };
             params.push((param_kind, canonical_identifier, identifier, comma));
         };
@@ -2549,16 +2593,20 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             "Expected ';'.",
             "';'"
         ))),
-        _ => try_or_emit_message!(
-            Err(create_unexpected_token_error!(
-                token_stream,
-                "Expected ';', \"let\" or an identifier.",
-                "';', \"let\" or an identifier",
-                next_token!(token_stream)
-            )),
-            context,
-            find_statement_end_and_return_invalid!(token_stream, start, Statement)
-        ),
+        _ => {
+            let token = next_token!(token_stream);
+            try_or_emit_message!(
+                Err(create_unexpected_token_error(
+                    token_stream,
+                    literal!("Expected ';', \"let\" or an identifier."),
+                    literal!("';', \"let\" or an identifier"),
+                    literal!(static_current_context!()),
+                    token
+                )),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start, Statement)
+            )
+        }
     }
 }
 
@@ -2772,7 +2820,11 @@ pub fn parse_sprite_statement(
                 )),
                 _ => {
                     let expression = try_or_emit_message!(
-                        parse_expression(token_stream, context),
+                        token_stream.substitude_unexpected_token_message(
+                            |token_stream| parse_expression(token_stream, context),
+                            literal!("Expected '(', '{' or an expression."),
+                            literal!("'(', '{' or an expression"),
+                        ),
                         context,
                         find_statement_end_and_return_invalid!(
                             token_stream,
@@ -2794,8 +2846,7 @@ pub fn parse_sprite_statement(
                             start_pos,
                             SpriteStatement
                         )
-                    )) // TODO: capture error and replace message 
-                    // Issue: #22
+                    ))
                 }
             }
         }
@@ -2848,10 +2899,15 @@ pub fn parse_sprite_statement(
             let token = next_token!(token_stream);
             let start = get_token_start(token_stream);
             try_or_emit_message!(
-                Err(create_unexpected_token_error!(
+                Err(create_unexpected_token_error(
                     token_stream,
-                    "Expected hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\".",
-                    "hat statement, \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"",
+                    literal!(
+                        "Expected hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"."
+                    ),
+                    literal!(
+                        "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\""
+                    ),
+                    literal!(static_current_context!()),
                     token
                 )),
                 context,
@@ -3063,7 +3119,11 @@ pub fn parse_stage_statement(
                 )),
                 _ => {
                     let expression = try_or_emit_message!(
-                        parse_expression(token_stream, context),
+                        token_stream.substitude_unexpected_token_message(
+                            |token_stream| parse_expression(token_stream, context),
+                            literal!("Expected '(', '{' or an expression."),
+                            literal!("'(', '{' or an expression"),
+                        ),
                         context,
                         find_statement_end_and_return_invalid!(
                             token_stream,
@@ -3077,8 +3137,7 @@ pub fn parse_stage_statement(
                         identifier,
                         expression,
                         start_pos,
-                    ) // TODO: capture error and replace message
-                    // Issue: #21
+                    )
                 }
             }
         }
@@ -3131,10 +3190,15 @@ pub fn parse_stage_statement(
             let token = next_token!(token_stream);
             let start = get_token_start(token_stream);
             try_or_emit_message!(
-                Err(create_unexpected_token_error!(
+                Err(create_unexpected_token_error(
                     token_stream,
-                    "Expected hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\".",
-                    "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\"",
+                    literal!(
+                        "Expected hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\"."
+                    ),
+                    literal!(
+                        "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\""
+                    ),
+                    literal!(static_current_context!()),
                     token
                 )),
                 context,
@@ -3275,10 +3339,11 @@ pub fn parse_top_level_statement(
         token => {
             let start = get_token_start(token_stream);
             try_or_emit_message!(
-                Err(create_unexpected_token_error!(
+                Err(create_unexpected_token_error(
                     token_stream,
-                    "Expected \"stage\", \"sprite\" or ';'.",
-                    "\"stage\", \"sprite\" or ';'",
+                    literal!("Expected \"stage\", \"sprite\", \"broadcast\" or ';'."),
+                    literal!("\"stage\", \"sprite\", \"broadcast\" or ';'"),
+                    literal!(static_current_context!()),
                     token
                 )),
                 context,
@@ -3306,7 +3371,11 @@ pub fn parse_code_block(token_stream: ParseIn, context: &mut ParseContext) -> Pa
             token_stream,
             Token::RightBrace(lexer::LexedRightBrace::Normal) => break from_stream_pos!(token_stream => cst::RightBrace)
         );
-        statements.push(parse_statement(token_stream, context)?);
+        statements.push(token_stream.substitude_unexpected_token_message(
+            |token_stream| parse_statement(token_stream, context),
+            literal!("Expected ';', '}', \"let\" or an identifier."),
+            literal!("';', '}', \"let\" or an identifier"),
+        )?);
     };
     Ok(CodeBlock {
         left_brace,
@@ -3329,7 +3398,13 @@ pub fn parse_sprite_code_block(
             token_stream,
             Token::RightBrace(lexer::LexedRightBrace::Normal) => break from_stream_pos!(token_stream => cst::RightBrace)
         );
-        statements.push(parse_sprite_statement(token_stream, context)?);
+        statements.push(
+            token_stream.substitude_unexpected_token_message(
+                |token_stream| parse_sprite_statement(token_stream, context),
+                literal!("Expected hat statement, '{', '}', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"."),
+                literal!("hat statement, '{', '}', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\""),
+            )
+            ?);
     };
     Ok(SpriteCodeBlock {
         left_brace,
@@ -3352,7 +3427,14 @@ pub fn parse_stage_code_block(
             token_stream,
             Token::RightBrace(lexer::LexedRightBrace::Normal) => break from_stream_pos!(token_stream => cst::RightBrace)
         );
-        statements.push(parse_stage_statement(token_stream, context)?);
+        statements.push(
+            
+            token_stream.substitude_unexpected_token_message(
+                |token_stream| parse_stage_statement(token_stream, context),
+                literal!("Expected hat statement, '{', '}', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\"."),
+                literal!("hat statement, '{', '}', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\""),
+            )
+            ?);
     };
     Ok(StageCodeBlock {
         left_brace,
@@ -3661,7 +3743,13 @@ pub fn parse_expression_list(
             break;
         });
         expressions.push((
-            parse_expression(token_stream, context)?,
+
+            token_stream.substitude_unexpected_token_message(
+                |token_stream| parse_expression(token_stream, context),
+                literal!("Expected ')' or an expression."),
+                literal!("')' or an expression"),
+            )
+            ?,
             match peek_token!(token_stream) {
                 Token::Comma => {
                     skip_token!(token_stream);
@@ -3669,11 +3757,12 @@ pub fn parse_expression_list(
                 }
                 Token::RightParens => None,
                 _ => {
+                    let token = next_token!(token_stream);
                     emit_unexpected_token!(
                         token_stream,
                         "Expected a comma or ')'.",
                         "a comma or ')'",
-                        next_token!(token_stream)
+                        token
                     );
                 }
             },

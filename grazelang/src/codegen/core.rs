@@ -80,7 +80,7 @@ pub enum GrazeSb3GeneratorError {
         expected: usize,
         source_span: SourceSpan,
     },
-    #[error("tried to get a list item for a non list, {identifier:?}")]
+    #[error("tried to access non list {identifier:?} as a list")]
     ListAccessForNonLists { identifier: Identifier },
     #[error("cannot initialize stage multiple times")]
     RepeatedStageInitialization { stage_keyword: cst::StageKeyword },
