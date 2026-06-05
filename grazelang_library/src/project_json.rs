@@ -376,7 +376,7 @@ impl ToTokens for Sb3Primitive {
 pub struct Sb3ListDeclaration(pub String, pub Vec<Sb3Primitive>);
 
 #[derive(Debug, Clone, PartialEq)]
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 pub enum Sb3Block {
     Normal(Sb3NormalBlock),
     Primitive(Sb3PrimitiveBlock),

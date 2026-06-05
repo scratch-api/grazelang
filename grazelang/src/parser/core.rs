@@ -65,7 +65,7 @@ macro_rules! expect_token_or_message {
 /// The difference between this and `consume_if` is that we cannot use values from the match in `consume_if` due to the borrow checker.
 macro_rules! consume_and_use_if {
     ($token_stream:expr, $pattern:pat => $body:expr) => {{
-        #[allow(unused_variables)]
+        #[expect(unused_variables)]
         if matches!(peek_token!($token_stream => Option), Some($pattern)) {
             match next_token!($token_stream) {
                 $pattern => Some($body),

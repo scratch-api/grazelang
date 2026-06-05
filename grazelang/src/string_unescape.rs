@@ -34,7 +34,6 @@ use thiserror::Error as ThisError;
 pub type UResult<T> = Result<T, Error>;
 
 /// Unescaper's `Error`.
-#[allow(missing_docs)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(Debug, ThisError)]
 pub enum Error {

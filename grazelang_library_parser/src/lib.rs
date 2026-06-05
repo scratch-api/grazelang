@@ -178,7 +178,7 @@ pub fn generate_library(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-#[allow(unused_variables)]
+#[expect(unused_variables)]
 pub fn generate_library_no_cache(input: TokenStream) -> TokenStream {
     implement_generate_library!(input, no_use_cache, no_create_cache)
 }
