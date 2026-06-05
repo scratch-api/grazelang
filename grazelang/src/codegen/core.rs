@@ -1165,8 +1165,7 @@ pub mod symbol_data_derivation {
                 known_block: Some(Rc::new(KnownBlock::List {
                     canonical_name: canonical_name.clone(),
                     id: id.clone(),
-                })), // TODO: add list length as method
-                // Issue: #6
+                })),
                 namespace: HashMap::new(),
                 parent: Default::default(),
             },
