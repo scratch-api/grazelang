@@ -146,7 +146,7 @@
     "29": {
         "filepath": "grazelang/src/parser/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L1143-L1144",
         "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "warn about shadowing"
@@ -154,7 +154,7 @@
     "28": {
         "filepath": "grazelang/src/parser/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L1584-L1585",
         "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "warn about shadowing"
@@ -162,7 +162,7 @@
     "27": {
         "filepath": "grazelang/src/parser/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2107-L2108",
         "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
@@ -170,7 +170,7 @@
     "26": {
         "filepath": "grazelang/src/parser/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2200-L2201",
         "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
@@ -178,7 +178,7 @@
     "25": {
         "filepath": "grazelang/src/parser/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2255-L2256",
         "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
@@ -186,7 +186,7 @@
     "24": {
         "filepath": "grazelang/src/parser/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2403-L2404",
         "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Warn about shadowing"
@@ -406,5 +406,13 @@
         "lines": "L737-L737",
         "commit": "57c306d18bc115f7f812edf8adbefc6a4f929717",
         "title": "Lower memory usage by moving shared data of these methods into Rc"
+    },
+    "58": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L1217-L1217",
+        "commit": "4b34c5c56febc2b5e16b99cdb876774d1a7f795d",
+        "title": "Add feature that enables context in ParseErrors"
     }
 }

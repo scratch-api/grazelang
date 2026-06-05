@@ -1215,6 +1215,7 @@ impl GetPos for CanonicalIdentifier {
 }
 
 // TODO: Add feature that enables context in ParseErrors
+// Issue: #58
 
 #[derive(Debug, Clone, Error)]
 pub enum ParseError {
