@@ -130,7 +130,7 @@
     "6": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L962-L963",
         "commit": "f2b1f4a682af0287348fb0286dc93fac2abba584",
         "title": "add list length as method"
