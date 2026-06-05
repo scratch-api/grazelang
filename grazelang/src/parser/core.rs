@@ -1096,6 +1096,12 @@ pub mod statement {
                 ),
                 symbols => {
                     let name = &identifier.to_single().unwrap().0;
+                    if name.as_str() == "super" {
+                        return Err(ParseError::SymbolNamedSuper {
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        });
+                    }
                     let previous_symbol = symbols.insert(name.clone(), if(matches!(dec_type, SingleDataDeclarationType::List(_)) || (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)) {
                         context::TargetSymbolDescriptor::List(context::ListDescriptor {
                             name: name.clone(), canonical_name: canonical_identifier.as_ref().map(|value|value.name.clone()), value_is_initial_value: values_are_initial_values, value: match &value {
@@ -1527,6 +1533,12 @@ pub mod statement {
             matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
                 let name = &identifier.to_single().unwrap().0;
+                if name.as_str() == "super" {
+                    return Err(ParseError::SymbolNamedSuper {
+                        context: literal!(static_current_context!()),
+                        source_span: identifier.to_single().unwrap().1,
+                    });
+                }
                 let previous_symbol = symbols.insert(
                     name.clone(),
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
@@ -2058,6 +2070,12 @@ pub mod statement {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                         let symbols = target.borrow_symbols_mut();
                         let name = &identifier.to_single().unwrap().0;
+                        if name.as_str() == "super" {
+                            return Err(ParseError::SymbolNamedSuper {
+                                context: literal!(static_current_context!()),
+                                source_span: identifier.to_single().unwrap().1,
+                            });
+                        }
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
                         let previous_symbol = symbols.insert(
                             name.clone(),
@@ -2160,6 +2178,12 @@ pub mod statement {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.to_single().unwrap().0;
+                    if name.as_str() == "super" {
+                        return Err(ParseError::SymbolNamedSuper {
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        });
+                    }
                     let canonical_name = Some(canonical_identifier.name.clone());
                     let previous_symbol = symbols.insert(
                         name.clone(),
@@ -2222,6 +2246,12 @@ pub mod statement {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.to_single().unwrap().0;
+                    if name.as_str() == "super" {
+                        return Err(ParseError::SymbolNamedSuper {
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        });
+                    }
                     let canonical_name = None;
                     let previous_symbol = symbols.insert(
                         name.clone(),
@@ -2377,6 +2407,12 @@ pub mod statement {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
             let name = &identifier.to_single().unwrap().0;
+            if name.as_str() == "super" {
+                return Err(ParseError::SymbolNamedSuper {
+                    context: literal!(static_current_context!()),
+                    source_span: identifier.to_single().unwrap().1,
+                });
+            }
             let previous_symbol = symbols.insert(
                 name.clone(),
                 TargetSymbolDescriptor::CustomBlockDescriptor(CustomBlockDescriptor {
@@ -2495,8 +2531,6 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             context,
             find_statement_end_and_return_invalid!(token_stream, start, Statement)
         )),
-        // TODO: Prevent users from naming variables "super" or possibly "root"
-        // Issue: #23
         Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
             let identifier = try_or_emit_message!(
                 parse_full_identifier(token_stream, context),
@@ -3202,6 +3236,12 @@ pub fn parse_top_level_statement(
                 )
             );
             let name = &identifier.to_single().unwrap().0;
+            if name.as_str() == "super" {
+                return Err(ParseError::SymbolNamedSuper {
+                    context: literal!(static_current_context!()),
+                    source_span: identifier.to_single().unwrap().1,
+                });
+            }
             let canonical_name = canonical_identifier
                 .as_ref()
                 .map(|value| value.name.clone());

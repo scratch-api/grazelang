@@ -1255,6 +1255,11 @@ pub enum ParseError {
         symbol: IString,
         source_span: SourceSpan,
     },
+    #[error("tried to name a symbol \"super\"")]
+    SymbolNamedSuper {
+        context: IString,
+        source_span: SourceSpan,
+    },
     #[error("{source}")]
     IoError {
         #[source]
@@ -1292,6 +1297,10 @@ impl GetPos for ParseError {
             ParseError::ShadowedSymbol {
                 context: _,
                 symbol: _,
+                source_span,
+            } => source_span,
+            ParseError::SymbolNamedSuper {
+                context: _,
                 source_span,
             } => source_span,
             ParseError::IoError {
