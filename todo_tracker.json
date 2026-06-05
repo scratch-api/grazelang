@@ -194,7 +194,7 @@
     "23": {
         "filepath": "grazelang/src/parser/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2518-L2519",
         "commit": "b909cba03d86783a0dd175ff2939f442821944f9",
         "title": "Prevent users from naming variables \"super\" or possibly \"root\""
