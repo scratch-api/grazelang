@@ -142,7 +142,7 @@ pub trait ResolveKnownBlock {
     fn resolve_for_assignment<'a>(
         &'a self,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> &'a SimpleCallableKnownBlockSignature;
+    ) -> Option<&'a SimpleCallableKnownBlockSignature>;
 }
 
 impl ResolveKnownBlock for KnownBlock {
@@ -422,7 +422,7 @@ impl ResolveKnownBlock for KnownBlock {
     fn resolve_for_assignment<'a>(
         &'a self,
         _context: &mut codegen::core::GrazeSb3GeneratorContext,
-    ) -> &'a SimpleCallableKnownBlockSignature {
+    ) -> Option<&'a SimpleCallableKnownBlockSignature> {
         match self {
             KnownBlock::Variable {
                 canonical_name: _,
@@ -436,7 +436,7 @@ impl ResolveKnownBlock for KnownBlock {
                 field: _,
                 assign: Some(assign),
                 bind_info: _,
-            } => assign,
+            } => Some(assign),
             KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
@@ -445,7 +445,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::SingletonReporter { .. }
             | KnownBlock::CustomBlock { .. }
-            | KnownBlock::Empty => todo!(), // warn user about incorrect usage
+            | KnownBlock::Empty => None,
         } // TODO: Implement assignment of x, y etc
         // Issue: #12
     }

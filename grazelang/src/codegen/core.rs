@@ -100,41 +100,38 @@ pub enum GrazeSb3GeneratorError {
     ShadowedSprite { identifier: Identifier },
     #[error("the identifier {identifier:?} is not callable")]
     IdentifierNotCallable { identifier: Identifier },
+    #[error("the identifier {identifier:?} is not assignable")]
+    IdentifierNotAssignable { identifier: Identifier },
 }
 
 impl GetPos for GrazeSb3GeneratorError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeSb3GeneratorError::UnknownIdentifier { identifier } => {
-                identifier.get_source_span()
-            }
-            GrazeSb3GeneratorError::IdentifierIsNotABlock { identifier } => {
+            GrazeSb3GeneratorError::UnknownIdentifier { identifier }
+            | GrazeSb3GeneratorError::IdentifierIsNotABlock { identifier }
+            | GrazeSb3GeneratorError::ListAccessForNonLists { identifier }
+            | GrazeSb3GeneratorError::BlockIsNotCBlock { identifier }
+            | GrazeSb3GeneratorError::ShadowedSprite { identifier }
+            | GrazeSb3GeneratorError::IdentifierNotCallable { identifier }
+            | GrazeSb3GeneratorError::IdentifierNotAssignable { identifier } => {
                 identifier.get_source_span()
             }
             GrazeSb3GeneratorError::UnexpectedInputMenu {
                 input_menu_value: _,
                 source_span,
-            } => source_span,
-            GrazeSb3GeneratorError::IncorrectParamCount {
+            }
+            | GrazeSb3GeneratorError::IncorrectParamCount {
                 unexpected: _,
                 expected: _,
                 source_span,
-            } => source_span,
-            GrazeSb3GeneratorError::ListAccessForNonLists { identifier } => {
-                identifier.get_source_span()
             }
-            GrazeSb3GeneratorError::RepeatedStageInitialization { stage_keyword } => {
-                stage_keyword.get_source_span()
-            }
-            GrazeSb3GeneratorError::BlockIsNotCBlock { identifier } => identifier.get_source_span(),
-            GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+            | GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                 param: _,
                 source_span,
-            } => source_span,
-            GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack { source_span } => source_span,
-            GrazeSb3GeneratorError::ShadowedSprite { identifier } => identifier.get_source_span(),
-            GrazeSb3GeneratorError::IdentifierNotCallable { identifier } => {
-                identifier.get_source_span()
+            }
+            | GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack { source_span } => source_span,
+            GrazeSb3GeneratorError::RepeatedStageInitialization { stage_keyword } => {
+                stage_keyword.get_source_span()
             }
         }
     }
@@ -2322,7 +2319,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let symbol = &context.symbol_table[symbol_id];
             let known_block = get_known_block(symbol, value.0)?.clone();
             let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
-                known_block.resolve_for_assignment(context);
+                known_block.resolve_for_assignment(context).ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotAssignable {
+                    identifier: value.0.clone(),
+                })?;
             let assignment_value = context.pop_param().unwrap();
             let mut fields = HashMap::new();
             let mut inputs = HashMap::new();
@@ -3028,7 +3027,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         let symbol = &context.symbol_table[symbol_id];
                         let known_block = symbol.known_block.as_ref().unwrap().clone();
                         let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
-                            known_block.resolve_for_assignment(context);
+                            known_block.resolve_for_assignment(context).unwrap();
                         let mut fields = HashMap::new();
                         let mut inputs = HashMap::new();
                         add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
