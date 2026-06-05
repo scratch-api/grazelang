@@ -3731,9 +3731,21 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             x.replace(0.0);
                             y.replace(0.0);
                         },
-                        // TODO: Warn user when trying to create a top level shadow expression
-                        // Issue: #47
-                        _ => return Ok(())
+                        _ => {
+                            emit_message(
+                                context,
+                                GrazeMessage::Warning(
+                                    GrazeWarning::Specific(
+                                        GrazeWarningKind::TopLevelShadowExpression,
+                                        literal!("Cannot create an isolated shadow expression."),
+                                        param_source_span,
+                                    ),
+                                    None,
+                                ),
+                                GrazeMessageSetting::Warnings,
+                            );
+                            return Ok(())
+                        }
                     }
                     wrap_in_reporter(context, |context, _, this_id| {
                         add_block(

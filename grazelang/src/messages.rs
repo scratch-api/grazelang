@@ -63,6 +63,8 @@ pub enum GrazeWarningKind {
     NonFieldSingletonAsField,
     #[assoc(internal_lint_id = "literal_field_value_incorrect")]
     LiteralFieldValueIncorrect,
+    #[assoc(internal_lint_id = "top_level_shadow_expression")]
+    TopLevelShadowExpression,
 }
 
 impl GetLintId for GrazeWarningKind {
