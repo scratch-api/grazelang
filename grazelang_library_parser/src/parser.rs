@@ -150,8 +150,7 @@ impl BlockEntry {
             match arg {
                 BlockArg::Field {
                     name,
-                    field_type: _, // TODO: Should this be used somehow?
-                    // Issue: #36
+                    field_type: _,
                     value,
                     options,
                     option_category,
@@ -423,8 +422,6 @@ pub fn process_toolbox_category(
         //     {
         //         field.replace(field_value.clone());
         //     } else {
-        //         todo!() // TODO: warn about overlap
-        //         // Issue: #34
         //     }
         // } else {
         //     // namespace.insert(
