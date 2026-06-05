@@ -322,7 +322,7 @@
     "47": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2885-L2885",
         "commit": "6bc2678984b24a4d4940ad1efae4e2c86f580bd8",
         "title": "Warn user when trying to create a top level shadow expression"
