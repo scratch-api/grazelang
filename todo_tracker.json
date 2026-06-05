@@ -282,7 +282,7 @@
     "36": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L158-L159",
         "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "Should this be used somehow?"
@@ -298,7 +298,7 @@
     "34": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "        // \n    }\n} else {\n    // namespace.insert(\n    //     name.clone(),\n    //     LibraryItem {\n    //         namespace: HashMap::new(),\n    //         value: Some(LibraryItemValue::Alias(vec![\n    //             AliasSegment::Super,\n    //             AliasSegment::Child(\"menus\".to_string()),\n    //             AliasSegment::Child(name.clone()),\n    //         ])),\n    //     },\n    // );\n}",
-        "status": "open",
+        "status": "closed",
         "lines": "L428-L443",
         "commit": "a0edf7a78dc0cbe3417a8d318f46b872daac4cb4",
         "title": "warn about overlap"
