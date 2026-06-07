@@ -1488,8 +1488,8 @@ impl From<(Sb3InputRepr, IsShadow)> for Sb3InputValue {
     }
 }
 
-impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputValue {
-    fn from(value: ((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)) -> Self {
+impl From<((Sb3InputRepr, IsShadow), Option<Cow<'_, Sb3PrimitiveBlock>>)> for Sb3InputValue {
+    fn from(value: ((Sb3InputRepr, IsShadow), Option<Cow<'_, Sb3PrimitiveBlock>>)) -> Self {
         let ((input_repr, is_shadow), shadow) = value;
         if is_shadow == IsShadow::Yes {
             if let Some(shadow) = shadow
@@ -1509,7 +1509,7 @@ impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputVal
                     Sb3PrimitiveBlock::Variable { .. } => unreachable!(),
                     Sb3PrimitiveBlock::List { .. } => unreachable!(),
                 };
-                return Self::Shadow(Sb3InputRepr::PrimitiveBlock(match shadow {
+                return Self::Shadow(Sb3InputRepr::PrimitiveBlock(match &*shadow {
                     Sb3PrimitiveBlock::Number(..) => Sb3PrimitiveBlock::Number(sb3_primitive),
                     Sb3PrimitiveBlock::PositiveNumber(..) => {
                         Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
@@ -1528,11 +1528,25 @@ impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputVal
         if let Some(shadow) = shadow {
             Self::ObscuredShadow {
                 value: input_repr,
-                shadow: Sb3InputRepr::PrimitiveBlock(shadow),
+                shadow: Sb3InputRepr::PrimitiveBlock(shadow.into_owned()),
             }
         } else {
             Self::NoShadow(input_repr)
         }
+    }
+}
+
+impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputValue {
+    fn from(value: ((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)) -> Self {
+        let (a, b) = value;
+        From::from((a, b.map(Cow::Owned)))
+    }
+}
+
+impl From<((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)> for Sb3InputValue {
+    fn from(value: ((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)) -> Self {
+        let (a, b) = value;
+        From::from((a, b.map(Cow::Borrowed)))
     }
 }
 

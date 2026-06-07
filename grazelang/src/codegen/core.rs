@@ -1417,7 +1417,7 @@ pub fn add_known_block_to_params(
         CallBlockParamKind::Input { default } => {
             if let Some(input_value) = create_input_value(
                 known_block_to_input_repr_no_menu(value, known_block_source_span, context)?,
-                default.clone(),
+                default.as_ref(),
             ) {
                 inputs.insert(param_name, input_value);
             }
@@ -1794,13 +1794,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let mut inputs = HashMap::with_capacity(2);
             if let Some(input_value) = create_input_value(
                 param_to_input_repr_no_menu(op_a_param, *value.0.get_source_span(), context)?,
-                operand_a_default.clone(),
+                operand_a_default.as_ref(),
             ) {
                 inputs.insert(operand_a_input_name, input_value);
             }
             if let Some(input_value) = create_input_value(
                 param_to_input_repr_no_menu(op_b_param, *value.2.get_source_span(), context)?,
-                operand_b_default.clone(),
+                operand_b_default.as_ref(),
             ) {
                 inputs.insert(operand_b_input_name, input_value);
             }
@@ -2028,10 +2028,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     let right = param_to_input_repr_no_menu(right, right_pr, context)?;
                     let left = create_input_value(
                         left,
-                        if context.settings.use_shadows == UseShadows::NotEverywhere {
-                            None::<Sb3PrimitiveBlock>
-                        } else {
-                            Some(Sb3PrimitiveBlock::String(
+                        (context.settings.use_shadows != UseShadows::NotEverywhere).then(|| {
+                            Sb3PrimitiveBlock::String(
                                 if context.settings.use_shadows
                                     == UseShadows::CorrectShadowsEverywhere
                                 {
@@ -2040,15 +2038,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                     ""
                                 }
                                 .into(),
-                            ))
-                        },
+                            )
+                        }),
                     );
                     let right = create_input_value(
                         right,
-                        if context.settings.use_shadows == UseShadows::NotEverywhere {
-                            None::<Sb3PrimitiveBlock>
-                        } else {
-                            Some(Sb3PrimitiveBlock::String(
+                        (context.settings.use_shadows != UseShadows::NotEverywhere).then(|| {
+                            Sb3PrimitiveBlock::String(
                                 if context.settings.use_shadows
                                     == UseShadows::CorrectShadowsEverywhere
                                 {
@@ -2057,8 +2053,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                     ""
                                 }
                                 .into(),
-                            ))
-                        },
+                            )
+                        }),
                     );
                     add_block(context, &this_id, make_join(parent, left, right));
                     Ok((
@@ -2616,20 +2612,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         )?;
                         let value = create_input_value(
                             value,
-                            if context.settings.use_shadows == UseShadows::NotEverywhere {
-                                None::<Sb3PrimitiveBlock>
-                            } else {
-                                Some(Sb3PrimitiveBlock::String(
-                                    if context.settings.use_shadows
-                                        == UseShadows::CorrectShadowsEverywhere
-                                    {
-                                        "thing"
-                                    } else {
-                                        ""
-                                    }
-                                    .into(),
-                                ))
-                            },
+                            (context.settings.use_shadows != UseShadows::NotEverywhere).then(
+                                || {
+                                    Sb3PrimitiveBlock::String(
+                                        if context.settings.use_shadows
+                                            == UseShadows::CorrectShadowsEverywhere
+                                        {
+                                            "thing"
+                                        } else {
+                                            ""
+                                        }
+                                        .into(),
+                                    )
+                                },
+                            ),
                         );
                         let inputs = if let Some(value) = value {
                             HashMap::from([("ITEM".to_string(), value)])
@@ -3102,14 +3098,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 let mut inputs = HashMap::with_capacity(if use_if_else { 3 } else { 2 });
                 visitor.visit_expression(&else_ifs[0].2, context)?;
                 let condition_value = context.pop_param().unwrap();
-                if let Some(condition) = create_input_value(
+                if let Some(condition) = {
                     param_to_input_repr_no_menu(
                         condition_value,
                         *else_ifs[0].2.get_source_span(),
                         context,
-                    )?,
-                    None::<Sb3PrimitiveBlock>,
-                ) {
+                    )?
+                    .map(Into::into)
+                } {
                     inputs.insert("CONDITION".to_string(), condition);
                 }
                 visitor.visit_code_block(&else_ifs[0].3, context)?;
@@ -3185,14 +3181,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let mut inputs = HashMap::with_capacity(if use_if_else { 3 } else { 2 });
             self.visit_expression(&value.0.1, context)?;
             let condition_value = context.pop_param().unwrap();
-            if let Some(condition) = create_input_value(
+            if let Some(condition) = {
                 param_to_input_repr_no_menu(
                     condition_value,
                     *value.0.1.get_source_span(),
                     context,
-                )?,
-                None::<Sb3PrimitiveBlock>,
-            ) {
+                )?.map(Into::into)
+            } {
                 inputs.insert("CONDITION".to_string(), condition);
             }
             self.visit_code_block(&value.0.2, context)?;
