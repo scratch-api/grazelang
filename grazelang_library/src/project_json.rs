@@ -1536,25 +1536,6 @@ impl From<((Sb3InputRepr, IsShadow), Option<Sb3PrimitiveBlock>)> for Sb3InputVal
     }
 }
 
-impl From<((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)> for Sb3InputValue {
-    fn from(value: ((Sb3InputRepr, IsShadow), Option<&Sb3PrimitiveBlock>)) -> Self {
-        // TODO: Implement primitive block conversion (if default is a positive integer, so would a literal value be)
-        // Issue: #32
-        let ((input_repr, is_shadow), shadow) = value;
-        if is_shadow == IsShadow::Yes {
-            return Self::Shadow(input_repr);
-        }
-        if let Some(shadow) = shadow {
-            Self::ObscuredShadow {
-                value: input_repr,
-                shadow: Sb3InputRepr::PrimitiveBlock(shadow.clone()),
-            }
-        } else {
-            Self::NoShadow(input_repr)
-        }
-    }
-}
-
 impl From<Sb3PrimitiveBlock> for Sb3InputValue {
     fn from(value: Sb3PrimitiveBlock) -> Self {
         if value.is_shadow() == IsShadow::Yes {

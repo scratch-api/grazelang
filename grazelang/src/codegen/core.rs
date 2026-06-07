@@ -1417,7 +1417,7 @@ pub fn add_known_block_to_params(
         CallBlockParamKind::Input { default } => {
             if let Some(input_value) = create_input_value(
                 known_block_to_input_repr_no_menu(value, known_block_source_span, context)?,
-                default.as_ref(),
+                default.clone(),
             ) {
                 inputs.insert(param_name, input_value);
             }
@@ -1794,13 +1794,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let mut inputs = HashMap::with_capacity(2);
             if let Some(input_value) = create_input_value(
                 param_to_input_repr_no_menu(op_a_param, *value.0.get_source_span(), context)?,
-                operand_a_default.as_ref(),
+                operand_a_default.clone(),
             ) {
                 inputs.insert(operand_a_input_name, input_value);
             }
             if let Some(input_value) = create_input_value(
                 param_to_input_repr_no_menu(op_b_param, *value.2.get_source_span(), context)?,
-                operand_b_default.as_ref(),
+                operand_b_default.clone(),
             ) {
                 inputs.insert(operand_b_input_name, input_value);
             }
