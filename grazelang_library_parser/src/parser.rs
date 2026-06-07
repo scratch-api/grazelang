@@ -26,6 +26,7 @@ pub struct BlockEntry {
     pub alt_name: Option<String>,
     #[serde(default)]
     pub is_simpleton: bool, // TODO: implement this
+    // Issue: #59
     pub assign: Option<AssignmentDescriptor>, // TODO: implement these
                                               // Issue: #40
 }
