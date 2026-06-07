@@ -24,6 +24,8 @@ pub struct BlockEntry {
     pub opcode: String,
     pub args: Vec<BlockArg>,
     pub alt_name: Option<String>,
+    #[serde(default)]
+    pub is_simpleton: bool, // TODO: implement this
     pub assign: Option<AssignmentDescriptor>, // TODO: implement these
                                               // Issue: #40
 }
