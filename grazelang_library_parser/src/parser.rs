@@ -25,7 +25,7 @@ pub struct BlockEntry {
     pub args: Vec<BlockArg>,
     pub alt_name: Option<String>,
     #[serde(default)]
-    pub is_simpleton: bool, // TODO: implement this
+    pub is_singleton: bool, // TODO: implement this
     // Issue: #59
     pub assign: Option<AssignmentDescriptor>, // TODO: implement these
                                               // Issue: #40
@@ -242,6 +242,7 @@ impl BlockEntry {
             opcode,
             args,
             alt_name,
+            is_singleton: _,
             assign,
         } = self;
         if args.is_empty() {
