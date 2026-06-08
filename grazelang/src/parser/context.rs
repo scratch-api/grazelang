@@ -189,7 +189,8 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::PrimitiveBlock { value } => KnownBlockInput::PrimitiveInput(value.clone()),
             KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
-            | KnownBlock::CustomBlock { .. } => {
+            | KnownBlock::CustomBlock { .. }
+            | KnownBlock::BoundMethod { .. } => {
                 emit_message(
                     context,
                     GrazeMessage::Warning(
@@ -312,7 +313,8 @@ impl ResolveKnownBlock for KnownBlock {
             },
             KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
-            | KnownBlock::CustomBlock { .. } => {
+            | KnownBlock::CustomBlock { .. }
+            | KnownBlock::BoundMethod { .. } => {
                 emit_message(
                     context,
                     GrazeMessage::Warning(
@@ -391,6 +393,9 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::PartialCallable(opcode, values, params) => {
                 Some(CallableKnownBlockSignature(opcode, params, values, None))
             }
+            KnownBlock::BoundMethod { signature, bound_params } => {
+                Some(CallableKnownBlockSignature(&signature.opcode, &signature.unbound_params, &*bound_params, None))
+            }
             KnownBlock::SingletonReporter { opcode, params, .. } => {
                 Some(CallableKnownBlockSignature(
                     opcode,
@@ -445,6 +450,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::SingletonReporter { .. }
             | KnownBlock::CustomBlock { .. }
+            | KnownBlock::BoundMethod { .. }
             | KnownBlock::Empty => None,
         } // TODO: Implement assignment of x, y etc
         // Issue: #12

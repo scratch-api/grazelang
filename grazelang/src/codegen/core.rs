@@ -253,6 +253,7 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::SingletonReporter { .. }
             | KnownBlock::CustomBlock { .. }
+            | KnownBlock::BoundMethod { .. }
             | KnownBlock::Empty => (),
         }
     }
@@ -701,12 +702,13 @@ pub mod symbol_data_derivation {
         ffi::OsStr,
         path::{Path, PathBuf},
         rc::Rc,
+        sync::{Arc, LazyLock},
     };
 
     use arcstr::{ArcStr as IString, literal};
     use grazelang_library::{
         BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
-        CallBlockParamKind, HasShadow, LISTS_CATEGORY_ID, SOUNDS_CATEGORY_ID,
+        CallBlockParamKind, HasShadow, LISTS_CATEGORY_ID, MethodSignature, SOUNDS_CATEGORY_ID,
         project_json::{
             Sb3Costume, Sb3FieldValue, Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock,
             Sb3Sound, Sb3VariableDeclaration, TargetAttachment,
@@ -731,15 +733,146 @@ pub mod symbol_data_derivation {
     pub type TargetSymbolData = (Symbol, Option<TargetAttachment>, Option<AssetFile>);
 
     pub fn patch_in_list_methods(symbol_table: &mut SymbolTable, symbol_id: SymbolId) {
-        // TODO: Lower memory usage by moving shared data of these methods into Rc
-        // Issue: #57
+        static LIST_METHODS: LazyLock<HashMap<IString, Arc<MethodSignature>>> =
+            LazyLock::new(|| {
+                HashMap::from([
+                    (
+                        literal!("push"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_addtolist"),
+                            unbound_params: vec![CallBlockParam {
+                                kind: CallBlockParamKind::Input {
+                                    default: Some("thing".into()),
+                                },
+                                name: literal!("ITEM"),
+                            }],
+                        }),
+                    ),
+                    (
+                        literal!("remove"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_deleteoflist"),
+                            unbound_params: vec![CallBlockParam {
+                                kind: CallBlockParamKind::Input {
+                                    default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                                },
+                                name: literal!("INDEX"),
+                            }],
+                        }),
+                    ),
+                    (
+                        literal!("clear"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_deletealloflist"),
+                            unbound_params: vec![],
+                        }),
+                    ),
+                    (
+                        literal!("insert"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_insertatlist"),
+                            unbound_params: vec![
+                                CallBlockParam {
+                                    kind: CallBlockParamKind::Input {
+                                        default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                                    },
+                                    name: literal!("INDEX"),
+                                },
+                                CallBlockParam {
+                                    kind: CallBlockParamKind::Input {
+                                        default: Some("thing".into()),
+                                    },
+                                    name: literal!("ITEM"),
+                                },
+                            ],
+                        }),
+                    ),
+                    (
+                        literal!("set"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_replaceitemoflist"),
+                            unbound_params: vec![
+                                CallBlockParam {
+                                    kind: CallBlockParamKind::Input {
+                                        default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                                    },
+                                    name: literal!("INDEX"),
+                                },
+                                CallBlockParam {
+                                    kind: CallBlockParamKind::Input {
+                                        default: Some("thing".into()),
+                                    },
+                                    name: literal!("ITEM"),
+                                },
+                            ],
+                        }),
+                    ),
+                    (
+                        literal!("get"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_itemoflist"),
+                            unbound_params: vec![CallBlockParam {
+                                kind: CallBlockParamKind::Input {
+                                    default: Some(Sb3PrimitiveBlock::Integer("1".into())),
+                                },
+                                name: literal!("INDEX"),
+                            }],
+                        }),
+                    ),
+                    (
+                        literal!("find"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_itemnumoflist"),
+                            unbound_params: vec![CallBlockParam {
+                                kind: CallBlockParamKind::Input {
+                                    default: Some("thing".into()),
+                                },
+                                name: literal!("ITEM"),
+                            }],
+                        }),
+                    ),
+                    (
+                        literal!("len"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_lengthoflist"),
+                            unbound_params: vec![],
+                        }),
+                    ),
+                    (
+                        literal!("contains"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_listcontainsitem"),
+                            unbound_params: vec![CallBlockParam {
+                                kind: CallBlockParamKind::Input {
+                                    default: Some("thing".into()),
+                                },
+                                name: literal!("ITEM"),
+                            }],
+                        }),
+                    ),
+                    (
+                        literal!("show"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_showlist"),
+                            unbound_params: vec![],
+                        }),
+                    ),
+                    (
+                        literal!("hide"),
+                        Arc::new(MethodSignature {
+                            opcode: literal!("data_hidelist"),
+                            unbound_params: vec![],
+                        }),
+                    ),
+                ])
+            });
         let known_block = symbol_table[symbol_id]
             .known_block
             .as_ref()
             .unwrap()
             .as_ref()
             .clone();
-        let list_select_param = (
+        let bound_params = Rc::<[_]>::from([(
             CallBlockParam {
                 kind: CallBlockParamKind::Field {
                     default: None,
@@ -748,149 +881,17 @@ pub mod symbol_data_derivation {
                 name: literal!("LIST"),
             },
             known_block,
-        );
-        for (name, known_block) in [
-            (
-                literal!("push"),
-                KnownBlock::PartialCallable(
-                    literal!("data_addtolist"),
-                    vec![list_select_param.clone()],
-                    vec![CallBlockParam {
-                        kind: CallBlockParamKind::Input {
-                            default: Some("thing".into()),
-                        },
-                        name: literal!("ITEM"),
-                    }],
-                ),
-            ),
-            (
-                literal!("remove"),
-                KnownBlock::PartialCallable(
-                    literal!("data_deleteoflist"),
-                    vec![list_select_param.clone()],
-                    vec![CallBlockParam {
-                        kind: CallBlockParamKind::Input {
-                            default: Some(Sb3PrimitiveBlock::Integer("1".into())),
-                        },
-                        name: literal!("INDEX"),
-                    }],
-                ),
-            ),
-            (
-                literal!("clear"),
-                KnownBlock::PartialCallable(
-                    literal!("data_deletealloflist"),
-                    vec![list_select_param.clone()],
-                    vec![],
-                ),
-            ),
-            (
-                literal!("insert"),
-                KnownBlock::PartialCallable(
-                    literal!("data_insertatlist"),
-                    vec![list_select_param.clone()],
-                    vec![
-                        CallBlockParam {
-                            kind: CallBlockParamKind::Input {
-                                default: Some(Sb3PrimitiveBlock::Integer("1".into())),
-                            },
-                            name: literal!("INDEX"),
-                        },
-                        CallBlockParam {
-                            kind: CallBlockParamKind::Input {
-                                default: Some("thing".into()),
-                            },
-                            name: literal!("ITEM"),
-                        },
-                    ],
-                ),
-            ),
-            (
-                literal!("set"),
-                KnownBlock::PartialCallable(
-                    literal!("data_replaceitemoflist"),
-                    vec![list_select_param.clone()],
-                    vec![
-                        CallBlockParam {
-                            kind: CallBlockParamKind::Input {
-                                default: Some(Sb3PrimitiveBlock::Integer("1".into())),
-                            },
-                            name: literal!("INDEX"),
-                        },
-                        CallBlockParam {
-                            kind: CallBlockParamKind::Input {
-                                default: Some("thing".into()),
-                            },
-                            name: literal!("ITEM"),
-                        },
-                    ],
-                ),
-            ),
-            (
-                literal!("get"),
-                KnownBlock::PartialCallable(
-                    literal!("data_itemoflist"),
-                    vec![list_select_param.clone()],
-                    vec![CallBlockParam {
-                        kind: CallBlockParamKind::Input {
-                            default: Some(Sb3PrimitiveBlock::Integer("1".into())),
-                        },
-                        name: literal!("INDEX"),
-                    }],
-                ),
-            ),
-            (
-                literal!("find"),
-                KnownBlock::PartialCallable(
-                    literal!("data_itemnumoflist"),
-                    vec![list_select_param.clone()],
-                    vec![CallBlockParam {
-                        kind: CallBlockParamKind::Input {
-                            default: Some("thing".into()),
-                        },
-                        name: literal!("ITEM"),
-                    }],
-                ),
-            ),
-            (
-                literal!("len"),
-                KnownBlock::PartialCallable(
-                    literal!("data_lengthoflist"),
-                    vec![list_select_param.clone()],
-                    vec![],
-                ),
-            ),
-            (
-                literal!("contains"),
-                KnownBlock::PartialCallable(
-                    literal!("data_listcontainsitem"),
-                    vec![list_select_param.clone()],
-                    vec![CallBlockParam {
-                        kind: CallBlockParamKind::Input {
-                            default: Some("thing".into()),
-                        },
-                        name: literal!("ITEM"),
-                    }],
-                ),
-            ),
-            (
-                literal!("show"),
-                KnownBlock::PartialCallable(
-                    literal!("data_showlist"),
-                    vec![list_select_param.clone()],
-                    vec![],
-                ),
-            ),
-            (
-                literal!("hide"),
-                KnownBlock::PartialCallable(
-                    literal!("data_hidelist"),
-                    vec![list_select_param],
-                    vec![],
-                ),
-            ),
-        ] {
-            symbol_table.new_child_symbol(symbol_id, name, Some(Rc::new(known_block)), 0);
+        )]);
+        for (name, signature) in LIST_METHODS.iter() {
+            symbol_table.new_child_symbol(
+                symbol_id,
+                name.clone(),
+                Some(Rc::new(KnownBlock::BoundMethod {
+                    signature: signature.clone(),
+                    bound_params: bound_params.clone(),
+                })),
+                0,
+            );
         }
     }
 
@@ -3182,11 +3183,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             self.visit_expression(&value.0.1, context)?;
             let condition_value = context.pop_param().unwrap();
             if let Some(condition) = {
-                param_to_input_repr_no_menu(
-                    condition_value,
-                    *value.0.1.get_source_span(),
-                    context,
-                )?.map(Into::into)
+                param_to_input_repr_no_menu(condition_value, *value.0.1.get_source_span(), context)?
+                    .map(Into::into)
             } {
                 inputs.insert("CONDITION".to_string(), condition);
             }

@@ -1,7 +1,10 @@
 pub mod project_json;
 
 use proc_macro2::TokenStream;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc, sync::Arc,
+};
 
 use arcstr::{ArcStr as IString, literal};
 use quote::{ToTokens, TokenStreamExt, quote};
@@ -25,7 +28,6 @@ pub const LOCATIONS_CATEGORY_ID: u32 = 12; // sprites or mouse pointer
 pub const PROPERTIES_CATEGORY_ID: u32 = 13;
 pub const OBJECTS_CATEGORY_ID: u32 = 14; // sprites or the stage
 pub const PEN_PROPERTIES_CATEGORY_ID: u32 = 15;
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindInfo {
@@ -99,7 +101,57 @@ pub enum KnownBlock {
         params: Vec<(IString, HasShadow)>,
         is_warp: bool,
     },
+    BoundMethod {
+        #[serde(with = "serde_arc_as_value")]
+        signature: Arc<MethodSignature>,
+        #[serde(with = "serde_rc_slice_as_value")]
+        bound_params: Rc<[(CallBlockParam, KnownBlock)]>,
+    },
     Empty,
+}
+
+mod serde_rc_slice_as_value {
+    use std::rc::Rc;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<T, S>(value: &Rc<[T]>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: Serialize,
+        S: Serializer,
+    {
+        value.as_ref().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Rc<[T]>, D::Error>
+    where
+        T: Deserialize<'de> + Clone,
+        D: Deserializer<'de>,
+    {
+        Ok(Rc::from(Vec::<T>::deserialize(deserializer)?))
+    }
+}
+
+mod serde_arc_as_value {
+    use std::sync::Arc;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<T, S>(value: &Arc<T>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        T: Serialize,
+        S: Serializer,
+    {
+        value.as_ref().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Arc<T>, D::Error>
+    where
+        T: Deserialize<'de>,
+        D: Deserializer<'de>,
+    {
+        Ok(Arc::new(T::deserialize(deserializer)?))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -128,6 +180,12 @@ pub struct SimpleCallableKnownBlockSignature(
     pub CallBlockParam,
     pub Vec<(CallBlockParam, KnownBlock)>,
 );
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MethodSignature {
+    pub opcode: IString,
+    pub unbound_params: Vec<CallBlockParam>,
+}
 
 impl ToTokens for SimpleCallableKnownBlockSignature {
     fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -387,6 +445,21 @@ impl ToTokens for KnownBlock {
                         call_params: ::std::vec![#( #call_params ),*],
                         params: ::std::vec![#( (::arcstr::literal!(#keys), #values) ),*],
                         is_warp: #is_warp,
+                    }
+                });
+            }
+            KnownBlock::BoundMethod { signature, bound_params } => {
+                let opcode = signature.opcode.as_str();
+                let unbound_params = &signature.unbound_params;
+                let (keys, values): (Vec<_>, Vec<_>) = 
+                    bound_params.iter().map(|(k, v)| (k, v)).unzip();
+                tokens.append_all(quote! {
+                    #prefix::BoundMethod {
+                        signature: ::std::sync::Arc::new(::grazelang_library::MethodSignature {
+                            opcode: ::arcstr::literal!(#opcode),
+                            unbound_params: ::std::vec![#( #unbound_params ),*],
+                        }),
+                        bound_params: ::std::rc::Rc::<[_]>::from([#( (#keys, #values) ),*]),
                     }
                 });
             }
