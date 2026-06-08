@@ -250,7 +250,7 @@
     "40": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L30-L31",
         "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
