@@ -343,19 +343,61 @@
                 "type": "motion_xposition",
                 "args": [],
                 "altName": "x_position",
-                "is_singleton": true
+                "isSingleton": true,
+                "assign": {
+                    "opcode": "motion_setx",
+                    "value": {
+                        "kind": "input",
+                        "name": "X",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                }
             },
             {
                 "type": "motion_yposition",
                 "args": [],
                 "altName": "y_position",
-                "is_singleton": true
+                "isSingleton": true,
+                "assign": {
+                    "opcode": "motion_sety",
+                    "value": {
+                        "kind": "input",
+                        "name": "Y",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "0",
+                            "options": null
+                        }
+                    }
+                }
             },
             {
                 "type": "motion_direction",
                 "args": [],
                 "altName": "direction",
-                "is_singleton": true
+                "isSingleton": true,
+                "assign": {
+                    "opcode": "motion_pointindirection",
+                    "value": {
+                        "kind": "input",
+                        "name": "DIRECTION",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_angle",
+                            "defaultValue": "90",
+                            "options": null
+                        }
+                    }
+                }
             }
         ]
     },
@@ -469,7 +511,7 @@
                         }
                     }
                 ],
-                "altName": "switch_costume_to"
+                "altName": "switch_to_costume"
             },
             {
                 "type": "looks_nextcostume",
@@ -508,7 +550,7 @@
                         }
                     }
                 ],
-                "altName": "switch_backdrop_to"
+                "altName": "switch_to_backdrop"
             },
             {
                 "type": "looks_switchbackdroptoandwait",
@@ -542,7 +584,7 @@
                         }
                     }
                 ],
-                "altName": "switch_backdrop_to_and_wait"
+                "altName": "switch_to_backdrop_and_wait"
             },
             {
                 "type": "looks_nextbackdrop",
@@ -813,7 +855,21 @@
                 "type": "looks_size",
                 "args": [],
                 "altName": "size",
-                "is_singleton": true
+                "isSingleton": true,
+                "assign": {
+                    "opcode": "looks_setsizeto",
+                    "value": {
+                        "kind": "input",
+                        "name": "SIZE",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "100",
+                            "options": null
+                        }
+                    }
+                }
             }
         ]
     },
@@ -1649,7 +1705,7 @@
                 "type": "sensing_answer",
                 "args": [],
                 "altName": "answer",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_keypressed",
@@ -1882,19 +1938,19 @@
                 "type": "sensing_mousedown",
                 "args": [],
                 "altName": "is_mouse_down",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_mousex",
                 "args": [],
                 "altName": "mouse_x",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_mousey",
                 "args": [],
                 "altName": "mouse_y",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_setdragmode",
@@ -1924,13 +1980,13 @@
                 "type": "sensing_loudness",
                 "args": [],
                 "altName": "loudness",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_timer",
                 "args": [],
                 "altName": "timer",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_resettimer",
@@ -2011,19 +2067,19 @@
                 "type": "sensing_dayssince2000",
                 "args": [],
                 "altName": "days_since_2000",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_online",
                 "args": [],
                 "altName": "is_online",
-                "is_singleton": true
+                "isSingleton": true
             },
             {
                 "type": "sensing_username",
                 "args": [],
                 "altName": "username",
-                "is_singleton": true
+                "isSingleton": true
             }
         ]
     },

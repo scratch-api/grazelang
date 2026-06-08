@@ -434,21 +434,20 @@ impl ResolveKnownBlock for KnownBlock {
                 id: _,
                 assign,
                 bind_info: _,
-            }
-            | KnownBlock::SingletonReporter {
+            } => Some(assign),
+            KnownBlock::SingletonReporter {
                 opcode: _,
                 params: _,
                 field: _,
-                assign: Some(assign),
+                assign,
                 bind_info: _,
-            } => Some(assign),
+            } => assign.as_ref(),
             KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
             | KnownBlock::PrimitiveBlock { .. }
             | KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
-            | KnownBlock::SingletonReporter { .. }
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::BoundMethod { .. }
             | KnownBlock::Empty => None,

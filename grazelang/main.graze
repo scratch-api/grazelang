@@ -2,10 +2,10 @@
 stage {
     backdrop `Backdrop 1` test_costume("empty.svg");
     {
-        switch_backdrop_to_and_wait(stage.test_costume);
+        switch_to_backdrop_and_wait(stage.test_costume);
     }
     {
-        switch_backdrop_to(stage.test_costume);
+        switch_to_backdrop(stage.test_costume);
     }
 }
 

@@ -26,8 +26,7 @@ pub struct BlockEntry {
     pub alt_name: Option<String>,
     #[serde(default)]
     pub is_singleton: bool,
-    pub assign: Option<AssignmentDescriptor>, // TODO: implement these
-                                              // Issue: #40
+    pub assign: Option<AssignmentDescriptor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -35,6 +34,7 @@ pub struct BlockEntry {
 pub struct AssignmentDescriptor {
     pub opcode: String,
     pub value: BlockArg,
+    #[serde(default)]
     pub known_params: Vec<KnownParam>,
 }
 
