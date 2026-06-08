@@ -418,7 +418,7 @@
     "59": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L28-L28",
         "commit": "402d95ffa1e0c32ae700232056286011a49e5c9b",
         "title": "implement this"
