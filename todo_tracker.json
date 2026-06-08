@@ -402,7 +402,7 @@
     "57": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L737-L737",
         "commit": "57c306d18bc115f7f812edf8adbefc6a4f929717",
         "title": "Lower memory usage by moving shared data of these methods into Rc"
