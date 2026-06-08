@@ -1437,9 +1437,8 @@ impl Default for Sb3Meta {
     fn default() -> Self {
         Self {
             semver: "3.0.0".into(),
-            vm: "12.6.4".into(),
+            vm: "14.0.0".into(),
             agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36".into(),
-            // ^ not my user agent
             origin: None,
         }
     }
