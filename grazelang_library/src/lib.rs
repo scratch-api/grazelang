@@ -125,7 +125,7 @@ mod serde_rc_slice_as_value {
 
     pub fn deserialize<'de, T, D>(deserializer: D) -> Result<Rc<[T]>, D::Error>
     where
-        T: Deserialize<'de> + Clone,
+        T: Deserialize<'de>,
         D: Deserializer<'de>,
     {
         Ok(Rc::from(Vec::<T>::deserialize(deserializer)?))
