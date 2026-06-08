@@ -25,8 +25,7 @@ pub struct BlockEntry {
     pub args: Vec<BlockArg>,
     pub alt_name: Option<String>,
     #[serde(default)]
-    pub is_singleton: bool, // TODO: implement this
-    // Issue: #59
+    pub is_singleton: bool,
     pub assign: Option<AssignmentDescriptor>, // TODO: implement these
                                               // Issue: #40
 }
@@ -242,10 +241,10 @@ impl BlockEntry {
             opcode,
             args,
             alt_name,
-            is_singleton: _,
+            is_singleton,
             assign,
         } = self;
-        if args.is_empty() {
+        if args.is_empty() && is_singleton {
             return ProcessedBlockEntry {
                 name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
                 opcode: opcode.clone(),
