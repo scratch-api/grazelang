@@ -788,8 +788,7 @@ impl Target {
                 canonical_name,
                 symbols: _,
             } => canonical_name.as_ref().unwrap_or(name),
-            Target::Stage { symbols: _ } => codegen::core::STAGE_FIELD_VALUE_ISTRING, // TODO: check whether this is correct
-                                                                                      // Issue: #5
+            Target::Stage { symbols: _ } => codegen::core::STAGE_FIELD_VALUE_ISTRING,
         }
     }
 
