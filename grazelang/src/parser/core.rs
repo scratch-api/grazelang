@@ -2151,9 +2151,9 @@ pub mod statement {
                         SingleAssetDeclaration(
                             canonical_identifier,
                             identifier,
-                            left_parens,
-                            path,
-                            right_parens,
+                            cst::SingleAssetDeclarationValue::Simple(left_parens,
+                                path,
+                                right_parens, left_parens.range_to(&right_parens)),
                             token_stream.span_from_previous_to_current(start_pos),
                         ),
                         {
@@ -2252,9 +2252,7 @@ pub mod statement {
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     Some(canonical_identifier),
                     identifier,
-                    left_parens,
-                    path,
-                    right_parens,
+                    cst::SingleAssetDeclarationValue::Simple(left_parens, path, right_parens, left_parens.range_to(&right_parens)),
                     token_stream.span_from_previous_to_current(start_pos),
                 )))
             }
@@ -2320,9 +2318,9 @@ pub mod statement {
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     None,
                     identifier,
-                    left_parens,
-                    path,
-                    right_parens,
+                    cst::SingleAssetDeclarationValue::Simple(left_parens,
+                        path,
+                        right_parens, left_parens.range_to(&right_parens)),
                     token_stream.span_from_previous_to_current(start_pos),
                 )))
             }

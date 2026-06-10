@@ -59,7 +59,7 @@ impl GetPos for TopLevelStatement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SpriteKeyword(pub SourceSpan);
 
 impl GetPos for SpriteKeyword {
@@ -69,7 +69,7 @@ impl GetPos for SpriteKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StageKeyword(pub SourceSpan);
 
 impl GetPos for StageKeyword {
@@ -79,7 +79,7 @@ impl GetPos for StageKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CostumeKeyword(pub SourceSpan);
 
 impl GetPos for CostumeKeyword {
@@ -99,7 +99,7 @@ impl GetPos for BroadcastKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct BackdropKeyword(pub SourceSpan);
 
 impl GetPos for BackdropKeyword {
@@ -109,7 +109,7 @@ impl GetPos for BackdropKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SoundKeyword(pub SourceSpan);
 
 impl GetPos for SoundKeyword {
@@ -119,7 +119,7 @@ impl GetPos for SoundKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ProcKeyword(pub SourceSpan);
 
 impl GetPos for ProcKeyword {
@@ -337,16 +337,39 @@ impl GetPos for AssetDeclaration {
 pub struct SingleAssetDeclaration(
     pub Option<CanonicalIdentifier>,
     pub Identifier,
-    pub LeftParens,
-    pub (IString, SourceSpan),
-    pub RightParens,
+    pub SingleAssetDeclarationValue,
     pub SourceSpan,
 );
 
 impl GetPos for SingleAssetDeclaration {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
-        &self.5
+        &self.3
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SingleAssetDeclarationValue {
+    Simple(
+        LeftParens,
+        (IString, SourceSpan),
+        RightParens,
+        SourceSpan,
+    ),
+    FlatDictionary(
+        LeftBrace,
+        Vec<(Identifier, NormalAssignmentOperator, Literal, Option<Comma>)>,
+        RightBrace,
+        SourceSpan,
+    )
+}
+
+impl GetPos for SingleAssetDeclarationValue {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            SingleAssetDeclarationValue::Simple(_, _, _, source_span) |
+            SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span) => source_span,
+        }
     }
 }
 
@@ -433,7 +456,7 @@ impl GetPos for Statement {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LetKeyword(pub SourceSpan);
 
 impl GetPos for LetKeyword {
@@ -443,7 +466,7 @@ impl GetPos for LetKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct VarsKeyword(pub SourceSpan);
 
 impl GetPos for VarsKeyword {
@@ -453,7 +476,7 @@ impl GetPos for VarsKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ListsKeyword(pub SourceSpan);
 
 impl GetPos for ListsKeyword {
@@ -463,7 +486,7 @@ impl GetPos for ListsKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct VarKeyword(pub SourceSpan);
 
 impl GetPos for VarKeyword {
@@ -473,7 +496,7 @@ impl GetPos for VarKeyword {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ListKeyword(pub SourceSpan);
 
 impl GetPos for ListKeyword {
@@ -537,7 +560,7 @@ pub enum DataDeclarationScope {
     Cloud(SourceSpan),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct NormalAssignmentOperator(pub SourceSpan);
 
 impl GetPos for NormalAssignmentOperator {
@@ -611,7 +634,7 @@ impl GetPos for SingleDataDeclaration {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Comma(pub SourceSpan);
 
 impl GetPos for Comma {
@@ -621,7 +644,7 @@ impl GetPos for Comma {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LeftBrace(pub SourceSpan);
 
 impl GetPos for LeftBrace {
@@ -631,7 +654,7 @@ impl GetPos for LeftBrace {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RightBrace(pub SourceSpan);
 
 impl GetPos for RightBrace {
@@ -734,7 +757,7 @@ impl Expression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LeftParens(pub SourceSpan);
 
 impl GetPos for LeftParens {
@@ -744,7 +767,7 @@ impl GetPos for LeftParens {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RightParens(pub SourceSpan);
 
 impl GetPos for RightParens {
@@ -754,7 +777,7 @@ impl GetPos for RightParens {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LeftBracket(pub SourceSpan);
 
 impl GetPos for LeftBracket {
@@ -764,7 +787,7 @@ impl GetPos for LeftBracket {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RightBracket(pub SourceSpan);
 
 impl GetPos for RightBracket {
@@ -774,7 +797,7 @@ impl GetPos for RightBracket {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LetterAccessLeftBracket(pub SourceSpan);
 
 impl GetPos for LetterAccessLeftBracket {
@@ -784,7 +807,7 @@ impl GetPos for LetterAccessLeftBracket {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Semicolon(pub SourceSpan);
 
 impl GetPos for Semicolon {
@@ -1197,7 +1220,7 @@ impl Identifier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SyntacticIf(pub SourceSpan);
 
 impl GetPos for SyntacticIf {
@@ -1207,7 +1230,7 @@ impl GetPos for SyntacticIf {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SyntacticElse(pub SourceSpan);
 
 impl GetPos for SyntacticElse {
