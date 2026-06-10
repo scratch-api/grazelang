@@ -149,6 +149,21 @@ pub enum CustomBlockParamKindValue {
     Boolean,
 }
 
+// TODO: Use CommaSeparated
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommaSeparated<T> {
+    pub values: Vec<(T, Comma)>,
+    pub tail_value: T,
+    pub source_span: SourceSpan
+}
+
+impl<T> GetPos for CommaSeparated<T> {
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockParamKind {
     pub kind: CustomBlockParamKindValue,
