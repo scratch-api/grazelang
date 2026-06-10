@@ -150,6 +150,7 @@ pub enum CustomBlockParamKindValue {
 }
 
 // TODO: Use CommaSeparated
+// Issue: #60
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommaSeparated<T> {
