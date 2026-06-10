@@ -196,7 +196,7 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::CallableAsInput,
-                            format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead.").into(),
+                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead."),
                             source_span
                         ),
                         None
@@ -248,7 +248,7 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::BlockRefAsField,
-                            format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."),
                             source_span
                         ),
                         None
@@ -320,7 +320,7 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::CallableAsField,
-                            format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead.").into(),
+                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead."),
                             source_span
                         ),
                         None
@@ -336,7 +336,7 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::EmptyExpressionAsField,
-                            format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
+                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."),
                             source_span
                         ),
                         None
@@ -353,27 +353,34 @@ impl ResolveKnownBlock for KnownBlock {
                 assign: _,
                 bind_info: _,
             } => {
-                field
-                    .clone()
-                    // TODO: Check what categories might fit
-                    // Issue: #48
-                    .map(|value| (value, &* NO_CATEGORIES))
-                    .unwrap_or_else(|| {
-                        emit_message(
-                            context,
-                            GrazeMessage::Warning(
-                                GrazeWarning::Specific(
-                                    GrazeWarningKind::NonFieldSingletonAsField,
-                                    format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter.").into(),
-                                    source_span
-                                ),
-                                None
+                if let Some(value) = field {
+                    match value {
+                        Sb3FieldValue::Normal(sb3_primitive) => {
+                        let cow_str = sb3_primitive.as_cow_str();
+                               (value.clone(),  context
+                                    .field_entry_categories
+                                    .get(&*cow_str)
+                                    .unwrap_or_else(|| &*NO_CATEGORIES))
+
+                        },
+                        Sb3FieldValue::WithId { .. } => (value.clone(), &* ANY_CATEGORIES),
+                    }
+                } else {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                GrazeWarningKind::NonFieldSingletonAsField,
+                                arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."),
+                                source_span
                             ),
-                            GrazeMessageSetting::Warnings,
-                        );
-                        // No need for a second warning, therefore `ANY_CATEGORIES` is used
-                        (Sb3FieldValue::Normal("".into()), &* ANY_CATEGORIES)
-                    })
+                            None
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                    // No need for a second warning, therefore `ANY_CATEGORIES` is used
+                    (Sb3FieldValue::Normal("".into()), &* ANY_CATEGORIES)
+                }
             }
         }
     }
@@ -393,9 +400,15 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::PartialCallable(opcode, values, params) => {
                 Some(CallableKnownBlockSignature(opcode, params, values, None))
             }
-            KnownBlock::BoundMethod { signature, bound_params } => {
-                Some(CallableKnownBlockSignature(&signature.opcode, &signature.unbound_params, &*bound_params, None))
-            }
+            KnownBlock::BoundMethod {
+                signature,
+                bound_params,
+            } => Some(CallableKnownBlockSignature(
+                &signature.opcode,
+                &signature.unbound_params,
+                &*bound_params,
+                None,
+            )),
             KnownBlock::SingletonReporter { opcode, params, .. } => {
                 Some(CallableKnownBlockSignature(
                     opcode,

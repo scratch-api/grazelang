@@ -556,16 +556,6 @@ impl GrazeSb3GeneratorContext {
                                     .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
                             )
                             .unwrap();
-                        // TODO: Add variables, lists, broadcasts, sprites etc to corresponding field categories
-                        //  Implement if necessary:
-                        //  - [ ] variables
-                        //  - [ ] lists
-                        //  - [ ] broadcasts
-                        //  - [x] sprites
-                        //  - [x] costumes
-                        //  - [x] backdrops
-                        //  - [x] sounds
-                        // Issue: #50
                         if let Some(AssetFile {
                             file_name,
                             file_path,
@@ -1433,7 +1423,7 @@ pub fn add_known_block_to_params(
                         GrazeMessage::Warning(
                             GrazeWarning::Specific(
                                 GrazeWarningKind::LiteralFieldValueIncorrect,
-                                format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value).into(),
+                                arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
                                 known_block_source_span,
                             ),
                             None,
@@ -1474,8 +1464,7 @@ pub fn add_known_block_to_params(
                                     GrazeMessage::Warning(
                                         GrazeWarning::Specific(
                                             GrazeWarningKind::LiteralFieldValueIncorrect,
-                                            format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value)
-                                                .into(),
+                                            arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
                                             known_block_source_span,
                                         ),
                                         None,
@@ -1491,8 +1480,7 @@ pub fn add_known_block_to_params(
                                     GrazeMessage::Warning(
                                         GrazeWarning::Specific(
                                             GrazeWarningKind::LiteralFieldValueIncorrect,
-                                            format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value)
-                                                .into(),
+                                            arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
                                             known_block_source_span,
                                         ),
                                         None,
@@ -1521,7 +1509,7 @@ pub fn add_known_block_to_params(
                             GrazeMessage::Warning(
                                 GrazeWarning::Specific(
                                     GrazeWarningKind::LiteralFieldValueIncorrect,
-                                    format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value).into(),
+                                    arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
                                     known_block_source_span,
                                 ),
                                 None,
