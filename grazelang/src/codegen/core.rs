@@ -102,6 +102,8 @@ pub enum GrazeSb3GeneratorError {
     IdentifierNotCallable { identifier: Identifier },
     #[error("the identifier {identifier:?} is not assignable")]
     IdentifierNotAssignable { identifier: Identifier },
+    #[error("the expression {expression:?} is not calculatable by graze")]
+    ExpressionNotConstant { expression: Expression },
 }
 
 impl GetPos for GrazeSb3GeneratorError {
@@ -132,6 +134,9 @@ impl GetPos for GrazeSb3GeneratorError {
             | GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack { source_span } => source_span,
             GrazeSb3GeneratorError::RepeatedStageInitialization { stage_keyword } => {
                 stage_keyword.get_source_span()
+            }
+            GrazeSb3GeneratorError::ExpressionNotConstant { expression } => {
+                expression.get_source_span()
             }
         }
     }
@@ -2716,7 +2721,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             | crate::parser::cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
             | crate::parser::cst::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
                 .iter()
-                .map(|(value, _)| match value {
+                .map(|(value, _)| Ok(match value {
                     crate::parser::cst::SingleDataDeclaration::Variable(
                         _,
                         my_scope,
@@ -2745,7 +2750,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 None => [Some(a), Some(var), None],
                             }
                         };
-                        SingleAssignment::Var(path, expression.calculate_value())
+                        SingleAssignment::Var(
+                            path,
+                            expression.calculate_value().ok_or_else(|| {
+                                GrazeSb3GeneratorError::ExpressionNotConstant {
+                                    expression: expression.clone(),
+                                }
+                            })?,
+                        )
                     }
                     crate::parser::cst::SingleDataDeclaration::EmptyVariable(
                         _,
@@ -2810,7 +2822,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             for (value, _) in items {
                                 match value {
                                     ListEntry::Expression(expression) => {
-                                        values.push(expression.calculate_value());
+                                        values.push(expression.calculate_value().ok_or_else(|| {
+                                            GrazeSb3GeneratorError::ExpressionNotConstant {
+                                                expression: expression.clone(),
+                                            }
+                                        })?);
                                     }
                                     ListEntry::Unwrap(literal, _) => {
                                         for c in literal.get_string_value().chars() {
@@ -2850,8 +2866,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         };
                         SingleAssignment::List(path, Vec::new())
                     }
-                })
-                .collect(),
+                }))
+                .collect::<Result<_, _>>()?,
             crate::parser::cst::DataDeclaration::Single(single_data_declaration) => {
                 let single_data_declaration = single_data_declaration.as_ref();
                 let single_assignment = match single_data_declaration {
@@ -2877,7 +2893,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 None => [Some(a), Some(var), None],
                             }
                         };
-                        SingleAssignment::Var(path, expression.calculate_value())
+                        SingleAssignment::Var(path, expression.calculate_value().ok_or_else(|| {
+                            GrazeSb3GeneratorError::ExpressionNotConstant {
+                                expression: expression.clone(),
+                            }
+                        })?)
                     }
                     crate::parser::cst::SingleDataDeclaration::EmptyVariable(
                         _,
@@ -2930,7 +2950,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             for (value, _) in items {
                                 match value {
                                     ListEntry::Expression(expression) => {
-                                        values.push(expression.calculate_value());
+                                        values.push(expression.calculate_value().ok_or_else(|| {
+                                            GrazeSb3GeneratorError::ExpressionNotConstant {
+                                                expression: expression.clone(),
+                                            }
+                                        })?);
                                     }
                                     ListEntry::Unwrap(literal, _) => {
                                         for c in literal.get_string_value().chars() {

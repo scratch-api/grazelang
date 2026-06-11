@@ -1143,7 +1143,11 @@ pub mod statement {
                                     let mut expressions = Vec::with_capacity(value.len());
                                     for(entry, _)in value {
                                         match entry {
-                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value()),
+                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().ok_or_else(|| {
+                                                ParseError::ExpressionNotConstant {
+                                                    expression: Box::new(expression.clone()),
+                                                }
+                                            })?),
                                             ListEntry::Unwrap(literal, _) => literal.get_string_value().as_str().chars().for_each(|c| expressions.push(grazelang_library::project_json::Sb3Primitive::String(c.to_string()))),
                                         }
                                     }
@@ -1160,8 +1164,12 @@ pub mod statement {
                             value_is_initial_value: values_are_initial_values,
                             value: match &value {
                                 DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
-                                DeclarationValue::Var(_,value) => {
-                                    value.calculate_value()
+                                DeclarationValue::Var(_, value) => {
+                                    value.calculate_value().ok_or_else(|| {
+                                        ParseError::ExpressionNotConstant {
+                                            expression: Box::new(value.clone()),
+                                        }
+                                    })?
                                 },
                                 DeclarationValue::List(..) => unreachable!()
                             },
@@ -1579,7 +1587,11 @@ pub mod statement {
                                     let mut expressions = Vec::with_capacity(value.len());
                                     for (entry, _) in value {
                                         match entry {
-                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value()),
+                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().ok_or_else(|| {
+                                                ParseError::ExpressionNotConstant {
+                                                    expression: Box::new(expression.clone()),
+                                                }
+                                            })?),
                                             ListEntry::Unwrap(literal, _) => literal
                                                 .get_string_value()
                                                 .as_str()
@@ -1603,7 +1615,11 @@ pub mod statement {
                             value: match &value {
                                 DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
                                 DeclarationValue::Var(_, value) => {
-                                    value.calculate_value()
+                                    value.calculate_value().ok_or_else(|| {
+                                        ParseError::ExpressionNotConstant {
+                                            expression: Box::new(value.clone()),
+                                        }
+                                    })?
                                 },
                                 DeclarationValue::List(..) => unreachable!()
                             },

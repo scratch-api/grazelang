@@ -740,14 +740,18 @@ impl Expression {
         matches!(self, Expression::Literal(Literal::EmptyExpression(..)))
     }
 
-    pub fn calculate_value(&self) -> Sb3Primitive {
+    pub fn calculate_value(&self) -> Option<Sb3Primitive> {
         match self {
             Expression::Literal(literal) => {
-                Sb3Primitive::String(literal.get_string_value().to_string())
+                Some(Sb3Primitive::String(literal.get_string_value().to_string()))
             }
-            // TODO: try to calculate the value or warn the user
+            // TODO: Try to calculate the value or warn the user
+            //  - [x] warn the user
+            //  - [ ] calculate binops
+            //  - [ ] calculate unops
+            //  - [ ] introduce constants or allow usage of initial values of other vars
             // Issue: #31
-            _ => todo!(),
+            _ => None,
         }
     }
 }
@@ -1317,6 +1321,10 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
+    #[error("the expression {expression:?} is not calculatable by graze")]
+    ExpressionNotConstant {
+        expression: Box<Expression>,
+    },
     #[error("{source}")]
     IoError {
         #[source]
@@ -1381,6 +1389,9 @@ impl GetPos for ParseError {
                 context: _,
                 source_span,
             } => source_span,
+            ParseError::ExpressionNotConstant {
+                expression,
+            } => expression.get_source_span(),
             ParseError::IoError {
                 source: _,
                 source_span,
