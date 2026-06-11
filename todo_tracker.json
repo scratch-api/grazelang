@@ -394,7 +394,7 @@
     "56": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L929-L929",
         "commit": "57c306d18bc115f7f812edf8adbefc6a4f929717",
         "title": "Allow user to control the rotation center of a costume or backdrop"
@@ -430,5 +430,13 @@
         "lines": "L152-L152",
         "commit": "0522286d6a033af50e5d2627d1da239fb9af722a",
         "title": "Use CommaSeparated"
+    },
+    "61": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L3878-L3878",
+        "commit": "9f87b754a0447c7d4c0165bb042a120534354934",
+        "title": "Check if Vec<(K, V)> can be used for symbols instead of HashMap<K, V>"
     }
 }
