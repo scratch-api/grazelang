@@ -192,7 +192,7 @@ impl Cli {
             for message in &context.messages {
                 dbg!(message);
             }
-            dbg!(parsed);
+            // dbg!(parsed);
             panic!("Parsing unsuccessful.");
         }
         let codegen_timer = Instant::now();

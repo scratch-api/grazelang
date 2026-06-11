@@ -463,7 +463,7 @@ impl GrazeSb3GeneratorContext {
             });
             for attachment in &attachments {
                 match attachment {
-                    TargetAttachment::Costume(sb3_costume) => {
+                    TargetAttachment::Costume(sb3_costume, _) => {
                         let field_name_istring: IString = sb3_costume.name.as_str().into();
                         if is_stage {
                             extend_categories_for_field_value(
@@ -481,7 +481,7 @@ impl GrazeSb3GeneratorContext {
                             );
                         }
                     }
-                    TargetAttachment::Sound(sb3_sound) => {
+                    TargetAttachment::Sound(sb3_sound, _) => {
                         add_category_for_field_value(
                             SOUNDS_CATEGORY_ID,
                             sb3_sound.name.as_str().into(),
@@ -909,16 +909,18 @@ pub mod symbol_data_derivation {
                 resources_directory,
                 HashSet::from([COSTUMES_CATEGORY_ID]),
                 |asset_id, name, md5ext, data_format| {
-                    TargetAttachment::Costume(Sb3Costume {
-                        asset_id,
-                        name,
-                        md5ext,
-                        data_format,
-                        bitmap_resolution: Some(2.0),
-                        rotation_center_x: 0.0, // TODO: Allow user to control the rotation center of a costume or backdrop
-                        // Issue: #56
-                        rotation_center_y: 0.0,
-                    })
+                    TargetAttachment::Costume(
+                        Sb3Costume {
+                            asset_id,
+                            name,
+                            md5ext,
+                            data_format,
+                            bitmap_resolution: Some(2.0),
+                            rotation_center_x: descriptor.rotation_center_x.unwrap_or(0.0),
+                            rotation_center_y: descriptor.rotation_center_y.unwrap_or(0.0),
+                        },
+                        descriptor.symbol_idx,
+                    )
                 },
             ),
             TargetSymbolDescriptor::Backdrop(descriptor) => process_asset(
@@ -928,15 +930,18 @@ pub mod symbol_data_derivation {
                 resources_directory,
                 HashSet::from([BACKDROPS_CATEGORY_ID, BACKDROP_TARGETS_CATEGORY_ID]),
                 |asset_id, name, md5ext, data_format| {
-                    TargetAttachment::Costume(Sb3Costume {
-                        asset_id,
-                        name,
-                        md5ext,
-                        data_format,
-                        bitmap_resolution: Some(2.0),
-                        rotation_center_x: 0.0,
-                        rotation_center_y: 0.0,
-                    })
+                    TargetAttachment::Costume(
+                        Sb3Costume {
+                            asset_id,
+                            name,
+                            md5ext,
+                            data_format,
+                            bitmap_resolution: Some(2.0),
+                            rotation_center_x: descriptor.rotation_center_x.unwrap_or(0.0),
+                            rotation_center_y: descriptor.rotation_center_y.unwrap_or(0.0),
+                        },
+                        descriptor.symbol_idx,
+                    )
                 },
             ),
             TargetSymbolDescriptor::Sound(descriptor) => process_asset(
@@ -946,14 +951,17 @@ pub mod symbol_data_derivation {
                 resources_directory,
                 HashSet::from([SOUNDS_CATEGORY_ID]),
                 |asset_id, name, md5ext, data_format| {
-                    TargetAttachment::Sound(Sb3Sound {
-                        asset_id,
-                        name,
-                        md5ext,
-                        data_format,
-                        rate: 48000.0,
-                        sample_count: 1124,
-                    })
+                    TargetAttachment::Sound(
+                        Sb3Sound {
+                            asset_id,
+                            name,
+                            md5ext,
+                            data_format,
+                            rate: 48000.0,
+                            sample_count: 1124,
+                        },
+                        descriptor.symbol_idx,
+                    )
                 },
             ),
         }
@@ -1464,7 +1472,10 @@ pub fn add_known_block_to_params(
                                     GrazeMessage::Warning(
                                         GrazeWarning::Specific(
                                             GrazeWarningKind::LiteralFieldValueIncorrect,
-                                            arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
+                                            arcstr::format!(
+                                                LITERAL_FIELD_VALUE_INCORRECT_MSG!(),
+                                                value
+                                            ),
                                             known_block_source_span,
                                         ),
                                         None,
@@ -1480,7 +1491,10 @@ pub fn add_known_block_to_params(
                                     GrazeMessage::Warning(
                                         GrazeWarning::Specific(
                                             GrazeWarningKind::LiteralFieldValueIncorrect,
-                                            arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
+                                            arcstr::format!(
+                                                LITERAL_FIELD_VALUE_INCORRECT_MSG!(),
+                                                value
+                                            ),
                                             known_block_source_span,
                                         ),
                                         None,
@@ -3761,15 +3775,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
     ) -> Result<(), GrazeSb3GeneratorError> {
         let mut stage = context.uninitialized_stage.take().ok_or(
             GrazeSb3GeneratorError::RepeatedStageInitialization {
-                stage_keyword: value.0.clone(),
+                stage_keyword: *value.0,
             },
         )?;
         let assets = context.target_attachments.remove("stage").unwrap();
         let my_blocks_symbol_id = static_resolve_identifier!(context, [MY_BLOCKS_ISTRING]);
+        let mut costumes = Vec::new();
+        let mut sounds = Vec::new();
         for asset in assets {
             match asset {
-                TargetAttachment::Costume(costume) => stage.costumes.push(costume),
-                TargetAttachment::Sound(sound) => stage.sounds.push(sound),
+                TargetAttachment::Costume(costume, symbol_idx) => {
+                    costumes.push((costume, symbol_idx))
+                }
+                TargetAttachment::Sound(sound, symbol_idx) => sounds.push((sound, symbol_idx)),
                 TargetAttachment::Var(name, sb3_variable_declaration) => {
                     stage.variables.insert(name, sb3_variable_declaration);
                 }
@@ -3788,6 +3806,16 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     stage.broadcasts.insert(id, name);
                 }
             }
+        }
+        costumes.sort_by_key(|value| value.1);
+        sounds.sort_by_key(|value| value.1);
+        stage.costumes.reserve(costumes.len());
+        stage.sounds.reserve(sounds.len());
+        for (costume, _) in costumes {
+            stage.costumes.push(costume);
+        }
+        for (sound, _) in sounds {
+            stage.sounds.push(sound);
         }
         context.current_sb3_target = Some(stage);
         context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
@@ -3847,10 +3875,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
             insert_symbols
         };
+        // TODO: Check if Vec<(K, V)> can be used for symbols instead of HashMap<K, V>
+        let mut costumes = Vec::new();
+        let mut sounds = Vec::new();
         for asset in assets {
             match asset {
-                TargetAttachment::Costume(costume) => new_sprite.costumes.push(costume),
-                TargetAttachment::Sound(sound) => new_sprite.sounds.push(sound),
+                TargetAttachment::Costume(costume, symbol_idx) => {
+                    costumes.push((costume, symbol_idx))
+                }
+                TargetAttachment::Sound(sound, symbol_idx) => sounds.push((sound, symbol_idx)),
                 TargetAttachment::Var(name, sb3_variable_declaration) => {
                     new_sprite.variables.insert(name, sb3_variable_declaration);
                 }
@@ -3869,6 +3902,16 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     new_sprite.broadcasts.insert(id, name);
                 }
             }
+        }
+        costumes.sort_by_key(|value| value.1);
+        sounds.sort_by_key(|value| value.1);
+        new_sprite.costumes.reserve(costumes.len());
+        new_sprite.sounds.reserve(sounds.len());
+        for (costume, _) in costumes {
+            new_sprite.costumes.push(costume);
+        }
+        for (sound, _) in sounds {
+            new_sprite.sounds.push(sound);
         }
         new_sprite.layer_order = context.sb3.targets.len()
             + if context.uninitialized_stage.is_some() {

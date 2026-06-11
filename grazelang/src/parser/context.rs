@@ -105,6 +105,9 @@ pub struct CostumeDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
     pub source: IString,
+    pub rotation_center_x: Option<f64>,
+    pub rotation_center_y: Option<f64>,
+    pub symbol_idx: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -112,6 +115,9 @@ pub struct BackdropDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
     pub source: IString,
+    pub rotation_center_x: Option<f64>,
+    pub rotation_center_y: Option<f64>,
+    pub symbol_idx: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -119,6 +125,7 @@ pub struct SoundDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
     pub source: IString,
+    pub symbol_idx: usize,
 }
 
 pub trait ResolveKnownBlock {
@@ -196,10 +203,12 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::CallableAsInput,
-                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead."),
-                            source_span
+                            arcstr::format!(
+                                "Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead."
+                            ),
+                            source_span,
                         ),
-                        None
+                        None,
                     ),
                     GrazeMessageSetting::Warnings,
                 );
@@ -248,10 +257,12 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::BlockRefAsField,
-                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."),
-                            source_span
+                            arcstr::format!(
+                                "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."
+                            ),
+                            source_span,
                         ),
-                        None
+                        None,
                     ),
                     GrazeMessageSetting::Warnings,
                 );
@@ -320,10 +331,12 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::CallableAsField,
-                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead."),
-                            source_span
+                            arcstr::format!(
+                                "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead."
+                            ),
+                            source_span,
                         ),
-                        None
+                        None,
                     ),
                     GrazeMessageSetting::Warnings,
                 );
@@ -336,10 +349,12 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
                             GrazeWarningKind::EmptyExpressionAsField,
-                            arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."),
-                            source_span
+                            arcstr::format!(
+                                "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."
+                            ),
+                            source_span,
                         ),
-                        None
+                        None,
                     ),
                     GrazeMessageSetting::Warnings,
                 );
@@ -356,14 +371,16 @@ impl ResolveKnownBlock for KnownBlock {
                 if let Some(value) = field {
                     match value {
                         Sb3FieldValue::Normal(sb3_primitive) => {
-                        let cow_str = sb3_primitive.as_cow_str();
-                               (value.clone(),  context
+                            let cow_str = sb3_primitive.as_cow_str();
+                            (
+                                value.clone(),
+                                context
                                     .field_entry_categories
                                     .get(&*cow_str)
-                                    .unwrap_or_else(|| &*NO_CATEGORIES))
-
-                        },
-                        Sb3FieldValue::WithId { .. } => (value.clone(), &* ANY_CATEGORIES),
+                                    .unwrap_or_else(|| &*NO_CATEGORIES),
+                            )
+                        }
+                        Sb3FieldValue::WithId { .. } => (value.clone(), &*ANY_CATEGORIES),
                     }
                 } else {
                     emit_message(
@@ -371,15 +388,17 @@ impl ResolveKnownBlock for KnownBlock {
                         GrazeMessage::Warning(
                             GrazeWarning::Specific(
                                 GrazeWarningKind::NonFieldSingletonAsField,
-                                arcstr::format!("Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."),
-                                source_span
+                                arcstr::format!(
+                                    "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."
+                                ),
+                                source_span,
                             ),
-                            None
+                            None,
                         ),
                         GrazeMessageSetting::Warnings,
                     );
                     // No need for a second warning, therefore `ANY_CATEGORIES` is used
-                    (Sb3FieldValue::Normal("".into()), &* ANY_CATEGORIES)
+                    (Sb3FieldValue::Normal("".into()), &*ANY_CATEGORIES)
                 }
             }
         }
@@ -406,7 +425,7 @@ impl ResolveKnownBlock for KnownBlock {
             } => Some(CallableKnownBlockSignature(
                 &signature.opcode,
                 &signature.unbound_params,
-                &*bound_params,
+                bound_params,
                 None,
             )),
             KnownBlock::SingletonReporter { opcode, params, .. } => {

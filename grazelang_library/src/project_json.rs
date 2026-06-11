@@ -1468,8 +1468,8 @@ impl From<IsShadow> for bool {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TargetAttachment {
-    Costume(Sb3Costume),
-    Sound(Sb3Sound),
+    Costume(Sb3Costume, usize),
+    Sound(Sb3Sound, usize),
     Var(String, Sb3VariableDeclaration),
     List(String, Sb3ListDeclaration),
     CustomBlock(IString, KnownBlock),
@@ -1519,7 +1519,7 @@ impl From<((Sb3InputRepr, IsShadow), Option<Cow<'_, Sb3PrimitiveBlock>>)> for Sb
                     Sb3PrimitiveBlock::Integer(..) => Sb3PrimitiveBlock::Integer(sb3_primitive),
                     Sb3PrimitiveBlock::Angle(..) => Sb3PrimitiveBlock::Angle(sb3_primitive),
                     Sb3PrimitiveBlock::Color(..) => Sb3PrimitiveBlock::Color(sb3_primitive),
-                    Sb3PrimitiveBlock::String(..) | _ => Sb3PrimitiveBlock::String(sb3_primitive),
+                    _ => Sb3PrimitiveBlock::String(sb3_primitive),
                 }));
             }
             return Self::Shadow(input_repr);

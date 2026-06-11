@@ -1,6 +1,11 @@
 
 stage {
-    backdrop `Backdrop 1` test_costume("empty.svg");
+    backdrop `backdrop1` test_costume("empty.svg");
+    backdrop `backdrop2` test_costume_2 {
+        path = "empty.svg",
+        rotation_center_x = 0.0,
+        rotation_center_y = 0.0,
+    };
     {
         switch_to_backdrop_and_wait(stage.test_costume);
     }
@@ -10,7 +15,7 @@ stage {
 }
 
 sprite `Sprite1` sprite_1 {
-    costume `Costume 1` test_costume("empty.svg");
+    costume `costume1` test_costume("empty.svg");
     let global test;
     let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
     let local list list_2;

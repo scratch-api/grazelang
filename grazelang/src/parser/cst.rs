@@ -156,7 +156,7 @@ pub enum CustomBlockParamKindValue {
 pub struct CommaSeparated<T> {
     pub values: Vec<(T, Comma)>,
     pub tail_value: T,
-    pub source_span: SourceSpan
+    pub source_span: SourceSpan,
 }
 
 impl<T> GetPos for CommaSeparated<T> {
@@ -350,25 +350,20 @@ impl GetPos for SingleAssetDeclaration {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleAssetDeclarationValue {
-    Simple(
-        LeftParens,
-        (IString, SourceSpan),
-        RightParens,
-        SourceSpan,
-    ),
+    Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
     FlatDictionary(
         LeftBrace,
         Vec<(Identifier, NormalAssignmentOperator, Literal, Option<Comma>)>,
         RightBrace,
         SourceSpan,
-    )
+    ),
 }
 
 impl GetPos for SingleAssetDeclarationValue {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            SingleAssetDeclarationValue::Simple(_, _, _, source_span) |
-            SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span) => source_span,
+            SingleAssetDeclarationValue::Simple(_, _, _, source_span)
+            | SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span) => source_span,
         }
     }
 }
@@ -1112,7 +1107,7 @@ pub enum Literal {
     EmptyExpression(LeftParens, RightParens, SourceSpan),
 }
 
-const EMPTY_ISTRING_REF: &IString = &arcstr::literal!("");
+pub const EMPTY_ISTRING_REF: &IString = &arcstr::literal!("");
 
 impl Literal {
     pub fn get_string_value(&self) -> &IString {
@@ -1258,14 +1253,12 @@ impl GetPos for CanonicalIdentifier {
 
 #[derive(Debug, Clone, Error)]
 pub enum ParseError {
-    #[error(
-        "the lexer reached the end of input without the parser completing (context: {context})"
-    )]
+    #[error("the lexer reached the end of input without the parser completing")]
     UnexpectedEndOfInput {
         context: IString,
         source_span: SourceSpan,
     },
-    #[error("unexpected token at {source_span:?}, expected {expected} (context: {context})")]
+    #[error("unexpected token at {source_span:?}, expected {expected}")]
     UnexpectedToken {
         expected: IString,
         message: IString,
@@ -1273,17 +1266,17 @@ pub enum ParseError {
         found: crate::lexer::Token,
         source_span: SourceSpan,
     },
-    #[error("the lexer got stuck after the token at {source_span:?} (context: {context})")]
+    #[error("the lexer got stuck after the token at {source_span:?}")]
     LexerStuck {
         context: IString,
         source_span: SourceSpan,
     },
-    #[error("tried to declare a local symbol in stage at {source_span:?} (context: {context})")]
+    #[error("tried to declare a local symbol in stage at {source_span:?}")]
     LocalSymbolInStage {
         context: IString,
         source_span: SourceSpan,
     },
-    #[error("tried to peek back at the beginning of the content (context: {context:?})")]
+    #[error("tried to peek back at the beginning of the content")]
     PeekedBackAtBeginning {
         context: IString,
         source_span: SourceSpan,
@@ -1296,6 +1289,31 @@ pub enum ParseError {
     },
     #[error("tried to name a symbol \"super\"")]
     SymbolNamedSuper {
+        context: IString,
+        source_span: SourceSpan,
+    },
+    #[error("expected key {key:?} in flat dictionary")]
+    MissingFlatDictionaryEntry {
+        key: IString,
+        context: IString,
+        source_span: SourceSpan,
+    },
+    #[error("unexpected key {key:?} in flat dictionary")]
+    UnknownFlatDictionaryEntry {
+        key: IString,
+        context: IString,
+        source_span: SourceSpan,
+    },
+    #[error("repeated key {key:?} in flat dictionary")]
+    RepeatedFlatDictionaryEntry {
+        key: IString,
+        context: IString,
+        source_span: SourceSpan,
+    },
+    #[error("key {key:?} with value {value:?} in flat dictionary has an incorrect type")]
+    IncorrectFlatDictionaryEntryType {
+        key: IString,
+        value: Box<Literal>,
         context: IString,
         source_span: SourceSpan,
     },
@@ -1339,6 +1357,27 @@ impl GetPos for ParseError {
                 source_span,
             } => source_span,
             ParseError::SymbolNamedSuper {
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::MissingFlatDictionaryEntry {
+                key: _,
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::UnknownFlatDictionaryEntry {
+                key: _,
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::RepeatedFlatDictionaryEntry {
+                key: _,
+                context: _,
+                source_span,
+            } => source_span,
+            ParseError::IncorrectFlatDictionaryEntryType {
+                key: _,
+                value: _,
                 context: _,
                 source_span,
             } => source_span,

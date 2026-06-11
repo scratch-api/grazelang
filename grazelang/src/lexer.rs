@@ -214,14 +214,10 @@ pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
 
 pub fn parse_middle_format_string(slice: &str) -> Option<IString> {
     unescape(&slice[..slice.len() - 2]).map(Into::into).ok()
-    // let json = String::from("\"") + &slice[..slice.len() - 2] + "\"";
-    // json_from_str::<'_, IString>(&json).ok()
 }
 
 pub fn parse_right_format_string(slice: &str) -> Option<IString> {
     unescape(&slice[..slice.len() - 1]).map(Into::into).ok()
-    // let json = String::from("\"") + slice;
-    // json_from_str::<'_, IString>(&json).ok()
 }
 
 pub fn register_newline(lex: &mut Lexer<Token>) {

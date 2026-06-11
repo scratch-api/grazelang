@@ -278,11 +278,11 @@ pub fn get_token_end(token_stream: ParseIn) -> (usize, usize) {
 }
 
 macro_rules! emit_unexpected_token {
-    ($token_stream:expr, $msg_1:expr, $msg_2:expr, $found:expr) => {
+    ($token_stream:expr, $message:expr, $expected:expr, $found:expr) => {
         return Err(create_unexpected_token_error(
             $token_stream,
-            literal!($msg_1),
-            literal!($msg_2),
+            literal!($message),
+            literal!($expected),
             literal!(static_current_context!()),
             $found,
         ))
@@ -744,14 +744,16 @@ pub fn parse_full_identifier_starting_with(
 
 // Statements *do* include semicolons.
 pub mod statement {
+    use std::collections::HashMap;
+
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        lexer,
+        lexer::{self, LexedRightBrace},
         parser::cst::{
             AssetDeclaration, CanonicalIdentifier, Comma, CustomBlockParamKind,
-            CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope, LeftBrace,
-            LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
+            CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF,
+            LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
             NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
             Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
             SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier,
@@ -2047,6 +2049,90 @@ pub mod statement {
         ))
     }
 
+    pub fn parse_flat_directionary_asset_value(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+    ) -> ParseOut<cst::SingleAssetDeclarationValue> {
+        let left_brace = expect_token!(
+            token_stream,
+            Token::LeftBrace => from_stream_pos!(token_stream => LeftBrace),
+            "Expected '{'.",
+            "'{'"
+        );
+        let mut items = Vec::<(
+            Identifier,
+            NormalAssignmentOperator,
+            cst::Literal,
+            Option<Comma>,
+        )>::new();
+        let right_brace = loop {
+            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
+            let assignment_operator = expect_token!(
+                token_stream,
+                Token::Assign => from_stream_pos!(token_stream => NormalAssignmentOperator),
+                "Expected '='.",
+                "'='"
+            );
+            let literal = parse_literal(token_stream, context)?;
+            let comma = match peek_token!(token_stream) {
+                Token::RightBrace(LexedRightBrace::Normal) => None,
+                Token::Comma => {
+                    skip_token!(token_stream);
+                    Some(from_stream_pos!(token_stream => Comma))
+                }
+                _ => {
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected '}' or ','.",
+                        "'}' or ','",
+                        token
+                    );
+                }
+            };
+            items.push((identifier, assignment_operator, literal, comma));
+            consume_then_never_if!(token_stream, Token::RightBrace(LexedRightBrace::Normal) => {
+                break from_stream_pos!(token_stream => RightBrace);
+            });
+        };
+        Ok(cst::SingleAssetDeclarationValue::FlatDictionary(
+            left_brace,
+            items,
+            right_brace,
+            left_brace.range_to(&right_brace),
+        ))
+    }
+
+    pub fn parse_simple_asset_value(
+        token_stream: ParseIn,
+        _context: &mut ParseContext,
+    ) -> ParseOut<cst::SingleAssetDeclarationValue> {
+        let left_parens = expect_token!(
+            token_stream,
+            Token::LeftParens => from_stream_pos!(token_stream => LeftParens),
+            "Expected '('.",
+            "'('"
+        );
+        let path = expect_token!(
+            token_stream,
+            Token::SimpleString(string) => (string, get_token_source_span(token_stream)),
+            "Expected '('.",
+            "'('"
+        );
+        let right_parens = expect_token!(
+            token_stream,
+            Token::RightParens => from_stream_pos!(token_stream => RightParens),
+            "Expected ')'.",
+            "')'"
+        );
+        Ok(cst::SingleAssetDeclarationValue::Simple(
+            left_parens,
+            path,
+            right_parens,
+            left_parens.range_to(&right_parens),
+        ))
+    }
+
     #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
     pub enum AssetDeclarationType {
         Costume,
@@ -2059,6 +2145,29 @@ pub mod statement {
         context: &mut ParseContext,
         asset_type: AssetDeclarationType,
     ) -> ParseOut<AssetDeclaration> {
+        fn extract_f64_entry(
+            data: &mut HashMap<IString, cst::Literal>,
+            errors: &mut Vec<ParseError>,
+            key: IString,
+        ) -> Option<f64> {
+            data.remove(key.as_str()).and_then(|value| {
+                value
+                    .get_string_value()
+                    .as_str()
+                    .parse::<f64>()
+                    .map_err(|_| {
+                        errors.push(ParseError::IncorrectFlatDictionaryEntryType {
+                            key,
+                            source_span: *value.get_source_span(),
+                            value: Box::new(value),
+                            context: literal!(static_current_context!()),
+                        })
+                    })
+                    .ok()
+            })
+        }
+        const ROTATION_CENTER_X_KEY: &IString = &literal!("rotation_center_x");
+        const ROTATION_CENTER_Y_KEY: &IString = &literal!("rotation_center_y");
         match peek_token!(token_stream) {
             Token::LeftParens => {
                 skip_token!(token_stream);
@@ -2082,35 +2191,53 @@ pub mod statement {
                     .unwrap_or((None, None));
                     let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
                     let start_pos = start_pos.unwrap_or(get_token_start(token_stream));
-                    let left_parens = expect_token!(
-                        token_stream,
-                        Token::LeftParens => from_stream_pos!(token_stream => LeftParens),
-                        "Expected '('.",
-                        "'('"
-                    );
-                    let path = expect_token!(
-                        token_stream,
-                        Token::SimpleString(string) => (string, get_token_source_span(token_stream)),
-                        "Expected '('.",
-                        "'('"
-                    );
-                    let right_parens = expect_token!(
-                        token_stream,
-                        Token::RightParens => from_stream_pos!(token_stream => RightParens),
-                        "Expected ')'.",
-                        "')'"
-                    );
+                    let value = match peek_token!(token_stream) {
+                        Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
+                        Token::LeftBrace => {
+                            parse_flat_directionary_asset_value(token_stream, context)?
+                        }
+                        _ => {
+                            let token = next_token!(token_stream);
+                            emit_unexpected_token!(
+                                token_stream,
+                                "Expected '(' or '{'.",
+                                "'(' or '{'",
+                                token
+                            );
+                        }
+                    };
+                    let mut errors = Vec::new();
                     with_mut_next_target!(context, target => {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                         let symbols = target.borrow_symbols_mut();
                         let name = &identifier.to_single().unwrap().0;
                         if name.as_str() == "super" {
-                            return Err(ParseError::SymbolNamedSuper {
+                            errors.push(ParseError::SymbolNamedSuper {
                                 context: literal!(static_current_context!()),
                                 source_span: identifier.to_single().unwrap().1,
                             });
                         }
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
+                        let (path, mut data) = match &value {
+                            cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
+                            cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
+                                let mut data = HashMap::with_capacity(items.len());
+                                for (ident, _, value, _) in items {
+                                    if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
+                                        errors.push(ParseError::RepeatedFlatDictionaryEntry {
+                                            key: ident.to_single().unwrap().0.clone(),
+                                            context: literal!(static_current_context!()),
+                                            source_span: *ident.get_source_span(),
+                                        });
+                                    }
+                                }
+                                (data.remove("path").unwrap_or_else(|| {
+                                    errors.push(ParseError::MissingFlatDictionaryEntry { key: literal!("path"), context: literal!(static_current_context!()), source_span: *value.get_source_span() });
+                                    cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
+                                }).cast_to_string(), data)
+                            },
+                        };
+                        let symbol_idx = symbols.len();
                         let previous_symbol = symbols.insert(
                             name.clone(),
                             match asset_type {
@@ -2118,21 +2245,28 @@ pub mod statement {
                                     CostumeDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        source: path.0.clone(),
+                                        source: path,
+                                        rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
+                                        rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                        symbol_idx,
                                     }
                                 ),
                                 AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
                                     BackdropDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        source: path.0.clone(),
+                                        source: path,
+                                        rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
+                                        rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                        symbol_idx,
                                     }
                                 ),
                                 AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
                                     SoundDescriptor {
                                         name: name.clone(),
                                         canonical_name,
-                                        source: path.0.clone(),
+                                        source: path,
+                                        symbol_idx,
                                     }
                                 ),
                             }
@@ -2140,20 +2274,29 @@ pub mod statement {
                         if let Some(previous_symbol) = previous_symbol {
                             symbols.insert(name.clone(), previous_symbol);
                             let single_identifier = identifier.to_single().unwrap();
-                            return Err(ParseError::ShadowedSymbol {
+                            errors.push(ParseError::ShadowedSymbol {
                                 context: literal!(static_current_context!()),
                                 symbol: single_identifier.0.clone(),
                                 source_span: single_identifier.1,
                             });
                         }
+                        if let Some((key, value)) = data.into_iter().next() {
+                            errors.push(ParseError::UnknownFlatDictionaryEntry {
+                                key,
+                                context: literal!(static_current_context!()),
+                                source_span: *value.get_source_span()
+                            });
+                        }
                     });
+                    for error in errors {
+                        context.successful = false;
+                        emit_message(context, error.into(), GrazeMessageSetting::Errors);
+                    }
                     declarations.push((
                         SingleAssetDeclaration(
                             canonical_identifier,
                             identifier,
-                            cst::SingleAssetDeclarationValue::Simple(left_parens,
-                                path,
-                                right_parens, left_parens.range_to(&right_parens)),
+                            value,
                             token_stream.span_from_previous_to_current(start_pos),
                         ),
                         {
@@ -2193,134 +2336,218 @@ pub mod statement {
                 };
                 let start_pos = get_token_start(token_stream);
                 let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
-                let left_parens = expect_token!(
-                    token_stream,
-                    Token::LeftParens => from_stream_pos!(token_stream => LeftParens),
-                    "Expected '('.",
-                    "'('"
-                );
-                let path = expect_token!(
-                    token_stream,
-                    Token::SimpleString(string) => (string, get_token_source_span(token_stream)),
-                    "Expected '('.",
-                    "'('"
-                );
-                let right_parens = expect_token!(
-                    token_stream,
-                    Token::RightParens => from_stream_pos!(token_stream => RightParens),
-                    "Expected ')'.",
-                    "')'"
-                );
+                let value = match peek_token!(token_stream) {
+                    Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
+                    Token::LeftBrace => parse_flat_directionary_asset_value(token_stream, context)?,
+                    _ => {
+                        let token = next_token!(token_stream);
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected '(' or '{'.",
+                            "'(' or '{'",
+                            token
+                        );
+                    }
+                };
+                let mut errors = Vec::new();
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.to_single().unwrap().0;
                     if name.as_str() == "super" {
-                        return Err(ParseError::SymbolNamedSuper {
+                        errors.push(ParseError::SymbolNamedSuper {
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
                         });
                     }
                     let canonical_name = Some(canonical_identifier.name.clone());
+                    let (path, mut data) = match &value {
+                        cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
+                        cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
+                            let mut data = HashMap::with_capacity(items.len());
+                            for (ident, _, value, _) in items {
+                                if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
+                                    errors.push(ParseError::RepeatedFlatDictionaryEntry {
+                                        key: ident.to_single().unwrap().0.clone(),
+                                        context: literal!(static_current_context!()),
+                                        source_span: *ident.get_source_span(),
+                                    });
+                                }
+                            }
+                            (data.remove("path").unwrap_or_else(|| {
+                                errors.push(ParseError::MissingFlatDictionaryEntry { key: literal!("path"), context: literal!(static_current_context!()), source_span: *value.get_source_span() });
+                                cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
+                            }).cast_to_string(), data)
+                        },
+                    };
+                    let symbol_idx = symbols.len();
                     let previous_symbol = symbols.insert(
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
-                                CostumeDescriptor { name: name.clone(), canonical_name,
-                                    source: path.0.clone(), }
+                                CostumeDescriptor {
+                                    name: name.clone(),
+                                    canonical_name,
+                                    source: path,
+                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
+                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    symbol_idx,
+                                }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
-                                BackdropDescriptor { name: name.clone(), canonical_name,
-                                    source: path.0.clone(), }
+                                BackdropDescriptor {
+                                    name: name.clone(),
+                                    canonical_name,
+                                    source: path,
+                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
+                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    symbol_idx,
+                                }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
-                                SoundDescriptor { name: name.clone(), canonical_name,
-                                    source: path.0.clone(), }
+                                SoundDescriptor {
+                                    name: name.clone(),
+                                    canonical_name,
+                                    source: path,
+                                    symbol_idx,
+                                }
                             ),
                         }
                     );
                     if let Some(previous_symbol) = previous_symbol {
                         symbols.insert(name.clone(), previous_symbol);
                         let single_identifier = identifier.to_single().unwrap();
-                        return Err(ParseError::ShadowedSymbol {
+                        errors.push(ParseError::ShadowedSymbol {
                             context: literal!(static_current_context!()),
                             symbol: single_identifier.0.clone(),
                             source_span: single_identifier.1,
                         });
                     }
+                    if let Some((key, value)) = data.into_iter().next() {
+                        errors.push(ParseError::UnknownFlatDictionaryEntry {
+                            key,
+                            context: literal!(static_current_context!()),
+                            source_span: *value.get_source_span()
+                        });
+                    }
                 });
+                for error in errors {
+                    context.successful = false;
+                    emit_message(context, error.into(), GrazeMessageSetting::Errors);
+                }
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     Some(canonical_identifier),
                     identifier,
-                    cst::SingleAssetDeclarationValue::Simple(left_parens, path, right_parens, left_parens.range_to(&right_parens)),
+                    value,
                     token_stream.span_from_previous_to_current(start_pos),
                 )))
             }
             Token::Identifier(_) => {
                 let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
                 let start_pos = get_token_start(token_stream);
-                let left_parens = expect_token!(
-                    token_stream,
-                    Token::LeftParens => from_stream_pos!(token_stream => LeftParens),
-                    "Expected '('.",
-                    "'('"
-                );
-                let path = expect_token!(
-                    token_stream,
-                    Token::SimpleString(string) => (string, get_token_source_span(token_stream)),
-                    "Expected '('.",
-                    "'('"
-                );
-                let right_parens = expect_token!(
-                    token_stream,
-                    Token::RightParens => from_stream_pos!(token_stream => RightParens),
-                    "Expected ')'.",
-                    "')'"
-                );
+                let value = match peek_token!(token_stream) {
+                    Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
+                    Token::LeftBrace => parse_flat_directionary_asset_value(token_stream, context)?,
+                    _ => {
+                        let token = next_token!(token_stream);
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected '(' or '{'.",
+                            "'(' or '{'",
+                            token
+                        );
+                    }
+                };
+                let mut errors = Vec::new();
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.to_single().unwrap().0;
                     if name.as_str() == "super" {
-                        return Err(ParseError::SymbolNamedSuper {
+                        errors.push(ParseError::SymbolNamedSuper {
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
                         });
                     }
                     let canonical_name = None;
+                    let (path, mut data) = match &value {
+                        cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
+                        cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
+                            let mut data = HashMap::with_capacity(items.len());
+                            for (ident, _, value, _) in items {
+                                if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
+                                    errors.push(ParseError::RepeatedFlatDictionaryEntry {
+                                        key: ident.to_single().unwrap().0.clone(),
+                                        context: literal!(static_current_context!()),
+                                        source_span: *ident.get_source_span(),
+                                    });
+                                }
+                            }
+                            (data.remove("path").unwrap_or_else(|| {
+                                errors.push(ParseError::MissingFlatDictionaryEntry { key: literal!("path"), context: literal!(static_current_context!()), source_span: *value.get_source_span() });
+                                cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
+                            }).cast_to_string(), data)
+                        },
+                    };
+                    let symbol_idx = symbols.len();
                     let previous_symbol = symbols.insert(
                         name.clone(),
                         match asset_type {
                             AssetDeclarationType::Costume => TargetSymbolDescriptor::Costume(
-                                CostumeDescriptor { name: name.clone(), canonical_name,
-                                    source: path.0.clone(), }
+                                CostumeDescriptor {
+                                    name: name.clone(),
+                                    canonical_name,
+                                    source: path,
+                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
+                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    symbol_idx,
+                                }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
-                                BackdropDescriptor { name: name.clone(), canonical_name,
-                                    source: path.0.clone(), }
+                                BackdropDescriptor {
+                                    name: name.clone(),
+                                    canonical_name,
+                                    source: path,
+                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
+                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    symbol_idx,
+                                }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
-                                SoundDescriptor { name: name.clone(), canonical_name,
-                                    source: path.0.clone(), }
+                                SoundDescriptor {
+                                    name: name.clone(),
+                                    canonical_name,
+                                    source: path,
+                                    symbol_idx,
+                                }
                             ),
                         }
                     );
                     if let Some(previous_symbol) = previous_symbol {
                         symbols.insert(name.clone(), previous_symbol);
                         let single_identifier = identifier.to_single().unwrap();
-                        return Err(ParseError::ShadowedSymbol {
+                        errors.push(ParseError::ShadowedSymbol {
                             context: literal!(static_current_context!()),
                             symbol: single_identifier.0.clone(),
                             source_span: single_identifier.1,
                         });
                     }
+                    if let Some((key, value)) = data.into_iter().next() {
+                        errors.push(ParseError::UnknownFlatDictionaryEntry {
+                            key,
+                            context: literal!(static_current_context!()),
+                            source_span: *value.get_source_span()
+                        });
+                    }
                 });
+                for error in errors {
+                    context.successful = false;
+                    emit_message(context, error.into(), GrazeMessageSetting::Errors);
+                }
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     None,
                     identifier,
-                    cst::SingleAssetDeclarationValue::Simple(left_parens,
-                        path,
-                        right_parens, left_parens.range_to(&right_parens)),
+                    value,
                     token_stream.span_from_previous_to_current(start_pos),
                 )))
             }
@@ -2424,8 +2651,7 @@ pub mod statement {
                 name: value,
                 source_span: get_token_source_span(token_stream),
             });
-            let identifier = 
-            parse_single_identifier_as_identifier(token_stream, context)?;
+            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
             let comma = match peek_token!(token_stream) {
                 Token::Comma => Some({
                     skip_token!(token_stream);
@@ -3426,13 +3652,12 @@ pub fn parse_stage_code_block(
             Token::RightBrace(lexer::LexedRightBrace::Normal) => break from_stream_pos!(token_stream => cst::RightBrace)
         );
         statements.push(
-            
             token_stream.substitude_unexpected_token_message(
                 |token_stream| parse_stage_statement(token_stream, context),
                 literal!("Expected hat statement, '{', '}', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\"."),
                 literal!("hat statement, '{', '}', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\""),
-            )
-            ?);
+            )?
+        );
     };
     Ok(StageCodeBlock {
         left_brace,
@@ -3741,13 +3966,11 @@ pub fn parse_expression_list(
             break;
         });
         expressions.push((
-
             token_stream.substitude_unexpected_token_message(
                 |token_stream| parse_expression(token_stream, context),
                 literal!("Expected ')' or an expression."),
                 literal!("')' or an expression"),
-            )
-            ?,
+            )?,
             match peek_token!(token_stream) {
                 Token::Comma => {
                     skip_token!(token_stream);
