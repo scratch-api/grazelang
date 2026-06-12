@@ -274,7 +274,7 @@
     "37": {
         "filepath": "grazelang_library_parser/src/parser.rs",
         "text": "\n\"data_variable\" => Some(Sb3PrimitiveBlock::Variable(value)),\n\"data_listcontents\" => Some(Sb3PrimitiveBlock::List(value)),",
-        "status": "open",
+        "status": "closed",
         "lines": "L123-L126",
         "commit": "2ff75831dbd1bdb4a4d03bfe0b6ea3bfa347a9e1",
         "title": "implement these"
