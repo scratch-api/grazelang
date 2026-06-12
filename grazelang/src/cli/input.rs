@@ -155,10 +155,10 @@ impl Cli {
     ) {
         let total_time = Instant::now();
         // TODO: Improve logging
-        //  [ ] Indicate which source file a message originated from
-        //  [ ] Improve error messages
-        //  [ ] Decide on a consistent logging format
-        //  [ ] Replace panics
+        //  - [ ] Indicate which source file a message originated from
+        //  - [ ] Improve error messages
+        //  - [ ] Decide on a consistent logging format
+        //  - [ ] Replace panics
         // Issue: #54
         let is_file = path.is_file();
         let mut context = ParseContext::new(
