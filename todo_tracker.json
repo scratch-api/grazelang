@@ -220,8 +220,8 @@
         "text": "- [x] warn the user\n- [ ] calculate binops\n- [ ] calculate unops\n- [ ] introduce constants or allow usage of initial values of other vars",
         "status": "open",
         "lines": "L748-L753",
-        "commit": "b79fc52766c753edfeb468b2d420bf7c3a219c0c",
-        "title": "Try to calculate the value or warn the user"
+        "commit": "9d26abda9804e16bc38da0e56601952a44c269e6",
+        "title": "Calculate constant expressions"
     },
     "30": {
         "filepath": "grazelang/src/parser/cst.rs",
@@ -370,18 +370,18 @@
     "53": {
         "filepath": "grazelang/src/cli/input.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L152-L152",
         "commit": "ceafab8be46fe43f74064f186dc0d5fc30872cfb",
         "title": "Better error message"
     },
     "54": {
         "filepath": "grazelang/src/cli/input.rs",
-        "text": "",
+        "text": "[ ] Indicate which source file a message originated from\n[ ] Improve error messages\n[ ] Decide on a consistent logging format\n[ ] Replace panics",
         "status": "open",
-        "lines": "L127-L127",
-        "commit": "ceafab8be46fe43f74064f186dc0d5fc30872cfb",
-        "title": "Use source files for errors"
+        "lines": "L157-L162",
+        "commit": "9d26abda9804e16bc38da0e56601952a44c269e6",
+        "title": "Improve logging"
     },
     "55": {
         "filepath": "grazelang/src/codegen/core.rs",
