@@ -117,10 +117,6 @@ pub fn primitive_opcode_to_sb3_primitive_block(
         "math_angle" => Some(Sb3PrimitiveBlock::Angle(value)),
         "colour_picker" => Some(Sb3PrimitiveBlock::Color(value)),
         "text" => Some(Sb3PrimitiveBlock::String(value)),
-        // "event_broadcast_menu" => Some(Sb3PrimitiveBlock::Broadcast(value)), // TODO: implement these
-        // Issue: #37
-        // "data_variable" => Some(Sb3PrimitiveBlock::Variable(value)),
-        // "data_listcontents" => Some(Sb3PrimitiveBlock::List(value)),
         _ => None,
     }
 }
