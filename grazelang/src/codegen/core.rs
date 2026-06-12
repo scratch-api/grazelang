@@ -3900,6 +3900,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             insert_symbols
         };
         // TODO: Check if Vec<(K, V)> can be used for symbols instead of HashMap<K, V>
+        // Resolved: Cannot be used because HashMap is required to efficiently detect shadowing of symbols
         // Issue: #61
         let mut costumes = Vec::new();
         let mut sounds = Vec::new();
