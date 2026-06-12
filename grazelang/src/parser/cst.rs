@@ -745,7 +745,7 @@ impl Expression {
             Expression::Literal(literal) => {
                 Some(Sb3Primitive::String(literal.get_string_value().to_string()))
             }
-            // TODO: Try to calculate the value or warn the user
+            // TODO: Calculate constant expressions
             //  - [x] warn the user
             //  - [ ] calculate binops
             //  - [ ] calculate unops

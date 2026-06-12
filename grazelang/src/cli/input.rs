@@ -154,7 +154,11 @@ impl Cli {
         log_time: bool,
     ) {
         let total_time = Instant::now();
-        // TODO: Use source files for errors
+        // TODO: Improve logging
+        //  [ ] Indicate which source file a message originated from
+        //  [ ] Improve error messages
+        //  [ ] Decide on a consistent logging format
+        //  [ ] Replace panics
         // Issue: #54
         let is_file = path.is_file();
         let mut context = ParseContext::new(
@@ -181,8 +185,6 @@ impl Cli {
                 HashMap::from([(0, path.clone())]),
             )
         } else {
-            // TODO: Better error message
-            // Issue: #53
             panic!();
         };
         if log_time {
