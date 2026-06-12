@@ -483,8 +483,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::BoundMethod { .. }
             | KnownBlock::Empty => None,
-        } // TODO: Implement assignment of x, y etc
-        // Issue: #12
+        }
     }
 }
 
