@@ -226,7 +226,7 @@
     "30": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L1102-L1103",
         "commit": "b102ea53aadb02710f7c422134d6680167f4e8df",
         "title": "convert into int if small enough"
