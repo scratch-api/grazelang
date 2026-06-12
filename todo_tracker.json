@@ -434,7 +434,7 @@
     "61": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "Resolved: Cannot be used because HashMap is required to efficiently detect shadowing of symbols",
-        "status": "open",
+        "status": "closed",
         "lines": "L3902-L3904",
         "commit": "f1fd3a84c39346c3062f189feae390c2be017b78",
         "title": "Check if Vec<(K, V)> can be used for symbols instead of HashMap<K, V>"
