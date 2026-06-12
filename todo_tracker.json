@@ -377,10 +377,10 @@
     },
     "54": {
         "filepath": "grazelang/src/cli/input.rs",
-        "text": "[ ] Indicate which source file a message originated from\n[ ] Improve error messages\n[ ] Decide on a consistent logging format\n[ ] Replace panics",
+        "text": "- [ ] Indicate which source file a message originated from\n- [ ] Improve error messages\n- [ ] Decide on a consistent logging format\n- [ ] Replace panics",
         "status": "open",
         "lines": "L157-L162",
-        "commit": "9d26abda9804e16bc38da0e56601952a44c269e6",
+        "commit": "89e74891e0014acfe8ec4cdf42bbd23d1c38a663",
         "title": "Improve logging"
     },
     "55": {
