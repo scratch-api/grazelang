@@ -191,9 +191,7 @@ pub enum Sb3Primitive {
     String(String),
     Int128(i128),
     Int(i64),
-    Float(f64), // f128 is not stable i guess
-                // Bool(bool),
-                // Null,
+    Float(f64),
 }
 
 impl Sb3Primitive {

@@ -2169,7 +2169,6 @@ pub mod statement {
             data.remove(key.as_str()).and_then(|value| {
                 value
                     .get_string_value()
-                    .as_str()
                     .parse::<f64>()
                     .map_err(|_| {
                         errors.push(ParseError::IncorrectFlatDictionaryEntryType {

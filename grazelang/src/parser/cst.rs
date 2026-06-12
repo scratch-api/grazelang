@@ -914,40 +914,40 @@ impl BinOp {
                 opcode: "operator_add".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
-                operand_a_default: Some("".into()),
-                operand_b_default: Some("".into()),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
                 is_negated: false,
             },
             BinOp::Minus(_) => BinOpDescriptor {
                 opcode: "operator_subtract".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
-                operand_a_default: Some("".into()),
-                operand_b_default: Some("".into()),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
                 is_negated: false,
             },
             BinOp::Times(_) => BinOpDescriptor {
                 opcode: "operator_multiply".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
-                operand_a_default: Some("".into()),
-                operand_b_default: Some("".into()),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
                 is_negated: false,
             },
             BinOp::Div(_) => BinOpDescriptor {
                 opcode: "operator_divide".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
-                operand_a_default: Some("".into()),
-                operand_b_default: Some("".into()),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
                 is_negated: false,
             },
             BinOp::Mod(_) => BinOpDescriptor {
                 opcode: "operator_mod".to_string(),
                 operand_a_input_name: "NUM1".to_string(),
                 operand_b_input_name: "NUM2".to_string(),
-                operand_a_default: Some("".into()),
-                operand_b_default: Some("".into()),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
                 is_negated: false,
             },
             BinOp::Join(_) => BinOpDescriptor {
@@ -1140,8 +1140,101 @@ impl Literal {
 
 impl From<&Literal> for Sb3Primitive {
     fn from(value: &Literal) -> Self {
-        value.get_string_value().into() // TODO: convert into int if small enough
-        // Issue: #30
+        match value {
+            Literal::DecimalInt(string, _) => {
+                if let Ok(int) = string.parse::<i128>() {
+                    if let Ok(int) = int.try_into() {
+                        return Self::Int(int);
+                    }
+                    return Self::Int128(int);
+                }
+            }
+            Literal::DecimalFloat(string, _) => {
+                if let Ok(float) = string.parse() {
+                    return Self::Float(float);
+                }
+            }
+            Literal::HexadecimalInt(string, _) => {
+                let mut int = 0_u128;
+                let mut digits = 0;
+                let mut i = string.chars();
+                i.next();
+                i.next();
+                loop {
+                    if let Some(c) = i.next() {
+                        if (digits == 0 && c == '0') || c == '_' {
+                            continue;
+                        }
+                        digits += 1;
+                        if digits > 32 {
+                            break;
+                        }
+                        int = (int << 4) | (c.to_digit(16).unwrap() as u128);
+                    } else if let Ok(int) = i128::try_from(int) {
+                        if let Ok(int) = int.try_into() {
+                            return Self::Int(int);
+                        }
+                        return Self::Int128(int);
+                    } else {
+                        break
+                    }
+                }
+            }
+            Literal::OctalInt(string, _) => {
+                let mut int = 0_u128;
+                let mut digits = 0;
+                let mut i = string.chars();
+                i.next();
+                i.next();
+                loop {
+                    if let Some(c) = i.next() {
+                        if (digits == 0 && c == '0') || c == '_' {
+                            continue;
+                        }
+                        digits += 1;
+                        if digits > 43 || int > (u128::MAX >> 3) {
+                            break;
+                        }
+                        int = (int << 3) | (c.to_digit(8).unwrap() as u128);
+                    } else if let Ok(int) = i128::try_from(int) {
+                        if let Ok(int) = int.try_into() {
+                            return Self::Int(int);
+                        }
+                        return Self::Int128(int);
+                    } else {
+                        break
+                    }
+                }
+            },
+            Literal::BinaryInt(string, _) => {
+                let mut int = 0_u128;
+                let mut digits = 0;
+                let mut i = string.chars();
+                i.next();
+                i.next();
+                loop {
+                    if let Some(c) = i.next() {
+                        if (digits == 0 && c == '0') || c == '_' {
+                            continue;
+                        }
+                        digits += 1;
+                        if digits > 128 {
+                            break;
+                        }
+                        int = (int << 1) | (c.to_digit(2).unwrap() as u128);
+                    } else if let Ok(int) = i128::try_from(int) {
+                        if let Ok(int) = int.try_into() {
+                            return Self::Int(int);
+                        }
+                        return Self::Int128(int);
+                    } else {
+                        break
+                    }
+                }
+            },
+            _ => (),
+        }
+        value.get_string_value().into()
     }
 }
 
@@ -1322,9 +1415,7 @@ pub enum ParseError {
         source_span: SourceSpan,
     },
     #[error("the expression {expression:?} is not calculatable by graze")]
-    ExpressionNotConstant {
-        expression: Box<Expression>,
-    },
+    ExpressionNotConstant { expression: Box<Expression> },
     #[error("{source}")]
     IoError {
         #[source]
@@ -1389,9 +1480,7 @@ impl GetPos for ParseError {
                 context: _,
                 source_span,
             } => source_span,
-            ParseError::ExpressionNotConstant {
-                expression,
-            } => expression.get_source_span(),
+            ParseError::ExpressionNotConstant { expression } => expression.get_source_span(),
             ParseError::IoError {
                 source: _,
                 source_span,

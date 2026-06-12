@@ -168,15 +168,16 @@ pub fn parse_string(lex: &mut Lexer<Token>) -> IString {
 }
 
 pub fn parse_number(lex: &mut Lexer<Token>) -> IString {
-    lex.slice().replace('_', "").into()
+    lex
+        .slice()
+        //.replace('_', "")
+        .into()
 }
 
 pub fn parse_left_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
     lex.extras.1 += 1;
     let slice = lex.slice();
     unescape(&slice[1..slice.len() - 2]).map(Into::into).ok()
-    // let json = slice[..slice.len() - 2].to_string() + "\"";
-    // json_from_str::<'_, IString>(&json).ok()
 }
 
 fn middle_regex_continuation() -> &'static Regex {
