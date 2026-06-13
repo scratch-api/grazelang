@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::lexer::SourceSpan;
+use crate::{cast::JsPrimitive, lexer::SourceSpan};
 use arcstr::ArcStr as IString; // Immutable string
 use grazelang_library::project_json::{Sb3Primitive, Sb3PrimitiveBlock};
 use serde::{Deserialize, Serialize};
@@ -740,11 +740,12 @@ impl Expression {
         matches!(self, Expression::Literal(Literal::EmptyExpression(..)))
     }
 
-    pub fn calculate_value(&self) -> Option<Sb3Primitive> {
+    pub fn calculate_value_js(&self) -> Option<JsPrimitive> {
         match self {
-            Expression::Literal(literal) => {
-                Some(Sb3Primitive::String(literal.get_string_value().to_string()))
-            }
+            Expression::Literal(literal) => Some(Sb3Primitive::from(literal).into()),
+            Expression::BinOp(expr_a, bin_op, expr_b, _) => Some(
+                bin_op.apply_operation(expr_a.calculate_value_js()?, expr_b.calculate_value_js()?),
+            ),
             // TODO: Calculate constant expressions
             //  - [x] warn the user
             //  - [ ] calculate binops
@@ -753,6 +754,13 @@ impl Expression {
             // Issue: #31
             _ => None,
         }
+    }
+
+    pub fn calculate_value(&self) -> Option<Sb3Primitive> {
+        if let Expression::Literal(literal) = self {
+            return Some(literal.into());
+        }
+        self.calculate_value_js().map(Into::into)
     }
 }
 
@@ -848,6 +856,45 @@ pub enum BinOp {
     GreaterThan(SourceSpan),
     LessThanOrEqual(SourceSpan),
     GreaterThanOrEqual(SourceSpan),
+}
+
+impl BinOp {
+    pub fn apply_operation(&self, expr_a: JsPrimitive, expr_b: JsPrimitive) -> JsPrimitive {
+        use crate::cast::{
+            ScratchVmCompare, ScratchVmToBoolean, ScratchVmToNumber, ScratchVmToString,
+        };
+        match self {
+            BinOp::Plus(_) => JsPrimitive::Number(expr_a.to_number() + expr_b.to_number()),
+            BinOp::Minus(_) => JsPrimitive::Number(expr_a.to_number() - expr_b.to_number()),
+            BinOp::Times(_) => JsPrimitive::Number(expr_a.to_number() * expr_b.to_number()),
+            BinOp::Div(_) => JsPrimitive::Number(expr_a.to_number() / expr_b.to_number()),
+            BinOp::Mod(_) => {
+                let n = expr_a.to_number();
+                let modulus = expr_b.to_number();
+                let result = n % modulus;
+                JsPrimitive::Number(if result / modulus < 0.0 {
+                    result + modulus
+                } else {
+                    result
+                })
+            }
+            BinOp::Join(_) => JsPrimitive::String(expr_a.to_string_js() + &*expr_b.to_cow_str_js()),
+            BinOp::And(_) => JsPrimitive::Boolean(expr_a.to_boolean() && expr_b.to_boolean()),
+            BinOp::Or(_) => JsPrimitive::Boolean(expr_a.to_boolean() || expr_b.to_boolean()),
+            BinOp::Equals(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) == 0.0),
+            BinOp::NotEquals(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) != 0.0),
+            BinOp::LessThan(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) < 0.0),
+            BinOp::GreaterThan(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) > 0.0),
+            BinOp::LessThanOrEqual(_) => JsPrimitive::Boolean(!matches!(
+                expr_a.compare(&expr_b).partial_cmp(&0.0),
+                Some(std::cmp::Ordering::Greater)
+            )),
+            BinOp::GreaterThanOrEqual(_) => JsPrimitive::Boolean(!matches!(
+                expr_a.compare(&expr_b).partial_cmp(&0.0),
+                Some(std::cmp::Ordering::Less)
+            )),
+        }
+    }
 }
 
 impl GetPos for BinOp {
@@ -1172,16 +1219,8 @@ impl From<&Literal> for Sb3Primitive {
                 }
             }
             Literal::DecimalFloat(string, _) => {
-                if string.contains('_') {
-                    let string = string.replace('_', "");
-                    if let Ok(float) = string.parse() {
-                        return Self::Float(float);
-                    } else {
-                        return string.into();
-                    }
-                } else if let Ok(float) = string.parse() {
-                    return Self::Float(float);
-                }
+                // Does not convert into f64 in order to preserve representation
+                return string.replace('_', "").into();
             }
             Literal::HexadecimalInt(string, _) => {
                 let mut int = 0_u128;
@@ -1466,66 +1505,66 @@ impl GetPos for ParseError {
         match self {
             ParseError::UnexpectedEndOfInput {
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::UnexpectedToken {
                 expected: _,
                 message: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 found: _,
                 source_span,
             } => source_span,
             ParseError::LexerStuck {
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::LocalSymbolInStage {
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::PeekedBackAtBeginning {
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::ShadowedSymbol {
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 symbol: _,
                 source_span,
             } => source_span,
             ParseError::SymbolNamedSuper {
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::MissingFlatDictionaryEntry {
                 key: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::UnknownFlatDictionaryEntry {
                 key: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::RepeatedFlatDictionaryEntry {
                 key: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::IncorrectFlatDictionaryEntryType {
                 key: _,
                 value: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
-                context: _,
+                    context: _,
                 source_span,
             } => source_span,
             ParseError::ExpressionNotConstant { expression } => expression.get_source_span(),

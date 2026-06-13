@@ -9,3 +9,4 @@ pub mod settings;
 pub mod string_unescape;
 pub mod visitor;
 pub mod zipper;
+pub mod cast;

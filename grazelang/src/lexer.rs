@@ -136,12 +136,12 @@ pub enum Token {
     #[regex(r#"[+-]?Infinity"#, parse_string)]
     #[token("NaN", |_| literal_istring!("NaN"))]
     DecimalFloat(IString),
-    #[regex(r#"0x[0-9a-fA-F](?:_?[0-9a-fA-F])*"#, parse_number)]
+    #[regex(r#"0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*"#, parse_number)]
     HexadecimalInt(IString),
-    #[regex(r#"0o[0-7](?:_?[0-7])*"#, parse_number)]
+    #[regex(r#"0[oO][0-7](?:_?[0-7])*"#, parse_number)]
     OctalInt(IString),
-    #[regex(r#"0b[01](?:_?[01])*"#, parse_number)]
-    BinaryInt(IString),
+    #[regex(r#"0[bB][01](?:_?[01])*"#, parse_number)]
+    BinaryInt(IString), // TODO: Implement boolean literal
     #[regex(r#""(?:[^\\"$\r\n]|(?:\\.))*\$\{"#, parse_left_format_string)]
     LeftFormattedString(IString),
 }
