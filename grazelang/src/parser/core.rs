@@ -21,6 +21,7 @@ use arcstr::{ArcStr as IString, literal};
 use logos::{Lexer, Logos};
 use std::{collections::VecDeque, vec};
 
+#[cfg(feature = "include_context_in_parse_errors")]
 macro_rules! static_current_context {
     () => {
         concat!(
@@ -53,6 +54,7 @@ macro_rules! expect_token_or_message {
                     $token_stream,
                     literal!($message),
                     literal!($expected),
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     literal!(static_current_context!()),
                     token,
                 )?;
@@ -119,6 +121,7 @@ macro_rules! peek_token {
             Some(Err(_)) => {
                 return {
                     Err(ParseError::LexerStuck {
+                        #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
                         source_span: get_token_source_span($token_stream),
                     })
@@ -126,6 +129,7 @@ macro_rules! peek_token {
             }
             None => {
                 return Err(ParseError::UnexpectedEndOfInput {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 })
@@ -137,6 +141,7 @@ macro_rules! peek_token {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 })
@@ -149,6 +154,7 @@ macro_rules! peek_token {
             Some(Ok(value)) => Some(value),
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 })
@@ -165,6 +171,7 @@ macro_rules! peek_back {
             Some(Some(Err(_))) => {
                 return {
                     Err(ParseError::LexerStuck {
+                        #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
                         source_span: get_token_source_span($token_stream),
                     })
@@ -172,12 +179,14 @@ macro_rules! peek_back {
             }
             Some(None) => {
                 return Err(ParseError::UnexpectedEndOfInput {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 })
             }
             None => {
                 return Err(ParseError::PeekedBackAtBeginning {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: (Default::default(), $token_stream.source_file_id),
                 })
@@ -189,6 +198,7 @@ macro_rules! peek_back {
             Some(Some(Ok(value))) => value,
             Some(Some(Err(_))) => {
                 return Err(ParseError::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 })
@@ -201,6 +211,7 @@ macro_rules! peek_back {
             Some(Some(Ok(value))) => Some(value),
             Some(Some(Err(_))) => {
                 return Err(ParseError::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 })
@@ -216,12 +227,14 @@ macro_rules! next_token {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
                 return Err(ParseError::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 });
             }
             None => {
                 return Err(ParseError::UnexpectedEndOfInput {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: get_token_source_span($token_stream),
                 });
@@ -232,10 +245,11 @@ macro_rules! next_token {
         match $token_stream.next() {
             Some(Ok(value)) => value,
             Some(Err(_)) => {
-                return Err(ParseError::LexerStuck(
-                    static_current_context!(),
-                    get_token_source_span($token_stream),
-                ));
+                return Err(ParseError::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                    context: literal!(static_current_context!()),
+                    source_span: get_token_source_span($token_stream),
+                });
             }
             None => return Ok(None),
         }
@@ -244,10 +258,11 @@ macro_rules! next_token {
         match $token_stream.next() {
             Some(Ok(value)) => Some(value),
             Some(Err(_)) => {
-                return Err(ParseError::LexerStuck(
-                    static_current_context!(),
-                    get_token_source_span($token_stream),
-                ));
+                return Err(ParseError::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                    context: literal!(static_current_context!()),
+                    source_span: get_token_source_span($token_stream),
+                });
             }
             None => None,
         }
@@ -258,6 +273,7 @@ macro_rules! skip_token {
     ($token_stream:expr) => {{
         if let Some(Err(_)) = $token_stream.next() {
             return Err(ParseError::LexerStuck {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: literal!(static_current_context!()),
                 source_span: get_token_source_span($token_stream),
             });
@@ -283,6 +299,7 @@ macro_rules! emit_unexpected_token {
             $token_stream,
             literal!($message),
             literal!($expected),
+            #[cfg(feature = "include_context_in_parse_errors")]
             literal!(static_current_context!()),
             $found,
         ))
@@ -293,12 +310,13 @@ pub fn create_unexpected_token_error(
     token_stream: ParseIn,
     message: IString,
     expected: IString,
-    context: IString,
+    #[cfg(feature = "include_context_in_parse_errors")] context: IString,
     found: Token,
 ) -> ParseError {
     ParseError::UnexpectedToken {
         message,
         expected,
+        #[cfg(feature = "include_context_in_parse_errors")]
         context,
         found,
         source_span: get_token_source_span(token_stream),
@@ -373,7 +391,7 @@ pub fn emit_unexpected_token_message(
     token_stream: ParseIn,
     message: IString,
     expected: IString,
-    code_context: IString,
+    #[cfg(feature = "include_context_in_parse_errors")] code_context: IString,
     found: Token,
 ) -> ParseOut<()> {
     context.successful = false;
@@ -387,6 +405,7 @@ pub fn emit_unexpected_token_message(
                 ParseError::UnexpectedToken {
                     message: message.clone(),
                     expected: expected.clone(),
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: code_context.clone(),
                     found: found.clone(),
                     source_span,
@@ -397,6 +416,7 @@ pub fn emit_unexpected_token_message(
         return Err(ParseError::UnexpectedToken {
             message,
             expected,
+            #[cfg(feature = "include_context_in_parse_errors")]
             context: code_context,
             found,
             source_span,
@@ -407,6 +427,7 @@ pub fn emit_unexpected_token_message(
         ParseError::UnexpectedToken {
             message,
             expected,
+            #[cfg(feature = "include_context_in_parse_errors")]
             context: code_context,
             found,
             source_span,
@@ -573,7 +594,8 @@ impl<'a> PeekableLexer<'a> {
             if let ParseError::UnexpectedToken {
                 expected: current_expected,
                 message: current_message,
-                context: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
                 found: _,
                 source_span,
             } = &mut err
@@ -1105,6 +1127,7 @@ pub mod statement {
                 )
             ) {
                 return Err(ParseError::LocalSymbolInStage {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: token_stream.span_from_previous_to_current(start_pos.unwrap()),
                 });
@@ -1132,6 +1155,7 @@ pub mod statement {
                     let name = &identifier.to_single().unwrap().0;
                     if name.as_str() == "super" {
                         return Err(ParseError::SymbolNamedSuper {
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
                         });
@@ -1183,6 +1207,7 @@ pub mod statement {
                         symbols.insert(name.clone(), previous_symbol);
                         let single_identifier = identifier.to_single().unwrap();
                         return Err(ParseError::ShadowedSymbol {
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             symbol: single_identifier.0.clone(),
                             source_span: single_identifier.1,
@@ -1559,6 +1584,7 @@ pub mod statement {
             )
         ) {
             return Err(ParseError::LocalSymbolInStage {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: literal!(static_current_context!()),
                 source_span: token_stream.span_from_previous_to_current(let_keyword_position.0.0),
             });
@@ -1571,6 +1597,7 @@ pub mod statement {
                 let name = &identifier.to_single().unwrap().0;
                 if name.as_str() == "super" {
                     return Err(ParseError::SymbolNamedSuper {
+                        #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
                         source_span: identifier.to_single().unwrap().1,
                     });
@@ -1631,6 +1658,7 @@ pub mod statement {
                     symbols.insert(name.clone(), previous_symbol);
                     let single_identifier = identifier.to_single().unwrap();
                     return Err(ParseError::ShadowedSymbol {
+                        #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
                         symbol: single_identifier.0.clone(),
                         source_span: single_identifier.1,
@@ -2175,6 +2203,7 @@ pub mod statement {
                             key,
                             source_span: *value.get_source_span(),
                             value: Box::new(value),
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                         })
                     })
@@ -2228,6 +2257,7 @@ pub mod statement {
                         let name = &identifier.to_single().unwrap().0;
                         if name.as_str() == "super" {
                             errors.push(ParseError::SymbolNamedSuper {
+                                #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
                                 source_span: identifier.to_single().unwrap().1,
                             });
@@ -2241,13 +2271,19 @@ pub mod statement {
                                     if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
                                         errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                             key: ident.to_single().unwrap().0.clone(),
+                                            #[cfg(feature = "include_context_in_parse_errors")]
                                             context: literal!(static_current_context!()),
                                             source_span: *ident.get_source_span(),
                                         });
                                     }
                                 }
                                 (data.remove("path").unwrap_or_else(|| {
-                                    errors.push(ParseError::MissingFlatDictionaryEntry { key: literal!("path"), context: literal!(static_current_context!()), source_span: *value.get_source_span() });
+                                    errors.push(ParseError::MissingFlatDictionaryEntry {
+                                        key: literal!("path"),
+                                        #[cfg(feature = "include_context_in_parse_errors")]
+                                        context: literal!(static_current_context!()),
+                                        source_span: *value.get_source_span()
+                                    });
                                     cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                                 }).cast_to_string(), data)
                             },
@@ -2290,6 +2326,7 @@ pub mod statement {
                             symbols.insert(name.clone(), previous_symbol);
                             let single_identifier = identifier.to_single().unwrap();
                             errors.push(ParseError::ShadowedSymbol {
+                                #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
                                 symbol: single_identifier.0.clone(),
                                 source_span: single_identifier.1,
@@ -2298,6 +2335,7 @@ pub mod statement {
                         if let Some((key, value)) = data.into_iter().next() {
                             errors.push(ParseError::UnknownFlatDictionaryEntry {
                                 key,
+                                #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
                                 source_span: *value.get_source_span()
                             });
@@ -2371,6 +2409,7 @@ pub mod statement {
                     let name = &identifier.to_single().unwrap().0;
                     if name.as_str() == "super" {
                         errors.push(ParseError::SymbolNamedSuper {
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
                         });
@@ -2384,13 +2423,19 @@ pub mod statement {
                                 if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                         key: ident.to_single().unwrap().0.clone(),
+                                        #[cfg(feature = "include_context_in_parse_errors")]
                                         context: literal!(static_current_context!()),
                                         source_span: *ident.get_source_span(),
                                     });
                                 }
                             }
                             (data.remove("path").unwrap_or_else(|| {
-                                errors.push(ParseError::MissingFlatDictionaryEntry { key: literal!("path"), context: literal!(static_current_context!()), source_span: *value.get_source_span() });
+                                errors.push(ParseError::MissingFlatDictionaryEntry {
+                                    key: literal!("path"),
+                                    #[cfg(feature = "include_context_in_parse_errors")]
+                                    context: literal!(static_current_context!()),
+                                    source_span: *value.get_source_span()
+                                });
                                 cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                             }).cast_to_string(), data)
                         },
@@ -2433,6 +2478,7 @@ pub mod statement {
                         symbols.insert(name.clone(), previous_symbol);
                         let single_identifier = identifier.to_single().unwrap();
                         errors.push(ParseError::ShadowedSymbol {
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             symbol: single_identifier.0.clone(),
                             source_span: single_identifier.1,
@@ -2441,6 +2487,7 @@ pub mod statement {
                     if let Some((key, value)) = data.into_iter().next() {
                         errors.push(ParseError::UnknownFlatDictionaryEntry {
                             key,
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: *value.get_source_span()
                         });
@@ -2480,6 +2527,7 @@ pub mod statement {
                     let name = &identifier.to_single().unwrap().0;
                     if name.as_str() == "super" {
                         errors.push(ParseError::SymbolNamedSuper {
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
                         });
@@ -2493,13 +2541,19 @@ pub mod statement {
                                 if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                         key: ident.to_single().unwrap().0.clone(),
+                                        #[cfg(feature = "include_context_in_parse_errors")]
                                         context: literal!(static_current_context!()),
                                         source_span: *ident.get_source_span(),
                                     });
                                 }
                             }
                             (data.remove("path").unwrap_or_else(|| {
-                                errors.push(ParseError::MissingFlatDictionaryEntry { key: literal!("path"), context: literal!(static_current_context!()), source_span: *value.get_source_span() });
+                                errors.push(ParseError::MissingFlatDictionaryEntry {
+                                    key: literal!("path"),
+                                    #[cfg(feature = "include_context_in_parse_errors")]
+                                    context: literal!(static_current_context!()),
+                                    source_span: *value.get_source_span()
+                                });
                                 cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                             }).cast_to_string(), data)
                         },
@@ -2542,6 +2596,7 @@ pub mod statement {
                         symbols.insert(name.clone(), previous_symbol);
                         let single_identifier = identifier.to_single().unwrap();
                         errors.push(ParseError::ShadowedSymbol {
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             symbol: single_identifier.0.clone(),
                             source_span: single_identifier.1,
@@ -2550,6 +2605,7 @@ pub mod statement {
                     if let Some((key, value)) = data.into_iter().next() {
                         errors.push(ParseError::UnknownFlatDictionaryEntry {
                             key,
+                            #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: *value.get_source_span()
                         });
@@ -2692,6 +2748,7 @@ pub mod statement {
             let name = &identifier.to_single().unwrap().0;
             if name.as_str() == "super" {
                 return Err(ParseError::SymbolNamedSuper {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: identifier.to_single().unwrap().1,
                 });
@@ -2715,6 +2772,7 @@ pub mod statement {
                 symbols.insert(name.clone(), previous_symbol);
                 let single_identifier = identifier.to_single().unwrap();
                 return Err(ParseError::ShadowedSymbol {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     symbol: single_identifier.0.clone(),
                     source_span: single_identifier.1,
@@ -2839,6 +2897,7 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
                     token_stream,
                     literal!("Expected ';', \"let\" or an identifier."),
                     literal!("';', \"let\" or an identifier"),
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     literal!(static_current_context!()),
                     token
                 )),
@@ -3146,6 +3205,7 @@ pub fn parse_sprite_statement(
                     literal!(
                         "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\""
                     ),
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     literal!(static_current_context!()),
                     token
                 )),
@@ -3437,6 +3497,7 @@ pub fn parse_stage_statement(
                     literal!(
                         "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\", \"backdrop\" or \"costume\""
                     ),
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     literal!(static_current_context!()),
                     token
                 )),
@@ -3541,6 +3602,7 @@ pub fn parse_top_level_statement(
             let name = &identifier.to_single().unwrap().0;
             if name.as_str() == "super" {
                 return Err(ParseError::SymbolNamedSuper {
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: identifier.to_single().unwrap().1,
                 });
@@ -3582,6 +3644,7 @@ pub fn parse_top_level_statement(
                     token_stream,
                     literal!("Expected \"stage\", \"sprite\", \"broadcast\" or ';'."),
                     literal!("\"stage\", \"sprite\", \"broadcast\" or ';'"),
+                    #[cfg(feature = "include_context_in_parse_errors")]
                     literal!(static_current_context!()),
                     token
                 )),

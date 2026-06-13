@@ -1374,13 +1374,11 @@ impl GetPos for CanonicalIdentifier {
     }
 }
 
-// TODO: Add feature that enables context in ParseErrors
-// Issue: #58
-
 #[derive(Debug, Clone, Error)]
 pub enum ParseError {
     #[error("the lexer reached the end of input without the parser completing")]
     UnexpectedEndOfInput {
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
@@ -1388,51 +1386,60 @@ pub enum ParseError {
     UnexpectedToken {
         expected: IString,
         message: IString,
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         found: crate::lexer::Token,
         source_span: SourceSpan,
     },
     #[error("the lexer got stuck after the token at {source_span:?}")]
     LexerStuck {
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
     #[error("tried to declare a local symbol in stage at {source_span:?}")]
     LocalSymbolInStage {
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
     #[error("tried to peek back at the beginning of the content")]
     PeekedBackAtBeginning {
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
     #[error("tried to shadow symbol {symbol}")]
     ShadowedSymbol {
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         symbol: IString,
         source_span: SourceSpan,
     },
     #[error("tried to name a symbol \"super\"")]
     SymbolNamedSuper {
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
     #[error("expected key {key:?} in flat dictionary")]
     MissingFlatDictionaryEntry {
         key: IString,
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
     #[error("unexpected key {key:?} in flat dictionary")]
     UnknownFlatDictionaryEntry {
         key: IString,
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
     #[error("repeated key {key:?} in flat dictionary")]
     RepeatedFlatDictionaryEntry {
         key: IString,
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
@@ -1440,6 +1447,7 @@ pub enum ParseError {
     IncorrectFlatDictionaryEntryType {
         key: IString,
         value: Box<Literal>,
+        #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
@@ -1457,55 +1465,66 @@ impl GetPos for ParseError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             ParseError::UnexpectedEndOfInput {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::UnexpectedToken {
                 expected: _,
                 message: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 found: _,
                 source_span,
             } => source_span,
             ParseError::LexerStuck {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::LocalSymbolInStage {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::PeekedBackAtBeginning {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::ShadowedSymbol {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 symbol: _,
                 source_span,
             } => source_span,
             ParseError::SymbolNamedSuper {
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::MissingFlatDictionaryEntry {
                 key: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::UnknownFlatDictionaryEntry {
                 key: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::RepeatedFlatDictionaryEntry {
                 key: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
             ParseError::IncorrectFlatDictionaryEntryType {
                 key: _,
                 value: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
                 context: _,
                 source_span,
             } => source_span,
