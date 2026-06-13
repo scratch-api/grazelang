@@ -438,5 +438,21 @@
         "lines": "L3902-L3904",
         "commit": "f1fd3a84c39346c3062f189feae390c2be017b78",
         "title": "Check if Vec<(K, V)> can be used for symbols instead of HashMap<K, V>"
+    },
+    "62": {
+        "filepath": "grazelang/src/cast.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L64-L64",
+        "commit": "9d8fcc0e0f03ee6a405c51ad7e250313b83f27af",
+        "title": "Implement ECMAScript specification for number coersion of String"
+    },
+    "63": {
+        "filepath": "grazelang/src/lexer.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L144-L144",
+        "commit": "9d8fcc0e0f03ee6a405c51ad7e250313b83f27af",
+        "title": "Implement boolean literal"
     }
 }

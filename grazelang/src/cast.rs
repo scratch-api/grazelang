@@ -62,6 +62,7 @@ impl ScratchVmToNumber for &JsPrimitive {
     fn to_number(self) -> f64 {
         fn convert_str_to_number(value: &str) -> f64 {
             // TODO: Implement ECMAScript specification for number coersion of String
+            // Issue: #62
             value.parse().unwrap_or(0.0)
         }
         match self {
