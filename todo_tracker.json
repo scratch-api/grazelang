@@ -410,7 +410,7 @@
     "58": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L1217-L1217",
         "commit": "4b34c5c56febc2b5e16b99cdb876774d1a7f795d",
         "title": "Add feature that enables context in ParseErrors"
