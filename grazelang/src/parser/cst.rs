@@ -201,7 +201,7 @@ pub enum StageStatement {
     MultiInputHatStatement(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>,
+        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
         RightParens,
         CodeBlock,
         Option<Semicolon>,
@@ -265,7 +265,7 @@ pub enum SpriteStatement {
     MultiInputHatStatement(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>,
+        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
         RightParens,
         CodeBlock,
         Option<Semicolon>,
@@ -317,7 +317,7 @@ impl GetPos for SpriteStatement {
 pub enum AssetDeclaration {
     Multiple(
         LeftParens,
-        Vec<(SingleAssetDeclaration, Option<Comma>)>,
+        Vec<(SingleAssetDeclaration, Option<Comma>)>, // Use CommaSeparated
         RightParens,
         SourceSpan,
     ),
@@ -382,7 +382,7 @@ pub enum Statement {
         Identifier,
         NormalAssignmentOperator,
         LeftBracket,
-        Vec<(ListEntry, Option<Comma>)>,
+        Vec<(ListEntry, Option<Comma>)>, // Use CommaSeparated
         RightBracket,
         Semicolon,
         SourceSpan,
@@ -400,7 +400,7 @@ pub enum Statement {
     Call(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>,
+        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
         RightParens,
         Semicolon,
         SourceSpan,
@@ -415,7 +415,7 @@ pub enum Statement {
     MultiInputControl(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>,
+        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
         RightParens,
         CodeBlock,
         Option<Semicolon>,
@@ -513,7 +513,7 @@ pub enum DataDeclaration {
     Mixed(
         DataDeclarationScope,
         LeftParens,
-        Vec<(SingleDataDeclaration, Option<Comma>)>,
+        Vec<(SingleDataDeclaration, Option<Comma>)>, // Use CommaSeparated
         RightParens,
         SourceSpan,
     ),
@@ -521,7 +521,7 @@ pub enum DataDeclaration {
         DataDeclarationScope,
         VarsKeyword,
         LeftBrace,
-        Vec<(SingleDataDeclaration, Option<Comma>)>,
+        Vec<(SingleDataDeclaration, Option<Comma>)>, // Use CommaSeparated
         RightBrace,
         SourceSpan,
     ),
@@ -529,7 +529,7 @@ pub enum DataDeclaration {
         DataDeclarationScope,
         ListsKeyword,
         LeftBrace,
-        Vec<(SingleDataDeclaration, Option<Comma>)>,
+        Vec<(SingleDataDeclaration, Option<Comma>)>, // Use CommaSeparated
         RightBrace,
         SourceSpan,
     ),
@@ -605,7 +605,7 @@ pub enum SingleDataDeclaration {
         Identifier,
         NormalAssignmentOperator,
         LeftBracket,
-        Vec<(ListEntry, Option<Comma>)>,
+        Vec<(ListEntry, Option<Comma>)>, // Use CommaSeparated
         RightBracket,
         SourceSpan,
     ),
@@ -714,7 +714,7 @@ pub enum Expression {
     Call(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>,
+        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
         RightParens,
         SourceSpan,
     ),
@@ -1142,15 +1142,44 @@ impl From<&Literal> for Sb3Primitive {
     fn from(value: &Literal) -> Self {
         match value {
             Literal::DecimalInt(string, _) => {
-                if let Ok(int) = string.parse::<i128>() {
-                    if let Ok(int) = int.try_into() {
-                        return Self::Int(int);
+                let mut int = 0_u128;
+                let mut digits = 0;
+                let mut i = string.chars();
+                i.next();
+                i.next();
+                loop {
+                    if let Some(c) = i.next() {
+                        if (digits == 0 && c == '0') || c == '_' {
+                            continue;
+                        }
+                        digits += 1;
+                        int = if let Some(n) = int
+                            .checked_mul(10)
+                            .and_then(|n| n.checked_add(c.to_digit(10).unwrap() as u128))
+                        {
+                            n
+                        } else {
+                            return string.replace('_', "").into();
+                        };
+                    } else if let Ok(int) = i128::try_from(int) {
+                        if let Ok(int) = int.try_into() {
+                            return Self::Int(int);
+                        }
+                        return Self::Int128(int);
+                    } else {
+                        return string.replace('_', "").into();
                     }
-                    return Self::Int128(int);
                 }
             }
             Literal::DecimalFloat(string, _) => {
-                if let Ok(float) = string.parse() {
+                if string.contains('_') {
+                    let string = string.replace('_', "");
+                    if let Ok(float) = string.parse() {
+                        return Self::Float(float);
+                    } else {
+                        return string.into();
+                    }
+                } else if let Ok(float) = string.parse() {
                     return Self::Float(float);
                 }
             }
@@ -1167,7 +1196,7 @@ impl From<&Literal> for Sb3Primitive {
                         }
                         digits += 1;
                         if digits > 32 {
-                            break;
+                            return string.replace('_', "").into();
                         }
                         int = (int << 4) | (c.to_digit(16).unwrap() as u128);
                     } else if let Ok(int) = i128::try_from(int) {
@@ -1176,7 +1205,7 @@ impl From<&Literal> for Sb3Primitive {
                         }
                         return Self::Int128(int);
                     } else {
-                        break
+                        return string.replace('_', "").into();
                     }
                 }
             }
@@ -1193,7 +1222,7 @@ impl From<&Literal> for Sb3Primitive {
                         }
                         digits += 1;
                         if digits > 43 || int > (u128::MAX >> 3) {
-                            break;
+                            return string.replace('_', "").into();
                         }
                         int = (int << 3) | (c.to_digit(8).unwrap() as u128);
                     } else if let Ok(int) = i128::try_from(int) {
@@ -1202,10 +1231,10 @@ impl From<&Literal> for Sb3Primitive {
                         }
                         return Self::Int128(int);
                     } else {
-                        break
+                        return string.replace('_', "").into();
                     }
                 }
-            },
+            }
             Literal::BinaryInt(string, _) => {
                 let mut int = 0_u128;
                 let mut digits = 0;
@@ -1219,7 +1248,7 @@ impl From<&Literal> for Sb3Primitive {
                         }
                         digits += 1;
                         if digits > 128 {
-                            break;
+                            return string.replace('_', "").into();
                         }
                         int = (int << 1) | (c.to_digit(2).unwrap() as u128);
                     } else if let Ok(int) = i128::try_from(int) {
@@ -1228,10 +1257,10 @@ impl From<&Literal> for Sb3Primitive {
                         }
                         return Self::Int128(int);
                     } else {
-                        break
+                        return string.replace('_', "").into();
                     }
                 }
-            },
+            }
             _ => (),
         }
         value.get_string_value().into()
