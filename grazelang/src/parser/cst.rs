@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write};
 
 use crate::{cast::JsPrimitive, lexer::SourceSpan};
 use arcstr::ArcStr as IString; // Immutable string
@@ -878,7 +878,12 @@ impl BinOp {
                     result
                 })
             }
-            BinOp::Join(_) => JsPrimitive::String(expr_a.to_string_js() + &*expr_b.to_cow_str_js()),
+            BinOp::Join(_) => JsPrimitive::String({
+                let mut expr_a_string = expr_a.to_string_js();
+                write!(&mut expr_a_string, "{expr_b}")
+                    .expect("a formatting trait implementation returned an error when the underlying stream did not");
+                expr_a_string
+            }),
             BinOp::And(_) => JsPrimitive::Boolean(expr_a.to_boolean() && expr_b.to_boolean()),
             BinOp::Or(_) => JsPrimitive::Boolean(expr_a.to_boolean() || expr_b.to_boolean()),
             BinOp::Equals(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) == 0.0),

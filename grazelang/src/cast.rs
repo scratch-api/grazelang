@@ -14,7 +14,7 @@ pub trait ScratchVmToBoolean {
     fn to_boolean(self) -> bool;
 }
 
-pub trait ScratchVmToString {
+pub trait ScratchVmToString: std::fmt::Display {
     /// Equivalent to `Cast.toString` in scratch-vm
     fn to_string_js(self) -> String;
 
@@ -108,6 +108,17 @@ impl ScratchVmToBoolean for &JsPrimitive {
             JsPrimitive::IString(value) => convert_str_to_bool(value),
             JsPrimitive::Number(value) => (!value.is_nan()) && *value != 0.0,
             JsPrimitive::Boolean(value) => *value,
+        }
+    }
+}
+
+impl std::fmt::Display for JsPrimitive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JsPrimitive::String(value) => write!(f, "{value}"),
+            JsPrimitive::IString(value) => write!(f, "{value}"),
+            JsPrimitive::Number(value) => write!(f, "{}", ryu_js::Buffer::new().format(*value)),
+            JsPrimitive::Boolean(value) => write!(f, "{value}"),
         }
     }
 }
