@@ -217,10 +217,10 @@
     },
     "31": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [x] warn the user\n- [ ] calculate binops\n- [ ] calculate unops\n- [ ] introduce constants or allow usage of initial values of other vars",
+        "text": "- [x] warn the user\n- [x] calculate binops\n- [ ] calculate unops\n- [ ] introduce constants or allow usage of initial values of other vars",
         "status": "open",
-        "lines": "L748-L753",
-        "commit": "9d26abda9804e16bc38da0e56601952a44c269e6",
+        "lines": "L749-L754",
+        "commit": "3d632b9296dd38684f0bffdcf24d9b21d5f1de42",
         "title": "Calculate constant expressions"
     },
     "30": {
@@ -442,7 +442,7 @@
     "62": {
         "filepath": "grazelang/src/cast.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L64-L64",
         "commit": "9d8fcc0e0f03ee6a405c51ad7e250313b83f27af",
         "title": "Implement ECMAScript specification for number coersion of String"
