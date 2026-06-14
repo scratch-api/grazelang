@@ -125,7 +125,7 @@ pub enum Token {
     Identifier(IString),
     #[regex(r#"\$\w+"#, parse_string)]
     MacroIdentifier(IString),
-    #[regex(r#"[+-]?[0-9](?:_?[0-9])*"#, parse_number, priority = 3)]
+    #[regex(r#"[0-9](?:_?[0-9])*"#, parse_number, priority = 3)]
     DecimalInt(IString),
     #[regex(
         r#"[0-9](?:_?[0-9])*\.(?:[0-9](?:_?[0-9])*)?(?:[eE][+-]?[0-9](?:_?[0-9])*)?"#,
@@ -133,7 +133,7 @@ pub enum Token {
     )]
     #[regex(r#"\.[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)?"#, parse_number)]
     #[regex(r#"[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*"#, parse_number)]
-    #[regex(r#"[+-]?Infinity"#, parse_string)]
+    #[regex(r#"Infinity"#, parse_string)]
     #[token("NaN", |_| literal_istring!("NaN"))]
     DecimalFloat(IString),
     #[regex(r#"0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*"#, parse_number)]

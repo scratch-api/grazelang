@@ -17,7 +17,7 @@ stage {
 sprite `Sprite1` sprite_1 {
     costume `costume1` test_costume("empty.svg");
     let global test;
-    let global list `list` list_ = [1, 0, 0, 0, 0, 0, 0];
+    let global list `list` list_ = [.."1000000"];
     let local list list_2;
     events.when_green_flag_clicked {
         list_.clear();

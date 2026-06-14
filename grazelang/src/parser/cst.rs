@@ -748,7 +748,7 @@ impl Expression {
             ),
             // TODO: Calculate constant expressions
             //  - [x] warn the user
-            //  - [ ] calculate binops
+            //  - [x] calculate binops
             //  - [ ] calculate unops
             //  - [ ] introduce constants or allow usage of initial values of other vars
             // Issue: #31
@@ -1189,11 +1189,15 @@ impl From<&Literal> for Sb3Primitive {
     fn from(value: &Literal) -> Self {
         match value {
             Literal::DecimalInt(string, _) => {
-                let mut int = 0_u128;
+                let mut int = 0_i128;
                 let mut digits = 0;
                 let mut i = string.chars();
-                i.next();
-                i.next();
+                let is_negative = if string.starts_with('-') {
+                    i.next();
+                    true
+                } else {
+                    false
+                };
                 loop {
                     if let Some(c) = i.next() {
                         if (digits == 0 && c == '0') || c == '_' {
@@ -1202,19 +1206,18 @@ impl From<&Literal> for Sb3Primitive {
                         digits += 1;
                         int = if let Some(n) = int
                             .checked_mul(10)
-                            .and_then(|n| n.checked_add(c.to_digit(10).unwrap() as u128))
+                            .and_then(|n| n.checked_add(c.to_digit(10).unwrap() as i128))
                         {
                             n
                         } else {
                             return string.replace('_', "").into();
                         };
-                    } else if let Ok(int) = i128::try_from(int) {
+                    } else {
+                        let int = if is_negative { -int } else { int };
                         if let Ok(int) = int.try_into() {
                             return Self::Int(int);
                         }
                         return Self::Int128(int);
-                    } else {
-                        return string.replace('_', "").into();
                     }
                 }
             }

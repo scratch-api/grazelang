@@ -1721,20 +1721,16 @@ where
             source_span: args_source_span,
         });
     }
-    let substack_input_name = if let CallBlockParam {
+    let CallBlockParam {
         kind: CallBlockParamKind::BlockStack,
-        name,
+        name: substack_input_name,
     } = params.last().unwrap()
-    {
-        name
-    } else {
+    else {
         return Err(GrazeSb3GeneratorError::BlockIsNotCBlock {
             identifier: identifier.clone(),
         });
     };
-    let substack = if let Param::BlockStack(block_ref) = substack {
-        block_ref
-    } else {
+    let Param::BlockStack(substack) = substack else {
         return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
             param: Box::new(substack),
             source_span: substack_source_span,
@@ -2721,7 +2717,166 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             | crate::parser::cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
             | crate::parser::cst::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
                 .iter()
-                .map(|(value, _)| Ok(match value {
+                .map(|(value, _)| {
+                    Ok(match value {
+                        crate::parser::cst::SingleDataDeclaration::Variable(
+                            _,
+                            my_scope,
+                            _,
+                            identifier,
+                            _,
+                            expression,
+                            _,
+                        ) => {
+                            let var = identifier.to_single().unwrap().0.clone();
+                            let path = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                [Some(stage_var_symbol[0].clone()), Some(var), None]
+                            } else {
+                                let (a, b) = this_target_var_symbol.clone();
+                                match b {
+                                    Some(b) => [Some(a), Some(b), Some(var)],
+                                    None => [Some(a), Some(var), None],
+                                }
+                            };
+                            SingleAssignment::Var(
+                                path,
+                                expression.calculate_value().ok_or_else(|| {
+                                    GrazeSb3GeneratorError::ExpressionNotConstant {
+                                        expression: expression.clone(),
+                                    }
+                                })?,
+                            )
+                        }
+                        crate::parser::cst::SingleDataDeclaration::EmptyVariable(
+                            _,
+                            my_scope,
+                            _,
+                            identifier,
+                            _,
+                        ) => {
+                            let var = identifier.to_single().unwrap().0.clone();
+                            let path = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                [Some(stage_var_symbol[0].clone()), Some(var), None]
+                            } else {
+                                let (a, b) = this_target_var_symbol.clone();
+                                match b {
+                                    Some(b) => [Some(a), Some(b), Some(var)],
+                                    None => [Some(a), Some(var), None],
+                                }
+                            };
+                            SingleAssignment::Var(path, "".into())
+                        }
+                        crate::parser::cst::SingleDataDeclaration::List(
+                            _,
+                            my_scope,
+                            _,
+                            identifier,
+                            _,
+                            _,
+                            items,
+                            _,
+                            _,
+                        ) => {
+                            let list = identifier.to_single().unwrap().0.clone();
+                            let path = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                [Some(stage_list_symbol[0].clone()), Some(list), None]
+                            } else {
+                                let (a, b) = this_target_list_symbol.clone();
+                                match b {
+                                    Some(b) => [Some(a), Some(b), Some(list)],
+                                    None => [Some(a), Some(list), None],
+                                }
+                            };
+                            SingleAssignment::List(path, {
+                                let mut values = Vec::with_capacity(items.len());
+                                for (value, _) in items {
+                                    match value {
+                                        ListEntry::Expression(expression) => {
+                                            values.push(expression.calculate_value().ok_or_else(
+                                                || GrazeSb3GeneratorError::ExpressionNotConstant {
+                                                    expression: expression.clone(),
+                                                },
+                                            )?);
+                                        }
+                                        ListEntry::Unwrap(literal, _) => {
+                                            for c in literal.get_string_value().chars() {
+                                                values.push(c.to_string().into());
+                                            }
+                                        }
+                                    }
+                                }
+                                values
+                            })
+                        }
+                        crate::parser::cst::SingleDataDeclaration::EmptyList(
+                            _,
+                            my_scope,
+                            _,
+                            identifier,
+                            _,
+                        ) => {
+                            let list = identifier.to_single().unwrap().0.clone();
+                            let path = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                [Some(stage_list_symbol[0].clone()), Some(list), None]
+                            } else {
+                                let (a, b) = this_target_list_symbol.clone();
+                                match b {
+                                    Some(b) => [Some(a), Some(b), Some(list)],
+                                    None => [Some(a), Some(list), None],
+                                }
+                            };
+                            SingleAssignment::List(path, Vec::new())
+                        }
+                    })
+                })
+                .collect::<Result<_, _>>()?,
+            crate::parser::cst::DataDeclaration::Single(single_data_declaration) => {
+                let single_data_declaration = single_data_declaration.as_ref();
+                let single_assignment = match single_data_declaration {
                     crate::parser::cst::SingleDataDeclaration::Variable(
                         _,
                         my_scope,
@@ -2733,14 +2888,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     ) => {
                         let var = identifier.to_single().unwrap().0.clone();
                         let path = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
+                            my_scope,
+                            DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
                             [Some(stage_var_symbol[0].clone()), Some(var), None]
                         } else {
@@ -2768,146 +2917,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     ) => {
                         let var = identifier.to_single().unwrap().0.clone();
                         let path = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
-                        ) {
-                            [Some(stage_var_symbol[0].clone()), Some(var), None]
-                        } else {
-                            let (a, b) = this_target_var_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(var)],
-                                None => [Some(a), Some(var), None],
-                            }
-                        };
-                        SingleAssignment::Var(path, "".into())
-                    }
-                    crate::parser::cst::SingleDataDeclaration::List(
-                        _,
-                        my_scope,
-                        _,
-                        identifier,
-                        _,
-                        _,
-                        items,
-                        _,
-                        _,
-                    ) => {
-                        let list = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
-                        ) {
-                            [Some(stage_list_symbol[0].clone()), Some(list), None]
-                        } else {
-                            let (a, b) = this_target_list_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(list)],
-                                None => [Some(a), Some(list), None],
-                            }
-                        };
-                        SingleAssignment::List(path, {
-                            let mut values = Vec::with_capacity(items.len());
-                            for (value, _) in items {
-                                match value {
-                                    ListEntry::Expression(expression) => {
-                                        values.push(expression.calculate_value().ok_or_else(|| {
-                                            GrazeSb3GeneratorError::ExpressionNotConstant {
-                                                expression: expression.clone(),
-                                            }
-                                        })?);
-                                    }
-                                    ListEntry::Unwrap(literal, _) => {
-                                        for c in literal.get_string_value().chars() {
-                                            values.push(c.to_string().into());
-                                        }
-                                    }
-                                }
-                            }
-                            values
-                        })
-                    }
-                    crate::parser::cst::SingleDataDeclaration::EmptyList(
-                        _,
-                        my_scope,
-                        _,
-                        identifier,
-                        _,
-                    ) => {
-                        let list = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
-                        ) {
-                            [Some(stage_list_symbol[0].clone()), Some(list), None]
-                        } else {
-                            let (a, b) = this_target_list_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(list)],
-                                None => [Some(a), Some(list), None],
-                            }
-                        };
-                        SingleAssignment::List(path, Vec::new())
-                    }
-                }))
-                .collect::<Result<_, _>>()?,
-            crate::parser::cst::DataDeclaration::Single(single_data_declaration) => {
-                let single_data_declaration = single_data_declaration.as_ref();
-                let single_assignment = match single_data_declaration {
-                    crate::parser::cst::SingleDataDeclaration::Variable(
-                        _,
-                        my_scope,
-                        _,
-                        identifier,
-                        _,
-                        expression,
-                        _,
-                    ) => {
-                        let var = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
-                            my_scope,
-                            DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                        ) {
-                            [Some(stage_var_symbol[0].clone()), Some(var), None]
-                        } else {
-                            let (a, b) = this_target_var_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(var)],
-                                None => [Some(a), Some(var), None],
-                            }
-                        };
-                        SingleAssignment::Var(path, expression.calculate_value().ok_or_else(|| {
-                            GrazeSb3GeneratorError::ExpressionNotConstant {
-                                expression: expression.clone(),
-                            }
-                        })?)
-                    }
-                    crate::parser::cst::SingleDataDeclaration::EmptyVariable(
-                        _,
-                        my_scope,
-                        _,
-                        identifier,
-                        _,
-                    ) => {
-                        let var = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
@@ -2950,11 +2959,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             for (value, _) in items {
                                 match value {
                                     ListEntry::Expression(expression) => {
-                                        values.push(expression.calculate_value().ok_or_else(|| {
-                                            GrazeSb3GeneratorError::ExpressionNotConstant {
+                                        values.push(expression.calculate_value().ok_or_else(
+                                            || GrazeSb3GeneratorError::ExpressionNotConstant {
                                                 expression: expression.clone(),
-                                            }
-                                        })?);
+                                            },
+                                        )?);
                                     }
                                     ListEntry::Unwrap(literal, _) => {
                                         for c in literal.get_string_value().chars() {
@@ -3137,9 +3146,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
                 visitor.visit_code_block(&else_ifs[0].3, context)?;
                 let first_branch = context.pop_param().unwrap();
-                let first_branch = if let Param::BlockStack(block_ref) = first_branch {
-                    block_ref
-                } else {
+                let Param::BlockStack(first_branch) = first_branch else {
                     return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                         param: Box::new(first_branch),
                         source_span: *else_ifs[0].3.get_source_span(),
@@ -3166,9 +3173,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         context.current_previous_block = None;
                         visitor.visit_code_block(&else_value.1, context)?;
                         let else_branch = context.pop_param().unwrap();
-                        let else_branch = if let Param::BlockStack(block_ref) = else_branch {
-                            block_ref
-                        } else {
+                        let Param::BlockStack(else_branch) = else_branch else {
                             return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                                 param: Box::new(else_branch),
                                 source_span: *else_value.1.get_source_span(),
@@ -3216,9 +3221,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
             self.visit_code_block(&value.0.2, context)?;
             let first_branch = context.pop_param().unwrap();
-            let first_branch = if let Param::BlockStack(block_ref) = first_branch {
-                block_ref
-            } else {
+            let Param::BlockStack(first_branch) = first_branch else {
                 return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
                     param: Box::new(first_branch),
                     source_span: *value.0.2.get_source_span(),
@@ -3382,11 +3385,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         };
         if !skip_param {
             let param = params.first().unwrap();
-            let prev_parent = if let Some(parent) = parent {
-                context.current_parent.replace(parent)
-            } else {
-                None
-            };
+            let prev_parent = parent.and_then(|parent| context.current_parent.replace(parent));
             add_param_to_params(
                 context,
                 param,
@@ -3459,11 +3458,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 source_span: value.0.range_to(value.3),
             });
         }
-        let prev_parent = if let Some(parent) = parent {
-            context.current_parent.replace(parent)
-        } else {
-            None
-        };
+        let prev_parent = parent.and_then(|parent| context.current_parent.replace(parent));
         for (param, (value, source_span)) in zip(
             params.iter(),
             reversed_args

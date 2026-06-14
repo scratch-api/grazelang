@@ -829,6 +829,46 @@ pub mod statement {
                     "')'"
                 )
             }
+            Token::Plus => {
+                let prefix_source_span = get_token_source_span(token_stream);
+                let token = next_token!(token_stream);
+                if get_token_start(token_stream) != prefix_source_span.0.1 {
+                    emit_unexpected_token!(token_stream, "Expected a literal immediately following the plus.", "a literal immediately following the plus", token);
+                }
+                match token {
+                    Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
+                        arcstr::format!("+{}", value.as_str()),
+                        get_token_source_span(token_stream),
+                    )),
+                    Token::DecimalFloat(value) => Ok(LLiteral::DecimalFloat(
+                        arcstr::format!("+{}", value.as_str()),
+                        get_token_source_span(token_stream),
+                    )),
+                    token => {
+                        emit_unexpected_token!(token_stream, "Expected a literal.", "a literal", token);
+                    }
+                }
+            }
+            Token::Minus => {
+                let prefix_source_span = get_token_source_span(token_stream);
+                let token = next_token!(token_stream);
+                if get_token_start(token_stream) != prefix_source_span.0.1 {
+                    emit_unexpected_token!(token_stream, "Expected a literal immediately following the minus.", "a literal immediately following the minus", token);
+                }
+                match token {
+                    Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
+                        arcstr::format!("-{}", value.as_str()),
+                        get_token_source_span(token_stream),
+                    )),
+                    Token::DecimalFloat(value) => Ok(LLiteral::DecimalFloat(
+                        arcstr::format!("-{}", value.as_str()),
+                        get_token_source_span(token_stream),
+                    )),
+                    token => {
+                        emit_unexpected_token!(token_stream, "Expected a literal.", "a literal", token);
+                    }
+                }
+            }
             token => {
                 emit_unexpected_token!(token_stream, "Expected a literal.", "a literal", token);
             }
@@ -1822,10 +1862,7 @@ pub mod statement {
                             };
                         if matches!(peek_token!(token_stream), Token::Identifier(_)) {
                             let if_identifier = parse_full_identifier(token_stream, context)?;
-                            let syntactic_if = if let Some(value) = if_identifier.to_syntactic_if()
-                            {
-                                value
-                            } else {
+                            let Some(syntactic_if) = if_identifier.to_syntactic_if() else {
                                 emit_unexpected_token!(
                                     token_stream,
                                     "Expected \"if\".",

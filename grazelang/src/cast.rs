@@ -36,12 +36,28 @@ pub enum JsPrimitive {
     Boolean(bool),
 }
 
+
 impl From<JsPrimitive> for Sb3Primitive {
     fn from(value: JsPrimitive) -> Self {
         match value {
             JsPrimitive::String(value) => Sb3Primitive::String(value),
             JsPrimitive::IString(value) => Sb3Primitive::String(value.to_string()),
-            JsPrimitive::Number(value) => Sb3Primitive::Float(value),
+            JsPrimitive::Number(value) => {
+                if value.is_finite()
+                    && value.fract() == 0.0
+                    && value >= i128::MIN as f64
+                    && value <= i128::MAX as f64
+                {
+                    let value = value as i128;
+                    if let Ok(value) = value.try_into() {
+                        Sb3Primitive::Int(value)
+                    } else {
+                        Sb3Primitive::Int128(value)
+                    }
+                } else {
+                    Sb3Primitive::Float(value)
+                }
+            }
             JsPrimitive::Boolean(value) => Sb3Primitive::String(value.to_string()),
         }
     }
@@ -61,9 +77,12 @@ impl From<Sb3Primitive> for JsPrimitive {
 impl ScratchVmToNumber for &JsPrimitive {
     fn to_number(self) -> f64 {
         fn convert_str_to_number(value: &str) -> f64 {
-            // TODO: Implement ECMAScript specification for number coersion of String
-            // Issue: #62
-            value.parse().unwrap_or(0.0)
+            let value =
+                parse_ecmascript_string_numeric_literal::parse_string_numeric_literal(value);
+            if value.is_nan() {
+                return 0.0;
+            }
+            value
         }
         match self {
             JsPrimitive::String(value) => convert_str_to_number(value),
@@ -117,7 +136,43 @@ impl ScratchVmToString for JsPrimitive {
 
 impl ScratchVmCompare for &JsPrimitive {
     fn compare(self, other: Self) -> f64 {
-        todo!()
+        fn convert_to_number_and_ws(value: &JsPrimitive) -> (f64, bool) {
+            use parse_ecmascript_string_numeric_literal::parse_string_numeric_literal_and_is_ws;
+            match value {
+                JsPrimitive::String(value) => parse_string_numeric_literal_and_is_ws(value),
+                JsPrimitive::IString(value) => parse_string_numeric_literal_and_is_ws(value),
+                JsPrimitive::Number(value) => (*value, false),
+                JsPrimitive::Boolean(value) => ((*value).into(), false),
+            }
+        }
+        let (mut num_1, ws_1) = convert_to_number_and_ws(self);
+        let (mut num_2, ws_2) = convert_to_number_and_ws(other);
+        if ws_1 {
+            num_1 = f64::NAN;
+        } else if ws_2 {
+            num_2 = f64::NAN;
+        }
+        if num_1.is_nan() || num_2.is_nan() {
+            let str_1 = self.to_cow_str_js();
+            let str_2 = other.to_cow_str_js();
+            if str_1 == str_2 {
+                return 0.0;
+            }
+            let chars_1 = str_1.chars().flat_map(|c| c.to_lowercase());
+            let chars_2 = str_2.chars().flat_map(|c| c.to_lowercase());
+            let ordering = chars_1.cmp(chars_2);
+            return match ordering {
+                std::cmp::Ordering::Less => -1.0,
+                std::cmp::Ordering::Equal => 0.0,
+                std::cmp::Ordering::Greater => 1.0,
+            };
+        }
+        if (num_1 == f64::INFINITY && num_2 == f64::INFINITY)
+            || (num_1 == f64::NEG_INFINITY && num_2 == f64::NEG_INFINITY)
+        {
+            return 0.0;
+        }
+        num_1 - num_2
     }
 }
 
@@ -178,7 +233,11 @@ pub mod parse_ecmascript_string_numeric_literal {
                 Opt<DecimalDigits<FalseType>>,
                 Opt<ExponentPart<FalseType>>,
             ),
-            C(CharDot, DecimalDigits<FalseType>, Opt<ExponentPart<FalseType>>),
+            C(
+                CharDot,
+                DecimalDigits<FalseType>,
+                Opt<ExponentPart<FalseType>>,
+            ),
             D(DecimalDigits<FalseType>, Opt<ExponentPart<FalseType>>),
         }
         // NonDecimalIntegerLiteral[Sep] ::
@@ -212,7 +271,11 @@ pub mod parse_ecmascript_string_numeric_literal {
         //   NonZeroDigit NumericLiteralSeparator DecimalDigits[+Sep] BigIntLiteralSuffix
         pub enum DecimalBigIntegerLiteral {
             A(CharZero, BigIntLiteralSuffix),
-            B(NonZeroDigit, Opt<DecimalDigits<TrueType>>, BigIntLiteralSuffix),
+            B(
+                NonZeroDigit,
+                Opt<DecimalDigits<TrueType>>,
+                BigIntLiteralSuffix,
+            ),
             C(
                 NonZeroDigit,
                 NumericLiteralSeparator,
@@ -234,7 +297,11 @@ pub mod parse_ecmascript_string_numeric_literal {
                 Opt<DecimalDigits<TrueType>>,
                 Opt<ExponentPart<TrueType>>,
             ),
-            B(CharDot, DecimalDigits<TrueType>, Opt<ExponentPart<TrueType>>),
+            B(
+                CharDot,
+                DecimalDigits<TrueType>,
+                Opt<ExponentPart<TrueType>>,
+            ),
             C(DecimalIntegerLiteral, Opt<ExponentPart<TrueType>>),
         }
         // DecimalIntegerLiteral ::
@@ -295,7 +362,7 @@ pub mod parse_ecmascript_string_numeric_literal {
         }
         // ExponentPart[Sep] ::
         //   ExponentIndicator SignedInteger[?Sep]
-        pub struct ExponentPart<Sep: BooleanType>(pub ExponentIndicator, pub SignedInteger<Sep>);
+        pub struct ExponentPart<Sep: BooleanType>(pub SignedInteger<Sep>);
         // ExponentIndicator :: one of
         //   e E
         pub enum ExponentIndicator {
@@ -385,20 +452,20 @@ pub mod parse_ecmascript_string_numeric_literal {
         // OctalDigit :: one of
         //   0 1 2 3 4 5 6 7
         pub enum OctalDigit {
-            Zero(CharZero),
-            One(CharOne),
-            Two(CharTwo),
-            Three(CharThree),
-            Four(CharFour),
-            Five(CharFive),
-            Six(CharSix),
-            Seven(CharSeven),
+            A(CharZero),
+            B(CharOne),
+            C(CharTwo),
+            D(CharThree),
+            E(CharFour),
+            F(CharFive),
+            G(CharSix),
+            H(CharSeven),
         }
         // NonOctalDigit :: one of
         //   8 9
         pub enum NonOctalDigit {
-            Eight(CharEight),
-            Nine(CharNine),
+            A(CharEight),
+            B(CharNine),
         }
         // HexIntegerLiteral[Sep] ::
         //   0x HexDigits[?Sep]
@@ -414,38 +481,33 @@ pub mod parse_ecmascript_string_numeric_literal {
         pub enum HexDigits<Sep: BooleanType> {
             A(HexDigit),
             B(Ref<HexDigits<Sep>>, HexDigit),
-            C(
-                Sep,
-                Ref<HexDigits<Sep>>,
-                NumericLiteralSeparator,
-                HexDigit,
-            ),
+            C(Sep, Ref<HexDigits<Sep>>, NumericLiteralSeparator, HexDigit),
         }
         // HexDigit :: one of
         //   0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F
         pub enum HexDigit {
-            Zero(CharZero),
-            One(CharOne),
-            Two(CharTwo),
-            Three(CharThree),
-            Four(CharFour),
-            Five(CharFive),
-            Six(CharSix),
-            Seven(CharSeven),
-            Eight(CharEight),
-            Nine(CharNine),
-            A(CharA),
-            B(CharB),
-            C(CharC),
-            D(CharD),
-            E(CharE),
-            F(CharF),
-            CapitalA(CharCapitalA),
-            CapitalB(CharCapitalB),
-            CapitalC(CharCapitalC),
-            CapitalD(CharCapitalD),
-            CapitalE(CharCapitalE),
-            CapitalF(CharCapitalF),
+            A(CharZero),
+            B(CharOne),
+            C(CharTwo),
+            D(CharThree),
+            E(CharFour),
+            F(CharFive),
+            G(CharSix),
+            H(CharSeven),
+            I(CharEight),
+            J(CharNine),
+            K(CharA),
+            L(CharB),
+            M(CharC),
+            N(CharD),
+            O(CharE),
+            P(CharF),
+            Q(CharCapitalA),
+            R(CharCapitalB),
+            S(CharCapitalC),
+            T(CharCapitalD),
+            U(CharCapitalE),
+            V(CharCapitalF),
         }
         pub struct CharZero;
         pub struct CharOne;
@@ -482,7 +544,65 @@ pub mod parse_ecmascript_string_numeric_literal {
         pub struct LineTerminator;
         pub struct Infinity;
     }
+    pub fn ecmascript_is_str_white_space_char(value: char) -> bool {
+        matches!(
+            value as u32,
+            0x0009..=0x000D | 0xFEFF | 0x0020 | 0x00A0 | 0x1680 | 0x2000
+                ..=0x200A | 0x202F | 0x205F | 0x3000 | 0x2028 | 0x2029
+        )
+    }
+    pub fn parse_string_numeric_literal_and_is_ws(value: &str) -> (f64, bool) {
+        let value = value.trim_matches(ecmascript_is_str_white_space_char);
+        match value {
+            "" => return (0.0, true),
+            "Infinity" | "+Infinity" => return (f64::INFINITY, false),
+            "-Infinity" => return (f64::NEG_INFINITY, false),
+            _ => (),
+        }
+        let base = {
+            let mut i = value.bytes();
+            match i.next().unwrap() {
+                b'0' => {
+                    if let Some(c) = i.next() {
+                        match c {
+                            b'b' | b'B' => Some(2),
+                            b'o' | b'O' => Some(8),
+                            b'x' | b'X' => Some(16),
+                            _ => None,
+                        }
+                    } else {
+                        return (0.0, false);
+                    }
+                }
+                b'+' | b'-' | b'.' | b'1'..=b'9' => None,
+                _ => return (f64::NAN, false),
+            }
+        };
+        if let Some(base) = base {
+            let value = &value[2..];
+            if value.is_empty() {
+                return (f64::NAN, false);
+            }
+            return (
+                u32::from_str_radix(value, base)
+                    .map(Into::into)
+                    .unwrap_or_else(|_| {
+                        let mut current_value = 0.0_f64;
+                        for c in value.chars() {
+                            if let Some(c) = c.to_digit(base) {
+                                current_value = current_value.mul_add(base as f64, c as f64);
+                            } else {
+                                return f64::NAN;
+                            }
+                        }
+                        current_value
+                    }),
+                false,
+            );
+        }
+        (fast_float2::parse(value).unwrap_or(f64::NAN), false)
+    }
     pub fn parse_string_numeric_literal(value: &str) -> f64 {
-        todo!()
+        parse_string_numeric_literal_and_is_ws(value).0
     }
 }
