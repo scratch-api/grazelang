@@ -753,6 +753,7 @@ impl Expression {
             //  - [ ] FormattedString
             //  - [ ] GetLetter
             //  - [ ] Parentheses
+            // Issue: #64
             _ => None,
         }
     }
