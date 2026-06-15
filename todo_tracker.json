@@ -218,7 +218,7 @@
     "31": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "- [x] warn the user\n- [x] calculate binops\n- [x] calculate unops",
-        "status": "open",
+        "status": "closed",
         "lines": "L752-L756",
         "commit": "f1f235f8506e383ca6f3610120e9901cc020f2c6",
         "title": "Calculate constant expressions"
