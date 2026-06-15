@@ -753,7 +753,6 @@ impl Expression {
             //  - [x] warn the user
             //  - [x] calculate binops
             //  - [x] calculate unops
-            //  - [ ] introduce constants or allow usage of initial values of other vars
             // Issue: #31
             _ => None,
         }
