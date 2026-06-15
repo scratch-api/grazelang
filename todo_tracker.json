@@ -217,10 +217,10 @@
     },
     "31": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [x] warn the user\n- [x] calculate binops\n- [ ] calculate unops\n- [ ] introduce constants or allow usage of initial values of other vars",
+        "text": "- [x] warn the user\n- [x] calculate binops\n- [x] calculate unops\n- [ ] introduce constants or allow usage of initial values of other vars",
         "status": "open",
-        "lines": "L749-L754",
-        "commit": "3d632b9296dd38684f0bffdcf24d9b21d5f1de42",
+        "lines": "L752-L757",
+        "commit": "655061d5734c1ca1eda31a541760307bdbb338d5",
         "title": "Calculate constant expressions"
     },
     "30": {
