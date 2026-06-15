@@ -749,11 +749,6 @@ impl Expression {
             Expression::UnOp(un_op, expr, _) => {
                 Some(un_op.apply_operation(expr.calculate_value_js()?))
             }
-            // TODO: Calculate constant expressions
-            //  - [x] warn the user
-            //  - [x] calculate binops
-            //  - [x] calculate unops
-            // Issue: #31
             _ => None,
         }
     }
