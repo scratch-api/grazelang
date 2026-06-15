@@ -746,10 +746,13 @@ impl Expression {
             Expression::BinOp(expr_a, bin_op, expr_b, _) => Some(
                 bin_op.apply_operation(expr_a.calculate_value_js()?, expr_b.calculate_value_js()?),
             ),
+            Expression::UnOp(un_op, expr, _) => {
+                Some(un_op.apply_operation(expr.calculate_value_js()?))
+            }
             // TODO: Calculate constant expressions
             //  - [x] warn the user
             //  - [x] calculate binops
-            //  - [ ] calculate unops
+            //  - [x] calculate unops
             //  - [ ] introduce constants or allow usage of initial values of other vars
             // Issue: #31
             _ => None,
@@ -881,6 +884,7 @@ impl BinOp {
             BinOp::Join(_) => JsPrimitive::String({
                 let mut expr_a_string = expr_a.to_string_js();
                 write!(&mut expr_a_string, "{expr_b}")
+                    // Expect arg from `format!(...)` implementation
                     .expect("a formatting trait implementation returned an error when the underlying stream did not");
                 expr_a_string
             }),
@@ -1084,6 +1088,18 @@ pub enum UnOp {
     Not(SourceSpan),
     Exp(SourceSpan),
     Pow(SourceSpan),
+}
+
+impl UnOp {
+    pub fn apply_operation(&self, expr: JsPrimitive) -> JsPrimitive {
+        use crate::cast::{ScratchVmToBoolean, ScratchVmToNumber};
+        match self {
+            UnOp::Minus(_) => JsPrimitive::Number(-expr.to_number()),
+            UnOp::Not(_) => JsPrimitive::Boolean(!expr.to_boolean()),
+            UnOp::Exp(_) => JsPrimitive::Number(expr.to_number().exp()),
+            UnOp::Pow(_) => JsPrimitive::Number(10_f64.powf(expr.to_number())),
+        }
+    }
 }
 
 impl GetPos for UnOp {
