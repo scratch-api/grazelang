@@ -470,5 +470,21 @@
         "lines": "L101-L101",
         "commit": "02a849d8a48146de8409bc7ff91956259eefa72e",
         "title": "Implement `contains` BinOp"
+    },
+    "66": {
+        "filepath": "grazelang/src/eval/call.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L41-L41",
+        "commit": "cc96d78279333a74b1c6c1c2a76a230cce1bb57b",
+        "title": "Replace Option<JsPrimitive> with Result<JsPrimitive, E> and decide on E"
+    },
+    "67": {
+        "filepath": "grazelang/src/lexer.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L92-L92",
+        "commit": "cc96d78279333a74b1c6c1c2a76a230cce1bb57b",
+        "title": "More UnOps"
     }
 }

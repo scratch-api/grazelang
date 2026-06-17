@@ -90,6 +90,7 @@ pub enum Token {
     Exp,
     #[regex(r"10 *\^")]
     Pow, // TODO: More UnOps
+    // Issue: #67
     #[token("*")]
     Times,
     #[token("/")]

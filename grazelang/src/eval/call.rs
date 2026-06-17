@@ -39,6 +39,7 @@ impl ConstantExprFunction {
         I: Iterator<Item = &'a Expression>,
     {
         // TODO: Replace Option<JsPrimitive> with Result<JsPrimitive, E> and decide on E
+        // Issue: #66
         fn bin_op_args<'a, I>(mut args: I) -> Option<(&'a Expression, &'a Expression)>
         where
             I: Iterator<Item = &'a Expression>,
