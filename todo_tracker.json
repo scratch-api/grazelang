@@ -457,10 +457,10 @@
     },
     "64": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [ ] FormattedString\n- [ ] GetLetter\n- [ ] Parentheses",
+        "text": "- [ ] FormattedString\n- [ ] GetLetter\n- [x] Parentheses",
         "status": "open",
-        "lines": "L752-L755",
-        "commit": "a4693d67c343b81a8118438b087d5812d24ba822",
+        "lines": "L755-L759",
+        "commit": "1a93935de09ed6bd2100782cd6094571c4663cb9",
         "title": "Advanced constant expressions"
     }
 }
