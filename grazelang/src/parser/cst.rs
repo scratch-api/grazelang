@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{cast::JsPrimitive, lexer::SourceSpan};
+use crate::{
+    cast::{JsPrimitive, ScratchVmToString},
+    lexer::SourceSpan,
+};
 use arcstr::ArcStr as IString; // Immutable string
 use grazelang_library::project_json::{Sb3Primitive, Sb3PrimitiveBlock};
 use serde::{Deserialize, Serialize};
@@ -775,9 +778,26 @@ impl Expression {
                         .unwrap_or_else(|| JsPrimitive::IString(EMPTY_ISTRING_REF.clone())),
                 )
             }
+            Expression::FormattedString(content, _) => Some(JsPrimitive::JsString(
+                content
+                    .iter()
+                    .try_fold(Vec::<u16>::new(), |mut current, value| {
+                        match value {
+                            FormattedStringContent::Expression(expression) => {
+                                expression
+                                    .calculate_value_js()?
+                                    .write_to_js_string(&mut current);
+                            }
+                            FormattedStringContent::String(value, _) => {
+                                current.extend(value.encode_utf16())
+                            }
+                        }
+                        Some(current)
+                    })?,
+            )),
             // TODO: Advanced constant expressions
-            //  - [ ] FormattedString
-            //  - [ ] GetLetter
+            //  - [x] FormattedString
+            //  - [x] GetLetter
             //  - [x] Parentheses
             //  - [ ] Calculate `Call` values if possible
             // Issue: #64
