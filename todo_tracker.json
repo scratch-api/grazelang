@@ -457,10 +457,10 @@
     },
     "64": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [ ] FormattedString\n- [ ] GetLetter\n- [x] Parentheses\n- [ ] Calculate `Call` values if possible",
+        "text": "- [x] FormattedString\n- [x] GetLetter\n- [x] Parentheses\n- [ ] Calculate `Call` values if possible",
         "status": "open",
-        "lines": "L778-L783",
-        "commit": "02a849d8a48146de8409bc7ff91956259eefa72e",
+        "lines": "L798-L803",
+        "commit": "bb333e4acb1b75df87c35bd63c4425bdadd67a9d",
         "title": "Advanced constant expressions"
     },
     "65": {
