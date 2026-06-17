@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Write};
+use std::collections::HashMap;
 
 use crate::{cast::JsPrimitive, lexer::SourceSpan};
 use arcstr::ArcStr as IString; // Immutable string
@@ -749,13 +749,37 @@ impl Expression {
             Expression::UnOp(un_op, expr, _) => {
                 Some(un_op.apply_operation(expr.calculate_value_js()?))
             }
-            Expression::Parentheses(_, expr, _, _) => {
-                expr.calculate_value_js()
+            Expression::Parentheses(_, expr, _, _) => expr.calculate_value_js(),
+            Expression::GetLetter(string, _, index, _, _) => {
+                use crate::cast::{
+                    JsPrimitive, ScratchVmToNumber, ScratchVmToString, try_convert_f64_into_i128,
+                };
+                let Some(string_js) = string.calculate_value_js() else {
+                    return Some(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
+                };
+                let string = string_js.to_js_cow_str();
+                let index = index.calculate_value_js()?.to_number() - 1.0;
+                let Ok(index) =
+                    usize::try_from(if let Some(it) = try_convert_f64_into_i128(index.floor()) {
+                        it
+                    } else {
+                        return Some(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
+                    })
+                else {
+                    return Some(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
+                };
+                Some(
+                    string
+                        .get(index)
+                        .map(|value| JsPrimitive::JsString(vec![*value]))
+                        .unwrap_or_else(|| JsPrimitive::IString(EMPTY_ISTRING_REF.clone())),
+                )
             }
             // TODO: Advanced constant expressions
             //  - [ ] FormattedString
             //  - [ ] GetLetter
             //  - [x] Parentheses
+            //  - [ ] Calculate `Call` values if possible
             // Issue: #64
             _ => None,
         }
@@ -883,11 +907,9 @@ impl BinOp {
                     result
                 })
             }
-            BinOp::Join(_) => JsPrimitive::String({
-                let mut expr_a_string = expr_a.to_string_js();
-                write!(&mut expr_a_string, "{expr_b}")
-                    // Expect arg from `format!(...)` implementation
-                    .expect("a formatting trait implementation returned an error when the underlying stream did not");
+            BinOp::Join(_) => JsPrimitive::JsString({
+                let mut expr_a_string = expr_a.to_js_string();
+                expr_b.write_to_js_string(&mut expr_a_string);
                 expr_a_string
             }),
             BinOp::And(_) => JsPrimitive::Boolean(expr_a.to_boolean() && expr_b.to_boolean()),

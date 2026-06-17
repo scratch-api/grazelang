@@ -1,4 +1,7 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Write},
+};
 
 use arcstr::ArcStr as IString;
 use grazelang_library::project_json::Sb3Primitive;
@@ -14,12 +17,14 @@ pub trait ScratchVmToBoolean {
     fn to_boolean(self) -> bool;
 }
 
-pub trait ScratchVmToString: std::fmt::Display {
+pub trait ScratchVmToString {
     /// Equivalent to `Cast.toString` in scratch-vm
-    fn to_string_js(self) -> String;
+    fn to_js_string(self) -> JsOwnedStringData;
 
     /// Equivalent to `Cast.toString` in scratch-vm but tries to avoid allocation
-    fn to_cow_str_js(&self) -> Cow<'_, str>;
+    fn to_js_cow_str(&self) -> Cow<'_, JsStringData>;
+
+    fn write_to_js_string(&self, string: &mut JsOwnedStringData);
 }
 
 pub trait ScratchVmCompare {
@@ -27,8 +32,25 @@ pub trait ScratchVmCompare {
     fn compare(self, other: Self) -> f64;
 }
 
+pub type JsOwnedStringData = Vec<u16>;
+
+#[derive(Debug, PartialEq)]
+pub struct U16Sink<'a> {
+    pub data: &'a mut JsOwnedStringData,
+}
+
+impl Write for U16Sink<'_> {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.data.extend(s.encode_utf16());
+        Ok(())
+    }
+}
+
+pub type JsStringData = [u16];
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum JsPrimitive {
+    JsString(JsOwnedStringData),
     String(String),
     /// Only here to reduce allocations
     IString(IString),
@@ -36,19 +58,22 @@ pub enum JsPrimitive {
     Boolean(bool),
 }
 
+pub fn try_convert_f64_into_i128(value: f64) -> Option<i128> {
+    (value.is_finite()
+        && value.fract() == 0.0
+        && value >= i128::MIN as f64
+        && value <= i128::MAX as f64)
+        .then_some(value as i128)
+}
 
 impl From<JsPrimitive> for Sb3Primitive {
     fn from(value: JsPrimitive) -> Self {
         match value {
+            JsPrimitive::JsString(value) => Sb3Primitive::String(String::from_utf16_lossy(&value)),
             JsPrimitive::String(value) => Sb3Primitive::String(value),
             JsPrimitive::IString(value) => Sb3Primitive::String(value.to_string()),
             JsPrimitive::Number(value) => {
-                if value.is_finite()
-                    && value.fract() == 0.0
-                    && value >= i128::MIN as f64
-                    && value <= i128::MAX as f64
-                {
-                    let value = value as i128;
+                if let Some(value) = try_convert_f64_into_i128(value) {
                     if let Ok(value) = value.try_into() {
                         Sb3Primitive::Int(value)
                     } else {
@@ -85,6 +110,7 @@ impl ScratchVmToNumber for &JsPrimitive {
             value
         }
         match self {
+            JsPrimitive::JsString(value) => convert_str_to_number(&String::from_utf16_lossy(value)),
             JsPrimitive::String(value) => convert_str_to_number(value),
             JsPrimitive::IString(value) => convert_str_to_number(value),
             JsPrimitive::Number(value) if value.is_nan() => 0.0,
@@ -104,6 +130,7 @@ impl ScratchVmToBoolean for &JsPrimitive {
             }
         }
         match self {
+            JsPrimitive::JsString(value) => convert_str_to_bool(&String::from_utf16_lossy(value)),
             JsPrimitive::String(value) => convert_str_to_bool(value),
             JsPrimitive::IString(value) => convert_str_to_bool(value),
             JsPrimitive::Number(value) => (!value.is_nan()) && *value != 0.0,
@@ -112,35 +139,68 @@ impl ScratchVmToBoolean for &JsPrimitive {
     }
 }
 
-impl std::fmt::Display for JsPrimitive {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JsPrimitive::String(value) => write!(f, "{value}"),
-            JsPrimitive::IString(value) => write!(f, "{value}"),
-            JsPrimitive::Number(value) => write!(f, "{}", ryu_js::Buffer::new().format(*value)),
-            JsPrimitive::Boolean(value) => write!(f, "{value}"),
-        }
-    }
-}
-
 impl ScratchVmToString for JsPrimitive {
-    fn to_string_js(self) -> String {
+    fn to_js_string(self) -> JsOwnedStringData {
         match self {
-            JsPrimitive::String(value) => value,
-            JsPrimitive::IString(value) => value.to_string(),
-            JsPrimitive::Number(value) => ryu_js::Buffer::new().format(value).to_string(),
-            JsPrimitive::Boolean(value) => value.to_string(),
+            JsPrimitive::JsString(value) => value,
+            JsPrimitive::String(value) => value.encode_utf16().collect(),
+            JsPrimitive::IString(value) => value.encode_utf16().collect(),
+            JsPrimitive::Number(value) => {
+                ryu_js::Buffer::new().format(value).encode_utf16().collect()
+            }
+            JsPrimitive::Boolean(value) => {
+                if value {
+                    vec![b't' as u16, b'r' as u16, b'u' as u16, b'e' as u16]
+                } else {
+                    vec![
+                        b'f' as u16,
+                        b'a' as u16,
+                        b'l' as u16,
+                        b's' as u16,
+                        b'e' as u16,
+                    ]
+                }
+            }
         }
     }
 
-    fn to_cow_str_js(&self) -> Cow<'_, str> {
+    fn to_js_cow_str(&self) -> Cow<'_, JsStringData> {
         match self {
-            JsPrimitive::String(value) => Cow::Borrowed(value),
-            JsPrimitive::IString(value) => Cow::Borrowed(value),
-            JsPrimitive::Number(value) => {
-                Cow::Owned(ryu_js::Buffer::new().format(*value).to_string())
-            }
-            JsPrimitive::Boolean(value) => Cow::Owned(value.to_string()),
+            JsPrimitive::JsString(value) => Cow::Borrowed(value),
+            JsPrimitive::String(value) => Cow::Owned(value.encode_utf16().collect()),
+            JsPrimitive::IString(value) => Cow::Owned(value.encode_utf16().collect()),
+            JsPrimitive::Number(value) => Cow::Owned(
+                ryu_js::Buffer::new()
+                    .format(*value)
+                    .encode_utf16()
+                    .collect(),
+            ),
+            JsPrimitive::Boolean(value) => Cow::Borrowed({
+                if *value {
+                    &[b't' as u16, b'r' as u16, b'u' as u16, b'e' as u16]
+                } else {
+                    &[
+                        b'f' as u16,
+                        b'a' as u16,
+                        b'l' as u16,
+                        b's' as u16,
+                        b'e' as u16,
+                    ]
+                }
+            }),
+        }
+    }
+
+    fn write_to_js_string(&self, string: &mut JsOwnedStringData) {
+        match self {
+            JsPrimitive::JsString(value) => string.extend(value),
+            JsPrimitive::String(value) => string.extend(value.encode_utf16()),
+            JsPrimitive::IString(value) => string.extend(value.encode_utf16()),
+            JsPrimitive::Number(value) => string.extend(ryu_js::Buffer::new()
+                .format(*value)
+                .encode_utf16()),
+            JsPrimitive::Boolean(value) => write!(U16Sink { data: string }, "{}", value)
+                .expect("a formatting trait implementation returned an error when the underlying stream did not"),
         }
     }
 }
@@ -150,6 +210,9 @@ impl ScratchVmCompare for &JsPrimitive {
         fn convert_to_number_and_ws(value: &JsPrimitive) -> (f64, bool) {
             use parse_ecmascript_string_numeric_literal::parse_string_numeric_literal_and_is_ws;
             match value {
+                JsPrimitive::JsString(value) => {
+                    parse_string_numeric_literal_and_is_ws(&String::from_utf16_lossy(value))
+                }
                 JsPrimitive::String(value) => parse_string_numeric_literal_and_is_ws(value),
                 JsPrimitive::IString(value) => parse_string_numeric_literal_and_is_ws(value),
                 JsPrimitive::Number(value) => (*value, false),
@@ -164,13 +227,17 @@ impl ScratchVmCompare for &JsPrimitive {
             num_2 = f64::NAN;
         }
         if num_1.is_nan() || num_2.is_nan() {
-            let str_1 = self.to_cow_str_js();
-            let str_2 = other.to_cow_str_js();
+            let str_1 = self.to_js_cow_str();
+            let str_2 = other.to_js_cow_str();
             if str_1 == str_2 {
                 return 0.0;
             }
-            let chars_1 = str_1.chars().flat_map(|c| c.to_lowercase());
-            let chars_2 = str_2.chars().flat_map(|c| c.to_lowercase());
+            let chars_1 = char::decode_utf16(str_1.iter().cloned())
+                .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
+                .flat_map(|c| c.to_lowercase());
+            let chars_2 = char::decode_utf16(str_2.iter().cloned())
+                .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
+                .flat_map(|c| c.to_lowercase());
             let ordering = chars_1.cmp(chars_2);
             return match ordering {
                 std::cmp::Ordering::Less => -1.0,
