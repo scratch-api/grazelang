@@ -3,7 +3,8 @@ pub mod project_json;
 use proc_macro2::TokenStream;
 use std::{
     collections::{HashMap, HashSet},
-    rc::Rc, sync::Arc,
+    rc::Rc,
+    sync::Arc,
 };
 
 use arcstr::{ArcStr as IString, literal};
@@ -448,10 +449,13 @@ impl ToTokens for KnownBlock {
                     }
                 });
             }
-            KnownBlock::BoundMethod { signature, bound_params } => {
+            KnownBlock::BoundMethod {
+                signature,
+                bound_params,
+            } => {
                 let opcode = signature.opcode.as_str();
                 let unbound_params = &signature.unbound_params;
-                let (keys, values): (Vec<_>, Vec<_>) = 
+                let (keys, values): (Vec<_>, Vec<_>) =
                     bound_params.iter().map(|(k, v)| (k, v)).unzip();
                 tokens.append_all(quote! {
                     #prefix::BoundMethod {
@@ -522,6 +526,7 @@ pub struct LibraryItem {
     pub value: Option<LibraryItemValue>,
 }
 
+
 pub fn quote_option<T>(value: Option<&T>) -> TokenStream
 where
     T: ToTokens,
@@ -547,3 +552,49 @@ impl ToTokens for LibraryItem {
         });
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ConstantExprLibraryItemValue {
+    Function(u32, bool),
+    AssociatedItem(u32),
+}
+
+impl ToTokens for ConstantExprLibraryItemValue {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.append_all(match self {
+            ConstantExprLibraryItemValue::Function(id, is_singleton) => {
+                quote! {
+                    ::grazelang_library::ConstantExprLibraryItemValue::Function(#id, #is_singleton)
+                }
+            }
+            ConstantExprLibraryItemValue::AssociatedItem(id) => {
+                quote! {
+                    ::grazelang_library::ConstantExprLibraryItemValue::AssociatedItem(#id)
+                }
+            }
+        });
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConstantExprLibraryItem {
+    pub namespace: HashMap<String, ConstantExprLibraryItem>,
+    pub value: Option<ConstantExprLibraryItemValue>,
+}
+
+impl ToTokens for ConstantExprLibraryItem {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ConstantExprLibraryItem { namespace, value } = self;
+        let keys = namespace.keys();
+        let values = namespace.values();
+        let value = quote_option(value.as_ref());
+
+        tokens.append_all(quote! {
+            ::grazelang_library::ConstantExprLibraryItem {
+                namespace: ::std::collections::HashMap::from([#( (#keys.to_string(), #values) ),*]),
+                value: #value,
+            }
+        });
+    }
+}
+

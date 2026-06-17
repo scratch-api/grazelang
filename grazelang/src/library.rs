@@ -1,16 +1,19 @@
 use std::{
+    borrow::Borrow,
     collections::{HashMap, HashSet},
+    hash::Hash,
     rc::Rc,
+    sync::LazyLock,
 };
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_library::{
     AliasSegment, BACKDROPS_CATEGORY_ID, BindInfo, COSTUMES_CATEGORY_ID, CallBlockParam,
-    CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID,
-    SimpleCallableKnownBlockSignature,
+    CallBlockParamKind, ConstantExprLibraryItem, KnownBlock, LibraryItem, LibraryItemValue,
+    NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3PrimitiveBlock},
 };
-use grazelang_library_parser::generate_library;
+use grazelang_library_parser::{generate_constant_expr_library, generate_library};
 
 use crate::{
     codegen::core::GrazeSb3GeneratorContext,
@@ -19,6 +22,22 @@ use crate::{
 
 pub fn get_generated_library() -> (HashMap<String, LibraryItem>, HashMap<u32, HashSet<IString>>) {
     generate_library!("schemas/toolbox_schema.json")
+}
+
+pub static CONSTANT_EXPR_LIBRARY: LazyLock<ConstantExprLibraryItem> =
+    LazyLock::new(|| generate_constant_expr_library!("schemas/toolbox_schema.json"));
+
+pub fn const_expr_lookup<'a, I, Q>(mut path: I) -> Option<&'static ConstantExprLibraryItem>
+where
+    I: Iterator<Item = &'a Q>,
+    String: Borrow<Q>,
+    Q: ?Sized + 'a,
+    Q: Hash + Eq,
+{
+    path.try_fold::<&ConstantExprLibraryItem, _, _>(
+        &CONSTANT_EXPR_LIBRARY,
+        |current, value| current.namespace.get(value),
+    )
 }
 
 pub fn convert_generated_library(

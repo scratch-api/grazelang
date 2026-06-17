@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    cast::{JsPrimitive, ScratchVmToString},
+    eval::{call::ConstantExprFunction, cast::JsPrimitive},
     lexer::SourceSpan,
 };
 use arcstr::ArcStr as IString; // Immutable string
-use grazelang_library::project_json::{Sb3Primitive, Sb3PrimitiveBlock};
+use grazelang_library::{
+    ConstantExprLibraryItemValue,
+    project_json::{Sb3Primitive, Sb3PrimitiveBlock},
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -754,7 +757,7 @@ impl Expression {
             }
             Expression::Parentheses(_, expr, _, _) => expr.calculate_value_js(),
             Expression::GetLetter(string, _, index, _, _) => {
-                use crate::cast::{
+                use crate::eval::cast::{
                     JsPrimitive, ScratchVmToNumber, ScratchVmToString, try_convert_f64_into_i128,
                 };
                 let Some(string_js) = string.calculate_value_js() else {
@@ -778,10 +781,11 @@ impl Expression {
                         .unwrap_or_else(|| JsPrimitive::IString(EMPTY_ISTRING_REF.clone())),
                 )
             }
-            Expression::FormattedString(content, _) => Some(JsPrimitive::JsString(
-                content
-                    .iter()
-                    .try_fold(Vec::<u16>::new(), |mut current, value| {
+            Expression::FormattedString(content, _) => {
+                use crate::eval::cast::ScratchVmToString;
+                Some(JsPrimitive::JsString(content.iter().try_fold(
+                    Vec::<u16>::new(),
+                    |mut current, value| {
                         match value {
                             FormattedStringContent::Expression(expression) => {
                                 expression
@@ -793,8 +797,30 @@ impl Expression {
                             }
                         }
                         Some(current)
-                    })?,
-            )),
+                    },
+                )?))
+            }
+            Expression::Call(identifier, _, exprs, _, _) => {
+                let library_item = crate::library::const_expr_lookup(
+                    identifier
+                        .path
+                        .iter()
+                        .chain(identifier.fields.iter())
+                        .map(|(next, _)| next as &str),
+                )?;
+
+                let Some(ConstantExprLibraryItemValue::Function(function_id, _)) =
+                    library_item.value
+                else {
+                    return None;
+                };
+
+                let Ok(function) = ConstantExprFunction::try_from(function_id) else {
+                    return None;
+                };
+
+                function.apply(exprs.iter().map(|(value, _)| value))
+            }
             // TODO: Advanced constant expressions
             //  - [x] FormattedString
             //  - [x] GetLetter
@@ -905,49 +931,6 @@ pub enum BinOp {
     GreaterThan(SourceSpan),
     LessThanOrEqual(SourceSpan),
     GreaterThanOrEqual(SourceSpan),
-}
-
-impl BinOp {
-    pub fn apply_operation(&self, expr_a: JsPrimitive, expr_b: JsPrimitive) -> JsPrimitive {
-        use crate::cast::{
-            ScratchVmCompare, ScratchVmToBoolean, ScratchVmToNumber, ScratchVmToString,
-        };
-        match self {
-            BinOp::Plus(_) => JsPrimitive::Number(expr_a.to_number() + expr_b.to_number()),
-            BinOp::Minus(_) => JsPrimitive::Number(expr_a.to_number() - expr_b.to_number()),
-            BinOp::Times(_) => JsPrimitive::Number(expr_a.to_number() * expr_b.to_number()),
-            BinOp::Div(_) => JsPrimitive::Number(expr_a.to_number() / expr_b.to_number()),
-            BinOp::Mod(_) => {
-                let n = expr_a.to_number();
-                let modulus = expr_b.to_number();
-                let result = n % modulus;
-                JsPrimitive::Number(if result / modulus < 0.0 {
-                    result + modulus
-                } else {
-                    result
-                })
-            }
-            BinOp::Join(_) => JsPrimitive::JsString({
-                let mut expr_a_string = expr_a.to_js_string();
-                expr_b.write_to_js_string(&mut expr_a_string);
-                expr_a_string
-            }),
-            BinOp::And(_) => JsPrimitive::Boolean(expr_a.to_boolean() && expr_b.to_boolean()),
-            BinOp::Or(_) => JsPrimitive::Boolean(expr_a.to_boolean() || expr_b.to_boolean()),
-            BinOp::Equals(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) == 0.0),
-            BinOp::NotEquals(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) != 0.0),
-            BinOp::LessThan(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) < 0.0),
-            BinOp::GreaterThan(_) => JsPrimitive::Boolean(expr_a.compare(&expr_b) > 0.0),
-            BinOp::LessThanOrEqual(_) => JsPrimitive::Boolean(!matches!(
-                expr_a.compare(&expr_b).partial_cmp(&0.0),
-                Some(std::cmp::Ordering::Greater)
-            )),
-            BinOp::GreaterThanOrEqual(_) => JsPrimitive::Boolean(!matches!(
-                expr_a.compare(&expr_b).partial_cmp(&0.0),
-                Some(std::cmp::Ordering::Less)
-            )),
-        }
-    }
 }
 
 impl GetPos for BinOp {
@@ -1132,18 +1115,6 @@ pub enum UnOp {
     Not(SourceSpan),
     Exp(SourceSpan),
     Pow(SourceSpan),
-}
-
-impl UnOp {
-    pub fn apply_operation(&self, expr: JsPrimitive) -> JsPrimitive {
-        use crate::cast::{ScratchVmToBoolean, ScratchVmToNumber};
-        match self {
-            UnOp::Minus(_) => JsPrimitive::Number(-expr.to_number()),
-            UnOp::Not(_) => JsPrimitive::Boolean(!expr.to_boolean()),
-            UnOp::Exp(_) => JsPrimitive::Number(expr.to_number().exp()),
-            UnOp::Pow(_) => JsPrimitive::Number(10_f64.powf(expr.to_number())),
-        }
-    }
 }
 
 impl GetPos for UnOp {

@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use arcstr::ArcStr as IString;
 use grazelang_library::{
-    CallBlockParam, CallBlockParamKind, KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID,
-    SimpleCallableKnownBlockSignature,
+    CallBlockParam, CallBlockParamKind, ConstantExprLibraryItem, ConstantExprLibraryItemValue,
+    KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,7 @@ pub struct BlockEntry {
     #[serde(default)]
     pub is_singleton: bool,
     pub assign: Option<AssignmentDescriptor>,
+    pub constant_expr_function_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -71,6 +72,7 @@ pub struct MenuOption {
     pub label: String,
     pub value: String,
     pub alt_name: Option<String>,
+    pub constant_expr_value_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -103,6 +105,20 @@ pub struct ProcessedBlockEntry {
     pub opcode: String,
     pub library_item: LibraryItem,
     pub associated_items: Vec<AssociatedLibraryItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssociatedConstantExprLibraryItem {
+    pub name: String,
+    pub constant_expr_value_id: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProcessedConstantExprBlockEntry {
+    pub name: String,
+    pub constant_expr_function_id: u32,
+    pub associated_items: Vec<AssociatedConstantExprLibraryItem>,
+    pub is_singleton: bool,
 }
 
 pub fn primitive_opcode_to_sb3_primitive_block(
@@ -239,6 +255,7 @@ impl BlockEntry {
             alt_name,
             is_singleton,
             assign,
+            constant_expr_function_id: _,
         } = self;
         if args.is_empty() && is_singleton {
             return ProcessedBlockEntry {
@@ -409,32 +426,6 @@ pub fn process_toolbox_category(
     let mut processed_associated_items =
         Vec::<(String, LibraryItem)>::with_capacity(associated_items.len());
     for (name, (field_value, categories)) in associated_items {
-        // if let Some(current) = namespace.get_mut(&name) {
-        //     if let Some(LibraryItemValue::KnownBlock(known_block)) = &mut current.value
-        //         && let KnownBlock::SingletonReporter {
-        //             opcode: _,
-        //             params: _,
-        //             field,
-        //             assign: _,
-        //             bind_info: _,
-        //         } = known_block.as_mut()
-        //     {
-        //         field.replace(field_value.clone());
-        //     } else {
-        //     }
-        // } else {
-        //     // namespace.insert(
-        //     //     name.clone(),
-        //     //     LibraryItem {
-        //     //         namespace: HashMap::new(),
-        //     //         value: Some(LibraryItemValue::Alias(vec![
-        //     //             AliasSegment::Super,
-        //     //             AliasSegment::Child("menus".to_string()),
-        //     //             AliasSegment::Child(name.clone()),
-        //     //         ])),
-        //     //     },
-        //     // );
-        // }
         processed_associated_items.push((
             name,
             LibraryItem {
@@ -455,6 +446,145 @@ pub fn process_toolbox_category(
             value: None,
         },
         processed_associated_items,
+    )
+}
+
+impl BlockEntry {
+    fn process_constant_expr(self) -> Option<ProcessedConstantExprBlockEntry> {
+        pub fn extract_associated_items(
+            arg: BlockArg,
+            associated_items: Option<&mut Vec<AssociatedConstantExprLibraryItem>>,
+        ) {
+            match arg {
+                BlockArg::Field {
+                    name: _,
+                    field_type: _,
+                    value: _,
+                    options,
+                    option_category: _,
+                } => {
+                    if let Some(associated_items) = associated_items {
+                        options.iter().flatten().for_each(|value| {
+                            let Some(constant_expr_value_id) = value.constant_expr_value_id else {
+                                return;
+                            };
+                            associated_items.push(AssociatedConstantExprLibraryItem {
+                                name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
+                                constant_expr_value_id,
+                            })
+                        })
+                    }
+                }
+                BlockArg::Input {
+                    name: _,
+                    menu_field_name: _,
+                    input_type: _,
+                    check: _,
+                    shadow:
+                        Some(ShadowData {
+                            shadow_type: _,
+                            default_value: _,
+                            options,
+                            option_category: _,
+                        }),
+                } => {
+                    if let Some(associated_items) = associated_items {
+                        options.iter().flatten().for_each(|value| {
+                            let Some(constant_expr_value_id) = value.constant_expr_value_id else {
+                                return;
+                            };
+                            associated_items.push(AssociatedConstantExprLibraryItem {
+                                name: value.alt_name.as_ref().unwrap_or(&value.label).clone(),
+                                constant_expr_value_id,
+                            })
+                        })
+                    }
+                }
+                _ => (),
+            }
+        }
+        let BlockEntry {
+            opcode,
+            args,
+            alt_name,
+            is_singleton,
+            assign: _,
+            constant_expr_function_id,
+        } = self;
+        let constant_expr_function_id = constant_expr_function_id?;
+        if args.is_empty() && is_singleton {
+            return Some(ProcessedConstantExprBlockEntry {
+                name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
+                constant_expr_function_id,
+                associated_items: Vec::new(),
+                is_singleton,
+            });
+        }
+        let mut associated_items = Vec::new();
+        for arg in args {
+            extract_associated_items(arg, Some(&mut associated_items));
+        }
+        Some(ProcessedConstantExprBlockEntry {
+            name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
+            constant_expr_function_id,
+            associated_items,
+            is_singleton: false,
+        })
+    }
+}
+
+pub fn process_constant_expr_toolbox_category(
+    value: ToolboxCategory,
+    associated_items: &mut HashMap<String, ConstantExprLibraryItem>,
+) -> (String, ConstantExprLibraryItem) {
+    let ToolboxCategory {
+        category: _,
+        id,
+        blocks,
+        alt_name,
+    } = value;
+    let mut namespace = HashMap::<String, ConstantExprLibraryItem>::with_capacity(blocks.len());
+    for block in blocks {
+        let Some(ProcessedConstantExprBlockEntry {
+            name,
+            constant_expr_function_id,
+            associated_items: new_associated_items,
+            is_singleton,
+        }) = block.process_constant_expr()
+        else {
+            continue;
+        };
+        for AssociatedConstantExprLibraryItem {
+            name: associated_item_name,
+            constant_expr_value_id,
+        } in new_associated_items
+        {
+            associated_items
+                .entry(associated_item_name)
+                .or_insert_with(|| ConstantExprLibraryItem {
+                    namespace: HashMap::new(),
+                    value: Some(ConstantExprLibraryItemValue::AssociatedItem(
+                        constant_expr_value_id,
+                    )),
+                });
+        }
+        namespace.insert(
+            name,
+            ConstantExprLibraryItem {
+                namespace: HashMap::new(),
+                value: Some(ConstantExprLibraryItemValue::Function(
+                    constant_expr_function_id,
+                    is_singleton
+                )),
+            },
+        );
+    }
+    (
+        alt_name.unwrap_or(id),
+        ConstantExprLibraryItem {
+            namespace,
+            value: None,
+        },
     )
 }
 

@@ -2113,7 +2113,8 @@
                         }
                     }
                 ],
-                "altName": "add_values"
+                "altName": "add_values",
+                "constantExprFunctionId": 0
             },
             {
                 "type": "operator_subtract",
@@ -2141,7 +2142,8 @@
                         }
                     }
                 ],
-                "altName": "subtract_values"
+                "altName": "subtract_values",
+                "constantExprFunctionId": 1
             },
             {
                 "type": "operator_multiply",
@@ -2169,7 +2171,8 @@
                         }
                     }
                 ],
-                "altName": "multiply_values"
+                "altName": "multiply_values",
+                "constantExprFunctionId": 2
             },
             {
                 "type": "operator_divide",
@@ -2197,7 +2200,8 @@
                         }
                     }
                 ],
-                "altName": "divide_values"
+                "altName": "divide_values",
+                "constantExprFunctionId": 3
             },
             {
                 "type": "operator_random",
@@ -2225,7 +2229,8 @@
                         }
                     }
                 ],
-                "altName": "pick_random_number"
+                "altName": "pick_random_number",
+                "constantExprFunctionId": 4
             },
             {
                 "type": "operator_gt",
@@ -2253,7 +2258,8 @@
                         }
                     }
                 ],
-                "altName": "is_greater_than"
+                "altName": "is_greater_than",
+                "constantExprFunctionId": 5
             },
             {
                 "type": "operator_lt",
@@ -2281,7 +2287,8 @@
                         }
                     }
                 ],
-                "altName": "is_less_than"
+                "altName": "is_less_than",
+                "constantExprFunctionId": 6
             },
             {
                 "type": "operator_equals",
@@ -2309,7 +2316,8 @@
                         }
                     }
                 ],
-                "altName": "is_equal_to"
+                "altName": "is_equal_to",
+                "constantExprFunctionId": 7
             },
             {
                 "type": "operator_and",
@@ -2329,7 +2337,8 @@
                         "shadow": null
                     }
                 ],
-                "altName": "logical_and"
+                "altName": "logical_and",
+                "constantExprFunctionId": 8
             },
             {
                 "type": "operator_or",
@@ -2349,7 +2358,8 @@
                         "shadow": null
                     }
                 ],
-                "altName": "logical_or"
+                "altName": "logical_or",
+                "constantExprFunctionId": 9
             },
             {
                 "type": "operator_not",
@@ -2362,7 +2372,8 @@
                         "shadow": null
                     }
                 ],
-                "altName": "logical_not"
+                "altName": "logical_not",
+                "constantExprFunctionId": 10
             },
             {
                 "type": "operator_join",
@@ -2390,7 +2401,8 @@
                         }
                     }
                 ],
-                "altName": "join_strings"
+                "altName": "join_strings",
+                "constantExprFunctionId": 11
             },
             {
                 "type": "operator_letter_of",
@@ -2418,7 +2430,8 @@
                         }
                     }
                 ],
-                "altName": "letter_of_string"
+                "altName": "letter_of_string",
+                "constantExprFunctionId": 12
             },
             {
                 "type": "operator_length",
@@ -2435,7 +2448,8 @@
                         }
                     }
                 ],
-                "altName": "string_length"
+                "altName": "string_length",
+                "constantExprFunctionId": 13
             },
             {
                 "type": "operator_contains",
@@ -2463,7 +2477,8 @@
                         }
                     }
                 ],
-                "altName": "string_contains"
+                "altName": "string_contains",
+                "constantExprFunctionId": 14
             },
             {
                 "type": "operator_mod",
@@ -2491,7 +2506,8 @@
                         }
                     }
                 ],
-                "altName": "math_mod"
+                "altName": "math_mod",
+                "constantExprFunctionId": 15
             },
             {
                 "type": "operator_round",
@@ -2508,7 +2524,8 @@
                         }
                     }
                 ],
-                "altName": "math_round"
+                "altName": "math_round",
+                "constantExprFunctionId": 16
             },
             {
                 "type": "operator_mathop",
@@ -2521,61 +2538,75 @@
                         "options": [
                             {
                                 "label": "abs",
-                                "value": "abs"
+                                "value": "abs",
+                                "constantExprValueId": 0
                             },
                             {
                                 "label": "floor",
-                                "value": "floor"
+                                "value": "floor",
+                                "constantExprValueId": 1
                             },
                             {
                                 "label": "ceiling",
-                                "value": "ceiling"
+                                "value": "ceiling",
+                                "constantExprValueId": 2
                             },
                             {
                                 "label": "sqrt",
-                                "value": "sqrt"
+                                "value": "sqrt",
+                                "constantExprValueId": 3
                             },
                             {
                                 "label": "sin",
-                                "value": "sin"
+                                "value": "sin",
+                                "constantExprValueId": 4
                             },
                             {
                                 "label": "cos",
-                                "value": "cos"
+                                "value": "cos",
+                                "constantExprValueId": 5
                             },
                             {
                                 "label": "tan",
-                                "value": "tan"
+                                "value": "tan",
+                                "constantExprValueId": 6
                             },
                             {
                                 "label": "asin",
-                                "value": "asin"
+                                "value": "asin",
+                                "constantExprValueId": 7
                             },
                             {
                                 "label": "acos",
-                                "value": "acos"
+                                "value": "acos",
+                                "constantExprValueId": 8
                             },
                             {
                                 "label": "atan",
-                                "value": "atan"
+                                "value": "atan",
+                                "constantExprValueId": 9
                             },
                             {
                                 "label": "ln",
-                                "value": "ln"
+                                "value": "ln",
+                                "constantExprValueId": 10
                             },
                             {
                                 "label": "log",
-                                "value": "log"
+                                "value": "log",
+                                "constantExprValueId": 11
                             },
                             {
                                 "label": "e ^",
                                 "altName": "exp",
-                                "value": "e ^"
+                                "value": "e ^",
+                                "constantExprValueId": 12
                             },
                             {
                                 "label": "10 ^",
                                 "altName": "pow",
-                                "value": "10 ^"
+                                "value": "10 ^",
+                                "constantExprValueId": 13
                             }
                         ],
                         "optionCategory": "math_ops"
@@ -2592,7 +2623,8 @@
                         }
                     }
                 ],
-                "altName": "math_function"
+                "altName": "math_function",
+                "constantExprFunctionId": 17
             }
         ]
     },
