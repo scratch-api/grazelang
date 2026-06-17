@@ -749,10 +749,13 @@ impl Expression {
             Expression::UnOp(un_op, expr, _) => {
                 Some(un_op.apply_operation(expr.calculate_value_js()?))
             }
+            Expression::Parentheses(_, expr, _, _) => {
+                expr.calculate_value_js()
+            }
             // TODO: Advanced constant expressions
             //  - [ ] FormattedString
             //  - [ ] GetLetter
-            //  - [ ] Parentheses
+            //  - [x] Parentheses
             // Issue: #64
             _ => None,
         }
