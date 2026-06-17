@@ -457,10 +457,18 @@
     },
     "64": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [ ] FormattedString\n- [ ] GetLetter\n- [x] Parentheses",
+        "text": "- [ ] FormattedString\n- [ ] GetLetter\n- [x] Parentheses\n- [ ] Calculate `Call` values if possible",
         "status": "open",
-        "lines": "L755-L759",
-        "commit": "1a93935de09ed6bd2100782cd6094571c4663cb9",
+        "lines": "L778-L783",
+        "commit": "02a849d8a48146de8409bc7ff91956259eefa72e",
         "title": "Advanced constant expressions"
+    },
+    "65": {
+        "filepath": "grazelang/src/lexer.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L101-L101",
+        "commit": "02a849d8a48146de8409bc7ff91956259eefa72e",
+        "title": "Implement `contains` BinOp"
     }
 }
