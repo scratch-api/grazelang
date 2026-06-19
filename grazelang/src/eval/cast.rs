@@ -1,5 +1,6 @@
 use std::{
     borrow::Cow,
+    char::DecodeUtf16Error,
     fmt::{Debug, Write},
 };
 
@@ -30,6 +31,11 @@ pub trait ScratchVmToString {
 pub trait ScratchVmCompare {
     /// Equivalent to `Cast.compare` in scratch-vm
     fn compare(self, other: Self) -> f64;
+}
+
+pub trait ScratchVmIsInt {
+    /// Equivalent to `Cast.isInt` in scratch-vm
+    fn is_int(self) -> bool;
 }
 
 pub type JsOwnedStringData = Vec<u16>;
@@ -219,6 +225,25 @@ impl ScratchVmCompare for &JsPrimitive {
                 JsPrimitive::Boolean(value) => ((*value).into(), false),
             }
         }
+        fn lowercase_char_or_u16(value: Result<char, DecodeUtf16Error>, buf: &mut [u16]) -> usize {
+            match value {
+                Ok(value) => {
+                    let mut index = 0;
+                    for c in value.to_lowercase() {
+                        let slice = c.encode_utf16(&mut buf[index..]);
+                        index += slice.len();
+                    }
+                    index
+                }
+                Err(value) => {
+                    let [a, ..] = buf else {
+                        unreachable!();
+                    };
+                    *a = value.unpaired_surrogate();
+                    1
+                }
+            }
+        }
         let (mut num_1, ws_1) = convert_to_number_and_ws(self);
         let (mut num_2, ws_2) = convert_to_number_and_ws(other);
         if ws_1 {
@@ -232,18 +257,22 @@ impl ScratchVmCompare for &JsPrimitive {
             if str_1 == str_2 {
                 return 0.0;
             }
-            let chars_1 = char::decode_utf16(str_1.iter().cloned())
-                .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
-                .flat_map(|c| c.to_lowercase());
-            let chars_2 = char::decode_utf16(str_2.iter().cloned())
-                .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
-                .flat_map(|c| c.to_lowercase());
-            let ordering = chars_1.cmp(chars_2);
-            return match ordering {
-                std::cmp::Ordering::Less => -1.0,
-                std::cmp::Ordering::Equal => 0.0,
-                std::cmp::Ordering::Greater => 1.0,
-            };
+            let mut iter_a = char::decode_utf16(str_1.iter().cloned()).to_lowercase();
+            let mut iter_b = char::decode_utf16(str_2.iter().cloned()).to_lowercase();
+            loop {
+                let val_a = iter_a.next();
+                let val_b = iter_b.next();
+                return match (val_a, val_b) {
+                    (Some(a), Some(b)) => match a.cmp(&b) {
+                        std::cmp::Ordering::Equal => continue,
+                        std::cmp::Ordering::Less => -1.0,
+                        std::cmp::Ordering::Greater => 1.0,
+                    },
+                    (None, None) => 0.0,
+                    (None, Some(_)) => -1.0,
+                    (Some(_), None) => 1.0,
+                };
+            }
         }
         if (num_1 == f64::INFINITY && num_2 == f64::INFINITY)
             || (num_1 == f64::NEG_INFINITY && num_2 == f64::NEG_INFINITY)
@@ -251,6 +280,20 @@ impl ScratchVmCompare for &JsPrimitive {
             return 0.0;
         }
         num_1 - num_2
+    }
+}
+
+impl ScratchVmIsInt for &JsPrimitive {
+    fn is_int(self) -> bool {
+        match self {
+            JsPrimitive::JsString(value) => !value.contains(&(b'.' as u16)),
+            JsPrimitive::String(value) => !value.contains('.'),
+            JsPrimitive::IString(value) => !value.contains('.'),
+            JsPrimitive::Number(value) => {
+                value.is_nan() || try_convert_f64_into_i128(*value).is_some()
+            }
+            JsPrimitive::Boolean(_) => true,
+        }
     }
 }
 
@@ -682,5 +725,57 @@ pub mod parse_ecmascript_string_numeric_literal {
     }
     pub fn parse_string_numeric_literal(value: &str) -> f64 {
         parse_string_numeric_literal_and_is_ws(value).0
+    }
+}
+
+pub trait ToLowercaseU16: Iterator<Item = Result<char, DecodeUtf16Error>> + Sized {
+    fn to_lowercase(self) -> ToLowercaseU16Iterator<Self> {
+        ToLowercaseU16Iterator {
+            iterator: self,
+            buf: Default::default(),
+            buf_idx: 0,
+            buf_len: 0,
+        }
+    }
+}
+
+impl<I> ToLowercaseU16 for I where I: Iterator<Item = Result<char, DecodeUtf16Error>> {}
+
+pub struct ToLowercaseU16Iterator<I>
+where
+    I: Iterator<Item = Result<char, DecodeUtf16Error>>,
+{
+    pub iterator: I,
+    pub buf: [u16; 8],
+    pub buf_len: usize,
+    pub buf_idx: usize,
+}
+
+impl<I> Iterator for ToLowercaseU16Iterator<I>
+where
+    I: Iterator<Item = Result<char, DecodeUtf16Error>>,
+{
+    type Item = u16;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.buf_idx < self.buf_len {
+            let value = self.buf[self.buf_idx];
+            self.buf_idx += 1;
+            return Some(value);
+        }
+        self.buf_len = match self.iterator.next()? {
+            Ok(value) => {
+                let mut index = 0;
+                for c in value.to_lowercase() {
+                    index += c.encode_utf16(&mut self.buf[index..]).len();
+                }
+                index
+            }
+            Err(value) => {
+                self.buf[0] = value.unpaired_surrogate();
+                1
+            }
+        };
+        self.buf_idx = 1;
+        Some(self.buf[0])
     }
 }

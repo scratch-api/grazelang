@@ -29,7 +29,7 @@ use super::ids::IdCounter;
 use crate::{
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
-    messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
+    messages::{ConstantExprEvaluationError, GrazeMessage, GrazeWarning, GrazeWarningKind},
     names::Namespace,
     parser::{
         context::{
@@ -102,8 +102,12 @@ pub enum GrazeSb3GeneratorError {
     IdentifierNotCallable { identifier: Identifier },
     #[error("the identifier {identifier:?} is not assignable")]
     IdentifierNotAssignable { identifier: Identifier },
-    #[error("the expression {expression:?} is not calculatable by graze")]
-    ExpressionNotConstant { expression: Expression },
+    #[error("the expression {expression:?} is not calculatable by graze, {source}")]
+    InvalidConstantExpression {
+        expression: Box<Expression>,
+        #[source]
+        source: ConstantExprEvaluationError,
+    },
 }
 
 impl GetPos for GrazeSb3GeneratorError {
@@ -135,9 +139,10 @@ impl GetPos for GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::RepeatedStageInitialization { stage_keyword } => {
                 stage_keyword.get_source_span()
             }
-            GrazeSb3GeneratorError::ExpressionNotConstant { expression } => {
-                expression.get_source_span()
-            }
+            GrazeSb3GeneratorError::InvalidConstantExpression {
+                expression,
+                source: _,
+            } => expression.get_source_span(),
         }
     }
 }
@@ -2751,9 +2756,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             };
                             SingleAssignment::Var(
                                 path,
-                                expression.calculate_value().ok_or_else(|| {
-                                    GrazeSb3GeneratorError::ExpressionNotConstant {
-                                        expression: expression.clone(),
+                                expression.calculate_value().map_err(|source| {
+                                    GrazeSb3GeneratorError::InvalidConstantExpression {
+                                        expression: Box::new(expression.clone()),
+                                        source,
                                     }
                                 })?,
                             )
@@ -2825,9 +2831,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 for (value, _) in items {
                                     match value {
                                         ListEntry::Expression(expression) => {
-                                            values.push(expression.calculate_value().ok_or_else(
-                                                || GrazeSb3GeneratorError::ExpressionNotConstant {
-                                                    expression: expression.clone(),
+                                            values.push(expression.calculate_value().map_err(
+                                                |source| {
+                                                    GrazeSb3GeneratorError::InvalidConstantExpression {
+                                                        expression: Box::new(expression.clone()),
+                                                        source,
+                                                    }
                                                 },
                                             )?);
                                         }
@@ -2901,9 +2910,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         };
                         SingleAssignment::Var(
                             path,
-                            expression.calculate_value().ok_or_else(|| {
-                                GrazeSb3GeneratorError::ExpressionNotConstant {
-                                    expression: expression.clone(),
+                            expression.calculate_value().map_err(|source| {
+                                GrazeSb3GeneratorError::InvalidConstantExpression {
+                                    expression: Box::new(expression.clone()),
+                                    source,
                                 }
                             })?,
                         )
@@ -2959,9 +2969,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             for (value, _) in items {
                                 match value {
                                     ListEntry::Expression(expression) => {
-                                        values.push(expression.calculate_value().ok_or_else(
-                                            || GrazeSb3GeneratorError::ExpressionNotConstant {
-                                                expression: expression.clone(),
+                                        values.push(expression.calculate_value().map_err(
+                                            |source| {
+                                                GrazeSb3GeneratorError::InvalidConstantExpression {
+                                                    expression: Box::new(expression.clone()),
+                                                    source,
+                                                }
                                             },
                                         )?);
                                     }

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     eval::{call::ConstantExprFunction, cast::JsPrimitive},
     lexer::SourceSpan,
+    messages::ConstantExprEvaluationError,
 };
 use arcstr::ArcStr as IString; // Immutable string
 use grazelang_library::{
@@ -746,44 +747,41 @@ impl Expression {
         matches!(self, Expression::Literal(Literal::EmptyExpression(..)))
     }
 
-    pub fn calculate_value_js(&self) -> Option<JsPrimitive> {
+    pub fn calculate_value_js(&self) -> Result<JsPrimitive, ConstantExprEvaluationError> {
         match self {
-            Expression::Literal(literal) => Some(Sb3Primitive::from(literal).into()),
-            Expression::BinOp(expr_a, bin_op, expr_b, _) => Some(
-                bin_op.apply_operation(expr_a.calculate_value_js()?, expr_b.calculate_value_js()?),
-            ),
+            Expression::Literal(literal) => Ok(Sb3Primitive::from(literal).into()),
+            Expression::BinOp(expr_a, bin_op, expr_b, _) => {
+                Ok(bin_op
+                    .apply_operation(expr_a.calculate_value_js()?, expr_b.calculate_value_js()?))
+            }
             Expression::UnOp(un_op, expr, _) => {
-                Some(un_op.apply_operation(expr.calculate_value_js()?))
+                Ok(un_op.apply_operation(expr.calculate_value_js()?))
             }
             Expression::Parentheses(_, expr, _, _) => expr.calculate_value_js(),
             Expression::GetLetter(string, _, index, _, _) => {
                 use crate::eval::cast::{
                     JsPrimitive, ScratchVmToNumber, ScratchVmToString, try_convert_f64_into_i128,
                 };
-                let Some(string_js) = string.calculate_value_js() else {
-                    return Some(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
-                };
+                let string_js = string.calculate_value_js()?;
                 let string = string_js.to_js_cow_str();
                 let index = index.calculate_value_js()?.to_number() - 1.0;
                 let Ok(index) =
                     usize::try_from(if let Some(it) = try_convert_f64_into_i128(index.floor()) {
                         it
                     } else {
-                        return Some(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
+                        return Ok(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
                     })
                 else {
-                    return Some(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
+                    return Ok(JsPrimitive::IString(EMPTY_ISTRING_REF.clone()));
                 };
-                Some(
-                    string
-                        .get(index)
-                        .map(|value| JsPrimitive::JsString(vec![*value]))
-                        .unwrap_or_else(|| JsPrimitive::IString(EMPTY_ISTRING_REF.clone())),
-                )
+                Ok(string
+                    .get(index)
+                    .map(|value| JsPrimitive::JsString(vec![*value]))
+                    .unwrap_or_else(|| JsPrimitive::IString(EMPTY_ISTRING_REF.clone())))
             }
             Expression::FormattedString(content, _) => {
                 use crate::eval::cast::ScratchVmToString;
-                Some(JsPrimitive::JsString(content.iter().try_fold(
+                Ok(JsPrimitive::JsString(content.iter().try_fold(
                     Vec::<u16>::new(),
                     |mut current, value| {
                         match value {
@@ -796,30 +794,54 @@ impl Expression {
                                 current.extend(value.encode_utf16())
                             }
                         }
-                        Some(current)
+                        Ok(current)
                     },
                 )?))
             }
-            Expression::Call(identifier, _, exprs, _, _) => {
+            Expression::Call(identifier, _, exprs, _, source_span) => {
                 let library_item = crate::library::const_expr_lookup(
                     identifier
                         .path
                         .iter()
                         .chain(identifier.fields.iter())
                         .map(|(next, _)| next as &str),
-                )?;
+                )
+                .map_err(|err| match err {
+                    crate::library::ConstExpLookupError::NotFound => {
+                        ConstantExprEvaluationError::ConstIdentifierDoesNotExist {
+                            identifier: identifier.clone(),
+                        }
+                    }
+                    crate::library::ConstExpLookupError::UsedSuper => {
+                        ConstantExprEvaluationError::ConstIdentifierUsedSupper {
+                            identifier: identifier.clone(),
+                        }
+                    }
+                })?;
 
                 let Some(ConstantExprLibraryItemValue::Function(function_id, _)) =
                     library_item.value
                 else {
-                    return None;
+                    return Err(match library_item.value {
+                        Some(ConstantExprLibraryItemValue::AssociatedItem(_)) => {
+                            ConstantExprEvaluationError::NotConstFunctionButValue {
+                                identifier: identifier.clone(),
+                            }
+                        }
+                        None => ConstantExprEvaluationError::NotConstFunctionButNamespace {
+                            identifier: identifier.clone(),
+                        },
+                        Some(ConstantExprLibraryItemValue::Function(_, _)) => unreachable!(),
+                    });
                 };
 
                 let Ok(function) = ConstantExprFunction::try_from(function_id) else {
-                    return None;
+                    return Err(ConstantExprEvaluationError::NotConstFunctionButNamespace {
+                        identifier: identifier.clone(),
+                    });
                 };
 
-                function.apply(exprs.iter().map(|(value, _)| value))
+                function.apply(exprs.iter().map(|(value, _)| value), *source_span)
             }
             // TODO: Advanced constant expressions
             //  - [x] FormattedString
@@ -827,13 +849,18 @@ impl Expression {
             //  - [x] Parentheses
             //  - [ ] Calculate `Call` values if possible
             // Issue: #64
-            _ => None,
+            Expression::Identifier(identifier) => todo!(),
+            Expression::GetItem(identifier, _, _, _, _) => {
+                Err(ConstantExprEvaluationError::ConstExprListAccess {
+                    identifier: identifier.clone(),
+                })
+            }
         }
     }
 
-    pub fn calculate_value(&self) -> Option<Sb3Primitive> {
+    pub fn calculate_value(&self) -> Result<Sb3Primitive, ConstantExprEvaluationError> {
         if let Expression::Literal(literal) = self {
-            return Some(literal.into());
+            return Ok(literal.into());
         }
         self.calculate_value_js().map(Into::into)
     }
@@ -1529,8 +1556,12 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
-    #[error("the expression {expression:?} is not calculatable by graze")]
-    ExpressionNotConstant { expression: Box<Expression> },
+    #[error("the expression {expression:?} is not calculatable by graze, {source}")]
+    InvalidConstantExpression {
+        expression: Box<Expression>,
+        #[source]
+        source: ConstantExprEvaluationError,
+    },
     #[error("{source}")]
     IoError {
         #[source]
@@ -1606,7 +1637,10 @@ impl GetPos for ParseError {
                     context: _,
                 source_span,
             } => source_span,
-            ParseError::ExpressionNotConstant { expression } => expression.get_source_span(),
+            ParseError::InvalidConstantExpression {
+                expression,
+                source: _,
+            } => expression.get_source_span(),
             ParseError::IoError {
                 source: _,
                 source_span,

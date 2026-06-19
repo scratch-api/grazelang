@@ -1,7 +1,5 @@
 use std::{
-    borrow::Borrow,
     collections::{HashMap, HashSet},
-    hash::Hash,
     rc::Rc,
     sync::LazyLock,
 };
@@ -24,20 +22,42 @@ pub fn get_generated_library() -> (HashMap<String, LibraryItem>, HashMap<u32, Ha
     generate_library!("schemas/toolbox_schema.json")
 }
 
-pub static CONSTANT_EXPR_LIBRARY: LazyLock<ConstantExprLibraryItem> =
-    LazyLock::new(|| generate_constant_expr_library!("schemas/toolbox_schema.json"));
+pub static CONSTANT_EXPR_LIBRARY: LazyLock<ConstantExprLibraryItem> = LazyLock::new(|| {
+    let mut library = generate_constant_expr_library!("schemas/toolbox_schema.json");
+    let mut flattened = HashMap::<String, Option<ConstantExprLibraryItem>>::new();
+    for namespace in library.namespace.values() {
+        for (key, value) in &namespace.namespace {
+            if let Some(mut_value) = flattened.get_mut(key) {
+                mut_value.take();
+            } else {
+                flattened.insert(key.clone(), Some(value.clone()));
+            }
+        }
+    }
+    for (key, value) in flattened {
+        if let Some(value) = value {
+            library.namespace.insert(key, value);
+        }
+    }
+    library
+});
 
-pub fn const_expr_lookup<'a, I, Q>(mut path: I) -> Option<&'static ConstantExprLibraryItem>
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ConstExpLookupError {
+    NotFound,
+    UsedSuper,
+}
+
+pub fn const_expr_lookup<'a, I>(mut path: I) -> Result<&'static ConstantExprLibraryItem, ConstExpLookupError>
 where
-    I: Iterator<Item = &'a Q>,
-    String: Borrow<Q>,
-    Q: ?Sized + 'a,
-    Q: Hash + Eq,
+    I: Iterator<Item = &'a str>,
 {
-    path.try_fold::<&ConstantExprLibraryItem, _, _>(
-        &CONSTANT_EXPR_LIBRARY,
-        |current, value| current.namespace.get(value),
-    )
+    path.try_fold::<&ConstantExprLibraryItem, _, _>(&CONSTANT_EXPR_LIBRARY, |current, value| {
+        if value == "super" {
+            return Err(ConstExpLookupError::UsedSuper);
+        }
+        current.namespace.get(value).ok_or(ConstExpLookupError::NotFound)
+    })
 }
 
 pub fn convert_generated_library(

@@ -833,7 +833,12 @@ pub mod statement {
                 let prefix_source_span = get_token_source_span(token_stream);
                 let token = next_token!(token_stream);
                 if get_token_start(token_stream) != prefix_source_span.0.1 {
-                    emit_unexpected_token!(token_stream, "Expected a literal immediately following the plus.", "a literal immediately following the plus", token);
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected a literal immediately following the plus.",
+                        "a literal immediately following the plus",
+                        token
+                    );
                 }
                 match token {
                     Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
@@ -845,7 +850,12 @@ pub mod statement {
                         get_token_source_span(token_stream),
                     )),
                     token => {
-                        emit_unexpected_token!(token_stream, "Expected a literal.", "a literal", token);
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected a literal.",
+                            "a literal",
+                            token
+                        );
                     }
                 }
             }
@@ -853,7 +863,12 @@ pub mod statement {
                 let prefix_source_span = get_token_source_span(token_stream);
                 let token = next_token!(token_stream);
                 if get_token_start(token_stream) != prefix_source_span.0.1 {
-                    emit_unexpected_token!(token_stream, "Expected a literal immediately following the minus.", "a literal immediately following the minus", token);
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected a literal immediately following the minus.",
+                        "a literal immediately following the minus",
+                        token
+                    );
                 }
                 match token {
                     Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
@@ -865,7 +880,12 @@ pub mod statement {
                         get_token_source_span(token_stream),
                     )),
                     token => {
-                        emit_unexpected_token!(token_stream, "Expected a literal.", "a literal", token);
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected a literal.",
+                            "a literal",
+                            token
+                        );
                     }
                 }
             }
@@ -1207,9 +1227,10 @@ pub mod statement {
                                     let mut expressions = Vec::with_capacity(value.len());
                                     for(entry, _)in value {
                                         match entry {
-                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().ok_or_else(|| {
-                                                ParseError::ExpressionNotConstant {
+                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().map_err(|source| {
+                                                ParseError::InvalidConstantExpression {
                                                     expression: Box::new(expression.clone()),
+                                                    source
                                                 }
                                             })?),
                                             ListEntry::Unwrap(literal, _) => literal.get_string_value().as_str().chars().for_each(|c| expressions.push(grazelang_library::project_json::Sb3Primitive::String(c.to_string()))),
@@ -1229,9 +1250,9 @@ pub mod statement {
                             value: match &value {
                                 DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
                                 DeclarationValue::Var(_, value) => {
-                                    value.calculate_value().ok_or_else(|| {
-                                        ParseError::ExpressionNotConstant {
-                                            expression: Box::new(value.clone()),
+                                    value.calculate_value().map_err(|source| {
+                                        ParseError::InvalidConstantExpression {
+                                            expression: Box::new(value.clone()), source
                                         }
                                     })?
                                 },
@@ -1654,9 +1675,9 @@ pub mod statement {
                                     let mut expressions = Vec::with_capacity(value.len());
                                     for (entry, _) in value {
                                         match entry {
-                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().ok_or_else(|| {
-                                                ParseError::ExpressionNotConstant {
-                                                    expression: Box::new(expression.clone()),
+                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().map_err(|source| {
+                                                ParseError::InvalidConstantExpression {
+                                                    expression: Box::new(expression.clone()),source
                                                 }
                                             })?),
                                             ListEntry::Unwrap(literal, _) => literal
@@ -1682,9 +1703,9 @@ pub mod statement {
                             value: match &value {
                                 DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
                                 DeclarationValue::Var(_, value) => {
-                                    value.calculate_value().ok_or_else(|| {
-                                        ParseError::ExpressionNotConstant {
-                                            expression: Box::new(value.clone()),
+                                    value.calculate_value().map_err(|source| {
+                                        ParseError::InvalidConstantExpression {
+                                            expression: Box::new(value.clone()),source
                                         }
                                     })?
                                 },

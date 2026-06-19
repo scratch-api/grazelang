@@ -18,6 +18,14 @@ sprite `Sprite1` sprite_1 {
     costume `costume1` test_costume("empty.svg");
     let global test;
     let global list `list` list_ = [.."1000000"];
+    let global list random_numbers = [
+        pick_random_number(0, 255),
+        pick_random_number(0, 255),
+        pick_random_number(0, 255),
+        pick_random_number(0, 255),
+        pick_random_number(0, 10000000000000000000000000000000000000000),
+        pick_random_number(0.0, 255.0),
+    ];
     let local list list_2;
     events.when_green_flag_clicked {
         list_.clear();
