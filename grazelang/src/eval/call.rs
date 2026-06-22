@@ -273,11 +273,12 @@ impl ConstantExprFunction {
                     RNG.lock().unwrap_or_else(|err| err.into_inner())
                 }
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                let (from, to) = (expr_a.to_number(), expr_b.to_number());
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                let (from, to) = (value_a.to_number(), value_b.to_number());
                 let (from, to) = if from <= to { (from, to) } else { (to, from) };
-                if expr_a.is_int()
-                    && expr_b.is_int()
+                if value_a.is_int()
+                    && value_b.is_int()
                     && let Some(from) = try_convert_f64_into_i128(from)
                     && let Some(to) = try_convert_f64_into_i128(to)
                 {
@@ -289,44 +290,50 @@ impl ConstantExprFunction {
             }
             ConstantExprFunction::OperatorGreaterThan => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(expr_a.compare(&expr_b) > 0.0))
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                Ok(JsPrimitive::Boolean(value_a.compare(&value_b) > 0.0))
             }
             ConstantExprFunction::OperatorLessThan => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(expr_a.compare(&expr_b) < 0.0))
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                Ok(JsPrimitive::Boolean(value_a.compare(&value_b) < 0.0))
             }
             ConstantExprFunction::OperatorEquals => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(expr_a.compare(&expr_b) == 0.0))
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                Ok(JsPrimitive::Boolean(value_a.compare(&value_b) == 0.0))
             }
             ConstantExprFunction::OperatorAnd => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
                 Ok(JsPrimitive::Boolean(
-                    expr_a.to_boolean() && expr_b.to_boolean(),
+                    value_a.to_boolean() && value_b.to_boolean(),
                 ))
             }
             ConstantExprFunction::OperatorOr => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
                 Ok(JsPrimitive::Boolean(
-                    expr_a.to_boolean() || expr_b.to_boolean(),
+                    value_a.to_boolean() || value_b.to_boolean(),
                 ))
             }
             ConstantExprFunction::OperatorNot => {
                 let expr = un_op_args(args, source_span)?;
-                let expr = expr.calculate_value_js()?;
-                Ok(JsPrimitive::Boolean(!expr.to_boolean()))
-            },
+                let value = expr.calculate_value_js()?;
+                Ok(JsPrimitive::Boolean(!value.to_boolean()))
+            }
             ConstantExprFunction::OperatorJoin => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
                 Ok(JsPrimitive::JsString({
-                    let mut expr_a_string = expr_a.to_js_string();
-                    expr_b.write_to_js_string(&mut expr_a_string);
+                    let mut expr_a_string = value_a.to_js_string();
+                    value_b.write_to_js_string(&mut expr_a_string);
                     expr_a_string
                 }))
             }
@@ -351,13 +358,14 @@ impl ConstantExprFunction {
             }
             ConstantExprFunction::OperatorLength => {
                 let expr = un_op_args(args, source_span)?;
-                let expr = expr.calculate_value_js()?;
-                Ok(JsPrimitive::Number(expr.to_js_cow_str().len() as f64))
-            },
+                let value = expr.calculate_value_js()?;
+                Ok(JsPrimitive::Number(value.to_js_cow_str().len() as f64))
+            }
             ConstantExprFunction::OperatorContains => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                let (haystack, needle) = (expr_a.to_js_cow_str(), expr_b.to_js_cow_str());
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                let (haystack, needle) = (value_a.to_js_cow_str(), value_b.to_js_cow_str());
                 let haystack = char::decode_utf16(haystack.iter().copied())
                     .to_lowercase()
                     .collect::<Vec<_>>();
@@ -368,9 +376,10 @@ impl ConstantExprFunction {
             }
             ConstantExprFunction::OperatorMod => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                let (expr_a, expr_b) = (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                let n = expr_a.to_number();
-                let modulus = expr_b.to_number();
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                let n = value_a.to_number();
+                let modulus = value_b.to_number();
                 let result = n % modulus;
                 Ok(JsPrimitive::Number(if result / modulus < 0.0 {
                     result + modulus
@@ -378,7 +387,15 @@ impl ConstantExprFunction {
                     result
                 }))
             }
-            ConstantExprFunction::OperatorRound => todo!(),
+            ConstantExprFunction::OperatorRound => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                if value >= -0.5 && (value < 0.0 || (value == 0.0 && value.is_sign_negative())) {
+                    return Ok(JsPrimitive::Number(-0.0));
+                }
+                Ok(JsPrimitive::Number((value + 0.5).floor()))
+            }
             ConstantExprFunction::OperatorMathop => todo!(),
         }
     }
