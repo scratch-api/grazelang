@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 
 pub trait ScratchVmToNumber {
     /// Equivalent to `Cast.toNumber` in scratch-vm
-    fn to_number(self) -> f64;
+    fn to_number(&self) -> f64;
 }
 
 pub trait ScratchVmToBoolean {
     /// Equivalent to `Cast.toBoolean` in scratch-vm
-    fn to_boolean(self) -> bool;
+    fn to_boolean(&self) -> bool;
 }
 
 pub trait ScratchVmToString {
@@ -30,12 +30,12 @@ pub trait ScratchVmToString {
 
 pub trait ScratchVmCompare {
     /// Equivalent to `Cast.compare` in scratch-vm
-    fn compare(self, other: Self) -> f64;
+    fn compare(&self, other: &Self) -> f64;
 }
 
 pub trait ScratchVmIsInt {
     /// Equivalent to `Cast.isInt` in scratch-vm
-    fn is_int(self) -> bool;
+    fn is_int(&self) -> bool;
 }
 
 pub type JsOwnedStringData = Vec<u16>;
@@ -105,8 +105,8 @@ impl From<Sb3Primitive> for JsPrimitive {
     }
 }
 
-impl ScratchVmToNumber for &JsPrimitive {
-    fn to_number(self) -> f64 {
+impl ScratchVmToNumber for JsPrimitive {
+    fn to_number(&self) -> f64 {
         fn convert_str_to_number(value: &str) -> f64 {
             let value =
                 parse_ecmascript_string_numeric_literal::parse_string_numeric_literal(value);
@@ -126,8 +126,8 @@ impl ScratchVmToNumber for &JsPrimitive {
     }
 }
 
-impl ScratchVmToBoolean for &JsPrimitive {
-    fn to_boolean(self) -> bool {
+impl ScratchVmToBoolean for JsPrimitive {
+    fn to_boolean(&self) -> bool {
         fn convert_str_to_bool(value: &str) -> bool {
             match value {
                 "" | "0" => false,
@@ -211,8 +211,8 @@ impl ScratchVmToString for JsPrimitive {
     }
 }
 
-impl ScratchVmCompare for &JsPrimitive {
-    fn compare(self, other: Self) -> f64 {
+impl ScratchVmCompare for JsPrimitive {
+    fn compare(&self, other: &Self) -> f64 {
         fn convert_to_number_and_ws(value: &JsPrimitive) -> (f64, bool) {
             use parse_ecmascript_string_numeric_literal::parse_string_numeric_literal_and_is_ws;
             match value {
@@ -283,8 +283,8 @@ impl ScratchVmCompare for &JsPrimitive {
     }
 }
 
-impl ScratchVmIsInt for &JsPrimitive {
-    fn is_int(self) -> bool {
+impl ScratchVmIsInt for JsPrimitive {
+    fn is_int(&self) -> bool {
         match self {
             JsPrimitive::JsString(value) => !value.contains(&(b'.' as u16)),
             JsPrimitive::String(value) => !value.contains('.'),

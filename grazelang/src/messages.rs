@@ -71,17 +71,8 @@ impl GetPos for ConstantExprEvaluationError {
             | Self::NotConstFunctionButNamespace { identifier }
             | Self::ConstIdentifierDoesNotExist { identifier }
             | Self::ConstExprListAccess { identifier }
-            | Self::NotConstFunctionButValue { identifier }
-            | Self::NotConstFunctionButNamespace { identifier }
-            | Self::ConstIdentifierDoesNotExist { identifier }
-            | Self::ConstIdentifierUsedSupper { identifier }
-            | Self::ConstExprListAccess { identifier } => identifier.get_source_span(),
+            | Self::ConstIdentifierUsedSupper { identifier } => identifier.get_source_span(),
             Self::IncorrectParamCount {
-                unexpected: _,
-                expected: _,
-                source_span,
-            }
-            | Self::IncorrectParamCount {
                 unexpected: _,
                 expected: _,
                 source_span,
