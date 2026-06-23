@@ -474,7 +474,7 @@
     "66": {
         "filepath": "grazelang/src/eval/call.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L41-L41",
         "commit": "cc96d78279333a74b1c6c1c2a76a230cce1bb57b",
         "title": "Replace Option<JsPrimitive> with Result<JsPrimitive, E> and decide on E"
