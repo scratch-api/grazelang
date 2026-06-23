@@ -2569,10 +2569,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             &Identifier,
             &crate::parser::cst::NormalAssignmentOperator,
             &crate::parser::cst::LeftBracket,
-            &[(
-                crate::parser::cst::ListEntry,
-                Option<crate::parser::cst::Comma>,
-            )],
+            &crate::parser::cst::CommaSeparated<crate::parser::cst::ListEntry>,
             &crate::parser::cst::RightBracket,
             &crate::parser::cst::Semicolon,
             &crate::lexer::SourceSpan,
@@ -2609,7 +2606,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             );
         });
         for item in value.3 {
-            match &item.0 {
+            match item {
                 ListEntry::Expression(expression) => {
                     wrap_in_statement(context, |context, parent, this_id| {
                         self.visit_expression(expression, context)?;
@@ -2828,7 +2825,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             };
                             SingleAssignment::List(path, {
                                 let mut values = Vec::with_capacity(items.len());
-                                for (value, _) in items {
+                                for value in items {
                                     match value {
                                         ListEntry::Expression(expression) => {
                                             values.push(expression.calculate_value().map_err(
@@ -2966,7 +2963,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         };
                         SingleAssignment::List(path, {
                             let mut values = Vec::with_capacity(items.len());
-                            for (value, _) in items {
+                            for value in items {
                                 match value {
                                     ListEntry::Expression(expression) => {
                                         values.push(expression.calculate_value().map_err(

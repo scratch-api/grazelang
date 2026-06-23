@@ -362,6 +362,49 @@ macro_rules! find_top_level_statement_end_and_return_invalid {
     }};
 }
 
+macro_rules! parse_comma_separated {
+    ($token_stream:expr, $context:expr, ($token_stream_ident:ident, $context_ident:ident) => $parse:expr, $end:pat, $end_pat_repr:expr) => {{
+        let token_stream = &mut *$token_stream;
+        let context = &mut *$context;
+        let mut start_pos = None;
+        let mut values = Vec::new();
+        let tail_value = loop {
+            if matches!(peek_token!(token_stream), $end) {
+                start_pos.get_or_insert_with(|| get_token_start(token_stream));
+                break None;
+            }
+            let value = {
+                let $token_stream_ident = &mut *token_stream;
+                let $context_ident = &mut *context;
+                $parse
+            };
+            start_pos.get_or_insert_with(|| value.get_source_span().0.0);
+            let comma = match peek_token!(token_stream) {
+                Token::Comma => {
+                    skip_token!(token_stream);
+                    cst::Comma(get_token_source_span(token_stream))
+                }
+                $end => break Some(value),
+                _ => {
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token!(
+                        token_stream,
+                        concat!("Expected a comma or ", $end_pat_repr, "."),
+                        concat!("a comma or ", $end_pat_repr),
+                        token
+                    );
+                }
+            };
+            values.push((value, comma));
+        };
+        cst::CommaSeparated {
+            values,
+            tail_value,
+            source_span: token_stream.span_from_previous_to_current(start_pos.unwrap()),
+        }
+    }};
+}
+
 pub fn emit_message(
     context: &mut ParseContext,
     message: GrazeMessage,
@@ -900,22 +943,19 @@ pub mod statement {
         context: &mut ParseContext,
     ) -> ParseOut<(
         LeftBracket,
-        Vec<(cst::ListEntry, Option<cst::Comma>)>,
+        cst::CommaSeparated<cst::ListEntry>,
         RightBracket,
     )> {
-        let mut entries = Vec::<(cst::ListEntry, Option<cst::Comma>)>::new();
         let left_bracket = expect_token!(
             token_stream,
             Token::LeftBracket => from_stream_pos!(token_stream => LeftBracket),
             "Expected '['.",
             "'['"
         );
-        let right_bracket = loop {
-            let list_entry = match peek_token!(token_stream) {
-                Token::RightBracket => {
-                    skip_token!(token_stream);
-                    break from_stream_pos!(token_stream => RightBracket);
-                }
+        let values = parse_comma_separated!(
+            token_stream,
+            context,
+            (token_stream, context) => match peek_token!(token_stream) {
                 Token::Unwrap => {
                     skip_token!(token_stream);
                     let unwrap_start = get_token_start(token_stream);
@@ -931,31 +971,19 @@ pub mod statement {
                 }
                 _ => ListEntry::Expression(token_stream.substitude_unexpected_token_message(
                     |token_stream| parse_expression(token_stream, context),
-                    literal!("Expected '}', \"..\" or an expression."),
-                    literal!("'}', \"..\" or an expression"),
+                    literal!("Expected ']', \"..\" or an expression."),
+                    literal!("']', \"..\" or an expression"),
                 )?),
-            };
-            entries.push((
-                list_entry,
-                match peek_token!(token_stream) {
-                    Token::RightBracket => None,
-                    Token::Comma => {
-                        skip_token!(token_stream);
-                        Some(from_stream_pos!(token_stream => cst::Comma))
-                    }
-                    _ => {
-                        let token = next_token!(token_stream);
-                        emit_unexpected_token!(
-                            token_stream,
-                            "Expected a comma or ']'.",
-                            "a comma or ']'",
-                            token
-                        );
-                    }
-                },
-            ));
-        };
-        Ok((left_bracket, entries, right_bracket))
+            },
+            Token::RightBracket, "']'"
+        );
+        let right_bracket = expect_token!(
+            token_stream,
+            Token::RightBracket => from_stream_pos!(token_stream => RightBracket),
+            "Expected ']'.",
+            "']'"
+        );
+        Ok((left_bracket, values, right_bracket))
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -970,7 +998,7 @@ pub mod statement {
         List(
             NormalAssignmentOperator,
             LeftBracket,
-            Vec<(cst::ListEntry, Option<cst::Comma>)>,
+            cst::CommaSeparated<cst::ListEntry>,
             RightBracket,
         ),
         Var(NormalAssignmentOperator, Expression),
@@ -1225,7 +1253,7 @@ pub mod statement {
                             name: name.clone(), canonical_name: canonical_identifier.as_ref().map(|value|value.name.clone()), value_is_initial_value: values_are_initial_values, value: match &value {
                                 DeclarationValue::List(_, _, value, _) => {
                                     let mut expressions = Vec::with_capacity(value.len());
-                                    for(entry, _)in value {
+                                    for entry in value {
                                         match entry {
                                             ListEntry::Expression(expression) => expressions.push(expression.calculate_value().map_err(|source| {
                                                 ParseError::InvalidConstantExpression {
@@ -1673,7 +1701,7 @@ pub mod statement {
                             value: match &value {
                                 DeclarationValue::List(_, _, value, _) => {
                                     let mut expressions = Vec::with_capacity(value.len());
-                                    for (entry, _) in value {
+                                    for entry in value {
                                         match entry {
                                             ListEntry::Expression(expression) => expressions.push(expression.calculate_value().map_err(|source| {
                                                 ParseError::InvalidConstantExpression {

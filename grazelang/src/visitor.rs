@@ -2,13 +2,14 @@ use crate::{
     lexer::SourceSpan,
     parser::cst::{
         AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
-        Comma, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope,
-        Expression, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket,
-        LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword,
-        Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
-        Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword,
-        SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse,
-        SyntacticIf, TopLevelStatement, UnOp, VarKeyword, VarsKeyword, WarpSpecifier,
+        Comma, CommaSeparated, CostumeKeyword, CustomBlockParamKind, DataDeclaration,
+        DataDeclarationScope, Expression, FormattedStringContent, GrazeProgram, Identifier,
+        LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry,
+        ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace,
+        RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock,
+        SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement,
+        SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, VarKeyword, VarsKeyword,
+        WarpSpecifier,
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -246,7 +247,7 @@ pub trait GrazeVisitor<C, E> {
             &Identifier,
             &NormalAssignmentOperator,
             &LeftBracket,
-            &[(ListEntry, Option<Comma>)],
+            &CommaSeparated<ListEntry>,
             &RightBracket,
             &Semicolon,
             &SourceSpan,
@@ -346,7 +347,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_list_content(
         &self,
-        value: &[(ListEntry, Option<Comma>)],
+        value: &CommaSeparated<ListEntry>,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_list_content(self, value, context)
@@ -447,7 +448,7 @@ pub trait GrazeVisitor<C, E> {
             &Identifier,
             &NormalAssignmentOperator,
             &LeftBracket,
-            &[(ListEntry, Option<Comma>)],
+            &CommaSeparated<ListEntry>,
             &RightBracket,
             &SourceSpan,
         ),
@@ -1398,7 +1399,7 @@ pub fn default_visit_statement_list_assignment<V, C, E>(
         &Identifier,
         &NormalAssignmentOperator,
         &LeftBracket,
-        &[(ListEntry, Option<Comma>)],
+        &CommaSeparated<ListEntry>,
         &RightBracket,
         &Semicolon,
         &SourceSpan,
@@ -1613,14 +1614,14 @@ where
 
 pub fn default_visit_list_content<V, C, E>(
     visitor: &V,
-    value: &[(ListEntry, Option<Comma>)],
+    value: &CommaSeparated<ListEntry>,
     context: &mut C,
 ) -> Result<(), E>
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value {
-        match &item.0 {
+        match item {
             ListEntry::Expression(expression) => visitor.visit_expression(expression, context)?,
             ListEntry::Unwrap(..) => (),
         }
@@ -1907,7 +1908,7 @@ pub fn default_visit_single_list_declaration<V, C, E>(
         &Identifier,
         &NormalAssignmentOperator,
         &LeftBracket,
-        &[(ListEntry, Option<Comma>)],
+        &CommaSeparated<ListEntry>,
         &RightBracket,
         &SourceSpan,
     ),

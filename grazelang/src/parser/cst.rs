@@ -162,8 +162,48 @@ pub enum CustomBlockParamKindValue {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommaSeparated<T> {
     pub values: Vec<(T, Comma)>,
-    pub tail_value: T,
+    pub tail_value: Option<T>,
     pub source_span: SourceSpan,
+}
+
+impl<T> CommaSeparated<T> {
+    pub fn len(&self) -> usize {
+        self.values.len() + self.tail_value.is_some() as usize
+    }
+}
+
+pub struct CommaSeparatedIterator<'a, T> {
+    pub comma_separated: &'a CommaSeparated<T>,
+    pub index: usize,
+}
+
+impl<'a, T> Iterator for CommaSeparatedIterator<'a, T> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        let cs_len = self.comma_separated.values.len();
+        if self.index < cs_len {
+            let value = &self.comma_separated.values[self.index].0;
+            self.index += 1;
+            return Some(value);
+        }
+        if self.index == cs_len {
+            let value = self.comma_separated.tail_value.as_ref();
+            self.index += 1;
+            return value;
+        }
+        None
+    }
+}
+
+impl<'a, T> IntoIterator for &'a CommaSeparated<T> {
+    type Item = &'a T;
+    type IntoIter = CommaSeparatedIterator<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        CommaSeparatedIterator {
+            comma_separated: self,
+            index: 0,
+        }
+    }
 }
 
 impl<T> GetPos for CommaSeparated<T> {
@@ -389,7 +429,7 @@ pub enum Statement {
         Identifier,
         NormalAssignmentOperator,
         LeftBracket,
-        Vec<(ListEntry, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<ListEntry>,
         RightBracket,
         Semicolon,
         SourceSpan,
@@ -612,7 +652,7 @@ pub enum SingleDataDeclaration {
         Identifier,
         NormalAssignmentOperator,
         LeftBracket,
-        Vec<(ListEntry, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<ListEntry>,
         RightBracket,
         SourceSpan,
     ),
