@@ -835,25 +835,25 @@ pub mod statement {
                 if get_token_start(token_stream) != prefix_source_span.0.1 {
                     emit_unexpected_token!(
                         token_stream,
-                        "Expected a literal immediately following the plus.",
-                        "a literal immediately following the plus",
+                        "Expected a decimal integer or decimal float immediately following the plus.",
+                        "a decimal integer or decimal float immediately following the plus",
                         token
                     );
                 }
                 match token {
                     Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
                         arcstr::format!("+{}", value.as_str()),
-                        get_token_source_span(token_stream),
+                        token_stream.span_from_previous_to_current(prefix_source_span.0.0),
                     )),
                     Token::DecimalFloat(value) => Ok(LLiteral::DecimalFloat(
                         arcstr::format!("+{}", value.as_str()),
-                        get_token_source_span(token_stream),
+                        token_stream.span_from_previous_to_current(prefix_source_span.0.0),
                     )),
                     token => {
                         emit_unexpected_token!(
                             token_stream,
-                            "Expected a literal.",
-                            "a literal",
+                            "Expected a decimal integer or decimal float.",
+                            "a decimal integer or decimal float",
                             token
                         );
                     }
@@ -865,25 +865,25 @@ pub mod statement {
                 if get_token_start(token_stream) != prefix_source_span.0.1 {
                     emit_unexpected_token!(
                         token_stream,
-                        "Expected a literal immediately following the minus.",
-                        "a literal immediately following the minus",
+                        "Expected a decimal integer or decimal float immediately following the minus.",
+                        "a decimal integer or decimal float immediately following the minus",
                         token
                     );
                 }
                 match token {
                     Token::DecimalInt(value) => Ok(LLiteral::DecimalInt(
                         arcstr::format!("-{}", value.as_str()),
-                        get_token_source_span(token_stream),
+                        token_stream.span_from_previous_to_current(prefix_source_span.0.0),
                     )),
                     Token::DecimalFloat(value) => Ok(LLiteral::DecimalFloat(
                         arcstr::format!("-{}", value.as_str()),
-                        get_token_source_span(token_stream),
+                        token_stream.span_from_previous_to_current(prefix_source_span.0.0),
                     )),
                     token => {
                         emit_unexpected_token!(
                             token_stream,
-                            "Expected a literal.",
-                            "a literal",
+                            "Expected a decimal integer or decimal float.",
+                            "a decimal integer or decimal float",
                             token
                         );
                     }
@@ -3879,11 +3879,88 @@ pub mod expression {
                 string.clone(),
                 token_position,
             ))),
-            Token::Minus => Ok(Expression::UnOp(
-                UnOp::Minus(token_position),
-                Box::new(parse_expression_without_binops(token_stream, context)?),
-                token_stream.span_from_previous_to_current(token_position.0.0),
-            )),
+            Token::Plus => {
+                let token = next_token!(token_stream);
+                if get_token_start(token_stream) != token_position.0.1 {
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected a decimal integer or decimal float immediately following the plus.",
+                        "a decimal integer or decimal float immediately following the plus",
+                        token
+                    );
+                }
+                match token {
+                    Token::DecimalInt(value) => Ok(ELiteral(LLiteral::DecimalInt(
+                        arcstr::format!("+{}", value.as_str()),
+                        token_stream.span_from_previous_to_current(token_position.0.0),
+                    ))),
+                    Token::DecimalFloat(value) => Ok(ELiteral(LLiteral::DecimalFloat(
+                        arcstr::format!("+{}", value.as_str()),
+                        token_stream.span_from_previous_to_current(token_position.0.0),
+                    ))),
+                    token => {
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected a decimal integer or decimal float.",
+                            "a decimal integer or decimal float",
+                            token
+                        );
+                    }
+                }
+            }
+            Token::Minus => Ok(
+                if matches!(
+                    peek_token!(token_stream),
+                    Token::DecimalFloat(_) | Token::DecimalInt(_)
+                ) {
+                    let new_token = next_token!(token_stream);
+                    if token_position.0.1 == get_token_start(token_stream) {
+                        match new_token {
+                            Token::DecimalFloat(value) => ELiteral(LLiteral::DecimalFloat(
+                                arcstr::format!("-{}", value.as_str()),
+                                (
+                                    (token_position.0.0, get_token_end(token_stream)),
+                                    token_position.1,
+                                ),
+                            )),
+                            Token::DecimalInt(value) => ELiteral(LLiteral::DecimalInt(
+                                arcstr::format!("-{}", value.as_str()),
+                                (
+                                    (token_position.0.0, get_token_end(token_stream)),
+                                    token_position.1,
+                                ),
+                            )),
+                            _ => unreachable!(),
+                        }
+                    } else {
+                        match new_token {
+                            Token::DecimalFloat(value) => Expression::UnOp(
+                                UnOp::Minus(token_position),
+                                Box::new(ELiteral(LLiteral::DecimalFloat(
+                                    value,
+                                    get_token_source_span(token_stream),
+                                ))),
+                                token_stream.span_from_previous_to_current(token_position.0.0),
+                            ),
+                            Token::DecimalInt(value) => Expression::UnOp(
+                                UnOp::Minus(token_position),
+                                Box::new(ELiteral(LLiteral::DecimalInt(
+                                    value,
+                                    get_token_source_span(token_stream),
+                                ))),
+                                token_stream.span_from_previous_to_current(token_position.0.0),
+                            ),
+                            _ => unreachable!(),
+                        }
+                    }
+                } else {
+                    Expression::UnOp(
+                        UnOp::Minus(token_position),
+                        Box::new(parse_expression_without_binops(token_stream, context)?),
+                        token_stream.span_from_previous_to_current(token_position.0.0),
+                    )
+                },
+            ),
             Token::Not => Ok(Expression::UnOp(
                 UnOp::Not(token_position),
                 Box::new(parse_expression_without_binops(token_stream, context)?),
