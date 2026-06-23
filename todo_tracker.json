@@ -426,7 +426,7 @@
     "60": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L152-L152",
         "commit": "0522286d6a033af50e5d2627d1da239fb9af722a",
         "title": "Use CommaSeparated"
