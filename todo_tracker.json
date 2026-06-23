@@ -458,7 +458,7 @@
     "64": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "- [x] FormattedString\n- [x] GetLetter\n- [x] Parentheses\n- [x] Calculate `Call` values if possible",
-        "status": "open",
+        "status": "closed",
         "lines": "L846-L851",
         "commit": "4e26bb37fe1d089d6c7766be1073d74ed5df3607",
         "title": "Advanced constant expressions"
