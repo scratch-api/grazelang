@@ -847,9 +847,58 @@ impl Expression {
             //  - [x] FormattedString
             //  - [x] GetLetter
             //  - [x] Parentheses
-            //  - [ ] Calculate `Call` values if possible
+            //  - [x] Calculate `Call` values if possible
             // Issue: #64
-            Expression::Identifier(identifier) => todo!(),
+            Expression::Identifier(identifier) => {
+                let value = crate::library::const_expr_lookup(
+                    identifier
+                        .path
+                        .iter()
+                        .chain(identifier.fields.iter())
+                        .map(|(next, _)| next as &str),
+                )
+                .map_err(|err| match err {
+                    crate::library::ConstExpLookupError::NotFound => {
+                        ConstantExprEvaluationError::ConstIdentifierDoesNotExist {
+                            identifier: identifier.clone(),
+                        }
+                    }
+                    crate::library::ConstExpLookupError::UsedSuper => {
+                        ConstantExprEvaluationError::ConstIdentifierUsedSupper {
+                            identifier: identifier.clone(),
+                        }
+                    }
+                })?;
+                let Ok(function) =
+                    (match &value.value {
+                        Some(ConstantExprLibraryItemValue::Function(function, true)) => {
+                            ConstantExprFunction::try_from(*function)
+                        }
+                        Some(ConstantExprLibraryItemValue::Function(_, _)) => {
+                            return Err(ConstantExprEvaluationError::NotSingletonConstFunction {
+                                identifier: identifier.clone(),
+                            });
+                        }
+                        Some(ConstantExprLibraryItemValue::AssociatedItem(_)) => {
+                            return Err(
+                                ConstantExprEvaluationError::NotSingletonConstFunctionButValue {
+                                    identifier: identifier.clone(),
+                                },
+                            );
+                        }
+                        None => return Err(
+                            ConstantExprEvaluationError::NotSingletonConstFunctionButNamespace {
+                                identifier: identifier.clone(),
+                            },
+                        ),
+                    })
+                else {
+                    return Err(ConstantExprEvaluationError::NotConstFunctionButNamespace {
+                        identifier: identifier.clone(),
+                    });
+                };
+                function.apply(std::iter::empty(), *identifier.get_source_span())
+            }
             Expression::GetItem(identifier, _, _, _, _) => {
                 Err(ConstantExprEvaluationError::ConstExprListAccess {
                     identifier: identifier.clone(),

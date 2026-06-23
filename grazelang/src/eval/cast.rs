@@ -225,25 +225,6 @@ impl ScratchVmCompare for JsPrimitive {
                 JsPrimitive::Boolean(value) => ((*value).into(), false),
             }
         }
-        fn lowercase_char_or_u16(value: Result<char, DecodeUtf16Error>, buf: &mut [u16]) -> usize {
-            match value {
-                Ok(value) => {
-                    let mut index = 0;
-                    for c in value.to_lowercase() {
-                        let slice = c.encode_utf16(&mut buf[index..]);
-                        index += slice.len();
-                    }
-                    index
-                }
-                Err(value) => {
-                    let [a, ..] = buf else {
-                        unreachable!();
-                    };
-                    *a = value.unpaired_surrogate();
-                    1
-                }
-            }
-        }
         let (mut num_1, ws_1) = convert_to_number_and_ws(self);
         let (mut num_2, ws_2) = convert_to_number_and_ws(other);
         if ws_1 {

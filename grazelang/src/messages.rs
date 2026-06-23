@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     codegen::core::GrazeSb3GeneratorError,
+    eval::call::ConstantExprValue,
     lexer::SourceSpan,
-    parser::cst::{GetPos, Identifier, ParseError},
+    parser::cst::{Expression, GetPos, Identifier, ParseError},
 };
 
 pub trait GetLintId {
@@ -43,8 +44,33 @@ pub enum ConstantExprEvaluationError {
         "the identifier {identifier:?} is not a constant expression function, is instead a constant expression namespace"
     )]
     NotConstFunctionButNamespace { identifier: Identifier },
+    #[error("the identifier {identifier:?} is not a singleton constant expression function")]
+    NotSingletonConstFunction { identifier: Identifier },
+    #[error(
+        "the identifier {identifier:?} is not a singleton constant expression function, is instead a constant expression value"
+    )]
+    NotSingletonConstFunctionButValue { identifier: Identifier },
+    #[error(
+        "the identifier {identifier:?} is not a singleton constant expression function, is instead a constant expression namespace"
+    )]
+    NotSingletonConstFunctionButNamespace { identifier: Identifier },
+    #[error(
+        "the identifier {identifier:?} is not a constant expression value, is instead a constant expression function"
+    )]
+    NotConstValueButFunction { identifier: Identifier },
+    #[error(
+        "the identifier {identifier:?} is not a constant expression value, is instead a constant expression namespace"
+    )]
+    NotConstValueButNamespace { identifier: Identifier },
     #[error("the identifier {identifier:?} does not exist as a constant expression symbol")]
     ConstIdentifierDoesNotExist { identifier: Identifier },
+    #[error(
+        "the const expect value {value:?} does not correspond to a constant expression symbol that can be used as a math op"
+    )]
+    IncorrectConstExprValueForMathOp {
+        value: ConstantExprValue,
+        source_span: SourceSpan,
+    },
     #[error(
         "the identifier {identifier:?} contains \"super\", which is not allowed, maybe try a normalized path to the constant expression symbol"
     )]
@@ -62,6 +88,10 @@ pub enum ConstantExprEvaluationError {
         maybe you meant to access a letter of the value of the identifier using \"@[\" instead of '['"
     )]
     ConstExprListAccess { identifier: Identifier },
+    #[error(
+        "tried to use {expression:?} in a constant expression when an identifier was expected in context"
+    )]
+    ExpectedIdentifier { expression: Box<Expression> },
 }
 
 impl GetPos for ConstantExprEvaluationError {
@@ -69,6 +99,11 @@ impl GetPos for ConstantExprEvaluationError {
         match self {
             Self::NotConstFunctionButValue { identifier }
             | Self::NotConstFunctionButNamespace { identifier }
+            | Self::NotConstValueButFunction { identifier }
+            | Self::NotConstValueButNamespace { identifier }
+            | Self::NotSingletonConstFunction { identifier }
+            | Self::NotSingletonConstFunctionButNamespace { identifier }
+            | Self::NotSingletonConstFunctionButValue { identifier }
             | Self::ConstIdentifierDoesNotExist { identifier }
             | Self::ConstExprListAccess { identifier }
             | Self::ConstIdentifierUsedSupper { identifier } => identifier.get_source_span(),
@@ -76,7 +111,12 @@ impl GetPos for ConstantExprEvaluationError {
                 unexpected: _,
                 expected: _,
                 source_span,
+            }
+            | Self::IncorrectConstExprValueForMathOp {
+                value: _,
+                source_span,
             } => source_span,
+            Self::ExpectedIdentifier { expression } => expression.get_source_span(),
         }
     }
 }

@@ -1,8 +1,8 @@
 use std::{
-    mem::MaybeUninit,
     sync::{LazyLock, Mutex, MutexGuard},
 };
 
+use grazelang_library::ConstantExprLibraryItemValue;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rand::{
     RngExt, SeedableRng,
@@ -16,8 +16,9 @@ use crate::{
         ScratchVmToString, ToLowercaseU16, try_convert_f64_into_i128,
     },
     lexer::SourceSpan,
+    library,
     messages::ConstantExprEvaluationError,
-    parser::cst::{EMPTY_ISTRING_REF, Expression},
+    parser::cst::{EMPTY_ISTRING_REF, Expression, Literal},
 };
 
 #[repr(u32)]
@@ -202,39 +203,107 @@ impl ConstantExprFunction {
             }
             Ok(expr)
         }
-        fn n_ary_args<'a, I, const N: usize>(
-            mut args: I,
-            source_span: SourceSpan,
-        ) -> Result<[&'a Expression; N], ConstantExprEvaluationError>
-        where
-            I: Iterator<Item = &'a Expression>,
-        {
-            let mut maybe_expressions = [MaybeUninit::<&Expression>::uninit(); N];
-            let mut i = 0;
-            while i < N {
-                maybe_expressions[i].write(args.next().ok_or_else(|| {
-                    ConstantExprEvaluationError::IncorrectParamCount {
-                        unexpected: i,
-                        expected: N,
-                        source_span,
+        // fn n_ary_args<'a, I, const N: usize>(
+        //     mut args: I,
+        //     source_span: SourceSpan,
+        // ) -> Result<[&'a Expression; N], ConstantExprEvaluationError>
+        // where
+        //     I: Iterator<Item = &'a Expression>,
+        // {
+        //     let mut maybe_expressions = [MaybeUninit::<&Expression>::uninit(); N];
+        //     let mut i = 0;
+        //     while i < N {
+        //         maybe_expressions[i].write(args.next().ok_or_else(|| {
+        //             ConstantExprEvaluationError::IncorrectParamCount {
+        //                 unexpected: i,
+        //                 expected: N,
+        //                 source_span,
+        //             }
+        //         })?);
+        //         i += 1;
+        //     }
+        //     let rest = args.count();
+        //     if rest > 0 {
+        //         Err(ConstantExprEvaluationError::IncorrectParamCount {
+        //             unexpected: N + rest,
+        //             expected: N,
+        //             source_span,
+        //         })
+        //     } else {
+        //         let maybe_expressions_ptr = &maybe_expressions as *const _;
+        //         let expressions_ptr = maybe_expressions_ptr as *const [&Expression; N];
+        //         // SAFETY: when i >= N, all array indices in 0..N have been written to and therefore it is safe
+        //         // to assume all MaybeUninit are init
+        //         let expressions = unsafe { expressions_ptr.read() };
+        //         Ok(expressions)
+        //     }
+        // }
+        fn extract_const_expr_value(
+            expr: &Expression,
+        ) -> Result<ConstantExprValue, ConstantExprEvaluationError> {
+            match expr {
+                Expression::Identifier(identifier) => library::const_expr_lookup(
+                    identifier
+                        .path
+                        .iter()
+                        .chain(identifier.fields.iter())
+                        .map(|(next, _)| next as &str),
+                )
+                .map_err(|err| match err {
+                    crate::library::ConstExpLookupError::NotFound => {
+                        ConstantExprEvaluationError::ConstIdentifierDoesNotExist {
+                            identifier: identifier.clone(),
+                        }
                     }
-                })?);
-                i += 1;
-            }
-            let rest = args.count();
-            if rest > 0 {
-                Err(ConstantExprEvaluationError::IncorrectParamCount {
-                    unexpected: N + rest,
-                    expected: N,
-                    source_span,
+                    crate::library::ConstExpLookupError::UsedSuper => {
+                        ConstantExprEvaluationError::ConstIdentifierUsedSupper {
+                            identifier: identifier.clone(),
+                        }
+                    }
                 })
-            } else {
-                let maybe_expressions_ptr = &maybe_expressions as *const _;
-                let expressions_ptr = maybe_expressions_ptr as *const [&Expression; N];
-                // SAFETY: when i >= N, all array indices in 0..N have been written to and therefore it is safe
-                // to assume all MaybeUninit are init
-                let expressions = unsafe { expressions_ptr.read() };
-                Ok(expressions)
+                .and_then(|value| match &value.value {
+                    Some(ConstantExprLibraryItemValue::AssociatedItem(item)) => Ok(*item),
+                    Some(ConstantExprLibraryItemValue::Function(_, _)) => {
+                        Err(ConstantExprEvaluationError::NotConstValueButFunction {
+                            identifier: identifier.clone(),
+                        })
+                    }
+                    None => Err(ConstantExprEvaluationError::NotConstValueButNamespace {
+                        identifier: identifier.clone(),
+                    }),
+                })
+                .and_then(|value| {
+                    ConstantExprValue::try_from(value).map_err(|_| {
+                        ConstantExprEvaluationError::NotConstValueButNamespace {
+                            identifier: identifier.clone(),
+                        }
+                    })
+                }),
+                Expression::Literal(Literal::String(value, _)) => Ok(match value.as_str() {
+                    "abs" => ConstantExprValue::Abs,
+                    "floor" => ConstantExprValue::Floor,
+                    "ceiling" => ConstantExprValue::Ceiling,
+                    "sqrt" => ConstantExprValue::Sqrt,
+                    "sin" => ConstantExprValue::Sin,
+                    "cos" => ConstantExprValue::Cos,
+                    "tan" => ConstantExprValue::Tan,
+                    "asin" => ConstantExprValue::Asin,
+                    "acos" => ConstantExprValue::Acos,
+                    "atan" => ConstantExprValue::Atan,
+                    "ln" => ConstantExprValue::Ln,
+                    "log" => ConstantExprValue::Log,
+                    "e ^" => ConstantExprValue::Exp,
+                    "10 ^" => ConstantExprValue::Pow,
+                    _ => {
+                        return Err(ConstantExprEvaluationError::ExpectedIdentifier {
+                            expression: Box::new(expr.clone()),
+                        });
+                    }
+                }),
+                Expression::Parentheses(_, expr, _, _) => extract_const_expr_value(expr),
+                _ => Err(ConstantExprEvaluationError::ExpectedIdentifier {
+                    expression: Box::new(expr.clone()),
+                }),
             }
         }
         match self {
@@ -396,11 +465,47 @@ impl ConstantExprFunction {
                 }
                 Ok(JsPrimitive::Number((value + 0.5).floor()))
             }
-            ConstantExprFunction::OperatorMathop => todo!(),
+            ConstantExprFunction::OperatorMathop => {
+                use std::f64::consts::PI;
+                let (expr_a, expr_b) = bin_op_args(args, source_span)?;
+                let value = expr_b.calculate_value_js()?;
+                let value = value.to_number();
+                let const_expr_value = extract_const_expr_value(expr_a)?;
+                let value = match const_expr_value {
+                    ConstantExprValue::Abs => value.abs(),
+                    ConstantExprValue::Floor => value.floor(),
+                    ConstantExprValue::Ceiling => value.ceil(),
+                    ConstantExprValue::Sqrt => value.sqrt(),
+                    ConstantExprValue::Sin => ((value * PI) / 180.0).sin(),
+                    ConstantExprValue::Cos => ((value * PI) / 180.0).cos(),
+                    ConstantExprValue::Tan => match value % 360.0 {
+                        -270.0 | 90.0 => f64::INFINITY,
+                        -90.0 | 270.0 => f64::NEG_INFINITY,
+                        _ => ((value * PI) / 180.0).tan(),
+                    },
+                    ConstantExprValue::Asin => (value.asin() * 180.0) / PI,
+                    ConstantExprValue::Acos => (value.acos() * 180.0) / PI,
+                    ConstantExprValue::Atan => (value.atan() * 180.0) / PI,
+                    ConstantExprValue::Ln => value.ln(),
+                    ConstantExprValue::Log => value.log10(),
+                    ConstantExprValue::Exp => value.exp(),
+                    ConstantExprValue::Pow => 10_f64.powf(value),
+                    // _ => {
+                    //     return Err(
+                    //         ConstantExprEvaluationError::IncorrectConstExprValueForMathOp {
+                    //             value: const_expr_value,
+                    //             source_span: *expr_a.get_source_span(),
+                    //         },
+                    //     );
+                    // }
+                };
+                Ok(JsPrimitive::Number(value))
+            }
         }
     }
 }
 
+#[non_exhaustive]
 #[repr(u32)]
 #[derive(
     Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive,
