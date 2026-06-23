@@ -2080,7 +2080,7 @@ where
         FormattedStringContent::Expression(expression) => {
             visitor.visit_expression(expression, context)?;
         }
-        FormattedStringContent::String(_arc_str, _) => (),
+        FormattedStringContent::String(_, _) => (),
     }
     Ok(())
 }
