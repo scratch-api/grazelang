@@ -13,7 +13,10 @@ use crate::{
     messages::GrazeMessage,
     parser::{
         context::{self, BroadcastDescriptor},
-        cst::{GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock, TopLevelStatement},
+        cst::{
+            CommaSeparated, GetPos, GrazeProgram, SpriteCodeBlock, StageCodeBlock,
+            TopLevelStatement,
+        },
     },
     settings::GrazeMessageSetting,
 };
@@ -370,7 +373,6 @@ macro_rules! parse_comma_separated {
         let mut values = Vec::new();
         let tail_value = loop {
             if matches!(peek_token!(token_stream), $end) {
-                start_pos.get_or_insert_with(|| get_token_start(token_stream));
                 break None;
             }
             let value = {
@@ -384,7 +386,7 @@ macro_rules! parse_comma_separated {
                     skip_token!(token_stream);
                     cst::Comma(get_token_source_span(token_stream))
                 }
-                $end => break Some(value),
+                $end => break Some(Box::new(value)),
                 _ => {
                     let token = next_token!(token_stream);
                     emit_unexpected_token!(
@@ -397,10 +399,11 @@ macro_rules! parse_comma_separated {
             };
             values.push((value, comma));
         };
+        let start_pos = start_pos.unwrap_or_else(|| get_token_end(token_stream));
         cst::CommaSeparated {
             values,
             tail_value,
-            source_span: token_stream.span_from_previous_to_current(start_pos.unwrap()),
+            source_span: token_stream.span_from_previous_to_current(start_pos),
         }
     }};
 }
@@ -1010,14 +1013,15 @@ pub mod statement {
         default_type: DefaultDataDeclarationType,
         default_scope: &DataDeclarationScope,
         values_are_initial_values: bool,
-    ) -> ParseOut<Vec<(SingleDataDeclaration, Option<Comma>)>> {
-        let mut declarations = Vec::<(SingleDataDeclaration, Option<Comma>)>::new();
-        loop {
+    ) -> ParseOut<cst::CommaSeparated<SingleDataDeclaration>> {
+        let mut declarations = Vec::<(SingleDataDeclaration, Comma)>::new();
+        let mut outer_start_pos = None;
+        let tail_declaration = loop {
             if matches!(
                 peek_token!(token_stream),
                 Token::RightBrace(lexer::LexedRightBrace::Normal) | Token::RightParens
             ) {
-                break;
+                break None;
             }
             let mut start_pos = None::<(usize, usize)>;
             let scope = match peek_token!(token_stream) {
@@ -1036,8 +1040,6 @@ pub mod statement {
                     start_pos = Some(get_token_start(token_stream));
                     from_stream_pos!(token_stream => DataDeclarationScope::Cloud)
                 }
-                Token::RightBrace(lexer::LexedRightBrace::Normal) => break,
-                Token::RightParens => break,
                 _ => DataDeclarationScope::Unset,
             };
             let dec_type = match peek_token!(token_stream) {
@@ -1370,28 +1372,33 @@ pub mod statement {
                     )
                 }
             };
-            declarations.push((
-                declaration,
-                match peek_token!(token_stream) {
-                    Token::Comma => {
-                        skip_token!(token_stream);
-                        Some(from_stream_pos!(token_stream => Comma))
-                    }
-                    Token::RightBrace(lexer::LexedRightBrace::Normal) => None,
-                    Token::RightParens => None,
-                    _ => {
-                        let token = next_token!(token_stream);
-                        emit_unexpected_token!(
-                            token_stream,
-                            "Expected ',', ')' or '}'.",
-                            "',', ')' or '}'",
-                            token
-                        )
-                    }
-                },
-            ));
-        }
-        Ok(declarations)
+            outer_start_pos.get_or_insert(start_pos.unwrap());
+            let comma = match peek_token!(token_stream) {
+                Token::Comma => {
+                    skip_token!(token_stream);
+                    from_stream_pos!(token_stream => Comma)
+                }
+                Token::RightBrace(lexer::LexedRightBrace::Normal) | Token::RightParens => {
+                    break Some(Box::new(declaration));
+                }
+                _ => {
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token!(
+                        token_stream,
+                        "Expected ',', ')' or '}'.",
+                        "',', ')' or '}'",
+                        token
+                    )
+                }
+            };
+            declarations.push((declaration, comma));
+        };
+        let start_pos = outer_start_pos.unwrap_or_else(|| get_token_end(token_stream));
+        Ok(CommaSeparated {
+            values: declarations,
+            tail_value: tail_declaration,
+            source_span: token_stream.span_from_previous_to_current(start_pos),
+        })
     }
 
     pub fn parse_data_declaration(
@@ -1963,9 +1970,10 @@ pub mod statement {
         identifier: Identifier,
     ) -> ParseOut<Statement> {
         let start_pos = get_token_start(token_stream);
-        let (left_parens, expressions, right_parens) = match peek_token!(token_stream) {
-            Token::LeftParens => parse_expression_list(token_stream, context)?,
-            _ => {
+        let (left_parens, expressions, right_parens) =
+            if matches!(peek_token!(token_stream), Token::LeftParens) {
+                parse_expression_list(token_stream, context)?
+            } else {
                 let expression = token_stream.substitude_unexpected_token_message(
                     |token_stream| parse_expression(token_stream, context),
                     literal!("Expected '(' or an expression."),
@@ -1978,8 +1986,7 @@ pub mod statement {
                     expression,
                     start_pos,
                 );
-            }
-        };
+            };
         if peek_token!(token_stream) == &Token::LeftBrace {
             let expression = match expressions.len() {
                 0 => {
@@ -1991,7 +1998,7 @@ pub mod statement {
                     ))
                 }
                 1 => {
-                    if expressions[0].1.is_some() {
+                    let Some(expression) = expressions.tail_value else {
                         return Ok(Statement::MultiInputControl(
                             identifier,
                             left_parens,
@@ -2001,17 +2008,9 @@ pub mod statement {
                             consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => Semicolon)),
                             token_stream.span_from_previous_to_current(start_pos),
                         ));
-                    }
+                    };
                     let source_span = (left_parens.0.0, right_parens.0.1);
-                    Expression::Parentheses(
-                        left_parens,
-                        Box::new({
-                            let (expression, _) = expressions.into_iter().next().unwrap();
-                            expression
-                        }),
-                        right_parens,
-                        source_span,
-                    )
+                    Expression::Parentheses(left_parens, expression, right_parens, source_span)
                 }
                 _ => {
                     return Ok(Statement::MultiInputControl(
@@ -2303,12 +2302,7 @@ pub mod statement {
                 skip_token!(token_stream);
                 let left_parens = from_stream_pos!(token_stream => LeftParens);
                 let start_pos = get_token_start(token_stream);
-                let mut declarations = Vec::<(SingleAssetDeclaration, Option<Comma>)>::new();
-                let right_parens = loop {
-                    consume_then_never_if!(
-                        token_stream,
-                        Token::RightParens => break from_stream_pos!(token_stream => RightParens)
-                    );
+                let declarations = parse_comma_separated!(token_stream, context, (token_stream, context) => {
                     let (canonical_identifier, start_pos) = consume_and_use_if!(
                         token_stream,
                         Token::CanonicalIdentifier(name) => (
@@ -2431,33 +2425,19 @@ pub mod statement {
                         context.successful = false;
                         emit_message(context, error.into(), GrazeMessageSetting::Errors);
                     }
-                    declarations.push((
-                        SingleAssetDeclaration(
-                            canonical_identifier,
-                            identifier,
-                            value,
-                            token_stream.span_from_previous_to_current(start_pos),
-                        ),
-                        {
-                            match peek_token!(token_stream) {
-                                Token::Comma => {
-                                    skip_token!(token_stream);
-                                    Some(from_stream_pos!(token_stream => Comma))
-                                }
-                                Token::RightParens => None,
-                                _ => {
-                                    let token = next_token!(token_stream);
-                                    emit_unexpected_token!(
-                                        token_stream,
-                                        "Expected ',' or ')'.",
-                                        "',' or ')'",
-                                        token
-                                    )
-                                }
-                            }
-                        },
-                    ));
-                };
+                    SingleAssetDeclaration(
+                        canonical_identifier,
+                        identifier,
+                        value,
+                        token_stream.span_from_previous_to_current(start_pos),
+                    )
+                }, Token::RightParens, "')'");
+                let right_parens = expect_token!(
+                    token_stream,
+                    Token::RightParens => from_stream_pos!(token_stream => RightParens),
+                    "Expected \")\".",
+                    "\")\""
+                );
                 Ok(AssetDeclaration::Multiple(
                     left_parens,
                     declarations,
@@ -3155,7 +3135,7 @@ pub fn parse_sprite_statement(
                             start_pos,
                         );
                     }
-                    if expressions.len() == 1 && expressions[0].1.is_none() {
+                    if expressions.values.is_empty() && expressions.tail_value.is_some() {
                         let source_span = (left_parens.0.0, right_parens.0.1);
                         return parse_sprite_rest_of_single_input_control(
                             token_stream,
@@ -3163,7 +3143,7 @@ pub fn parse_sprite_statement(
                             identifier,
                             Expression::Parentheses(
                                 left_parens,
-                                Box::new(expressions.into_iter().next().unwrap().0),
+                                expressions.tail_value.unwrap(),
                                 right_parens,
                                 source_span,
                             ),
@@ -3455,7 +3435,7 @@ pub fn parse_stage_statement(
                             start_pos,
                         );
                     }
-                    if expressions.len() == 1 && expressions[0].1.is_none() {
+                    if expressions.values.is_empty() && expressions.tail_value.is_some() {
                         let source_span = (left_parens.0.0, right_parens.0.1);
                         return parse_stage_rest_of_single_input_control(
                             token_stream,
@@ -3463,7 +3443,7 @@ pub fn parse_stage_statement(
                             identifier,
                             Expression::Parentheses(
                                 left_parens,
-                                Box::new(expressions.into_iter().next().unwrap().0),
+                                expressions.tail_value.unwrap(),
                                 right_parens,
                                 source_span,
                             ),
@@ -4043,10 +4023,10 @@ pub mod expression {
                     expressions.push(FormattedStringContent::String(string, token_position));
                 }
                 loop {
-                    expressions.push(FormattedStringContent::Expression(parse_expression(
+                    expressions.push(FormattedStringContent::Expression(Box::new(parse_expression(
                         token_stream,
                         context,
-                    )?));
+                    )?)));
                     match next_token!(token_stream) {
                         Token::RightBrace(lexer::LexedRightBrace::MiddleFormattedString(
                             string,
@@ -4196,43 +4176,15 @@ pub fn parse_expression_list(
     context: &mut ParseContext,
 ) -> ParseOut<(
     cst::LeftParens,
-    Vec<(Expression, Option<cst::Comma>)>,
+    CommaSeparated<Expression>,
     cst::RightParens,
 )> {
-    expect_token!(token_stream, Token::LeftParens => (), "Expected '('.", "'('");
-    let left_parens = from_stream_pos!(token_stream => cst::LeftParens);
-    let mut expressions = Vec::<(Expression, Option<cst::Comma>)>::new();
-    loop {
-        consume_then_never_if!(token_stream, Token::RightParens => {
-            break;
-        });
-        expressions.push((
-            token_stream.substitude_unexpected_token_message(
-                |token_stream| parse_expression(token_stream, context),
-                literal!("Expected ')' or an expression."),
-                literal!("')' or an expression"),
-            )?,
-            match peek_token!(token_stream) {
-                Token::Comma => {
-                    skip_token!(token_stream);
-                    Some(cst::Comma(get_token_source_span(token_stream)))
-                }
-                Token::RightParens => None,
-                _ => {
-                    let token = next_token!(token_stream);
-                    emit_unexpected_token!(
-                        token_stream,
-                        "Expected a comma or ')'.",
-                        "a comma or ')'",
-                        token
-                    );
-                }
-            },
-        ));
-    }
-    Ok((
-        left_parens,
-        expressions,
-        from_stream_pos!(token_stream => cst::RightParens),
-    ))
+    let left_parens = expect_token!(token_stream, Token::LeftParens => from_stream_pos!(token_stream => cst::LeftParens), "Expected '('.", "'('");
+    let expressions = parse_comma_separated!(token_stream, context, (token_stream, context) => token_stream.substitude_unexpected_token_message(
+        |token_stream| parse_expression(token_stream, context),
+        literal!("Expected ')' or an expression."),
+        literal!("')' or an expression"),
+    )?, Token::RightParens, "')'");
+    let right_parens = expect_token!(token_stream, Token::RightParens => from_stream_pos!(token_stream => cst::RightParens), "Expected ')'.", "')'");
+    Ok((left_parens, expressions, right_parens))
 }

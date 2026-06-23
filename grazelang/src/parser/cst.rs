@@ -156,13 +156,10 @@ pub enum CustomBlockParamKindValue {
     Boolean,
 }
 
-// TODO: Use CommaSeparated
-// Issue: #60
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommaSeparated<T> {
     pub values: Vec<(T, Comma)>,
-    pub tail_value: Option<T>,
+    pub tail_value: Option<Box<T>>,
     pub source_span: SourceSpan,
 }
 
@@ -170,14 +167,18 @@ impl<T> CommaSeparated<T> {
     pub fn len(&self) -> usize {
         self.values.len() + self.tail_value.is_some() as usize
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty() && self.tail_value.is_none()
+    }
 }
 
-pub struct CommaSeparatedIterator<'a, T> {
+pub struct BorrowedCommaSeparatedIterator<'a, T> {
     pub comma_separated: &'a CommaSeparated<T>,
     pub index: usize,
 }
 
-impl<'a, T> Iterator for CommaSeparatedIterator<'a, T> {
+impl<'a, T> Iterator for BorrowedCommaSeparatedIterator<'a, T> {
     type Item = &'a T;
     fn next(&mut self) -> Option<Self::Item> {
         let cs_len = self.comma_separated.values.len();
@@ -187,7 +188,7 @@ impl<'a, T> Iterator for CommaSeparatedIterator<'a, T> {
             return Some(value);
         }
         if self.index == cs_len {
-            let value = self.comma_separated.tail_value.as_ref();
+            let value = self.comma_separated.tail_value.as_ref().map(Box::as_ref);
             self.index += 1;
             return value;
         }
@@ -195,12 +196,45 @@ impl<'a, T> Iterator for CommaSeparatedIterator<'a, T> {
     }
 }
 
+impl<T> CommaSeparated<T> {
+    pub fn iter(&self) -> BorrowedCommaSeparatedIterator<'_, T> {
+        self.into_iter()
+    }
+}
+
 impl<'a, T> IntoIterator for &'a CommaSeparated<T> {
     type Item = &'a T;
-    type IntoIter = CommaSeparatedIterator<'a, T>;
+    type IntoIter = BorrowedCommaSeparatedIterator<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        BorrowedCommaSeparatedIterator {
+            comma_separated: self,
+            index: 0,
+        }
+    }
+}
+pub struct CommaSeparatedIterator<T> {
+    pub values_iterator: <Vec<(T, Comma)> as IntoIterator>::IntoIter,
+    pub tail_value: Option<T>,
+    pub index: usize,
+}
+
+impl<T> Iterator for CommaSeparatedIterator<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.values_iterator
+            .next()
+            .map(|value| value.0)
+            .or_else(|| self.tail_value.take())
+    }
+}
+
+impl<T> IntoIterator for CommaSeparated<T> {
+    type Item = T;
+    type IntoIter = CommaSeparatedIterator<T>;
     fn into_iter(self) -> Self::IntoIter {
         CommaSeparatedIterator {
-            comma_separated: self,
+            values_iterator: self.values.into_iter(),
+            tail_value: self.tail_value.map(|value| *value),
             index: 0,
         }
     }
@@ -248,7 +282,7 @@ pub enum StageStatement {
     MultiInputHatStatement(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<Expression>,
         RightParens,
         CodeBlock,
         Option<Semicolon>,
@@ -312,7 +346,7 @@ pub enum SpriteStatement {
     MultiInputHatStatement(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<Expression>,
         RightParens,
         CodeBlock,
         Option<Semicolon>,
@@ -364,7 +398,7 @@ impl GetPos for SpriteStatement {
 pub enum AssetDeclaration {
     Multiple(
         LeftParens,
-        Vec<(SingleAssetDeclaration, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<SingleAssetDeclaration>,
         RightParens,
         SourceSpan,
     ),
@@ -447,7 +481,7 @@ pub enum Statement {
     Call(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<Expression>,
         RightParens,
         Semicolon,
         SourceSpan,
@@ -462,7 +496,7 @@ pub enum Statement {
     MultiInputControl(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<Expression>,
         RightParens,
         CodeBlock,
         Option<Semicolon>,
@@ -560,7 +594,7 @@ pub enum DataDeclaration {
     Mixed(
         DataDeclarationScope,
         LeftParens,
-        Vec<(SingleDataDeclaration, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<SingleDataDeclaration>,
         RightParens,
         SourceSpan,
     ),
@@ -568,7 +602,7 @@ pub enum DataDeclaration {
         DataDeclarationScope,
         VarsKeyword,
         LeftBrace,
-        Vec<(SingleDataDeclaration, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<SingleDataDeclaration>,
         RightBrace,
         SourceSpan,
     ),
@@ -576,7 +610,7 @@ pub enum DataDeclaration {
         DataDeclarationScope,
         ListsKeyword,
         LeftBrace,
-        Vec<(SingleDataDeclaration, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<SingleDataDeclaration>,
         RightBrace,
         SourceSpan,
     ),
@@ -761,7 +795,7 @@ pub enum Expression {
     Call(
         Identifier,
         LeftParens,
-        Vec<(Expression, Option<Comma>)>, // Use CommaSeparated
+        CommaSeparated<Expression>,
         RightParens,
         SourceSpan,
     ),
@@ -881,7 +915,7 @@ impl Expression {
                     });
                 };
 
-                function.apply(exprs.iter().map(|(value, _)| value), *source_span)
+                function.apply(exprs.iter(), *source_span)
             }
             Expression::Identifier(identifier) => {
                 let value = crate::library::const_expr_lookup(
@@ -1477,7 +1511,7 @@ impl GetPos for Literal {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FormattedStringContent {
-    Expression(Expression),
+    Expression(Box<Expression>),
     String(IString, SourceSpan),
 }
 

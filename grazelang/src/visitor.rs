@@ -138,7 +138,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &[(Expression, Option<Comma>)],
+            &CommaSeparated<Expression>,
             &RightParens,
             &CodeBlock,
             Option<&Semicolon>,
@@ -279,7 +279,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &[(Expression, Option<Comma>)],
+            &CommaSeparated<Expression>,
             &RightParens,
             &Semicolon,
             &SourceSpan,
@@ -308,7 +308,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &[(Expression, Option<Comma>)],
+            &CommaSeparated<Expression>,
             &RightParens,
             &CodeBlock,
             Option<&Semicolon>,
@@ -362,7 +362,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &DataDeclarationScope,
             &LeftParens,
-            &[(SingleDataDeclaration, Option<Comma>)],
+            &CommaSeparated<SingleDataDeclaration>,
             &RightParens,
             &SourceSpan,
         ),
@@ -377,7 +377,7 @@ pub trait GrazeVisitor<C, E> {
             &DataDeclarationScope,
             &VarsKeyword,
             &LeftBrace,
-            &[(SingleDataDeclaration, Option<Comma>)],
+            &CommaSeparated<SingleDataDeclaration>,
             &RightBrace,
             &SourceSpan,
         ),
@@ -392,7 +392,7 @@ pub trait GrazeVisitor<C, E> {
             &DataDeclarationScope,
             &ListsKeyword,
             &LeftBrace,
-            &[(SingleDataDeclaration, Option<Comma>)],
+            &CommaSeparated<SingleDataDeclaration>,
             &RightBrace,
             &SourceSpan,
         ),
@@ -508,7 +508,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &Identifier,
             &LeftParens,
-            &[(Expression, Option<Comma>)],
+            &CommaSeparated<Expression>,
             &RightParens,
             &SourceSpan,
         ),
@@ -1092,7 +1092,7 @@ pub fn default_visit_multi_input_hat_statement<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &[(Expression, Option<Comma>)],
+        &CommaSeparated<Expression>,
         &RightParens,
         &CodeBlock,
         Option<&Semicolon>,
@@ -1104,7 +1104,7 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value.2 {
-        visitor.visit_expression(&item.0, context)?;
+        visitor.visit_expression(item, context)?;
     }
     visitor.visit_code_block(value.4, context)?;
     Ok(())
@@ -1440,7 +1440,7 @@ pub fn default_visit_statement_call<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &[(Expression, Option<Comma>)],
+        &CommaSeparated<Expression>,
         &RightParens,
         &Semicolon,
         &SourceSpan,
@@ -1451,7 +1451,7 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value.2 {
-        visitor.visit_expression(&item.0, context)?;
+        visitor.visit_expression(item, context)?;
     }
     Ok(())
 }
@@ -1480,7 +1480,7 @@ pub fn default_visit_statement_multi_input_control<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &[(Expression, Option<Comma>)],
+        &CommaSeparated<Expression>,
         &RightParens,
         &CodeBlock,
         Option<&Semicolon>,
@@ -1492,7 +1492,7 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value.2 {
-        visitor.visit_expression(&item.0, context)?;
+        visitor.visit_expression(item, context)?;
     }
     visitor.visit_code_block(value.4, context)?;
     Ok(())
@@ -1708,7 +1708,7 @@ pub fn default_visit_mixed_data_declaration<V, C, E>(
     value: (
         &DataDeclarationScope,
         &LeftParens,
-        &[(SingleDataDeclaration, Option<Comma>)],
+        &CommaSeparated<SingleDataDeclaration>,
         &RightParens,
         &SourceSpan,
     ),
@@ -1718,7 +1718,7 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value.2 {
-        visitor.visit_single_data_declaration(&item.0, context)?;
+        visitor.visit_single_data_declaration(item, context)?;
     }
     Ok(())
 }
@@ -1729,7 +1729,7 @@ pub fn default_visit_vars_data_declaration<V, C, E>(
         &DataDeclarationScope,
         &VarsKeyword,
         &LeftBrace,
-        &[(SingleDataDeclaration, Option<Comma>)],
+        &CommaSeparated<SingleDataDeclaration>,
         &RightBrace,
         &SourceSpan,
     ),
@@ -1739,7 +1739,7 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value.3 {
-        visitor.visit_single_data_declaration(&item.0, context)?;
+        visitor.visit_single_data_declaration(item, context)?;
     }
     Ok(())
 }
@@ -1750,7 +1750,7 @@ pub fn default_visit_lists_data_declaration<V, C, E>(
         &DataDeclarationScope,
         &ListsKeyword,
         &LeftBrace,
-        &[(SingleDataDeclaration, Option<Comma>)],
+        &CommaSeparated<SingleDataDeclaration>,
         &RightBrace,
         &SourceSpan,
     ),
@@ -1760,7 +1760,7 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value.3 {
-        visitor.visit_single_data_declaration(&item.0, context)?;
+        visitor.visit_single_data_declaration(item, context)?;
     }
     Ok(())
 }
@@ -2004,7 +2004,7 @@ pub fn default_visit_expression_call<V, C, E>(
     value: (
         &Identifier,
         &LeftParens,
-        &[(Expression, Option<Comma>)],
+        &CommaSeparated<Expression>,
         &RightParens,
         &SourceSpan,
     ),
@@ -2014,7 +2014,7 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     for item in value.2 {
-        visitor.visit_expression(&item.0, context)?;
+        visitor.visit_expression(item, context)?;
     }
     Ok(())
 }

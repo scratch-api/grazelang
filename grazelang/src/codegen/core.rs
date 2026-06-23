@@ -1872,10 +1872,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &crate::parser::cst::Identifier,
             &crate::parser::cst::LeftParens,
-            &[(
-                crate::parser::cst::Expression,
-                Option<crate::parser::cst::Comma>,
-            )],
+            &crate::parser::cst::CommaSeparated<crate::parser::cst::Expression>,
             &crate::parser::cst::RightParens,
             &crate::lexer::SourceSpan,
         ),
@@ -1904,7 +1901,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     source_span: value.0.range_to(value.3),
                 });
             }
-            for (param, (value, (expr, _))) in
+            for (param, (value, expr)) in
                 zip(params.iter(), reversed_args.into_iter().rev().zip(value.2))
             {
                 add_param_to_params(
@@ -2354,7 +2351,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &Identifier,
             &crate::parser::cst::LeftParens,
-            &[(Expression, Option<crate::parser::cst::Comma>)],
+            &crate::parser::cst::CommaSeparated<Expression>,
             &crate::parser::cst::RightParens,
             &crate::parser::cst::CodeBlock,
             Option<&crate::parser::cst::Semicolon>,
@@ -2376,7 +2373,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     reversed_args
                         .into_iter()
                         .rev()
-                        .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
+                        .zip(value.2.iter().map(|expr| *expr.get_source_span())),
                     arg_count,
                 ),
                 value.0.range_to(value.3),
@@ -2419,7 +2416,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &Identifier,
             &crate::parser::cst::LeftParens,
-            &[(Expression, Option<crate::parser::cst::Comma>)],
+            &crate::parser::cst::CommaSeparated<Expression>,
             &crate::parser::cst::RightParens,
             &crate::parser::cst::Semicolon,
             &crate::lexer::SourceSpan,
@@ -2454,7 +2451,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 reversed_args
                     .into_iter()
                     .rev()
-                    .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
+                    .zip(value.2.iter().map(|expr| *expr.get_source_span())),
             ) {
                 add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
             }
@@ -2719,7 +2716,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             | crate::parser::cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
             | crate::parser::cst::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
                 .iter()
-                .map(|(value, _)| {
+                .map(|value| {
                     Ok(match value {
                         crate::parser::cst::SingleDataDeclaration::Variable(
                             _,
@@ -3422,7 +3419,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &Identifier,
             &crate::parser::cst::LeftParens,
-            &[(Expression, Option<crate::parser::cst::Comma>)],
+            &crate::parser::cst::CommaSeparated<Expression>,
             &crate::parser::cst::RightParens,
             &crate::parser::cst::CodeBlock,
             Option<&crate::parser::cst::Semicolon>,
@@ -3474,7 +3471,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             reversed_args
                 .into_iter()
                 .rev()
-                .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
+                .zip(value.2.iter().map(|expr| *expr.get_source_span())),
         ) {
             add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
         }
