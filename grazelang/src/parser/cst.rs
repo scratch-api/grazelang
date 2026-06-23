@@ -843,12 +843,6 @@ impl Expression {
 
                 function.apply(exprs.iter().map(|(value, _)| value), *source_span)
             }
-            // TODO: Advanced constant expressions
-            //  - [x] FormattedString
-            //  - [x] GetLetter
-            //  - [x] Parentheses
-            //  - [x] Calculate `Call` values if possible
-            // Issue: #64
             Expression::Identifier(identifier) => {
                 let value = crate::library::const_expr_lookup(
                     identifier
