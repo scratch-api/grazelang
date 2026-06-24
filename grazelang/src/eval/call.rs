@@ -1,6 +1,4 @@
-use std::{
-    sync::{LazyLock, Mutex, MutexGuard},
-};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 
 use grazelang_library::ConstantExprLibraryItemValue;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -21,6 +19,7 @@ use crate::{
     parser::cst::{EMPTY_ISTRING_REF, Expression, Literal},
 };
 
+#[non_exhaustive]
 #[repr(u32)]
 #[derive(
     Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive,
@@ -44,6 +43,20 @@ pub enum ConstantExprFunction {
     OperatorMod = 15,
     OperatorRound = 16,
     OperatorMathop = 17,
+    ShorthandOperatorAbs = 18,
+    ShorthandOperatorFloor = 19,
+    ShorthandOperatorCeiling = 20,
+    ShorthandOperatorSqrt = 21,
+    ShorthandOperatorSin = 22,
+    ShorthandOperatorCos = 23,
+    ShorthandOperatorTan = 24,
+    ShorthandOperatorAsin = 25,
+    ShorthandOperatorAcos = 26,
+    ShorthandOperatorAtan = 27,
+    ShorthandOperatorLn = 28,
+    ShorthandOperatorLog = 29,
+    ShorthandOperatorExp = 30,
+    ShorthandOperatorPow = 31,
 }
 
 pub fn str_contains<const N: usize>(haystack: &[u16], needle: &[u16]) -> bool {
@@ -304,6 +317,41 @@ impl ConstantExprFunction {
                 }),
             }
         }
+        fn apply_math_op(
+            math_op: ConstantExprValue,
+            value: f64,
+            _source_span: SourceSpan,
+        ) -> Result<f64, ConstantExprEvaluationError> {
+            use std::f64::consts::PI;
+            Ok(match math_op {
+                ConstantExprValue::Abs => value.abs(),
+                ConstantExprValue::Floor => value.floor(),
+                ConstantExprValue::Ceiling => value.ceil(),
+                ConstantExprValue::Sqrt => value.sqrt(),
+                ConstantExprValue::Sin => ((value * PI) / 180.0).sin(),
+                ConstantExprValue::Cos => ((value * PI) / 180.0).cos(),
+                ConstantExprValue::Tan => match value % 360.0 {
+                    -270.0 | 90.0 => f64::INFINITY,
+                    -90.0 | 270.0 => f64::NEG_INFINITY,
+                    _ => ((value * PI) / 180.0).tan(),
+                },
+                ConstantExprValue::Asin => (value.asin() * 180.0) / PI,
+                ConstantExprValue::Acos => (value.acos() * 180.0) / PI,
+                ConstantExprValue::Atan => (value.atan() * 180.0) / PI,
+                ConstantExprValue::Ln => value.ln(),
+                ConstantExprValue::Log => value.log10(),
+                ConstantExprValue::Exp => value.exp(),
+                ConstantExprValue::Pow => 10_f64.powf(value),
+                // _ => {
+                //     return Err(
+                //         ConstantExprEvaluationError::IncorrectConstExprValueForMathOp {
+                //             value: const_expr_value,
+                //             source_span: *expr_a.get_source_span(),
+                //         },
+                //     );
+                // }
+            })
+        }
         match self {
             ConstantExprFunction::OperatorAdd => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
@@ -464,39 +512,109 @@ impl ConstantExprFunction {
                 Ok(JsPrimitive::Number((value + 0.5).floor()))
             }
             ConstantExprFunction::OperatorMathop => {
-                use std::f64::consts::PI;
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let value = expr_b.calculate_value_js()?;
                 let value = value.to_number();
-                let const_expr_value = extract_const_expr_value(expr_a)?;
-                let value = match const_expr_value {
-                    ConstantExprValue::Abs => value.abs(),
-                    ConstantExprValue::Floor => value.floor(),
-                    ConstantExprValue::Ceiling => value.ceil(),
-                    ConstantExprValue::Sqrt => value.sqrt(),
-                    ConstantExprValue::Sin => ((value * PI) / 180.0).sin(),
-                    ConstantExprValue::Cos => ((value * PI) / 180.0).cos(),
-                    ConstantExprValue::Tan => match value % 360.0 {
-                        -270.0 | 90.0 => f64::INFINITY,
-                        -90.0 | 270.0 => f64::NEG_INFINITY,
-                        _ => ((value * PI) / 180.0).tan(),
-                    },
-                    ConstantExprValue::Asin => (value.asin() * 180.0) / PI,
-                    ConstantExprValue::Acos => (value.acos() * 180.0) / PI,
-                    ConstantExprValue::Atan => (value.atan() * 180.0) / PI,
-                    ConstantExprValue::Ln => value.ln(),
-                    ConstantExprValue::Log => value.log10(),
-                    ConstantExprValue::Exp => value.exp(),
-                    ConstantExprValue::Pow => 10_f64.powf(value),
-                    // _ => {
-                    //     return Err(
-                    //         ConstantExprEvaluationError::IncorrectConstExprValueForMathOp {
-                    //             value: const_expr_value,
-                    //             source_span: *expr_a.get_source_span(),
-                    //         },
-                    //     );
-                    // }
-                };
+                let math_op = extract_const_expr_value(expr_a)?;
+                let value = apply_math_op(math_op, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorAbs => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Abs, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorFloor => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Floor, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorCeiling => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Ceiling, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorSqrt => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Sqrt, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorSin => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Sin, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorCos => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Cos, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorTan => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Tan, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorAsin => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Asin, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorAcos => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Acos, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorAtan => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Atan, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorLn => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Ln, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorLog => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Log, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorExp => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Exp, value, source_span)?;
+                Ok(JsPrimitive::Number(value))
+            }
+            ConstantExprFunction::ShorthandOperatorPow => {
+                let expr = un_op_args(args, source_span)?;
+                let value = expr.calculate_value_js()?;
+                let value = value.to_number();
+                let value = apply_math_op(ConstantExprValue::Pow, value, source_span)?;
                 Ok(JsPrimitive::Number(value))
             }
         }

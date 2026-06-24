@@ -27,6 +27,8 @@ pub struct BlockEntry {
     #[serde(default)]
     pub is_singleton: bool,
     pub assign: Option<AssignmentDescriptor>,
+    #[serde(default)]
+    pub known_params: Vec<KnownParam>,
     pub constant_expr_function_id: Option<u32>,
 }
 
@@ -255,6 +257,7 @@ impl BlockEntry {
             alt_name,
             is_singleton,
             assign,
+            known_params,
             constant_expr_function_id: _,
         } = self;
         if args.is_empty() && is_singleton {
@@ -266,7 +269,41 @@ impl BlockEntry {
                     value: Some(LibraryItemValue::KnownBlock(Box::new(
                         KnownBlock::SingletonReporter {
                             opcode: opcode.into(),
-                            params: Vec::new(),
+                            params: known_params
+                                .into_iter()
+                                .map(|KnownParam { param, value }| {
+                                    let category = match &param {
+                                        BlockArg::Field {
+                                            name: _,
+                                            field_type: _,
+                                            value: _,
+                                            options: _,
+                                            option_category,
+                                        } => get_menu_category_id(
+                                            menu_category_ids,
+                                            option_category.as_ref(),
+                                        ),
+                                        BlockArg::Input {
+                                            name: _,
+                                            menu_field_name: _,
+                                            input_type: _,
+                                            check: _,
+                                            shadow: _,
+                                        } => NO_CATEGORY_ID,
+                                    };
+                                    (
+                                        convert_block_arg_into_call_block_param(
+                                            param,
+                                            None,
+                                            menu_category_ids,
+                                        ),
+                                        KnownBlock::FieldValue {
+                                            value,
+                                            categories: HashSet::from([category]),
+                                        },
+                                    )
+                                })
+                                .collect(),
                             field: None,
                             assign: assign.map(
                                 |AssignmentDescriptor {
@@ -337,13 +374,47 @@ impl BlockEntry {
                 )
             })
             .collect::<Vec<_>>();
+        let known_block = if known_params.is_empty() {
+            KnownBlock::Callable(opcode.as_str().into(), known_block_args)
+        } else {
+            KnownBlock::PartialCallable(
+                opcode.as_str().into(),
+                known_params
+                    .into_iter()
+                    .map(|KnownParam { param, value }| {
+                        let category = match &param {
+                            BlockArg::Field {
+                                name: _,
+                                field_type: _,
+                                value: _,
+                                options: _,
+                                option_category,
+                            } => get_menu_category_id(menu_category_ids, option_category.as_ref()),
+                            BlockArg::Input {
+                                name: _,
+                                menu_field_name: _,
+                                input_type: _,
+                                check: _,
+                                shadow: _,
+                            } => NO_CATEGORY_ID,
+                        };
+                        (
+                            convert_block_arg_into_call_block_param(param, None, menu_category_ids),
+                            KnownBlock::FieldValue {
+                                value,
+                                categories: HashSet::from([category]),
+                            },
+                        )
+                    })
+                    .collect(),
+                known_block_args,
+            )
+        };
         ProcessedBlockEntry {
             name: alt_name.unwrap_or_else(|| opcode.split_once('_').unwrap().1.to_string()),
             library_item: LibraryItem {
                 namespace: HashMap::new(),
-                value: Some(LibraryItemValue::KnownBlock(Box::new(
-                    KnownBlock::Callable(opcode.as_str().into(), known_block_args),
-                ))),
+                value: Some(LibraryItemValue::KnownBlock(Box::new(known_block))),
             },
             opcode,
             associated_items,
@@ -509,6 +580,7 @@ impl BlockEntry {
             alt_name,
             is_singleton,
             assign: _,
+            known_params: _,
             constant_expr_function_id,
         } = self;
         let constant_expr_function_id = constant_expr_function_id?;
@@ -574,7 +646,7 @@ pub fn process_constant_expr_toolbox_category(
                 namespace: HashMap::new(),
                 value: Some(ConstantExprLibraryItemValue::Function(
                     constant_expr_function_id,
-                    is_singleton
+                    is_singleton,
                 )),
             },
         );

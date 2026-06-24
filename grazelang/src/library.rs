@@ -48,7 +48,9 @@ pub enum ConstExpLookupError {
     UsedSuper,
 }
 
-pub fn const_expr_lookup<'a, I>(mut path: I) -> Result<&'static ConstantExprLibraryItem, ConstExpLookupError>
+pub fn const_expr_lookup<'a, I>(
+    mut path: I,
+) -> Result<&'static ConstantExprLibraryItem, ConstExpLookupError>
 where
     I: Iterator<Item = &'a str>,
 {
@@ -56,7 +58,10 @@ where
         if value == "super" {
             return Err(ConstExpLookupError::UsedSuper);
         }
-        current.namespace.get(value).ok_or(ConstExpLookupError::NotFound)
+        current
+            .namespace
+            .get(value)
+            .ok_or(ConstExpLookupError::NotFound)
     })
 }
 
@@ -129,7 +134,7 @@ pub fn convert_generated_library(
 
 /// Output is not guaranteed to be correct
 pub fn get_standard_library_namespace_count() -> usize {
-    10
+    11
 }
 
 pub fn add_standard_library_namespaces(

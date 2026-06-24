@@ -2539,72 +2539,84 @@
                             {
                                 "label": "abs",
                                 "value": "abs",
+                                "altName": "op_abs",
                                 "constantExprValueId": 0
                             },
                             {
                                 "label": "floor",
                                 "value": "floor",
+                                "altName": "op_floor",
                                 "constantExprValueId": 1
                             },
                             {
                                 "label": "ceiling",
                                 "value": "ceiling",
+                                "altName": "op_ceil",
                                 "constantExprValueId": 2
                             },
                             {
                                 "label": "sqrt",
                                 "value": "sqrt",
+                                "altName": "op_sqrt",
                                 "constantExprValueId": 3
                             },
                             {
                                 "label": "sin",
                                 "value": "sin",
+                                "altName": "op_sin",
                                 "constantExprValueId": 4
                             },
                             {
                                 "label": "cos",
                                 "value": "cos",
+                                "altName": "op_cos",
                                 "constantExprValueId": 5
                             },
                             {
                                 "label": "tan",
                                 "value": "tan",
+                                "altName": "op_tan",
                                 "constantExprValueId": 6
                             },
                             {
                                 "label": "asin",
                                 "value": "asin",
+                                "altName": "op_asin",
                                 "constantExprValueId": 7
                             },
                             {
                                 "label": "acos",
                                 "value": "acos",
+                                "altName": "op_acos",
                                 "constantExprValueId": 8
                             },
                             {
                                 "label": "atan",
                                 "value": "atan",
+                                "altName": "op_atan",
                                 "constantExprValueId": 9
                             },
                             {
                                 "label": "ln",
                                 "value": "ln",
+                                "altName": "op_ln",
                                 "constantExprValueId": 10
                             },
                             {
                                 "label": "log",
                                 "value": "log",
+                                "altName": "op_log",
                                 "constantExprValueId": 11
                             },
                             {
                                 "label": "e ^",
-                                "altName": "exp",
+                                "altName": "op_exp",
                                 "value": "e ^",
                                 "constantExprValueId": 12
                             },
                             {
                                 "label": "10 ^",
-                                "altName": "pow",
+                                "altName": "op_pow",
                                 "value": "10 ^",
                                 "constantExprValueId": 13
                             }
@@ -2623,8 +2635,477 @@
                         }
                     }
                 ],
-                "altName": "math_function",
+                "altName": "math_operator",
                 "constantExprFunctionId": 17
+            }
+        ]
+    },
+    {
+        "category": "grazelang_math_op_shorthands",
+        "id": "grazelang_math_op_shorthands",
+        "altName": "math_ops",
+        "blocks": [
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "abs",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "abs"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "abs",
+                "constantExprFunctionId": 18
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "floor",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "floor"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "floor",
+                "constantExprFunctionId": 19
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "ceiling",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "ceiling"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "ceil",
+                "constantExprFunctionId": 20
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "sqrt",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "sqrt"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "sqrt",
+                "constantExprFunctionId": 21
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "sin",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "sin"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "sin",
+                "constantExprFunctionId": 22
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "cos",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "cos"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "cos",
+                "constantExprFunctionId": 23
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "tan",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "tan"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "tan",
+                "constantExprFunctionId": 24
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "asin",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "asin"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "asin",
+                "constantExprFunctionId": 25
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "acos",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "acos"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "acos",
+                "constantExprFunctionId": 26
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "atan",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "atan"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "op_atan",
+                "constantExprFunctionId": 27
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "ln",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "ln"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "ln",
+                "constantExprFunctionId": 28
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "log",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "log"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "log",
+                "constantExprFunctionId": 29
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "e ^",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "e ^"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "exp",
+                "constantExprFunctionId": 30
+            },
+            {
+                "type": "operator_mathop",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "OPERATOR",
+                            "fieldType": "field_dropdown",
+                            "value": "10 ^",
+                            "options": [],
+                            "optionCategory": "math_ops"
+                        },
+                        "value": [
+                            "10 ^"
+                        ]
+                    }
+                ],
+                "args": [
+                    {
+                        "kind": "input",
+                        "name": "NUM",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "",
+                            "options": null
+                        }
+                    }
+                ],
+                "altName": "pow",
+                "constantExprFunctionId": 31
             }
         ]
     },

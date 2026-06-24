@@ -45,6 +45,9 @@ sprite `Sprite1` sprite_1 {
         test = "";
         list_ = [1, 0, 0, 0, 0, 0, 0];
     }
+    {
+        say("sin(45) = ${sin(45)}; math_operator(op_sin, 45) = ${math_operator(op_sin, 45)}");
+    }
     ("0b${list_}" + 10)
     (test)
     warp proc test_proc(str a, bool b, num c) {
