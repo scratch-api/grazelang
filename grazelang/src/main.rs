@@ -4,7 +4,7 @@ use grazelang::cli::input::Cli;
 fn main() {
     let cli = Cli::parse();
     cli.execute();
-    // let lexer = lexer::create_lexer(include_str!("./test.graze"));
+    // let lexer = lexer::create_lexer(include_str!(r#"C:\Users\gine\projects\grazelang\grazelang\src\test3.graze"#));
     // let mut context = ParseContext::new(Default::default(), Default::default());
 
     // let parsed = parser::parse_graze_program(&mut PeekableLexer::new(lexer), &mut context).unwrap();

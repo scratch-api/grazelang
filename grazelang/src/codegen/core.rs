@@ -170,6 +170,7 @@ pub struct GrazeSb3GeneratorContext {
     pub targets: Vec<Target>,
     // Root symbol is always 0.
     pub symbol_table: SymbolTable,
+    pub data_symbol_context: GrazeSb3GeneratorDataSymbolsContext,
     pub field_category_entries: HashMap<u32, HashSet<IString>>,
     pub field_entry_categories: HashMap<IString, HashSet<u32>>,
     pub block_counter: IdCounter,
@@ -198,6 +199,14 @@ pub struct AssetFile {
 pub struct FormattedStringContext {
     pub ids: Vec<Option<String>>,
     pub current_idx: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GrazeSb3GeneratorDataSymbolsContext {
+    pub global_vars: SymbolId,
+    pub global_lists: SymbolId,
+    pub local_vars: SymbolId,
+    pub local_lists: SymbolId,
 }
 
 impl FormattedStringContext {
@@ -627,6 +636,12 @@ impl GrazeSb3GeneratorContext {
             sb3: Sb3Root::default(),
             targets,
             symbol_table,
+            data_symbol_context: GrazeSb3GeneratorDataSymbolsContext {
+                global_vars: variables_symbol,
+                global_lists: lists_symbol,
+                local_vars: variables_symbol,
+                local_lists: lists_symbol,
+            },
             field_category_entries,
             field_entry_categories,
             block_counter,
@@ -2689,27 +2704,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        let stage_var_symbol = [literal!("vars")];
-        let stage_list_symbol = [literal!("lists")];
-        let (this_target_var_symbol, this_target_list_symbol) = {
-            let current_target = context.current_sb3_target.as_ref().unwrap();
-            if current_target.is_stage {
-                (
-                    (stage_var_symbol[0].clone(), None),
-                    (stage_list_symbol[0].clone(), None),
-                )
-            } else {
-                let value: (_, Option<IString>) = (
-                    SPRITES_ISTRING.clone(),
-                    Some(current_target.name.as_str().into()),
-                );
-                (value.clone(), value)
-            }
-        };
+        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+        pub enum Scope {
+            Global,
+            Local,
+        }
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
         pub enum SingleAssignment {
-            List([Option<IString>; 3], Vec<Sb3Primitive>),
-            Var([Option<IString>; 3], Sb3Primitive),
+            List(Scope, IString, Vec<Sb3Primitive>),
+            Var(Scope, IString, Sb3Primitive),
         }
         let assignments: Vec<SingleAssignment> = match value.1 {
             crate::parser::cst::DataDeclaration::Mixed(parent_scope, _, items, _, _)
@@ -2728,7 +2731,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             _,
                         ) => {
                             let var = identifier.to_single().unwrap().0.clone();
-                            let path = if matches!(
+                            let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
                                     DataDeclarationScope::Cloud(_)
@@ -2740,16 +2743,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                         | DataDeclarationScope::Global(_)
                                 )
                             ) {
-                                [Some(stage_var_symbol[0].clone()), Some(var), None]
+                                Scope::Global
                             } else {
-                                let (a, b) = this_target_var_symbol.clone();
-                                match b {
-                                    Some(b) => [Some(a), Some(b), Some(var)],
-                                    None => [Some(a), Some(var), None],
-                                }
+                                Scope::Local
                             };
                             SingleAssignment::Var(
-                                path,
+                                scope,
+                                var,
                                 expression.calculate_value().map_err(|source| {
                                     GrazeSb3GeneratorError::InvalidConstantExpression {
                                         expression: Box::new(expression.clone()),
@@ -2766,7 +2766,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             _,
                         ) => {
                             let var = identifier.to_single().unwrap().0.clone();
-                            let path = if matches!(
+                            let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
                                     DataDeclarationScope::Cloud(_)
@@ -2778,15 +2778,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                         | DataDeclarationScope::Global(_)
                                 )
                             ) {
-                                [Some(stage_var_symbol[0].clone()), Some(var), None]
+                                Scope::Global
                             } else {
-                                let (a, b) = this_target_var_symbol.clone();
-                                match b {
-                                    Some(b) => [Some(a), Some(b), Some(var)],
-                                    None => [Some(a), Some(var), None],
-                                }
+                                Scope::Local
                             };
-                            SingleAssignment::Var(path, "".into())
+                            SingleAssignment::Var(scope, var, "".into())
                         }
                         crate::parser::cst::SingleDataDeclaration::List(
                             _,
@@ -2800,7 +2796,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             _,
                         ) => {
                             let list = identifier.to_single().unwrap().0.clone();
-                            let path = if matches!(
+                            let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
                                     DataDeclarationScope::Cloud(_)
@@ -2812,15 +2808,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                         | DataDeclarationScope::Global(_)
                                 )
                             ) {
-                                [Some(stage_list_symbol[0].clone()), Some(list), None]
+                                Scope::Global
                             } else {
-                                let (a, b) = this_target_list_symbol.clone();
-                                match b {
-                                    Some(b) => [Some(a), Some(b), Some(list)],
-                                    None => [Some(a), Some(list), None],
-                                }
+                                Scope::Local
                             };
-                            SingleAssignment::List(path, {
+                            SingleAssignment::List(scope, list, {
                                 let mut values = Vec::with_capacity(items.len());
                                 for value in items {
                                     match value {
@@ -2852,7 +2844,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             _,
                         ) => {
                             let list = identifier.to_single().unwrap().0.clone();
-                            let path = if matches!(
+                            let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
                                     DataDeclarationScope::Cloud(_)
@@ -2864,15 +2856,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                         | DataDeclarationScope::Global(_)
                                 )
                             ) {
-                                [Some(stage_list_symbol[0].clone()), Some(list), None]
+                                Scope::Global
                             } else {
-                                let (a, b) = this_target_list_symbol.clone();
-                                match b {
-                                    Some(b) => [Some(a), Some(b), Some(list)],
-                                    None => [Some(a), Some(list), None],
-                                }
+                                Scope::Local
                             };
-                            SingleAssignment::List(path, Vec::new())
+                            SingleAssignment::List(scope, list, Vec::new())
                         }
                     })
                 })
@@ -2890,20 +2878,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     ) => {
                         let var = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
+                        let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            [Some(stage_var_symbol[0].clone()), Some(var), None]
+                            Scope::Global
                         } else {
-                            let (a, b) = this_target_var_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(var)],
-                                None => [Some(a), Some(var), None],
-                            }
+                            Scope::Local
                         };
                         SingleAssignment::Var(
-                            path,
+                            scope,
+                            var,
                             expression.calculate_value().map_err(|source| {
                                 GrazeSb3GeneratorError::InvalidConstantExpression {
                                     expression: Box::new(expression.clone()),
@@ -2920,19 +2905,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     ) => {
                         let var = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
+                        let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            [Some(stage_var_symbol[0].clone()), Some(var), None]
+                            Scope::Global
                         } else {
-                            let (a, b) = this_target_var_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(var)],
-                                None => [Some(a), Some(var), None],
-                            }
+                            Scope::Local
                         };
-                        SingleAssignment::Var(path, "".into())
+                        SingleAssignment::Var(scope, var, "".into())
                     }
                     crate::parser::cst::SingleDataDeclaration::List(
                         _,
@@ -2946,19 +2927,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     ) => {
                         let list = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
+                        let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            [Some(stage_list_symbol[0].clone()), Some(list), None]
+                            Scope::Global
                         } else {
-                            let (a, b) = this_target_list_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(list)],
-                                None => [Some(a), Some(list), None],
-                            }
+                            Scope::Local
                         };
-                        SingleAssignment::List(path, {
+                        SingleAssignment::List(scope, list, {
                             let mut values = Vec::with_capacity(items.len());
                             for value in items {
                                 match value {
@@ -2990,19 +2967,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     ) => {
                         let list = identifier.to_single().unwrap().0.clone();
-                        let path = if matches!(
+                        let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
                         ) {
-                            [Some(stage_list_symbol[0].clone()), Some(list), None]
+                            Scope::Global
                         } else {
-                            let (a, b) = this_target_list_symbol.clone();
-                            match b {
-                                Some(b) => [Some(a), Some(b), Some(list)],
-                                None => [Some(a), Some(list), None],
-                            }
+                            Scope::Local
                         };
-                        SingleAssignment::List(path, Vec::new())
+                        SingleAssignment::List(scope, list, Vec::new())
                     }
                 };
                 vec![single_assignment]
@@ -3010,9 +2983,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         };
         for assignment in assignments {
             match assignment {
-                SingleAssignment::List(identifier, sb3_primitives) => {
+                SingleAssignment::List(scope, list, sb3_primitives) => {
+                    let parent_symbol_id = if scope == Scope::Global {
+                        context.data_symbol_context.global_lists
+                    } else {
+                        context.data_symbol_context.local_lists
+                    };
                     let symbol_id = context
-                        .resolve_path(identifier.iter().map_while(|value| value.as_ref()))
+                        .symbol_table
+                        .get_child(parent_symbol_id, &list)
                         .unwrap();
                     let symbol = &context.symbol_table[symbol_id];
                     let known_block = symbol.known_block.as_ref().unwrap().clone();
@@ -3059,10 +3038,16 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         })?;
                     }
                 }
-                SingleAssignment::Var(identifier, sb3_primitive) => {
+                SingleAssignment::Var(scope, var, sb3_primitive) => {
                     wrap_in_statement(context, |context, parent, this_id| {
+                        let parent_symbol_id = if scope == Scope::Global {
+                            context.data_symbol_context.global_vars
+                        } else {
+                            context.data_symbol_context.local_vars
+                        };
                         let symbol_id = context
-                            .resolve_path(identifier.iter().map_while(|value| value.as_ref()))
+                            .symbol_table
+                            .get_child(parent_symbol_id, &var)
                             .unwrap();
                         let symbol = &context.symbol_table[symbol_id];
                         let known_block = symbol.known_block.as_ref().unwrap().clone();
@@ -3534,15 +3519,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .unwrap();
         let proc_symbol = &context.symbol_table[proc_symbol_id];
         let proc_known_block = proc_symbol.known_block.as_ref().unwrap().clone();
-        let (proccode, params, is_warp) = if let KnownBlock::CustomBlock {
+        let KnownBlock::CustomBlock {
             proccode,
             call_params: _,
             params,
             is_warp,
         } = proc_known_block.as_ref()
-        {
-            (proccode, params, is_warp)
-        } else {
+        else {
             unreachable!()
         };
         wrap_in_statement(context, |context, parent, this_id| {
@@ -3804,6 +3787,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 stage_keyword: *value.0,
             },
         )?;
+        context.data_symbol_context.local_vars = context.data_symbol_context.global_vars;
+        context.data_symbol_context.local_lists = context.data_symbol_context.global_lists;
         let assets = context.target_attachments.remove("stage").unwrap();
         let my_blocks_symbol_id = static_resolve_identifier!(context, [MY_BLOCKS_ISTRING]);
         let mut costumes = Vec::new();
@@ -3881,6 +3866,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let my_blocks_symbol_id = static_resolve_identifier!(context, [MY_BLOCKS_ISTRING]);
         let sprite_symbol_id =
             static_resolve_identifier!(context, [SPRITES_ISTRING, &value.2.to_single().unwrap().0]);
+        context.data_symbol_context.local_vars = sprite_symbol_id;
+        context.data_symbol_context.local_lists = sprite_symbol_id;
         let inserted_symbols = {
             let mut insert_symbols = Vec::new();
             let root_symbol_id = Default::default();
