@@ -4078,6 +4078,7 @@ pub mod expression {
             Token::Div => BinOp::Div,
             Token::Mod => BinOp::Mod,
             Token::Join => BinOp::Join,
+            Token::ContainsKeyword => BinOp::Contains,
             Token::And => BinOp::And,
             Token::Or => BinOp::Or,
             Token::Equals => BinOp::Equals,

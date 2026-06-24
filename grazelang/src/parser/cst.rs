@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    eval::{call::ConstantExprFunction, cast::JsPrimitive},
+    eval::{
+        call::ConstantExprFunction,
+        cast::JsPrimitive,
+        ops::{ConstantExprBinOp, ConstantExprUnOp},
+    },
     lexer::SourceSpan,
     messages::ConstantExprEvaluationError,
 };
@@ -1067,6 +1071,7 @@ pub enum BinOp {
     Div(SourceSpan),
     Mod(SourceSpan),
     Join(SourceSpan),
+    Contains(SourceSpan),
     And(SourceSpan),
     Or(SourceSpan),
     Equals(SourceSpan),
@@ -1086,6 +1091,7 @@ impl GetPos for BinOp {
             BinOp::Div(p) => p,
             BinOp::Mod(p) => p,
             BinOp::Join(p) => p,
+            BinOp::Contains(p) => p,
             BinOp::And(p) => p,
             BinOp::Or(p) => p,
             BinOp::Equals(p) => p,
@@ -1124,6 +1130,7 @@ impl BinOp {
             BinOp::Div(_) => (4, L),
             BinOp::Mod(_) => (4, L),
             BinOp::Join(_) => (2, L),
+            BinOp::Contains(_) => (2, L),
             BinOp::And(_) => (0, L),
             BinOp::Or(_) => (0, L),
             BinOp::Equals(_) => (1, L),
@@ -1183,6 +1190,14 @@ impl BinOp {
                 operand_b_input_name: "STRING2".to_string(),
                 operand_a_default: Some("apple ".into()),
                 operand_b_default: Some("banana".into()),
+                is_negated: false,
+            },
+            BinOp::Contains(_) => BinOpDescriptor {
+                opcode: "operator_contains".to_string(),
+                operand_a_input_name: "STRING1".to_string(),
+                operand_b_input_name: "STRING2".to_string(),
+                operand_a_default: Some("apple".into()),
+                operand_b_default: Some("a".into()),
                 is_negated: false,
             },
             BinOp::And(_) => BinOpDescriptor {

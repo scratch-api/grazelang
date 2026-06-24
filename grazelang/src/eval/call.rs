@@ -8,11 +8,15 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    eval::cast::{
+use super::{
+    cast::{
         JsPrimitive, ScratchVmCompare, ScratchVmIsInt, ScratchVmToBoolean, ScratchVmToNumber,
-        ScratchVmToString, ToLowercaseU16, try_convert_f64_into_i128,
+        ScratchVmToString, try_convert_f64_into_i128,
     },
+    ops,
+};
+use crate::{
+    eval::ops::{ConstantExprBinOp, ConstantExprUnOp},
     lexer::SourceSpan,
     library,
     messages::ConstantExprEvaluationError,
@@ -57,98 +61,6 @@ pub enum ConstantExprFunction {
     ShorthandOperatorLog = 29,
     ShorthandOperatorExp = 30,
     ShorthandOperatorPow = 31,
-}
-
-pub fn str_contains<const N: usize>(haystack: &[u16], needle: &[u16]) -> bool {
-    fn compute_table<'a>(needle: &[u16], buf: &'a mut [isize]) -> &'a [isize] {
-        let m = needle.len();
-        let t = &mut buf[..m];
-        t[0] = -1;
-        let mut pos = 1;
-        let mut cnd = 0;
-        while pos < m {
-            if needle[pos] == needle[cnd as usize] {
-                t[pos] = t[cnd as usize];
-            } else {
-                t[pos] = cnd;
-                while cnd >= 0 && needle[pos] != needle[cnd as usize] {
-                    cnd = t[cnd as usize];
-                }
-            }
-            pos += 1;
-            cnd += 1;
-        }
-        t
-    }
-    if needle.is_empty() {
-        return true;
-    }
-    if haystack.len() < needle.len() {
-        return false;
-    }
-    if needle.len() > N {
-        return any_str_contains(haystack, needle);
-    }
-    let mut buf = [0; N];
-    let t = compute_table(needle, &mut buf);
-    let mut i = 0;
-    let mut j = 0;
-    while i < haystack.len() {
-        if j == -1 || haystack[i] == needle[j as usize] {
-            i += 1;
-            j += 1;
-            if j == needle.len() as isize {
-                return true;
-            }
-        } else {
-            j = t[j as usize];
-        }
-    }
-    false
-}
-
-pub fn any_str_contains(haystack: &[u16], needle: &[u16]) -> bool {
-    fn compute_table(needle: &[u16]) -> Vec<isize> {
-        let m = needle.len();
-        let mut t = vec![0; m];
-        t[0] = -1;
-        let mut pos = 1;
-        let mut cnd = 0;
-        while pos < m {
-            if needle[pos] == needle[cnd as usize] {
-                t[pos] = t[cnd as usize];
-            } else {
-                t[pos] = cnd;
-                while cnd >= 0 && needle[pos] != needle[cnd as usize] {
-                    cnd = t[cnd as usize];
-                }
-            }
-            pos += 1;
-            cnd += 1;
-        }
-        t
-    }
-    if needle.is_empty() {
-        return true;
-    }
-    if haystack.len() < needle.len() {
-        return false;
-    }
-    let t = compute_table(needle);
-    let mut i = 0;
-    let mut j = 0;
-    while i < haystack.len() {
-        if j == -1 || haystack[i] == needle[j as usize] {
-            i += 1;
-            j += 1;
-            if j == needle.len() as isize {
-                return true;
-            }
-        } else {
-            j = t[j as usize];
-        }
-    }
-    false
 }
 
 impl ConstantExprFunction {
@@ -359,31 +271,27 @@ impl ConstantExprFunction {
         match self {
             ConstantExprFunction::OperatorAdd => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                Ok(JsPrimitive::Number(
-                    expr_a.calculate_value_js()?.to_number()
-                        + expr_b.calculate_value_js()?.to_number(),
-                ))
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                Ok(ops::PlusBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorSubtract => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                Ok(JsPrimitive::Number(
-                    expr_a.calculate_value_js()?.to_number()
-                        - expr_b.calculate_value_js()?.to_number(),
-                ))
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                Ok(ops::MinusBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorMultiply => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                Ok(JsPrimitive::Number(
-                    expr_a.calculate_value_js()?.to_number()
-                        * expr_b.calculate_value_js()?.to_number(),
-                ))
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                Ok(ops::TimesBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorDivide => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
-                Ok(JsPrimitive::Number(
-                    expr_a.calculate_value_js()?.to_number()
-                        / expr_b.calculate_value_js()?.to_number(),
-                ))
+                let (value_a, value_b) =
+                    (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
+                Ok(ops::DivBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorRandom => {
                 static RNG: LazyLock<Mutex<StdRng>> =
@@ -411,50 +319,42 @@ impl ConstantExprFunction {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(value_a.compare(&value_b) > 0.0))
+                Ok(ops::GreaterThanBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorLessThan => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(value_a.compare(&value_b) < 0.0))
+                Ok(ops::LessThanBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorEquals => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(value_a.compare(&value_b) == 0.0))
+                Ok(ops::EqualsBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorAnd => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(
-                    value_a.to_boolean() && value_b.to_boolean(),
-                ))
+                Ok(ops::AndBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorOr => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::Boolean(
-                    value_a.to_boolean() || value_b.to_boolean(),
-                ))
+                Ok(ops::OrBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorNot => {
                 let expr = un_op_args(args, source_span)?;
                 let value = expr.calculate_value_js()?;
-                Ok(JsPrimitive::Boolean(!value.to_boolean()))
+                Ok(ops::NotUnOp.apply_operation(value))
             }
             ConstantExprFunction::OperatorJoin => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                Ok(JsPrimitive::JsString({
-                    let mut expr_a_string = value_a.to_js_string();
-                    value_b.write_to_js_string(&mut expr_a_string);
-                    expr_a_string
-                }))
+                Ok(ops::JoinBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorLetterOf => {
                 let (index, string) = bin_op_args(args, source_span)?;
@@ -484,27 +384,13 @@ impl ConstantExprFunction {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                let (haystack, needle) = (value_a.to_js_cow_str(), value_b.to_js_cow_str());
-                let haystack = char::decode_utf16(haystack.iter().copied())
-                    .to_lowercase()
-                    .collect::<Vec<_>>();
-                let needle = char::decode_utf16(needle.iter().copied())
-                    .to_lowercase()
-                    .collect::<Vec<_>>();
-                Ok(JsPrimitive::Boolean(str_contains::<16>(&haystack, &needle)))
+                Ok(ops::ContainsBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorMod => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
-                let n = value_a.to_number();
-                let modulus = value_b.to_number();
-                let result = n % modulus;
-                Ok(JsPrimitive::Number(if result / modulus < 0.0 {
-                    result + modulus
-                } else {
-                    result
-                }))
+                Ok(ops::ModBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorRound => {
                 let expr = un_op_args(args, source_span)?;

@@ -98,8 +98,9 @@ pub enum Token {
     Mod,
     #[token("++")]
     #[token("join")]
-    Join, // TODO: Implement `contains` BinOp
-    // Issue: #65
+    Join,
+    #[token("contains")]
+    ContainsKeyword,
     #[token("==")]
     Equals,
     #[token("!=")]
