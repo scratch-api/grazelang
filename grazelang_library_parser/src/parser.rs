@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use arcstr::ArcStr as IString;
-use grazelang_library::{
+use grazelang_types::{
     CallBlockParam, CallBlockParamKind, ConstantExprLibraryItem, ConstantExprLibraryItemValue,
     KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},

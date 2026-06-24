@@ -414,8 +414,8 @@ dependencies = [
  "clap",
  "enum-assoc",
  "fast-float2",
- "grazelang_library",
  "grazelang_library_parser",
+ "grazelang_types",
  "logos",
  "md5",
  "num_enum",
@@ -430,29 +430,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "grazelang_library"
-version = "0.1.0"
-dependencies = [
- "arcstr",
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "grazelang_library_parser"
 version = "0.1.0"
 dependencies = [
  "arcstr",
  "base16ct",
- "grazelang_library",
+ "grazelang_types",
  "proc-macro2",
  "quote",
  "serde",
  "serde_json",
  "sha3",
  "syn",
+]
+
+[[package]]
+name = "grazelang_types"
+version = "0.1.0"
+dependencies = [
+ "arcstr",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

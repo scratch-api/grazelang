@@ -5,7 +5,7 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
-use grazelang_library::{
+use grazelang_types::{
     AliasSegment, BACKDROPS_CATEGORY_ID, BindInfo, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, ConstantExprLibraryItem, KnownBlock, LibraryItem, LibraryItemValue,
     NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,

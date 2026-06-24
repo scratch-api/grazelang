@@ -1,6 +1,6 @@
 use std::sync::{LazyLock, Mutex, MutexGuard};
 
-use grazelang_library::ConstantExprLibraryItemValue;
+use grazelang_types::ConstantExprLibraryItemValue;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rand::{
     RngExt, SeedableRng,
@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     cast::{
-        JsPrimitive, ScratchVmCompare, ScratchVmIsInt, ScratchVmToBoolean, ScratchVmToNumber,
-        ScratchVmToString, try_convert_f64_into_i128,
+        JsPrimitive, ScratchVmIsInt, ScratchVmToNumber, ScratchVmToString,
+        try_convert_f64_into_i128,
     },
     ops,
 };

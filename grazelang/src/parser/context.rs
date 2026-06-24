@@ -8,12 +8,12 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
-pub use grazelang_library::KnownBlock;
-use grazelang_library::{
+pub use grazelang_types::KnownBlock;
+use grazelang_types::{
     BROADCASTS_CATEGORY_ID, CallBlockParam, CallableKnownBlockSignature, KnownBlockInput,
     LISTS_CATEGORY_ID, PROPERTIES_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     VARIABLES_CATEGORY_ID,
-    project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock, TargetAttachment},
+    project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool, TargetAttachment},
 };
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -70,7 +70,7 @@ pub enum Primitive {
 pub struct VarDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub value: Sb3Primitive,
+    pub value: Sb3PrimitiveOrBool,
     pub is_cloud: bool,
     /// vars declared as a normal statement are assigned to every time the statement is reached and their initial value is empty
     pub value_is_initial_value: bool,
@@ -80,7 +80,7 @@ pub struct VarDescriptor {
 pub struct ListDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
-    pub value: Vec<Sb3Primitive>,
+    pub value: Vec<Sb3PrimitiveOrBool>,
     /// lists declared as a normal statement are assigned to every time the statement is reached and their initial value is empty
     pub value_is_initial_value: bool,
 }
@@ -270,17 +270,17 @@ impl ResolveKnownBlock for KnownBlock {
                 (Sb3FieldValue::Normal(id.into()), &*ANY_CATEGORIES)
             }
             KnownBlock::PrimitiveBlock { value } => match value {
-                grazelang_library::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
-                | grazelang_library::project_json::Sb3PrimitiveBlock::PositiveNumber(
+                grazelang_types::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
+                | grazelang_types::project_json::Sb3PrimitiveBlock::PositiveNumber(
                     sb3_primitive,
                 )
-                | grazelang_library::project_json::Sb3PrimitiveBlock::PositiveInteger(
+                | grazelang_types::project_json::Sb3PrimitiveBlock::PositiveInteger(
                     sb3_primitive,
                 )
-                | grazelang_library::project_json::Sb3PrimitiveBlock::Integer(sb3_primitive)
-                | grazelang_library::project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
-                | grazelang_library::project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
-                | grazelang_library::project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
+                | grazelang_types::project_json::Sb3PrimitiveBlock::Integer(sb3_primitive)
+                | grazelang_types::project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
+                | grazelang_types::project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
+                | grazelang_types::project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
                     let cow_str = sb3_primitive.as_cow_str();
                     (
                         Sb3FieldValue::Normal(sb3_primitive.clone()),
@@ -290,14 +290,14 @@ impl ResolveKnownBlock for KnownBlock {
                             .unwrap_or_else(|| &*NO_CATEGORIES),
                     )
                 }
-                grazelang_library::project_json::Sb3PrimitiveBlock::Broadcast { name, id } => (
+                grazelang_types::project_json::Sb3PrimitiveBlock::Broadcast { name, id } => (
                     Sb3FieldValue::WithId {
                         value: Sb3Primitive::String(name.clone()),
                         id: id.clone(),
                     },
                     &*BROADCAST_CATEGORIES,
                 ),
-                grazelang_library::project_json::Sb3PrimitiveBlock::Variable {
+                grazelang_types::project_json::Sb3PrimitiveBlock::Variable {
                     name,
                     id,
                     x: _,
@@ -309,7 +309,7 @@ impl ResolveKnownBlock for KnownBlock {
                     },
                     &*VARIABLE_CATEGORIES,
                 ),
-                grazelang_library::project_json::Sb3PrimitiveBlock::List {
+                grazelang_types::project_json::Sb3PrimitiveBlock::List {
                     name,
                     id,
                     x: _,

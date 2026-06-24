@@ -143,8 +143,10 @@ pub enum Token {
     #[regex(r#"0[oO][0-7](?:_?[0-7])*"#, parse_number)]
     OctalInt(IString),
     #[regex(r#"0[bB][01](?:_?[01])*"#, parse_number)]
-    BinaryInt(IString), // TODO: Implement boolean literal
-    // Issue: #63
+    BinaryInt(IString),
+    #[token("true", |_| true)]
+    #[token("false", |_| false)]
+    Bool(bool),
     #[regex(r#""(?:[^\\"$\r\n]|(?:\\.))*\$\{"#, parse_left_format_string)]
     LeftFormattedString(IString),
 }

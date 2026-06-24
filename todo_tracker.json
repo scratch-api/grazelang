@@ -232,7 +232,7 @@
         "title": "convert into int if small enough"
     },
     "33": {
-        "filepath": "grazelang_library/src/project_json.rs",
+        "filepath": "grazelang_types/src/project_json.rs",
         "text": "",
         "status": "closed",
         "lines": "L1465-L1466",
@@ -240,7 +240,7 @@
         "title": "Implement primitive block conversion (if default is a positive integer, so would a literal value be)"
     },
     "32": {
-        "filepath": "grazelang_library/src/project_json.rs",
+        "filepath": "grazelang_types/src/project_json.rs",
         "text": "",
         "status": "closed",
         "lines": "L1484-L1485",

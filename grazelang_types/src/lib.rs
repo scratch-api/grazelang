@@ -49,7 +49,7 @@ impl ToTokens for BindInfo {
                 .map(|(key, value)| (key, value))
                 .unzip();
         tokens.append_all(quote! {
-            ::grazelang_library::BindInfo {
+            ::grazelang_types::BindInfo {
                 parent_target: ::arcstr::literal!(#parent_target),
                 property_of_params: vec![#( (#property_of_params_keys, #property_of_params_values ) ),*]
             }
@@ -195,7 +195,7 @@ impl ToTokens for SimpleCallableKnownBlockSignature {
         let (keys, values): (Vec<_>, Vec<_>) = known_params.iter().map(|(a, b)| (a, b)).unzip();
 
         tokens.append_all(quote! {
-            ::grazelang_library::SimpleCallableKnownBlockSignature(
+            ::grazelang_types::SimpleCallableKnownBlockSignature(
                 ::arcstr::literal!(#opcode),
                 #param,
                 ::std::vec![#( (#keys, #values) ),*]
@@ -224,7 +224,7 @@ pub enum CallBlockParamKind {
 
 impl ToTokens for CallBlockParamKind {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let prefix = quote!(::grazelang_library::CallBlockParamKind);
+        let prefix = quote!(::grazelang_types::CallBlockParamKind);
         match self {
             CallBlockParamKind::Input { default } => {
                 let default = quote_option(default.as_ref());
@@ -269,7 +269,7 @@ impl ToTokens for CallBlockParam {
         let name = name.as_str();
 
         tokens.append_all(quote! {
-            ::grazelang_library::CallBlockParam {
+            ::grazelang_types::CallBlockParam {
                 kind: #kind,
                 name: ::arcstr::literal!(#name)
             }
@@ -288,12 +288,12 @@ impl ToTokens for HasShadow {
         match self {
             HasShadow::Yes => {
                 tokens.append_all(quote! {
-                    ::grazelang_library::HasShadow::Yes
+                    ::grazelang_types::HasShadow::Yes
                 });
             }
             HasShadow::No => {
                 tokens.append_all(quote! {
-                    ::grazelang_library::HasShadow::No
+                    ::grazelang_types::HasShadow::No
                 });
             }
         }
@@ -352,7 +352,7 @@ impl From<Sb3PrimitiveBlock> for KnownBlock {
 
 impl ToTokens for KnownBlock {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let prefix = quote!(::grazelang_library::KnownBlock);
+        let prefix = quote!(::grazelang_types::KnownBlock);
         match self {
             KnownBlock::Variable {
                 canonical_name,
@@ -459,7 +459,7 @@ impl ToTokens for KnownBlock {
                     bound_params.iter().map(|(k, v)| (k, v)).unzip();
                 tokens.append_all(quote! {
                     #prefix::BoundMethod {
-                        signature: ::std::sync::Arc::new(::grazelang_library::MethodSignature {
+                        signature: ::std::sync::Arc::new(::grazelang_types::MethodSignature {
                             opcode: ::arcstr::literal!(#opcode),
                             unbound_params: ::std::vec![#( #unbound_params ),*],
                         }),
@@ -486,10 +486,10 @@ impl ToTokens for AliasSegment {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             AliasSegment::Super => {
-                tokens.append_all(quote!(::grazelang_library::AliasSegment::Super))
+                tokens.append_all(quote!(::grazelang_types::AliasSegment::Super))
             }
             AliasSegment::Child(s) => {
-                tokens.append_all(quote!(::grazelang_library::AliasSegment::Child(#s.to_string())))
+                tokens.append_all(quote!(::grazelang_types::AliasSegment::Child(#s.to_string())))
             }
         }
     }
@@ -507,13 +507,13 @@ impl ToTokens for LibraryItemValue {
             LibraryItemValue::KnownBlock(known_block) => {
                 let known_block = known_block.as_ref();
                 tokens.append_all(quote! {
-                    ::grazelang_library::LibraryItemValue::KnownBlock(::std::boxed::Box::new(#known_block))
+                    ::grazelang_types::LibraryItemValue::KnownBlock(::std::boxed::Box::new(#known_block))
                 })
             }
             LibraryItemValue::Alias(alias_segments) => {
                 let alias_segments = alias_segments.iter();
                 tokens.append_all(quote! {
-                    ::grazelang_library::LibraryItemValue::Alias(vec![#( #alias_segments ),*])
+                    ::grazelang_types::LibraryItemValue::Alias(vec![#( #alias_segments ),*])
                 })
             }
         }
@@ -545,7 +545,7 @@ impl ToTokens for LibraryItem {
         let value = quote_option(value.as_ref());
 
         tokens.append_all(quote! {
-            ::grazelang_library::LibraryItem {
+            ::grazelang_types::LibraryItem {
                 namespace: ::std::collections::HashMap::from([#( (#keys.to_string(), #values) ),*]),
                 value: #value,
             }
@@ -564,12 +564,12 @@ impl ToTokens for ConstantExprLibraryItemValue {
         tokens.append_all(match self {
             ConstantExprLibraryItemValue::Function(id, is_singleton) => {
                 quote! {
-                    ::grazelang_library::ConstantExprLibraryItemValue::Function(#id, #is_singleton)
+                    ::grazelang_types::ConstantExprLibraryItemValue::Function(#id, #is_singleton)
                 }
             }
             ConstantExprLibraryItemValue::AssociatedItem(id) => {
                 quote! {
-                    ::grazelang_library::ConstantExprLibraryItemValue::AssociatedItem(#id)
+                    ::grazelang_types::ConstantExprLibraryItemValue::AssociatedItem(#id)
                 }
             }
         });
@@ -590,7 +590,7 @@ impl ToTokens for ConstantExprLibraryItem {
         let value = quote_option(value.as_ref());
 
         tokens.append_all(quote! {
-            ::grazelang_library::ConstantExprLibraryItem {
+            ::grazelang_types::ConstantExprLibraryItem {
                 namespace: ::std::collections::HashMap::from([#( (#keys.to_string(), #values) ),*]),
                 value: #value,
             }

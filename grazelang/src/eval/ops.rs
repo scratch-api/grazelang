@@ -32,7 +32,7 @@ pub struct NotUnOp;
 
 impl ConstantExprUnOp for NotUnOp {
     fn apply_operation(&self, value: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(!value.to_boolean())
+        JsPrimitive::Bool(!value.to_boolean())
     }
 }
 pub struct ExpUnOp;
@@ -150,7 +150,7 @@ impl ConstantExprBinOp for ContainsBinOp {
         let needle = char::decode_utf16(needle.iter().copied())
             .to_lowercase()
             .collect::<Vec<_>>();
-        JsPrimitive::Boolean(str_contains::<16>(&haystack, &needle))
+        JsPrimitive::Bool(str_contains::<16>(&haystack, &needle))
     }
 }
 
@@ -158,7 +158,7 @@ pub struct AndBinOp;
 
 impl ConstantExprBinOp for AndBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(value_a.to_boolean() && value_b.to_boolean())
+        JsPrimitive::Bool(value_a.to_boolean() && value_b.to_boolean())
     }
 }
 
@@ -166,7 +166,7 @@ pub struct OrBinOp;
 
 impl ConstantExprBinOp for OrBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(value_a.to_boolean() || value_b.to_boolean())
+        JsPrimitive::Bool(value_a.to_boolean() || value_b.to_boolean())
     }
 }
 
@@ -174,7 +174,7 @@ pub struct EqualsBinOp;
 
 impl ConstantExprBinOp for EqualsBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(value_a.compare(&value_b) == 0.0)
+        JsPrimitive::Bool(value_a.compare(&value_b) == 0.0)
     }
 }
 
@@ -182,7 +182,7 @@ pub struct NotEqualsBinOp;
 
 impl ConstantExprBinOp for NotEqualsBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(value_a.compare(&value_b) != 0.0)
+        JsPrimitive::Bool(value_a.compare(&value_b) != 0.0)
     }
 }
 
@@ -190,7 +190,7 @@ pub struct LessThanBinOp;
 
 impl ConstantExprBinOp for LessThanBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(value_a.compare(&value_b) < 0.0)
+        JsPrimitive::Bool(value_a.compare(&value_b) < 0.0)
     }
 }
 
@@ -198,7 +198,7 @@ pub struct GreaterThanBinOp;
 
 impl ConstantExprBinOp for GreaterThanBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(value_a.compare(&value_b) > 0.0)
+        JsPrimitive::Bool(value_a.compare(&value_b) > 0.0)
     }
 }
 
@@ -206,7 +206,7 @@ pub struct LessThanOrEqualBinOp;
 
 impl ConstantExprBinOp for LessThanOrEqualBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(!matches!(
+        JsPrimitive::Bool(!matches!(
             value_a.compare(&value_b).partial_cmp(&0.0),
             Some(std::cmp::Ordering::Greater)
         ))
@@ -217,7 +217,7 @@ pub struct GreaterThanOrEqualBinOp;
 
 impl ConstantExprBinOp for GreaterThanOrEqualBinOp {
     fn apply_operation(&self, value_a: JsPrimitive, value_b: JsPrimitive) -> JsPrimitive {
-        JsPrimitive::Boolean(!matches!(
+        JsPrimitive::Bool(!matches!(
             value_a.compare(&value_b).partial_cmp(&0.0),
             Some(std::cmp::Ordering::Less)
         ))

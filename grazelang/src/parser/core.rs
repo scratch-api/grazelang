@@ -860,6 +860,7 @@ pub mod statement {
                 value,
                 get_token_source_span(token_stream),
             )),
+            Token::Bool(value) => Ok(LLiteral::Bool(value, get_token_source_span(token_stream))),
             Token::LeftParens => {
                 let left_parens_position = get_token_source_span(token_stream);
                 expect_token!(
@@ -1263,7 +1264,7 @@ pub mod statement {
                                                     source
                                                 }
                                             })?),
-                                            ListEntry::Unwrap(literal, _) => literal.get_string_value().as_str().chars().for_each(|c| expressions.push(grazelang_library::project_json::Sb3Primitive::String(c.to_string()))),
+                                            ListEntry::Unwrap(literal, _) => literal.get_string_value().as_str().chars().for_each(|c| expressions.push(grazelang_types::project_json::Sb3PrimitiveOrBool::String(c.to_string()))),
                                         }
                                     }
                                     expressions
@@ -1278,7 +1279,7 @@ pub mod statement {
                             canonical_name: canonical_identifier.as_ref().map(|value|value.name.clone()),
                             value_is_initial_value: values_are_initial_values,
                             value: match &value {
-                                DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
+                                DeclarationValue::None => grazelang_types::project_json::Sb3PrimitiveOrBool::String("".to_string()),
                                 DeclarationValue::Var(_, value) => {
                                     value.calculate_value().map_err(|source| {
                                         ParseError::InvalidConstantExpression {
@@ -1720,7 +1721,7 @@ pub mod statement {
                                                 .as_str()
                                                 .chars()
                                                 .for_each(|c| expressions.push(
-                                                    grazelang_library::project_json::Sb3Primitive::String(c.to_string())
+                                                    grazelang_types::project_json::Sb3PrimitiveOrBool::String(c.to_string())
                                                 )),
                                         }
                                     }
@@ -1736,7 +1737,7 @@ pub mod statement {
                             canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
                             value_is_initial_value: values_are_initial_values,
                             value: match &value {
-                                DeclarationValue::None => grazelang_library::project_json::Sb3Primitive::String("".to_string()),
+                                DeclarationValue::None => grazelang_types::project_json::Sb3PrimitiveOrBool::String("".to_string()),
                                 DeclarationValue::Var(_, value) => {
                                     value.calculate_value().map_err(|source| {
                                         ParseError::InvalidConstantExpression {
@@ -3887,6 +3888,7 @@ pub mod expression {
                 string.clone(),
                 token_position,
             ))),
+            Token::Bool(bool) => Ok(ELiteral(LLiteral::Bool(bool, token_position))),
             Token::Plus => {
                 let token = next_token!(token_stream);
                 if get_token_start(token_stream) != token_position.0.1 {
@@ -4023,10 +4025,9 @@ pub mod expression {
                     expressions.push(FormattedStringContent::String(string, token_position));
                 }
                 loop {
-                    expressions.push(FormattedStringContent::Expression(Box::new(parse_expression(
-                        token_stream,
-                        context,
-                    )?)));
+                    expressions.push(FormattedStringContent::Expression(Box::new(
+                        parse_expression(token_stream, context)?,
+                    )));
                     match next_token!(token_stream) {
                         Token::RightBrace(lexer::LexedRightBrace::MiddleFormattedString(
                             string,

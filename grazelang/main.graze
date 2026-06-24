@@ -25,6 +25,7 @@ sprite `Sprite1` sprite_1 {
         pick_random_number(0, 255),
         pick_random_number(0, 10000000000000000000000000000000000000000),
         pick_random_number(0.0, 255.0),
+        sin(45)
     ];
     let local list list_2;
     events.when_green_flag_clicked {

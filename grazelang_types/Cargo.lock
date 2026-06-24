@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "grazelang_library"
+name = "grazelang_types"
 version = "0.1.0"
 dependencies = [
  "arcstr",

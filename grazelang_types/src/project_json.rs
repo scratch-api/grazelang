@@ -131,7 +131,7 @@ impl Sb3Target {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sb3VariableDeclaration {
     pub name: String,
-    pub value: Sb3Primitive,
+    pub value: Sb3PrimitiveOrBool,
     pub is_cloud: bool,
 }
 
@@ -172,7 +172,7 @@ impl<'de> Deserialize<'de> for Sb3VariableDeclaration {
                     .next_element::<String>()?
                     .ok_or_else(|| de::Error::invalid_length(0, &"2 to 3"))?;
                 let value = seq
-                    .next_element::<Sb3Primitive>()?
+                    .next_element::<Sb3PrimitiveOrBool>()?
                     .ok_or_else(|| de::Error::invalid_length(1, &"2 to 3"))?;
                 let is_cloud = seq.next_element::<bool>()?.unwrap_or(false);
                 Ok(Sb3VariableDeclaration {
@@ -192,6 +192,38 @@ pub enum Sb3Primitive {
     Int128(i128),
     Int(i64),
     Float(f64),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Sb3PrimitiveOrBool {
+    String(String),
+    Int128(i128),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+}
+
+impl From<Sb3PrimitiveOrBool> for Sb3Primitive {
+    fn from(value: Sb3PrimitiveOrBool) -> Self {
+        match value {
+            Sb3PrimitiveOrBool::String(value) => Self::String(value),
+            Sb3PrimitiveOrBool::Int128(value) => Self::Int128(value),
+            Sb3PrimitiveOrBool::Int(value) => Self::Int(value),
+            Sb3PrimitiveOrBool::Float(value) => Self::Float(value),
+            Sb3PrimitiveOrBool::Bool(value) => Self::String(value.to_string()),
+        }
+    }
+}
+
+impl From<Sb3Primitive> for Sb3PrimitiveOrBool {
+    fn from(value: Sb3Primitive) -> Self {
+        match value {
+            Sb3Primitive::String(value) => Self::String(value),
+            Sb3Primitive::Int128(value) => Self::Int128(value),
+            Sb3Primitive::Int(value) => Self::Int(value),
+            Sb3Primitive::Float(value) => Self::Float(value),
+        }
+    }
 }
 
 impl Sb3Primitive {
@@ -234,6 +266,48 @@ impl From<&str> for Sb3Primitive {
     }
 }
 
+impl Sb3PrimitiveOrBool {
+    pub fn as_cow_str(&self) -> Cow<'_, str> {
+        match self {
+            Sb3PrimitiveOrBool::String(value) => Cow::Borrowed(value.as_str()),
+            Sb3PrimitiveOrBool::Int128(value) => Cow::Owned(value.to_string()),
+            Sb3PrimitiveOrBool::Int(value) => Cow::Owned(value.to_string()),
+            Sb3PrimitiveOrBool::Float(value) => Cow::Owned(value.to_string()),
+            Sb3PrimitiveOrBool::Bool(value) => Cow::Owned(value.to_string()),
+        }
+    }
+}
+
+impl Display for Sb3PrimitiveOrBool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Sb3PrimitiveOrBool::String(value) => value.fmt(f),
+            Sb3PrimitiveOrBool::Int128(value) => value.fmt(f),
+            Sb3PrimitiveOrBool::Int(value) => value.fmt(f),
+            Sb3PrimitiveOrBool::Float(value) => value.fmt(f),
+            Sb3PrimitiveOrBool::Bool(value) => value.fmt(f),
+        }
+    }
+}
+
+impl From<String> for Sb3PrimitiveOrBool {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&arcstr::ArcStr> for Sb3PrimitiveOrBool {
+    fn from(value: &arcstr::ArcStr) -> Self {
+        value.to_string().into()
+    }
+}
+
+impl From<&str> for Sb3PrimitiveOrBool {
+    fn from(value: &str) -> Self {
+        value.to_string().into()
+    }
+}
+
 impl Serialize for Sb3Primitive {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -244,14 +318,30 @@ impl Serialize for Sb3Primitive {
             Sb3Primitive::Int128(i) => serializer.serialize_i128(*i),
             Sb3Primitive::Int(i) => serializer.serialize_i64(*i),
             Sb3Primitive::Float(f) => serializer.serialize_f64(*f),
-            // Sb3Primitive::Bool(b) => serializer.serialize_bool(*b),
+            // Sb3Primitive::Boolean(b) => serializer.serialize_bool(*b),
+            // Sb3Primitive::Null => serializer.serialize_none(),
+        }
+    }
+}
+
+impl Serialize for Sb3PrimitiveOrBool {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Sb3PrimitiveOrBool::String(s) => serializer.serialize_str(s),
+            Sb3PrimitiveOrBool::Int128(i) => serializer.serialize_i128(*i),
+            Sb3PrimitiveOrBool::Int(i) => serializer.serialize_i64(*i),
+            Sb3PrimitiveOrBool::Float(f) => serializer.serialize_f64(*f),
+            Sb3PrimitiveOrBool::Bool(b) => serializer.serialize_bool(*b),
             // Sb3Primitive::Null => serializer.serialize_none(),
         }
     }
 }
 
 mod sb3_primitive {
-    use super::Sb3Primitive;
+    use super::{Sb3Primitive, Sb3PrimitiveOrBool};
     use serde::de::{self, Visitor};
 
     pub(super) struct Sb3PrimitiveVisitor;
@@ -321,8 +411,92 @@ mod sb3_primitive {
         // where
         //     E: de::Error,
         // {
-        //     Ok(Sb3Primitive::Bool(v))
+        //     Ok(Sb3Primitive::Boolean(v))
         // }
+
+        fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+        where
+            D: de::Deserializer<'de>,
+        {
+            deserializer.deserialize_any(self)
+        }
+
+        // fn visit_none<E>(self) -> Result<Self::Value, E>
+        // where
+        //     E: de::Error,
+        // {
+        //     Ok(Sb3Primitive::Null)
+        // }
+    }
+    pub(super) struct Sb3PrimitiveOrBoolVisitor;
+
+    impl<'de> Visitor<'de> for Sb3PrimitiveOrBoolVisitor {
+        type Value = Sb3PrimitiveOrBool;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a json primitive")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3PrimitiveOrBool::String(v.to_string()))
+        }
+
+        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3PrimitiveOrBool::String(v))
+        }
+
+        fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3PrimitiveOrBool::Int(v))
+        }
+
+        fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3PrimitiveOrBool::Int128(v))
+        }
+
+        fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(match v.try_into() {
+                Ok(value) => Sb3PrimitiveOrBool::Int(value),
+                Err(_) => Sb3PrimitiveOrBool::Int128(v as i128),
+            })
+        }
+
+        fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3PrimitiveOrBool::Int128(v.try_into().map_err(|_| {
+                de::Error::invalid_value(de::Unexpected::Other("integer too big for i128"), &"i128")
+            })?))
+        }
+
+        fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3PrimitiveOrBool::Float(v))
+        }
+
+        fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Sb3PrimitiveOrBool::Bool(v))
+        }
 
         fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
@@ -349,25 +523,57 @@ impl<'de> Deserialize<'de> for Sb3Primitive {
     }
 }
 
+impl<'de> Deserialize<'de> for Sb3PrimitiveOrBool {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(sb3_primitive::Sb3PrimitiveOrBoolVisitor)
+    }
+}
+
 impl ToTokens for Sb3Primitive {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         match self {
             Sb3Primitive::String(s) => tokens.append_all(
-                quote!(::grazelang_library::project_json::Sb3Primitive::String(#s.to_string())),
+                quote!(::grazelang_types::project_json::Sb3Primitive::String(#s.to_string())),
             ),
             Sb3Primitive::Int128(i) => tokens
-                .append_all(quote!(::grazelang_library::project_json::Sb3Primitive::Int128(#i))),
+                .append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Int128(#i))),
             Sb3Primitive::Int(i) => {
-                tokens.append_all(quote!(::grazelang_library::project_json::Sb3Primitive::Int(#i)))
+                tokens.append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Int(#i)))
             }
             Sb3Primitive::Float(f) => tokens
-                .append_all(quote!(::grazelang_library::project_json::Sb3Primitive::Float(#f))),
+                .append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Float(#f))),
+            // Sb3Primitive::Boolean(b) => {
+            //     tokens.append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Boolean(#b)))
+            // }
+        }
+    }
+}
+
+impl ToTokens for Sb3PrimitiveOrBool {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            Sb3PrimitiveOrBool::String(s) => tokens.append_all(
+                quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::String(#s.to_string())),
+            ),
+            Sb3PrimitiveOrBool::Int128(i) => tokens
+                .append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Int128(#i))),
+            Sb3PrimitiveOrBool::Int(i) => {
+                tokens.append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Int(#i)))
+            }
+            Sb3PrimitiveOrBool::Float(f) => tokens
+                .append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Float(#f))),
+            Sb3PrimitiveOrBool::Bool(b) => {
+                tokens.append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Bool(#b)))
+            }
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Sb3ListDeclaration(pub String, pub Vec<Sb3Primitive>);
+pub struct Sb3ListDeclaration(pub String, pub Vec<Sb3PrimitiveOrBool>);
 
 #[derive(Debug, Clone, PartialEq)]
 #[expect(clippy::large_enum_variant)]
@@ -867,7 +1073,7 @@ impl<'de> Deserialize<'de> for Sb3PrimitiveBlock {
 
 impl ToTokens for Sb3PrimitiveBlock {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let prefix = quote!(::grazelang_library::project_json::Sb3PrimitiveBlock);
+        let prefix = quote!(::grazelang_types::project_json::Sb3PrimitiveBlock);
         match self {
             Sb3PrimitiveBlock::Number(p) => tokens.append_all(quote!(#prefix::Number(#p))),
             Sb3PrimitiveBlock::PositiveNumber(p) => {
@@ -959,7 +1165,7 @@ impl<'de> Deserialize<'de> for Sb3FieldValue {
 
 impl ToTokens for Sb3FieldValue {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let prefix = quote!(::grazelang_library::project_json::Sb3FieldValue);
+        let prefix = quote!(::grazelang_types::project_json::Sb3FieldValue);
         match self {
             Sb3FieldValue::Normal(p) => tokens.append_all(quote!(#prefix::Normal(#p))),
             Sb3FieldValue::WithId { value, id } => {

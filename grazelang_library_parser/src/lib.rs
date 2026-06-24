@@ -5,7 +5,7 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
-use grazelang_library::{
+use grazelang_types::{
     BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
     CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, ConstantExprLibraryItem,
     DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID,
@@ -140,7 +140,7 @@ macro_rules! implement_generate_constant_expr_library {
         let library_keys = library.keys();
         let library_values = library.values();
         let expanded = quote! {
-            ::grazelang_library::ConstantExprLibraryItem {
+            ::grazelang_types::ConstantExprLibraryItem {
                 namespace: ::std::collections::HashMap::from([#((#library_keys.to_string(), #library_values)),*]),
                 value: ::std::option::Option::None,
             }

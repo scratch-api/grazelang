@@ -10,12 +10,16 @@ use crate::{
     messages::ConstantExprEvaluationError,
 };
 use arcstr::ArcStr as IString; // Immutable string
-use grazelang_library::{
+use grazelang_types::{
     ConstantExprLibraryItemValue,
-    project_json::{Sb3Primitive, Sb3PrimitiveBlock},
+    project_json::{Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool},
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+pub const EMPTY_ISTRING_REF: &IString = &arcstr::literal!("");
+pub const FALSE_ISTRING_REF: &IString = &arcstr::literal!("false");
+pub const TRUE_ISTRING_REF: &IString = &arcstr::literal!("true");
 
 pub trait GetPos {
     fn get_source_span(&self) -> &SourceSpan;
@@ -827,7 +831,7 @@ impl Expression {
 
     pub fn calculate_value_js(&self) -> Result<JsPrimitive, ConstantExprEvaluationError> {
         match self {
-            Expression::Literal(literal) => Ok(Sb3Primitive::from(literal).into()),
+            Expression::Literal(literal) => Ok(Sb3PrimitiveOrBool::from(literal).into()),
             Expression::BinOp(expr_a, bin_op, expr_b, _) => {
                 Ok(bin_op
                     .apply_operation(expr_a.calculate_value_js()?, expr_b.calculate_value_js()?))
@@ -979,7 +983,7 @@ impl Expression {
         }
     }
 
-    pub fn calculate_value(&self) -> Result<Sb3Primitive, ConstantExprEvaluationError> {
+    pub fn calculate_value(&self) -> Result<Sb3PrimitiveOrBool, ConstantExprEvaluationError> {
         if let Expression::Literal(literal) = self {
             return Ok(literal.into());
         }
@@ -1291,14 +1295,14 @@ impl GetPos for UnOp {
 pub struct UnOpDescriptor {
     pub opcode: String,
     pub operand_input_name: String,
-    pub extra_inputs: HashMap<String, grazelang_library::project_json::Sb3PrimitiveBlock>,
-    pub field_values: HashMap<String, grazelang_library::project_json::Sb3FieldValue>,
-    pub default: Option<grazelang_library::project_json::Sb3PrimitiveBlock>,
+    pub extra_inputs: HashMap<String, grazelang_types::project_json::Sb3PrimitiveBlock>,
+    pub field_values: HashMap<String, grazelang_types::project_json::Sb3FieldValue>,
+    pub default: Option<grazelang_types::project_json::Sb3PrimitiveBlock>,
 }
 
 impl UnOp {
     pub fn get_descriptor(&self) -> UnOpDescriptor {
-        use grazelang_library::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
+        use grazelang_types::project_json::{Sb3FieldValue, Sb3PrimitiveBlock};
 
         match self {
             UnOp::Minus(_) => UnOpDescriptor {
@@ -1350,10 +1354,9 @@ pub enum Literal {
     HexadecimalInt(IString, SourceSpan),
     OctalInt(IString, SourceSpan),
     BinaryInt(IString, SourceSpan),
+    Bool(bool, SourceSpan),
     EmptyExpression(LeftParens, RightParens, SourceSpan),
 }
-
-pub const EMPTY_ISTRING_REF: &IString = &arcstr::literal!("");
 
 impl Literal {
     pub fn get_string_value(&self) -> &IString {
@@ -1364,23 +1367,22 @@ impl Literal {
             Literal::HexadecimalInt(value, _) => value,
             Literal::OctalInt(value, _) => value,
             Literal::BinaryInt(value, _) => value,
+            Literal::Bool(value, _) => {
+                if *value {
+                    TRUE_ISTRING_REF
+                } else {
+                    FALSE_ISTRING_REF
+                }
+            }
             Literal::EmptyExpression(_, _, _) => EMPTY_ISTRING_REF,
         }
     }
     pub fn cast_to_string(&self) -> IString {
-        match self {
-            Literal::String(value, _) => value.clone(),
-            Literal::DecimalInt(value, _) => value.clone(),
-            Literal::DecimalFloat(value, _) => value.clone(),
-            Literal::HexadecimalInt(value, _) => value.clone(),
-            Literal::OctalInt(value, _) => value.clone(),
-            Literal::BinaryInt(value, _) => value.clone(),
-            Literal::EmptyExpression(_, _, _) => arcstr::literal!(""),
-        }
+        self.get_string_value().clone()
     }
 }
 
-impl From<&Literal> for Sb3Primitive {
+impl From<&Literal> for Sb3PrimitiveOrBool {
     fn from(value: &Literal) -> Self {
         match value {
             Literal::DecimalInt(string, _) => {
@@ -1498,9 +1500,17 @@ impl From<&Literal> for Sb3Primitive {
                     }
                 }
             }
+            Literal::Bool(value, _) => return Self::Bool(*value),
             _ => (),
         }
         value.get_string_value().into()
+    }
+}
+
+impl From<&Literal> for Sb3Primitive {
+    fn from(value: &Literal) -> Self {
+        let prim_or_bool: Sb3PrimitiveOrBool = value.into();
+        prim_or_bool.into()
     }
 }
 
@@ -1519,6 +1529,7 @@ impl GetPos for Literal {
             Literal::HexadecimalInt(_, p) => p,
             Literal::OctalInt(_, p) => p,
             Literal::BinaryInt(_, p) => p,
+            Literal::Bool(_, p) => p,
             Literal::EmptyExpression(_, _, p) => p,
         }
     }

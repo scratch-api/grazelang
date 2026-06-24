@@ -5,7 +5,7 @@ use std::{
 };
 
 use arcstr::ArcStr as IString;
-use grazelang_library::project_json::Sb3Primitive;
+use grazelang_types::project_json::Sb3PrimitiveOrBool;
 use serde::{Deserialize, Serialize};
 
 pub trait ScratchVmToNumber {
@@ -61,7 +61,7 @@ pub enum JsPrimitive {
     /// Only here to reduce allocations
     IString(IString),
     Number(f64),
-    Boolean(bool),
+    Bool(bool),
 }
 
 pub fn try_convert_f64_into_i128(value: f64) -> Option<i128> {
@@ -72,35 +72,36 @@ pub fn try_convert_f64_into_i128(value: f64) -> Option<i128> {
         .then_some(value as i128)
 }
 
-impl From<JsPrimitive> for Sb3Primitive {
+impl From<JsPrimitive> for Sb3PrimitiveOrBool {
     fn from(value: JsPrimitive) -> Self {
         match value {
-            JsPrimitive::JsString(value) => Sb3Primitive::String(String::from_utf16_lossy(&value)),
-            JsPrimitive::String(value) => Sb3Primitive::String(value),
-            JsPrimitive::IString(value) => Sb3Primitive::String(value.to_string()),
+            JsPrimitive::JsString(value) => Sb3PrimitiveOrBool::String(String::from_utf16_lossy(&value)),
+            JsPrimitive::String(value) => Sb3PrimitiveOrBool::String(value),
+            JsPrimitive::IString(value) => Sb3PrimitiveOrBool::String(value.to_string()),
             JsPrimitive::Number(value) => {
                 if let Some(value) = try_convert_f64_into_i128(value) {
                     if let Ok(value) = value.try_into() {
-                        Sb3Primitive::Int(value)
+                        Sb3PrimitiveOrBool::Int(value)
                     } else {
-                        Sb3Primitive::Int128(value)
+                        Sb3PrimitiveOrBool::Int128(value)
                     }
                 } else {
-                    Sb3Primitive::Float(value)
+                    Sb3PrimitiveOrBool::Float(value)
                 }
             }
-            JsPrimitive::Boolean(value) => Sb3Primitive::String(value.to_string()),
+            JsPrimitive::Bool(value) => Sb3PrimitiveOrBool::Bool(value)
         }
     }
 }
 
-impl From<Sb3Primitive> for JsPrimitive {
-    fn from(value: Sb3Primitive) -> Self {
+impl From<Sb3PrimitiveOrBool> for JsPrimitive {
+    fn from(value: Sb3PrimitiveOrBool) -> Self {
         match value {
-            Sb3Primitive::String(value) => JsPrimitive::String(value),
-            Sb3Primitive::Int128(value) => JsPrimitive::String(value.to_string()),
-            Sb3Primitive::Int(value) => JsPrimitive::String(value.to_string()),
-            Sb3Primitive::Float(value) => JsPrimitive::Number(value),
+            Sb3PrimitiveOrBool::String(value) => JsPrimitive::String(value),
+            Sb3PrimitiveOrBool::Int128(value) => JsPrimitive::String(value.to_string()),
+            Sb3PrimitiveOrBool::Int(value) => JsPrimitive::String(value.to_string()),
+            Sb3PrimitiveOrBool::Float(value) => JsPrimitive::Number(value),
+            Sb3PrimitiveOrBool::Bool(value) => JsPrimitive::Bool(value),
         }
     }
 }
@@ -121,7 +122,7 @@ impl ScratchVmToNumber for JsPrimitive {
             JsPrimitive::IString(value) => convert_str_to_number(value),
             JsPrimitive::Number(value) if value.is_nan() => 0.0,
             JsPrimitive::Number(value) => *value,
-            JsPrimitive::Boolean(value) => (*value).into(),
+            JsPrimitive::Bool(value) => (*value).into(),
         }
     }
 }
@@ -140,7 +141,7 @@ impl ScratchVmToBoolean for JsPrimitive {
             JsPrimitive::String(value) => convert_str_to_bool(value),
             JsPrimitive::IString(value) => convert_str_to_bool(value),
             JsPrimitive::Number(value) => (!value.is_nan()) && *value != 0.0,
-            JsPrimitive::Boolean(value) => *value,
+            JsPrimitive::Bool(value) => *value,
         }
     }
 }
@@ -154,7 +155,7 @@ impl ScratchVmToString for JsPrimitive {
             JsPrimitive::Number(value) => {
                 ryu_js::Buffer::new().format(value).encode_utf16().collect()
             }
-            JsPrimitive::Boolean(value) => {
+            JsPrimitive::Bool(value) => {
                 if value {
                     vec![b't' as u16, b'r' as u16, b'u' as u16, b'e' as u16]
                 } else {
@@ -181,7 +182,7 @@ impl ScratchVmToString for JsPrimitive {
                     .encode_utf16()
                     .collect(),
             ),
-            JsPrimitive::Boolean(value) => Cow::Borrowed({
+            JsPrimitive::Bool(value) => Cow::Borrowed({
                 if *value {
                     &[b't' as u16, b'r' as u16, b'u' as u16, b'e' as u16]
                 } else {
@@ -205,7 +206,7 @@ impl ScratchVmToString for JsPrimitive {
             JsPrimitive::Number(value) => string.extend(ryu_js::Buffer::new()
                 .format(*value)
                 .encode_utf16()),
-            JsPrimitive::Boolean(value) => write!(U16Sink { data: string }, "{}", value)
+            JsPrimitive::Bool(value) => write!(U16Sink { data: string }, "{}", value)
                 .expect("a formatting trait implementation returned an error when the underlying stream did not"),
         }
     }
@@ -222,7 +223,7 @@ impl ScratchVmCompare for JsPrimitive {
                 JsPrimitive::String(value) => parse_string_numeric_literal_and_is_ws(value),
                 JsPrimitive::IString(value) => parse_string_numeric_literal_and_is_ws(value),
                 JsPrimitive::Number(value) => (*value, false),
-                JsPrimitive::Boolean(value) => ((*value).into(), false),
+                JsPrimitive::Bool(value) => ((*value).into(), false),
             }
         }
         let (mut num_1, ws_1) = convert_to_number_and_ws(self);
@@ -273,7 +274,7 @@ impl ScratchVmIsInt for JsPrimitive {
             JsPrimitive::Number(value) => {
                 value.is_nan() || try_convert_f64_into_i128(*value).is_some()
             }
-            JsPrimitive::Boolean(_) => true,
+            JsPrimitive::Bool(_) => true,
         }
     }
 }
