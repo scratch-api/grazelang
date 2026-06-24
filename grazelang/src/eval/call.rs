@@ -322,18 +322,22 @@ impl ConstantExprFunction {
             value: f64,
             _source_span: SourceSpan,
         ) -> Result<f64, ConstantExprEvaluationError> {
+            fn round_10(x: f64) -> f64 {
+                const FACTOR: f64 = 1e10f64;
+                (x * FACTOR).round() / FACTOR
+            }
             use std::f64::consts::PI;
             Ok(match math_op {
                 ConstantExprValue::Abs => value.abs(),
                 ConstantExprValue::Floor => value.floor(),
                 ConstantExprValue::Ceiling => value.ceil(),
                 ConstantExprValue::Sqrt => value.sqrt(),
-                ConstantExprValue::Sin => ((value * PI) / 180.0).sin(),
-                ConstantExprValue::Cos => ((value * PI) / 180.0).cos(),
+                ConstantExprValue::Sin => round_10(((value * PI) / 180.0).sin()),
+                ConstantExprValue::Cos => round_10(((value * PI) / 180.0).cos()),
                 ConstantExprValue::Tan => match value % 360.0 {
                     -270.0 | 90.0 => f64::INFINITY,
                     -90.0 | 270.0 => f64::NEG_INFINITY,
-                    _ => ((value * PI) / 180.0).tan(),
+                    _ => round_10(((value * PI) / 180.0).tan()),
                 },
                 ConstantExprValue::Asin => (value.asin() * 180.0) / PI,
                 ConstantExprValue::Acos => (value.acos() * 180.0) / PI,
