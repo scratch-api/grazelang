@@ -29,9 +29,10 @@ pub enum Token {
     WarpKeyword,
     #[token("nowarp")]
     NowarpKeyword,
-    #[token("use")] // TODO: Implement use statement
-    // Issue: #4
+    #[token("use")]
     UseKeyword,
+    #[token("as")]
+    AsKeyword,
     #[token("let")]
     LetKeyword,
     #[token("cloud")]

@@ -2506,7 +2506,7 @@
                         }
                     }
                 ],
-                "altName": "math_mod",
+                "altName": "modulo",
                 "constantExprFunctionId": 15
             },
             {
@@ -2524,7 +2524,7 @@
                         }
                     }
                 ],
-                "altName": "math_round",
+                "altName": "round",
                 "constantExprFunctionId": 16
             },
             {

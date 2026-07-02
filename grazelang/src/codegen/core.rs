@@ -38,8 +38,8 @@ use crate::{
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclarationScope, Expression, FormattedStringContent, GetPos, Identifier,
-            ListEntry, Literal, UnOpDescriptor,
+            DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FormattedStringContent, GetPos,
+            Identifier, ListEntry, Literal, UnOpDescriptor,
         },
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
@@ -175,6 +175,7 @@ pub struct GrazeSb3GeneratorContext {
     pub field_entry_categories: HashMap<IString, HashSet<u32>>,
     pub block_counter: IdCounter,
     pub arg_stack: Vec<Param>,
+    pub scope_stack: Vec<PreviousSymbolStates>,
     pub current_block_id: IdString,
     pub current_parent: Option<String>,
     pub current_sb3_target: Option<Sb3Target>,
@@ -188,6 +189,9 @@ pub struct GrazeSb3GeneratorContext {
     pub settings: GrazeSettings,
     pub messages: Vec<GrazeMessage>,
 }
+
+pub type PreviousSymbolStates = HashMap<IString, PreviousSymbolState>;
+pub type PreviousSymbolState = Option<SymbolId>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssetFile {
@@ -646,6 +650,7 @@ impl GrazeSb3GeneratorContext {
             field_entry_categories,
             block_counter,
             arg_stack: Vec::new(),
+            scope_stack: vec![HashMap::new()],
             current_block_id: next_block_id,
             current_parent: None,
             current_sb3_target: None,
@@ -1780,6 +1785,27 @@ where
     Ok(())
 }
 
+#[inline]
+pub fn wrap_in_scope<F, O>(
+    context: &mut GrazeSb3GeneratorContext,
+    action: F,
+) -> Result<O, GrazeSb3GeneratorError>
+where
+    F: FnOnce(&mut GrazeSb3GeneratorContext) -> Result<O, GrazeSb3GeneratorError>,
+{
+    context.scope_stack.push(HashMap::new());
+    let value = action(context)?;
+    let namespace = &mut context.symbol_table[Default::default()].namespace;
+    for (key, value) in context.scope_stack.pop().unwrap() {
+        if let Some(value) = value {
+            namespace.insert(key, value);
+        } else {
+            namespace.remove(&key);
+        }
+    }
+    Ok(value)
+}
+
 pub fn emit_message(
     context: &mut GrazeSb3GeneratorContext,
     message: GrazeMessage,
@@ -2375,7 +2401,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
-            default_visit_statement_multi_input_control(self, value, context)?;
+            wrap_in_scope(context, |context| {
+                default_visit_statement_multi_input_control(self, value, context)
+            })?;
             let substack = context.pop_param().unwrap();
             let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
                 .take(value.2.len())
@@ -2411,7 +2439,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
-            default_visit_statement_single_input_control(self, value, context)?;
+            wrap_in_scope(context, |context| {
+                default_visit_statement_single_input_control(self, value, context)
+            })?;
             let substack = context.pop_param().unwrap();
             let arg = context.pop_param().unwrap();
             create_control_block(
@@ -2497,7 +2527,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
-            default_visit_statement_forever(self, value, context)?;
+            wrap_in_scope(context, |context| {
+                default_visit_statement_forever(self, value, context)
+            })?;
             let substack = context.pop_param().unwrap();
             create_control_block(
                 context,
@@ -3301,7 +3333,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 mutation.map(make_proc_call_mutation),
             ),
         );
-        default_visit_no_input_hat_statement(self, value, context)?;
+        wrap_in_scope(context, |context| {
+            default_visit_no_input_hat_statement(self, value, context)
+        })?;
         let mut inputs = HashMap::new();
         let mut fields = HashMap::new();
         add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
@@ -3357,7 +3391,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 mutation.map(make_proc_call_mutation),
             ),
         );
-        default_visit_single_input_hat_statement(self, value, context)?;
+        wrap_in_scope(context, |context| {
+            default_visit_single_input_hat_statement(self, value, context)
+        })?;
         let arg = context.pop_param().unwrap();
         let mut fields = HashMap::new();
         let mut inputs = HashMap::new();
@@ -3436,7 +3472,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 mutation.map(make_proc_call_mutation),
             ),
         );
-        default_visit_multi_input_hat_statement(self, value, context)?;
+        wrap_in_scope(context, |context| {
+            default_visit_multi_input_hat_statement(self, value, context)
+        })?;
         let reversed_args = iter::repeat_with(|| context.pop_param().unwrap())
             .take(value.2.len())
             .collect::<Vec<_>>();
@@ -3688,7 +3726,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 .symbol_table
                 .insert_child(arguments_symbol_id, key, arg);
         }
-        default_visit_custom_block_definition(self, value, context)?;
+        wrap_in_scope(context, |context| {
+            default_visit_custom_block_definition(self, value, context)
+        })?;
         context.symbol_table[Default::default()]
             .namespace
             .remove(ARGUMENTS_ISTRING);
@@ -3707,7 +3747,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_previous_block = None;
         context.current_parent = None;
         context.arg_stack.clear();
-        default_visit_isolated_block(self, value, context)
+        wrap_in_scope(context, |context| {
+            default_visit_isolated_block(self, value, context)
+        })
     }
 
     fn visit_isolated_expression(
@@ -3767,6 +3809,98 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 grazelang_types::KnownBlockInput::Empty => (),
             }
         });
+        Ok(())
+    }
+
+    // Scope:
+
+    fn visit_use_statement(
+        &self,
+        value: (
+            &cst::UseKeyword,
+            &cst::UseStatementContent,
+            &cst::Semicolon,
+            &SourceSpan,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        fn add_symbols(
+            context: &mut GrazeSb3GeneratorContext,
+            path: &mut Vec<IString>,
+            current: &cst::UseStatementContent,
+        ) -> Result<(), GrazeSb3GeneratorError> {
+            match current {
+                cst::UseStatementContent::SingleUse {
+                    identifier,
+                    rename,
+                    source_span: _,
+                } => {
+                    let mut self_used = false;
+                    let mut size = 0_usize;
+                    for (seg, _) in &identifier.path {
+                        if size == 0 && !self_used && seg.as_str() == "self" {
+                            self_used = true;
+                            continue;
+                        }
+                        size += 1;
+                        path.push(seg.clone());
+                    }
+                    let symbol = context.resolve_path(path.iter()).ok_or_else(|| {
+                        GrazeSb3GeneratorError::UnknownIdentifier {
+                            identifier: identifier.clone(),
+                        }
+                    })?;
+                    let name = rename
+                        .as_ref()
+                        .map(|(_, name)| name.to_single().unwrap().0.clone())
+                        .unwrap_or_else(|| path.last().unwrap_or(EMPTY_ISTRING_REF).clone());
+                    let previous_value =
+                        context
+                            .symbol_table
+                            .insert_alias(Default::default(), name.clone(), symbol);
+                    context
+                        .scope_stack
+                        .last_mut()
+                        .unwrap()
+                        .entry(name)
+                        .or_insert(previous_value);
+                    for _ in 0..size {
+                        path.pop();
+                    }
+                    Ok(())
+                }
+                cst::UseStatementContent::MultiUse {
+                    root,
+                    left_brace: _,
+                    content,
+                    right_brace: _,
+                    source_span: _,
+                } => {
+                    let mut self_used = false;
+                    let mut size = 0_usize;
+                    for (seg, _) in &root.path {
+                        if size == 0 && !self_used && seg.as_str() == "self" {
+                            self_used = true;
+                            continue;
+                        }
+                        size += 1;
+                        path.push(seg.clone());
+                    }
+                    for child in content {
+                        add_symbols(context, path, child)?;
+                    }
+                    for _ in 0..size {
+                        path.pop();
+                    }
+                    Ok(())
+                }
+                cst::UseStatementContent::Invalid(_) => {
+                    panic!("You must pass a valid AST to the visitor.")
+                }
+            }
+        }
+        let mut path = Vec::new();
+        add_symbols(context, &mut path, value.1)?;
         Ok(())
     }
 
@@ -3830,7 +3964,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         context.current_sb3_target = Some(stage);
         context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
-        default_visit_top_level_statement_stage(self, value, context)?;
+        wrap_in_scope(context, |context| {
+            default_visit_top_level_statement_stage(self, value, context)
+        })?;
         context
             .sb3
             .targets
@@ -3933,7 +4069,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             };
         context.current_sb3_target = Some(new_sprite);
         context.current_target_symbol_name = Some(value.2.to_single().unwrap().0.clone());
-        default_visit_top_level_statement_sprite(self, value, context)?;
+        wrap_in_scope(context, |context| {
+            default_visit_top_level_statement_sprite(self, value, context)
+        })?;
         context
             .sb3
             .targets

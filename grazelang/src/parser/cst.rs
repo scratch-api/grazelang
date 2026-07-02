@@ -58,8 +58,9 @@ pub enum TopLevelStatement {
         Semicolon,
         SourceSpan,
     ),
+    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
-    InvalidStatement(SourceSpan),
+    Invalid(SourceSpan),
 }
 
 impl GetPos for TopLevelStatement {
@@ -68,8 +69,9 @@ impl GetPos for TopLevelStatement {
             TopLevelStatement::Stage(_, _, _, p) => p,
             TopLevelStatement::Sprite(_, _, _, _, _, p) => p,
             TopLevelStatement::BroadcastDeclaration(_, _, _, _, p) => p,
+            TopLevelStatement::UseStatement(_, _, _, p) => p,
             TopLevelStatement::EmptyStatement(p) => &p.0,
-            TopLevelStatement::InvalidStatement(p) => p,
+            TopLevelStatement::Invalid(p) => p,
         }
     }
 }
@@ -108,6 +110,26 @@ impl GetPos for CostumeKeyword {
 pub struct BroadcastKeyword(pub SourceSpan);
 
 impl GetPos for BroadcastKeyword {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UseKeyword(pub SourceSpan);
+
+impl GetPos for UseKeyword {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AsKeyword(pub SourceSpan);
+
+impl GetPos for AsKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
         &self.0
@@ -255,6 +277,43 @@ impl<T> GetPos for CommaSeparated<T> {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum UseStatementContent {
+    SingleUse {
+        identifier: Identifier,
+        rename: Option<(AsKeyword, Identifier)>,
+        source_span: SourceSpan,
+    },
+    MultiUse {
+        root: Identifier,
+        left_brace: LeftBrace,
+        content: CommaSeparated<UseStatementContent>,
+        right_brace: RightBrace,
+        source_span: SourceSpan,
+    },
+    Invalid(SourceSpan),
+}
+
+impl GetPos for UseStatementContent {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            UseStatementContent::SingleUse {
+                identifier: _,
+                rename: _,
+                source_span,
+            }
+            | UseStatementContent::MultiUse {
+                root: _,
+                left_brace: _,
+                content: _,
+                right_brace: _,
+                source_span,
+            }
+            | UseStatementContent::Invalid(source_span) => source_span,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockParamKind {
     pub kind: CustomBlockParamKindValue,
     pub source_span: SourceSpan,
@@ -316,8 +375,9 @@ pub enum StageStatement {
         Option<Semicolon>,
         SourceSpan,
     ),
+    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
-    InvalidStatement(SourceSpan),
+    Invalid(SourceSpan),
 }
 
 impl GetPos for StageStatement {
@@ -332,8 +392,9 @@ impl GetPos for StageStatement {
             StageStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
             StageStatement::IsolatedBlock(_, _, p) => p,
             StageStatement::IsolatedExpression(_, _, _, _, p) => p,
+            StageStatement::UseStatement(_, _, _, p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
-            StageStatement::InvalidStatement(p) => p,
+            StageStatement::Invalid(p) => p,
         }
     }
 }
@@ -380,8 +441,9 @@ pub enum SpriteStatement {
         Option<Semicolon>,
         SourceSpan,
     ),
+    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
-    InvalidStatement(SourceSpan),
+    Invalid(SourceSpan),
 }
 
 impl GetPos for SpriteStatement {
@@ -396,8 +458,9 @@ impl GetPos for SpriteStatement {
             SpriteStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
             SpriteStatement::IsolatedBlock(_, _, p) => p,
             SpriteStatement::IsolatedExpression(_, _, _, _, p) => p,
+            SpriteStatement::UseStatement(_, _, _, p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
-            SpriteStatement::InvalidStatement(p) => p,
+            SpriteStatement::Invalid(p) => p,
         }
     }
 }
@@ -446,13 +509,15 @@ pub enum SingleAssetDeclarationValue {
         RightBrace,
         SourceSpan,
     ),
+    Invalid(SourceSpan),
 }
 
 impl GetPos for SingleAssetDeclarationValue {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             SingleAssetDeclarationValue::Simple(_, _, _, source_span)
-            | SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span) => source_span,
+            | SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span)
+            | SingleAssetDeclarationValue::Invalid(source_span) => source_span,
         }
     }
 }
@@ -518,8 +583,9 @@ pub enum Statement {
         Option<Semicolon>,
         SourceSpan,
     ),
+    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
-    InvalidStatement(SourceSpan),
+    Invalid(SourceSpan),
 }
 
 impl GetPos for Statement {
@@ -534,8 +600,9 @@ impl GetPos for Statement {
             Statement::MultiInputControl(_, _, _, _, _, _, p) => p,
             Statement::Forever(_, _, _, p) => p,
             Statement::IfElse(_, _, _, _, p) => p,
+            Statement::UseStatement(_, _, _, p) => p,
             Statement::EmptyStatement(p) => &p.0,
-            Statement::InvalidStatement(p) => p,
+            Statement::Invalid(p) => p,
         }
     }
 }
@@ -1670,6 +1737,12 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
+    #[error("tried to name a symbol \"self\"")]
+    SymbolNamedSelf {
+        #[cfg(feature = "include_context_in_parse_errors")]
+        context: IString,
+        source_span: SourceSpan,
+    },
     #[error("expected key {key:?} in flat dictionary")]
     MissingFlatDictionaryEntry {
         key: IString,
@@ -1751,6 +1824,11 @@ impl GetPos for ParseError {
                 source_span,
             } => source_span,
             ParseError::SymbolNamedSuper {
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
+                source_span,
+            } => source_span,
+            ParseError::SymbolNamedSelf {
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span,

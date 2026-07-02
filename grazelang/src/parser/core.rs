@@ -52,7 +52,7 @@ macro_rules! expect_token_or_message {
         match next_token!($token_stream) {
             $pattern => $value,
             token => {
-                emit_unexpected_token_message(
+                emit_unexpected_token_message_or_return(
                     $context,
                     $token_stream,
                     literal!($message),
@@ -296,6 +296,18 @@ pub fn get_token_end(token_stream: ParseIn) -> (usize, usize) {
     token_stream.span_memoize().1
 }
 
+pub fn peek_token_source_span(token_stream: ParseIn) -> SourceSpan {
+    (token_stream.peek_span(), token_stream.source_file_id)
+}
+
+pub fn peek_token_start(token_stream: ParseIn) -> (usize, usize) {
+    token_stream.peek_span().0
+}
+
+pub fn peek_token_end(token_stream: ParseIn) -> (usize, usize) {
+    token_stream.peek_span().1
+}
+
 macro_rules! emit_unexpected_token {
     ($token_stream:expr, $message:expr, $expected:expr, $found:expr) => {
         return Err(create_unexpected_token_error(
@@ -350,7 +362,7 @@ macro_rules! try_or_emit_message {
 macro_rules! find_statement_end_and_return_invalid {
     ($token_stream:expr, $start_pos:expr, $stmt_type:ty) => {{
         statement::find_statement_end($token_stream)?;
-        Ok(<$stmt_type>::InvalidStatement(
+        Ok(<$stmt_type>::Invalid(
             $token_stream.span_from_previous_to_current($start_pos),
         ))
     }};
@@ -359,7 +371,7 @@ macro_rules! find_statement_end_and_return_invalid {
 macro_rules! find_top_level_statement_end_and_return_invalid {
     ($token_stream:expr, $start_pos:expr, $stmt_type:ty) => {{
         statement::find_top_level_statement_end($token_stream)?;
-        Ok(<$stmt_type>::InvalidStatement(
+        Ok(<$stmt_type>::Invalid(
             $token_stream.span_from_previous_to_current($start_pos),
         ))
     }};
@@ -432,7 +444,7 @@ where
     }
 }
 
-pub fn emit_unexpected_token_message(
+pub fn emit_unexpected_token_message_or_return(
     context: &mut ParseContext,
     token_stream: ParseIn,
     message: IString,
@@ -585,6 +597,11 @@ impl<'a> PeekableLexer<'a> {
         // }
         // self.peeked_token = self.lexer.next();
         // self.peeked_token.as_ref()
+    }
+
+    pub fn peek_span(&mut self) -> TextSpan {
+        self.peek();
+        internal_get_source_span(&self.lexer, self.lexer.span())
     }
 
     pub fn span(&self) -> TextSpan {
@@ -1244,12 +1261,18 @@ pub mod statement {
                 ),
                 symbols => {
                     let name = &identifier.to_single().unwrap().0;
-                    if name.as_str() == "super" {
-                        return Err(ParseError::SymbolNamedSuper {
+                    match name.as_str() {
+                        "super" => return Err(ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
-                        });
+                        }),
+                        "self" => return Err(ParseError::SymbolNamedSelf {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        }),
+                        _ => ()
                     }
                     let previous_symbol = symbols.insert(name.clone(), if(matches!(dec_type, SingleDataDeclarationType::List(_)) || (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)) {
                         context::TargetSymbolDescriptor::List(context::ListDescriptor {
@@ -1692,12 +1715,18 @@ pub mod statement {
             matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
                 let name = &identifier.to_single().unwrap().0;
-                if name.as_str() == "super" {
-                    return Err(ParseError::SymbolNamedSuper {
+                match name.as_str() {
+                    "super" => return Err(ParseError::SymbolNamedSuper {
                         #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
                         source_span: identifier.to_single().unwrap().1,
-                    });
+                    }),
+                    "self" => return Err(ParseError::SymbolNamedSelf {
+                        #[cfg(feature = "include_context_in_parse_errors")]
+                        context: literal!(static_current_context!()),
+                        source_span: identifier.to_single().unwrap().1,
+                    }),
+                    _ => ()
                 }
                 let previous_symbol = symbols.insert(
                     name.clone(),
@@ -2183,11 +2212,14 @@ pub mod statement {
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<cst::SingleAssetDeclarationValue> {
-        let left_brace = expect_token!(
+        let start_pos = peek_token_start(token_stream);
+        let left_brace = expect_token_or_message!(
             token_stream,
+            context,
             Token::LeftBrace => from_stream_pos!(token_stream => LeftBrace),
             "Expected '{'.",
-            "'{'"
+            "'{'",
+            find_statement_end_and_return_invalid!(token_stream, start_pos, cst::SingleAssetDeclarationValue)
         );
         let mut items = Vec::<(
             Identifier,
@@ -2196,14 +2228,32 @@ pub mod statement {
             Option<Comma>,
         )>::new();
         let right_brace = loop {
-            let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
-            let assignment_operator = expect_token!(
+            let identifier = try_or_emit_message!(
+                parse_single_identifier_as_identifier(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(
+                    token_stream,
+                    start_pos,
+                    cst::SingleAssetDeclarationValue
+                )
+            );
+            let assignment_operator = expect_token_or_message!(
                 token_stream,
+                context,
                 Token::Assign => from_stream_pos!(token_stream => NormalAssignmentOperator),
                 "Expected '='.",
-                "'='"
+                "'='",
+                find_statement_end_and_return_invalid!(token_stream, start_pos, cst::SingleAssetDeclarationValue)
             );
-            let literal = parse_literal(token_stream, context)?;
+            let literal = try_or_emit_message!(
+                parse_literal(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(
+                    token_stream,
+                    start_pos,
+                    cst::SingleAssetDeclarationValue
+                )
+            );
             let comma = match peek_token!(token_stream) {
                 Token::RightBrace(LexedRightBrace::Normal) => None,
                 Token::Comma => {
@@ -2212,11 +2262,19 @@ pub mod statement {
                 }
                 _ => {
                     let token = next_token!(token_stream);
-                    emit_unexpected_token!(
+                    emit_unexpected_token_message_or_return(
+                        context,
                         token_stream,
-                        "Expected '}' or ','.",
-                        "'}' or ','",
-                        token
+                        literal!("Expected '}' or ','."),
+                        literal!("'}' or ','"),
+                        #[cfg(feature = "include_context_in_parse_errors")]
+                        literal!(static_current_context!()),
+                        token,
+                    )?;
+                    return find_statement_end_and_return_invalid!(
+                        token_stream,
+                        start_pos,
+                        cst::SingleAssetDeclarationValue
                     );
                 }
             };
@@ -2336,12 +2394,18 @@ pub mod statement {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                         let symbols = target.borrow_symbols_mut();
                         let name = &identifier.to_single().unwrap().0;
-                        if name.as_str() == "super" {
-                            errors.push(ParseError::SymbolNamedSuper {
+                        match name.as_str() {
+                            "super" => errors.push(ParseError::SymbolNamedSuper {
                                 #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
                                 source_span: identifier.to_single().unwrap().1,
-                            });
+                            }),
+                            "self" => errors.push(ParseError::SymbolNamedSelf {
+                                #[cfg(feature = "include_context_in_parse_errors")]
+                                context: literal!(static_current_context!()),
+                                source_span: identifier.to_single().unwrap().1,
+                            }),
+                            _ => ()
                         }
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
                         let (path, mut data) = match &value {
@@ -2368,6 +2432,9 @@ pub mod statement {
                                     cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                                 }).cast_to_string(), data)
                             },
+                            cst::SingleAssetDeclarationValue::Invalid(_) => {
+                                (EMPTY_ISTRING_REF.clone(), HashMap::new())
+                            }
                         };
                         let symbol_idx = symbols.len();
                         let previous_symbol = symbols.insert(
@@ -2474,12 +2541,18 @@ pub mod statement {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.to_single().unwrap().0;
-                    if name.as_str() == "super" {
-                        errors.push(ParseError::SymbolNamedSuper {
+                    match name.as_str() {
+                        "super" => errors.push(ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
-                        });
+                        }),
+                        "self" => errors.push(ParseError::SymbolNamedSelf {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        }),
+                        _ => ()
                     }
                     let canonical_name = Some(canonical_identifier.name.clone());
                     let (path, mut data) = match &value {
@@ -2506,6 +2579,9 @@ pub mod statement {
                                 cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                             }).cast_to_string(), data)
                         },
+                        cst::SingleAssetDeclarationValue::Invalid(_) => {
+                            (EMPTY_ISTRING_REF.clone(), HashMap::new())
+                        }
                     };
                     let symbol_idx = symbols.len();
                     let previous_symbol = symbols.insert(
@@ -2592,12 +2668,18 @@ pub mod statement {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
                     let name = &identifier.to_single().unwrap().0;
-                    if name.as_str() == "super" {
-                        errors.push(ParseError::SymbolNamedSuper {
+                    match name.as_str() {
+                        "super" => errors.push(ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
-                        });
+                        }),
+                        "self" => errors.push(ParseError::SymbolNamedSelf {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        }),
+                        _ => ()
                     }
                     let canonical_name = None;
                     let (path, mut data) = match &value {
@@ -2624,6 +2706,9 @@ pub mod statement {
                                 cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                             }).cast_to_string(), data)
                         },
+                        cst::SingleAssetDeclarationValue::Invalid(_) => {
+                            (EMPTY_ISTRING_REF.clone(), HashMap::new())
+                        }
                     };
                     let symbol_idx = symbols.len();
                     let previous_symbol = symbols.insert(
@@ -2813,12 +2898,18 @@ pub mod statement {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
             let name = &identifier.to_single().unwrap().0;
-            if name.as_str() == "super" {
-                return Err(ParseError::SymbolNamedSuper {
+            match name.as_str() {
+                "super" => return Err(ParseError::SymbolNamedSuper {
                     #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: identifier.to_single().unwrap().1,
-                });
+                }),
+                "self" => return Err(ParseError::SymbolNamedSelf {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                    context: literal!(static_current_context!()),
+                    source_span: identifier.to_single().unwrap().1,
+                }),
+                _ => ()
             }
             let previous_symbol = symbols.insert(
                 name.clone(),
@@ -2860,8 +2951,149 @@ pub mod statement {
         ))
     }
 
-    pub fn find_statement_end(token_stream: ParseIn) -> Result<(), ParseError> {
-        let mut layers = 0_i32;
+    pub fn parse_use_statement_content(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+    ) -> ParseOut<cst::UseStatementContent> {
+        fn parse_use_identifier(
+            token_stream: ParseIn,
+            context: &mut ParseContext,
+        ) -> ParseOut<(Identifier, Option<LeftBrace>)> {
+            let mut names: Vec<(IString, SourceSpan)> = vec![(
+                parse_single_identifier(token_stream, context)?,
+                get_token_source_span(token_stream),
+            )];
+            let start_pos = get_token_start(token_stream);
+            let mut path: Option<Vec<(IString, SourceSpan)>> = None;
+            loop {
+                match match peek_token!(token_stream => Option) {
+                    Some(value) => value,
+                    None => break,
+                } {
+                    Token::ScopeResolution => {
+                        if path.is_some() {
+                            let token = next_token!(token_stream);
+                            emit_unexpected_token!(token_stream, "Expected a dot.", "a dot", token);
+                        }
+                    }
+                    Token::Dot => {
+                        if path.is_none() {
+                            path = Some(names);
+                            names = Vec::new();
+                        }
+                    }
+                    _ => break,
+                }
+                skip_token!(token_stream);
+                names.push({
+                    match next_token!(token_stream) {
+                        Token::Identifier(value) => (value, get_token_source_span(token_stream)),
+                        Token::LeftBrace => {
+                            if path.is_none() {
+                                path = Some(std::mem::take(&mut names));
+                            }
+                            return Ok((
+                                Identifier {
+                                    path: path.unwrap_or_default(),
+                                    fields: names,
+                                    source_span: token_stream
+                                        .span_from_previous_to_current(start_pos),
+                                },
+                                Some(from_stream_pos!(token_stream => LeftBrace)),
+                            ));
+                        }
+                        Token::StageKeyword => {
+                            (literal!("stage"), get_token_source_span(token_stream))
+                        }
+                        Token::VarsKeyword => {
+                            (literal!("vars"), get_token_source_span(token_stream))
+                        }
+                        Token::ListsKeyword => {
+                            (literal!("lists"), get_token_source_span(token_stream))
+                        }
+                        token => emit_unexpected_token!(
+                            token_stream,
+                            "Expected an identifier possibly ending with '{'.",
+                            "an identifier possibly ending with '{'",
+                            token
+                        ),
+                    }
+                });
+            }
+            if path.is_none() {
+                path = Some(std::mem::take(&mut names));
+            }
+            Ok((
+                Identifier {
+                    path: path.unwrap_or_default(),
+                    fields: names,
+                    source_span: token_stream.span_from_previous_to_current(start_pos),
+                },
+                None,
+            ))
+        }
+        let start = peek_token_start(token_stream);
+        let (ident, left_brace) = try_or_emit_message!(
+            parse_use_identifier(token_stream, context),
+            context,
+            find_statement_end_and_return_invalid!(token_stream, start, cst::UseStatementContent)
+        );
+        if let Some(left_brace) = left_brace {
+            let inner = parse_comma_separated!(
+                token_stream,
+                context,
+                (token_stream, context) => {
+                    parse_use_statement_content(token_stream, context)?
+                },
+                Token::RightBrace(LexedRightBrace::Normal),
+                "'}'"
+            );
+            let right_brace = expect_token_or_message!(
+                token_stream,
+                context,
+                Token::RightBrace(LexedRightBrace::Normal) => from_stream_pos!(token_stream => RightBrace),
+                "Expected '}'.",
+                "'}'",
+                find_statement_end_and_return_invalid!(
+                    token_stream,
+                    start,
+                    cst::UseStatementContent
+                )
+            );
+            return Ok(cst::UseStatementContent::MultiUse {
+                root: ident,
+                left_brace,
+                content: inner,
+                right_brace,
+                source_span: token_stream.span_from_previous_to_current(start),
+            });
+        }
+        consume_then_never_if!(token_stream, Token::AsKeyword => {
+            let as_keyword = from_stream_pos!(token_stream => cst::AsKeyword);
+            let new_name = try_or_emit_message!(
+                parse_single_identifier_as_identifier(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(
+                    token_stream,
+                    start,
+                    cst::UseStatementContent
+                )
+            );
+            return Ok(cst::UseStatementContent::SingleUse {
+                source_span: ident.range_to(&new_name),
+                identifier: ident,
+                rename: Some((as_keyword, new_name)),
+            })
+        });
+        Ok(cst::UseStatementContent::SingleUse {
+            source_span: *ident.get_source_span(),
+            identifier: ident,
+            rename: None,
+        })
+    }
+
+    pub fn find_statement_end(token_stream: ParseIn) -> ParseOut<()> {
+        let mut layers = 0_usize;
         let mut step_back = false;
         find_next_token(token_stream, |token| match token {
             Token::Semicolon => layers == 0,
@@ -2874,7 +3106,7 @@ pub mod statement {
                 // ```
                 // {
                 //     misformed-identifier
-                // //  ^ Error is encountered here
+                // //           ^ Error is encountered here
                 // }
                 // ```
                 // ^ Invalid statement ends here
@@ -2883,7 +3115,7 @@ pub mod statement {
                 // ```
                 // {
                 //     misformed-identifier {
-                // //  ^ Error is encountered here
+                // //           ^ Error is encountered here
                 //         something
                 //     }
                 // //  ^ Invalid statement ends here
@@ -2909,7 +3141,7 @@ pub mod statement {
     }
 
     pub fn find_top_level_statement_end(token_stream: ParseIn) -> Result<(), ParseError> {
-        let mut layers = 0_i32;
+        let mut layers = 0_usize;
         find_next_token(token_stream, |token| match token {
             Token::Semicolon => layers == 0,
             Token::LeftBrace => {
@@ -2932,7 +3164,7 @@ pub mod statement {
 
 /// Statements do not include semicolons.
 pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> ParseOut<Statement> {
-    let start = get_token_end(token_stream);
+    let start = peek_token_start(token_stream);
     match peek_token!(token_stream) {
         Token::LetKeyword => Ok(try_or_emit_message!(
             statement::parse_statement_data_declaration_fully(token_stream, context),
@@ -2949,6 +3181,29 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
                 statement::parse_statement_after_identifier(token_stream, context, identifier),
                 context,
                 find_statement_end_and_return_invalid!(token_stream, start, Statement)
+            ))
+        }
+        Token::UseKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            let use_keyword = expect_token!(
+                token_stream,
+                Token::UseKeyword => from_stream_pos!(token_stream => cst::UseKeyword),
+                "Expected \"use\".",
+                "\"use\""
+            );
+            let content = statement::parse_use_statement_content(token_stream, context)?;
+            Ok(Statement::UseStatement(
+                use_keyword,
+                content,
+                expect_token_or_message!(
+                    token_stream,
+                    context,
+                    Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon),
+                    "Expected ';'.",
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, Statement)
+                ),
+                token_stream.span_from_previous_to_current(start_pos),
             ))
         }
         Token::Semicolon => Ok(Statement::EmptyStatement(expect_token!(
@@ -3041,7 +3296,7 @@ pub fn parse_sprite_statement(
             ))
         }
         Token::LetKeyword => {
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             Ok(try_or_emit_message!(
                 statement::parse_sprite_data_declaration_fully(token_stream, context),
                 context,
@@ -3049,7 +3304,7 @@ pub fn parse_sprite_statement(
             ))
         }
         Token::NowarpKeyword | Token::WarpKeyword | Token::ProcKeyword => {
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             let (
                 proc_keyword,
                 warp_specifier,
@@ -3104,13 +3359,12 @@ pub fn parse_sprite_statement(
                     token_stream.span_from_previous_to_current(start_pos),
                 ))
             }
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             let identifier = try_or_emit_message!(
                 parse_full_identifier(token_stream, context),
                 context,
                 find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
             );
-            let start_pos = identifier.source_span.0.0;
             match peek_token!(token_stream) {
                 Token::LeftParens => {
                     let (left_parens, expressions, right_parens) = try_or_emit_message!(
@@ -3216,13 +3470,12 @@ pub fn parse_sprite_statement(
             }
         }
         Token::LeftBrace => {
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             let code_block = try_or_emit_message!(
                 parse_code_block(token_stream, context),
                 context,
                 find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
             );
-            let start_pos = code_block.source_span.0.0;
             Ok(SpriteStatement::IsolatedBlock(
                 code_block,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon)),
@@ -3251,6 +3504,29 @@ pub fn parse_sprite_statement(
                 expression,
                 right_parens,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon)),
+                token_stream.span_from_previous_to_current(start_pos),
+            ))
+        }
+        Token::UseKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            let use_keyword = expect_token!(
+                token_stream,
+                Token::UseKeyword => from_stream_pos!(token_stream => cst::UseKeyword),
+                "Expected \"use\".",
+                "\"use\""
+            );
+            let content = statement::parse_use_statement_content(token_stream, context)?;
+            Ok(SpriteStatement::UseStatement(
+                use_keyword,
+                content,
+                expect_token_or_message!(
+                    token_stream,
+                    context,
+                    Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon),
+                    "Expected ';'.",
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
+                ),
                 token_stream.span_from_previous_to_current(start_pos),
             ))
         }
@@ -3341,7 +3617,7 @@ pub fn parse_stage_statement(
             ))
         }
         Token::LetKeyword => {
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             Ok(try_or_emit_message!(
                 statement::parse_stage_data_declaration_fully(token_stream, context),
                 context,
@@ -3349,7 +3625,7 @@ pub fn parse_stage_statement(
             ))
         }
         Token::NowarpKeyword | Token::WarpKeyword | Token::ProcKeyword => {
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             let (
                 proc_keyword,
                 warp_specifier,
@@ -3404,13 +3680,12 @@ pub fn parse_stage_statement(
                     token_stream.span_from_previous_to_current(start_pos),
                 ))
             }
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             let identifier = try_or_emit_message!(
                 parse_full_identifier(token_stream, context),
                 context,
                 find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
             );
-            let start_pos = identifier.source_span.0.0;
             match peek_token!(token_stream) {
                 Token::LeftParens => {
                     let (left_parens, expressions, right_parens) = try_or_emit_message!(
@@ -3508,13 +3783,12 @@ pub fn parse_stage_statement(
             }
         }
         Token::LeftBrace => {
-            let start_pos = get_token_end(token_stream);
+            let start_pos = peek_token_start(token_stream);
             let code_block = try_or_emit_message!(
                 parse_code_block(token_stream, context),
                 context,
                 find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
             );
-            let start_pos = code_block.source_span.0.0;
             Ok(StageStatement::IsolatedBlock(
                 code_block,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon)),
@@ -3543,6 +3817,29 @@ pub fn parse_stage_statement(
                 expression,
                 right_parens,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon)),
+                token_stream.span_from_previous_to_current(start_pos),
+            ))
+        }
+        Token::UseKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            let use_keyword = expect_token!(
+                token_stream,
+                Token::UseKeyword => from_stream_pos!(token_stream => cst::UseKeyword),
+                "Expected \"use\".",
+                "\"use\""
+            );
+            let content = statement::parse_use_statement_content(token_stream, context)?;
+            Ok(StageStatement::UseStatement(
+                use_keyword,
+                content,
+                expect_token_or_message!(
+                    token_stream,
+                    context,
+                    Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon),
+                    "Expected ';'.",
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
+                ),
                 token_stream.span_from_previous_to_current(start_pos),
             ))
         }
@@ -3667,12 +3964,22 @@ pub fn parse_top_level_statement(
                 )
             );
             let name = &identifier.to_single().unwrap().0;
-            if name.as_str() == "super" {
-                return Err(ParseError::SymbolNamedSuper {
-                    #[cfg(feature = "include_context_in_parse_errors")]
-                    context: literal!(static_current_context!()),
-                    source_span: identifier.to_single().unwrap().1,
-                });
+            match name.as_str() {
+                "super" => {
+                    return Err(ParseError::SymbolNamedSuper {
+                        #[cfg(feature = "include_context_in_parse_errors")]
+                        context: literal!(static_current_context!()),
+                        source_span: identifier.to_single().unwrap().1,
+                    });
+                }
+                "self" => {
+                    return Err(ParseError::SymbolNamedSelf {
+                        #[cfg(feature = "include_context_in_parse_errors")]
+                        context: literal!(static_current_context!()),
+                        source_span: identifier.to_single().unwrap().1,
+                    });
+                }
+                _ => (),
             }
             let canonical_name = canonical_identifier
                 .as_ref()
@@ -3700,6 +4007,29 @@ pub fn parse_top_level_statement(
             ));
             context.next_target = None;
             return_val
+        }
+        Token::UseKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            let use_keyword = expect_token!(
+                token_stream,
+                Token::UseKeyword => from_stream_pos!(token_stream => cst::UseKeyword),
+                "Expected \"use\".",
+                "\"use\""
+            );
+            let content = statement::parse_use_statement_content(token_stream, context)?;
+            Ok(TopLevelStatement::UseStatement(
+                use_keyword,
+                content,
+                expect_token_or_message!(
+                    token_stream,
+                    context,
+                    Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon),
+                    "Expected ';'.",
+                    "';'",
+                    find_statement_end_and_return_invalid!(token_stream, start_pos, TopLevelStatement)
+                ),
+                token_stream.span_from_previous_to_current(start_pos),
+            ))
         }
         Token::Semicolon => Ok(TopLevelStatement::EmptyStatement(
             from_stream_pos!(token_stream => cst::Semicolon),

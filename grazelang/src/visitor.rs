@@ -8,8 +8,8 @@ use crate::{
         ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace,
         RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock,
         SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement,
-        SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, VarKeyword, VarsKeyword,
-        WarpSpecifier,
+        SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent,
+        VarKeyword, VarsKeyword, WarpSpecifier,
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -73,6 +73,14 @@ pub trait GrazeVisitor<C, E> {
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_top_level_statement_broadcast_declaration(self, value, context)
+    }
+
+    fn visit_use_statement(
+        &self,
+        value: (&UseKeyword, &UseStatementContent, &Semicolon, &SourceSpan),
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_use_statement(self, value, context)
     }
 
     fn visit_empty_statement(&self, value: &Semicolon, context: &mut C) -> Result<(), E> {
@@ -640,10 +648,21 @@ where
                 context,
             )?;
         }
+        TopLevelStatement::UseStatement(
+            use_keyword,
+            use_statement_content,
+            semicolon,
+            source_span,
+        ) => {
+            visitor.visit_use_statement(
+                (use_keyword, use_statement_content, semicolon, source_span),
+                context,
+            )?;
+        }
         TopLevelStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
-        TopLevelStatement::InvalidStatement(_) => {
+        TopLevelStatement::Invalid(_) => {
             panic!("You must pass a valid AST to the visitor.")
         }
     }
@@ -723,6 +742,17 @@ pub fn default_visit_top_level_statement_broadcast_declaration<V, C, E>(
         &Semicolon,
         &SourceSpan,
     ),
+    _context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    Ok(())
+}
+
+pub fn default_visit_use_statement<V, C, E>(
+    _visitor: &V,
+    _value: (&UseKeyword, &UseStatementContent, &Semicolon, &SourceSpan),
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -874,10 +904,21 @@ where
                 context,
             )?;
         }
+        StageStatement::UseStatement(
+            use_keyword,
+            use_statement_content,
+            semicolon,
+            source_span,
+        ) => {
+            visitor.visit_use_statement(
+                (use_keyword, use_statement_content, semicolon, source_span),
+                context,
+            )?;
+        }
         StageStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
-        StageStatement::InvalidStatement(_) => panic!("You must pass a valid AST to the visitor."),
+        StageStatement::Invalid(_) => panic!("You must pass a valid AST to the visitor."),
     }
     Ok(())
 }
@@ -1014,10 +1055,21 @@ where
                 context,
             )?;
         }
+        SpriteStatement::UseStatement(
+            use_keyword,
+            use_statement_content,
+            semicolon,
+            source_span,
+        ) => {
+            visitor.visit_use_statement(
+                (use_keyword, use_statement_content, semicolon, source_span),
+                context,
+            )?;
+        }
         SpriteStatement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
-        SpriteStatement::InvalidStatement(_) => panic!("You must pass a valid AST to the visitor."),
+        SpriteStatement::Invalid(_) => panic!("You must pass a valid AST to the visitor."),
     }
     Ok(())
 }
@@ -1355,10 +1407,16 @@ where
                 context,
             )?;
         }
+        Statement::UseStatement(use_keyword, use_statement_content, semicolon, source_span) => {
+            visitor.visit_use_statement(
+                (use_keyword, use_statement_content, semicolon, source_span),
+                context,
+            )?;
+        }
         Statement::EmptyStatement(semicolon) => {
             visitor.visit_empty_statement(semicolon, context)?;
         }
-        Statement::InvalidStatement(_) => panic!("You must pass a valid AST to the visitor."),
+        Statement::Invalid(_) => panic!("You must pass a valid AST to the visitor."),
     }
     Ok(())
 }
