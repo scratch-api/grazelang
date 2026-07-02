@@ -2,7 +2,7 @@
     "4": {
         "filepath": "grazelang/src/lexer.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "32-33",
         "commit": "79f5e76cc67e40739d13c4b3fbd731a554a0c4dc",
         "title": "Implement use statement"
