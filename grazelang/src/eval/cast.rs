@@ -209,7 +209,7 @@ impl ScratchVmToString for JsPrimitive {
                 .format(*value)
                 .encode_utf16()),
             JsPrimitive::Bool(value) => write!(U16Sink { data: string }, "{}", value)
-                .expect("a formatting trait implementation returned an error when the underlying stream did not"),
+                .unwrap(),
         }
     }
 }

@@ -1,4 +1,8 @@
-use std::{ffi::OsStr, path::PathBuf};
+use std::{
+    ffi::OsStr,
+    fmt::{Write, format},
+    path::PathBuf,
+};
 
 use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Renderer, Snippet};
 
@@ -88,6 +92,30 @@ impl GrazeMessage {
             },
             GrazeMessage::Warning(graze_warning, graze_suggestion) => todo!(),
             GrazeMessage::Info(graze_info, graze_suggestion) => todo!(),
+            GrazeMessage::Unsuccessful {
+                error_count,
+                warning_count,
+            } => Group::with_title(Level::ERROR.secondary_title({
+                let error_count = *error_count;
+                let warning_count = *warning_count;
+                let mut error = String::with_capacity(100);
+                write!(
+                    error,
+                    "could not complete transpilation due to {error_count} previous error",
+                )
+                .unwrap();
+                if error_count != 1 {
+                    write!(error, "s").unwrap();
+                }
+                if warning_count > 0 {
+                    write!(error, "; {warning_count} warning").unwrap();
+                    if warning_count != 1 {
+                        write!(error, "s").unwrap();
+                    }
+                    write!(error, " emitted").unwrap();
+                }
+                error
+            })),
         }
     }
 }

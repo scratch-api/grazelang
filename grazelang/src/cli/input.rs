@@ -13,7 +13,10 @@ use clap::{Parser, Subcommand};
 
 use crate::{
     codegen, lexer,
-    messages::annotations::{self, Source},
+    messages::{
+        annotations::{self, Source},
+        types::GrazeMessage,
+    },
     parser::{
         self,
         context::ParseContext,
@@ -143,6 +146,23 @@ pub fn parse_single_file(
     ))
 }
 
+pub fn count_errors_and_warnings(messages: &[GrazeMessage]) -> (usize, usize) {
+    let mut errors = 0;
+    let mut warnings = 0;
+    for message in messages {
+        match message {
+            GrazeMessage::Error(graze_error, graze_suggestion) => {
+                errors += 1;
+            }
+            GrazeMessage::Warning(graze_warning, graze_suggestion) => {
+                warnings += 1;
+            }
+            _ => (),
+        }
+    }
+    (errors, warnings)
+}
+
 // TODO: Check unwraps and possibly replace
 // Issue: #52
 
@@ -206,30 +226,41 @@ impl Cli {
         } else {
             panic!();
         };
-        if log_time {
-            println!("Parsing took: {:?}", parse_timer.elapsed());
-        }
+        let parse_time = parse_timer.elapsed();
         if !context.successful {
             let renderer = Renderer::styled();
+            let (error_count, warning_count) = count_errors_and_warnings(&context.messages);
+            context.messages.push(GrazeMessage::Unsuccessful {
+                error_count,
+                warning_count,
+            });
             let anns = annotations::annotate(context.messages.iter(), &renderer, |id| {
                 source_files.get(&id).unwrap().as_descriptor()
             });
             anstream::println!("{}", renderer.render(&anns));
-            panic!("Parsing unsuccessful.");
+            std::process::exit(1);
         }
         let codegen_timer = Instant::now();
         let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
         let visitor = codegen::core::GrazeSb3Generator;
         visitor.visit_graze_program(&parsed, &mut context).unwrap();
-        if log_time {
-            println!("Codegen took: {:?}", codegen_timer.elapsed());
-        }
+        let codegen_time = codegen_timer.elapsed();
         let renderer = Renderer::styled();
+        let (error_count, warning_count) = count_errors_and_warnings(&context.messages);
+        if error_count > 0 {
+            context.messages.push(GrazeMessage::Unsuccessful {
+                error_count,
+                warning_count,
+            });
+        }
         let anns = annotations::annotate(context.messages.iter(), &renderer, |id| {
             source_files.get(&id).unwrap().as_descriptor()
         });
         if !anns.is_empty() {
             anstream::println!("{}", renderer.render(&anns));
+        }
+        if error_count > 0 {
+            std::process::exit(1);
         }
         // target.unwrap_or(&path).join(
         //     path.file_name()
@@ -261,8 +292,11 @@ impl Cli {
         }
         let zip_timer = Instant::now();
         zipper::write_to_zip_path(&output_path, &context).unwrap();
+        let zip_time = zip_timer.elapsed();
         if log_time {
-            println!("Zipping took: {:?}", zip_timer.elapsed());
+            println!("Parsing took: {:?}", parse_time);
+            println!("Codegen took: {:?}", codegen_time);
+            println!("Zipping took: {:?}", zip_time);
             println!("Total time: {:?}", total_time.elapsed());
         }
     }

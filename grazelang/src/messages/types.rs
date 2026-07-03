@@ -289,6 +289,10 @@ pub enum GrazeMessage {
     Error(GrazeError, Option<GrazeSuggestion>),
     Warning(GrazeWarning, Option<GrazeSuggestion>),
     Info(GrazeInfo, Option<GrazeSuggestion>),
+    Unsuccessful {
+        error_count: usize,
+        warning_count: usize,
+    },
 }
 
 impl From<ParseError> for GrazeMessage {

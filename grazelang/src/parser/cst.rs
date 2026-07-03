@@ -1887,13 +1887,13 @@ impl ParseError {
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span: _,
-            } => return Cow::Owned(format!("missing dictionary entry with key \"{key}\"")),
+            } => return Cow::Owned(format!("missing dictionary entry key: \"{key}\"")),
             Self::UnknownFlatDictionaryEntry {
                 key,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span: _,
-            } => return Cow::Owned(format!("unexpected dictionary entry with key \"{key}\"")),
+            } => return Cow::Owned(format!("unexpected dictionary entry key: \"{key}\"")),
             Self::RepeatedFlatDictionaryEntry {
                 key,
                 #[cfg(feature = "include_context_in_parse_errors")]
