@@ -422,6 +422,7 @@ name = "grazelang"
 version = "0.1.0"
 dependencies = [
  "annotate-snippets",
+ "anstream",
  "arcstr",
  "clap",
  "enum-assoc",

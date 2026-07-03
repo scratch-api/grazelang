@@ -22,6 +22,7 @@ ryu-js = "1.0.2"
 fast-float2 = "0.2.3"
 num_enum = "0.7.6"
 annotate-snippets = "0.12.16"
+anstream = "1.0.0"
 
 [features]
 default = []

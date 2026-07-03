@@ -1,3 +1,5 @@
+use std::{ffi::OsStr, path::PathBuf};
+
 use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Renderer, Snippet};
 
 use crate::{
@@ -9,10 +11,27 @@ use crate::{
 
 use super::types::GrazeMessage;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Source {
+    pub content: String,
+    pub path: PathBuf,
+    pub line_starts: Vec<usize>,
+}
+
+impl Source {
+    pub fn as_descriptor(&self) -> SourceDescriptor<'_> {
+        SourceDescriptor {
+            content: &self.content,
+            path: self.path.as_os_str(),
+            line_starts: &self.line_starts,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceDescriptor<'a> {
     pub content: &'a str,
-    pub path: &'a str,
+    pub path: &'a OsStr,
     pub line_starts: &'a [usize],
 }
 
@@ -52,7 +71,7 @@ impl GrazeMessage {
                         .id("custom_error")
                         .element(
                             Snippet::<Annotation>::source(content)
-                                .path(path)
+                                .path(path.to_string_lossy())
                                 .annotation(
                                     AnnotationKind::Primary
                                         .span(convert_source_span(source_span.0, line_starts))
@@ -88,7 +107,7 @@ impl ParseError {
             .primary_title(self.primary_message())
             .id(self.get_lint_id())
             .element(
-                Snippet::source(content).path(path).annotation(
+                Snippet::source(content).path(path.to_string_lossy()).annotation(
                     AnnotationKind::Primary
                         .span(convert_source_span(source_span.0, line_starts))
                         .label(self.secondary_message()),

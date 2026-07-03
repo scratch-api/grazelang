@@ -8,10 +8,12 @@ use std::{
     time::Instant,
 };
 
+use annotate_snippets::Renderer;
 use clap::{Parser, Subcommand};
 
 use crate::{
     codegen, lexer,
+    messages::annotations::{self, Source},
     parser::{
         self,
         context::ParseContext,
@@ -61,7 +63,7 @@ pub enum Commands {
 pub fn parse_project_directory(
     path: &Path,
     context: &mut ParseContext,
-) -> Result<(GrazeProgram, HashMap<u32, PathBuf>), ParseError> {
+) -> Result<(GrazeProgram, HashMap<u32, Source>), ParseError> {
     let mut program = Vec::new();
     let mut file_id = 0_u32;
     let mut source_files = HashMap::new();
@@ -92,9 +94,17 @@ pub fn parse_project_directory(
             buf
         };
         let lexer = lexer::create_lexer(&graze_code);
-        let parsed = parser::parse_graze_program(&mut PeekableLexer::new(lexer, file_id), context)?;
+        let mut lexer = PeekableLexer::new(lexer, file_id);
+        let parsed = parser::parse_graze_program(&mut lexer, context)?;
         program.extend(parsed.0);
-        source_files.insert(file_id, current_file);
+        source_files.insert(
+            file_id,
+            Source {
+                line_starts: lexer.lexer.extras.0,
+                content: graze_code,
+                path: current_file,
+            },
+        );
         file_id += 1;
     }
     Ok((GrazeProgram(program), source_files))
@@ -103,7 +113,7 @@ pub fn parse_project_directory(
 pub fn parse_single_file(
     path: &Path,
     context: &mut ParseContext,
-) -> Result<GrazeProgram, ParseError> {
+) -> Result<(GrazeProgram, HashMap<u32, Source>), ParseError> {
     let graze_code = {
         let mut file = File::open(path).map_err(|value| ParseError::IoError {
             source: Rc::new(value),
@@ -118,7 +128,19 @@ pub fn parse_single_file(
         buf
     };
     let lexer = lexer::create_lexer(&graze_code);
-    parser::parse_graze_program(&mut PeekableLexer::new(lexer, 0), context)
+    let mut lexer = PeekableLexer::new(lexer, 0);
+    let parsed = parser::parse_graze_program(&mut lexer, context)?;
+    Ok((
+        parsed,
+        HashMap::from([(
+            0,
+            Source {
+                line_starts: lexer.lexer.extras.0,
+                content: graze_code,
+                path: path.to_path_buf(),
+            },
+        )]),
+    ))
 }
 
 // TODO: Check unwraps and possibly replace
@@ -177,13 +199,10 @@ impl Cli {
         );
         let parse_timer = Instant::now();
         let path = path.canonicalize().unwrap();
-        let (parsed, _source_files) = if path.is_dir() {
+        let (parsed, source_files) = if path.is_dir() {
             parse_project_directory(&path, &mut context).unwrap()
         } else if is_file {
-            (
-                parse_single_file(&path, &mut context).unwrap(),
-                HashMap::from([(0, path.clone())]),
-            )
+            parse_single_file(&path, &mut context).unwrap()
         } else {
             panic!();
         };
@@ -191,10 +210,11 @@ impl Cli {
             println!("Parsing took: {:?}", parse_timer.elapsed());
         }
         if !context.successful {
-            for message in &context.messages {
-                dbg!(message);
-            }
-            // dbg!(parsed);
+            let renderer = Renderer::styled();
+            let anns = annotations::annotate(context.messages.iter(), &renderer, |id| {
+                source_files.get(&id).unwrap().as_descriptor()
+            });
+            anstream::println!("{}", renderer.render(&anns));
             panic!("Parsing unsuccessful.");
         }
         let codegen_timer = Instant::now();
@@ -204,8 +224,12 @@ impl Cli {
         if log_time {
             println!("Codegen took: {:?}", codegen_timer.elapsed());
         }
-        for message in &context.messages {
-            dbg!(message);
+        let renderer = Renderer::styled();
+        let anns = annotations::annotate(context.messages.iter(), &renderer, |id| {
+            source_files.get(&id).unwrap().as_descriptor()
+        });
+        if !anns.is_empty() {
+            anstream::println!("{}", renderer.render(&anns));
         }
         // target.unwrap_or(&path).join(
         //     path.file_name()
