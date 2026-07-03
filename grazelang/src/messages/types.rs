@@ -12,8 +12,6 @@ pub trait GetLintId {
     fn get_lint_id(&self) -> &'static str;
 }
 
-// enum_assoc
-
 #[derive(Debug, Clone, thiserror::Error, enum_assoc::Assoc)]
 pub enum GrazeError {
     #[error("{0}")]

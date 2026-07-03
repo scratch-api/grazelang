@@ -403,8 +403,8 @@ macro_rules! parse_comma_separated {
                     let token = next_token!(token_stream);
                     emit_unexpected_token!(
                         token_stream,
-                        concat!("Expected a comma or ", $end_pat_repr, "."),
-                        concat!("a comma or ", $end_pat_repr),
+                        concat!("Expected ',' or ", $end_pat_repr, "."),
+                        concat!("',' or ", $end_pat_repr),
                         token
                     );
                 }
@@ -736,7 +736,7 @@ pub fn parse_full_identifier(
             Token::ScopeResolution => {
                 if path.is_some() {
                     let token = next_token!(token_stream);
-                    emit_unexpected_token!(token_stream, "Expected a dot.", "a dot", token);
+                    emit_unexpected_token!(token_stream, "Expected '.'.", "'.'", token);
                 }
             }
             Token::Dot => {
@@ -789,7 +789,7 @@ pub fn parse_full_identifier_starting_with(
             Token::ScopeResolution => {
                 if scope.is_some() {
                     let token = next_token!(token_stream);
-                    emit_unexpected_token!(token_stream, "Expected a dot.", "a dot", token);
+                    emit_unexpected_token!(token_stream, "Expected '.'.", "'.'", token);
                 }
             }
             Token::Dot => {
@@ -2973,7 +2973,7 @@ pub mod statement {
                     Token::ScopeResolution => {
                         if path.is_some() {
                             let token = next_token!(token_stream);
-                            emit_unexpected_token!(token_stream, "Expected a dot.", "a dot", token);
+                            emit_unexpected_token!(token_stream, "Expected '.'.", "'.'", token);
                         }
                     }
                     Token::Dot => {

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::string_unescape::unescape;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Logos)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Logos)]
 #[logos(extras = (Vec<usize>, usize))]
 #[logos(skip r"[ \t\f]+")]
 #[logos(skip(r"\n|\r\n?", register_newline))]
@@ -152,6 +152,74 @@ pub enum Token {
     LeftFormattedString(IString),
 }
 
+impl std::fmt::Debug for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Token::SpriteKeyword => write!(f, "\"sprite\""),
+            Token::StageKeyword => write!(f, "\"stage\""),
+            Token::ProcKeyword => write!(f, "\"proc\""),
+            Token::WarpKeyword => write!(f, "\"warp\""),
+            Token::NowarpKeyword => write!(f, "\"nowarp\""),
+            Token::UseKeyword => write!(f, "\"use\""),
+            Token::AsKeyword => write!(f, "\"as\""),
+            Token::LetKeyword => write!(f, "\"let\""),
+            Token::CloudKeyword => write!(f, "\"cloud\""),
+            Token::GlobalKeyword => write!(f, "\"global\""),
+            Token::LocalKeyword => write!(f, "\"local\""),
+            Token::VarKeyword => write!(f, "\"var\""),
+            Token::VarsKeyword => write!(f, "\"vars\""),
+            Token::ListKeyword => write!(f, "\"list\""),
+            Token::ListsKeyword => write!(f, "\"lists\""),
+            Token::CostumeKeyword => write!(f, "\"costume\""),
+            Token::BackdropKeyword => write!(f, "\"backdrop\""),
+            Token::SoundKeyword => write!(f, "\"sound\""),
+            Token::BroadcastKeyword => write!(f, "\"broadcast\""),
+            Token::ContainsKeyword => write!(f, "\"contains\""),
+            Token::LeftBrace => write!(f, "'{{'"),
+            Token::RightBrace(_) => write!(f, "'}}'"),
+            Token::LeftParens => write!(f, "'('"),
+            Token::RightParens => write!(f, "')'"),
+            Token::LeftBracket => write!(f, "'['"),
+            Token::RightBracket => write!(f, "']'"),
+            Token::Semicolon => write!(f, "';'"),
+            Token::Comma => write!(f, "','"),
+            Token::Dot => write!(f, "'.'"),
+            Token::Assign => write!(f, "'='"),
+            Token::Plus => write!(f, "'+'"),
+            Token::Minus => write!(f, "'-'"),
+            Token::Not => write!(f, "'!'"),
+            Token::Times => write!(f, "'*'"),
+            Token::Div => write!(f, "'/'"),
+            Token::Mod => write!(f, "'%'"),
+            Token::LessThan => write!(f, "'<'"),
+            Token::GreaterThan => write!(f, "'>'"),
+            Token::LetterAccessLeftBracket => write!(f, "\"@[\""),
+            Token::ScopeResolution => write!(f, "\"::\""),
+            Token::Exp => write!(f, "\"e^\""),
+            Token::Pow => write!(f, "\"10^\""),
+            Token::Join => write!(f, "\"join\""),
+            Token::Equals => write!(f, "\"==\""),
+            Token::NotEquals => write!(f, "\"!=\""),
+            Token::LessThanOrEqual => write!(f, "\"<=\""),
+            Token::GreaterThanOrEqual => write!(f, "\">=\""),
+            Token::And => write!(f, "\"&&\""),
+            Token::Or => write!(f, "\"||\""),
+            Token::Unwrap => write!(f, "\"..\""),
+            Token::SimpleString(val) => write!(f, "\"{}\"", val),
+            Token::CanonicalIdentifier(val) => write!(f, "\"{}\"", val),
+            Token::Identifier(val) => write!(f, "\"{}\"", val),
+            Token::MacroIdentifier(val) => write!(f, "\"{}\"", val),
+            Token::DecimalInt(val) => write!(f, "\"{}\"", val),
+            Token::DecimalFloat(val) => write!(f, "\"{}\"", val),
+            Token::HexadecimalInt(val) => write!(f, "\"{}\"", val),
+            Token::OctalInt(val) => write!(f, "\"{}\"", val),
+            Token::BinaryInt(val) => write!(f, "\"{}\"", val),
+            Token::Bool(val) => write!(f, "\"{}\"", val),
+            Token::LeftFormattedString(val) => write!(f, "\"{}\"", val),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LexedRightBrace {
     Normal,
@@ -245,7 +313,7 @@ pub fn register_newlines_from_multiline_comment(lex: &mut Lexer<Token>) {
 
 pub type TextSpan = ((usize, usize), (usize, usize));
 pub type SourceFileId = u32;
-pub type SourceSpan = (((usize, usize), (usize, usize)), SourceFileId);
+pub type SourceSpan = (TextSpan, SourceFileId);
 
 pub fn get_position(lex: &Lexer<Token>, character_index: usize) -> (usize, usize) {
     let last_newline_index = *match lex.extras.0.last() {

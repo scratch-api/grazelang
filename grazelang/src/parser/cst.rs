@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::{
     eval::{
@@ -7,7 +7,7 @@ use crate::{
         ops::{ConstantExprBinOp, ConstantExprUnOp},
     },
     lexer::SourceSpan,
-    messages::types::ConstantExprEvaluationError,
+    messages::types::{ConstantExprEvaluationError, GetLintId},
 };
 use arcstr::ArcStr as IString; // Immutable string
 use grazelang_types::{
@@ -1689,14 +1689,25 @@ impl GetPos for CanonicalIdentifier {
     }
 }
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Error, enum_assoc::Assoc)]
+#[func(const fn internal_lint_id(&self) -> &'static str)]
+#[func(const fn internal_primary_message(&self) -> &'static str)]
+#[func(pub const fn secondary_message(&self) -> &'static str)]
 pub enum ParseError {
+    #[assoc(internal_lint_id = "unexpected_end_of_input")]
+    #[assoc(
+        internal_primary_message = "the lexer reached the end of input without the parser completing"
+    )]
+    #[assoc(secondary_message = "unexpected end of input")]
     #[error("the lexer reached the end of input without the parser completing")]
     UnexpectedEndOfInput {
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "unexpected_token")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "unexpected token")]
     #[error("unexpected token at {source_span:?}, expected {expected}")]
     UnexpectedToken {
         expected: IString,
@@ -1706,24 +1717,36 @@ pub enum ParseError {
         found: crate::lexer::Token,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "lexer_stuck")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("the lexer got stuck after the token at {source_span:?}")]
     LexerStuck {
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "local_symbol_in_stage")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("tried to declare a local symbol in stage at {source_span:?}")]
     LocalSymbolInStage {
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "peeked_back_at_beginning")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("tried to peek back at the beginning of the content")]
     PeekedBackAtBeginning {
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "shadowed_symbol")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("tried to shadow symbol {symbol}")]
     ShadowedSymbol {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1731,18 +1754,27 @@ pub enum ParseError {
         symbol: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "symbol_named_super")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("tried to name a symbol \"super\"")]
     SymbolNamedSuper {
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "symbol_named_self")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("tried to name a symbol \"self\"")]
     SymbolNamedSelf {
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "missing_flat_dictionary_entry")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("expected key {key:?} in flat dictionary")]
     MissingFlatDictionaryEntry {
         key: IString,
@@ -1750,6 +1782,9 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "unknown_flat_dictionary_entry")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("unexpected key {key:?} in flat dictionary")]
     UnknownFlatDictionaryEntry {
         key: IString,
@@ -1757,6 +1792,9 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "repeated_flat_dictionary_entry")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("repeated key {key:?} in flat dictionary")]
     RepeatedFlatDictionaryEntry {
         key: IString,
@@ -1764,6 +1802,9 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "incorrect_flat_dictionary_entry_type")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("key {key:?} with value {value:?} in flat dictionary has an incorrect type")]
     IncorrectFlatDictionaryEntryType {
         key: IString,
@@ -1772,18 +1813,46 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "invalid_constant_expression")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
     InvalidConstantExpression {
         expression: Box<Expression>,
         #[source]
         source: ConstantExprEvaluationError,
     },
+    #[assoc(internal_lint_id = "io_error")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(secondary_message = "")]
     #[error("{source}")]
     IoError {
         #[source]
         source: std::rc::Rc<std::io::Error>,
         source_span: SourceSpan,
     },
+}
+
+impl GetLintId for ParseError {
+    #[inline]
+    fn get_lint_id(&self) -> &'static str {
+        self.internal_lint_id()
+    }
+}
+
+impl ParseError {
+    pub const fn primary_message(&self) -> Cow<'static, str> {
+        match self {
+            Self::UnexpectedToken {
+                expected,
+                message,
+                found,
+                source_span,
+            } => return Cow::Owned(format!("expected {expected}, found {found:?}")),
+            _ => (),
+        }
+        Cow::Borrowed(self.internal_primary_message())
+    }
 }
 
 impl GetPos for ParseError {
