@@ -89,6 +89,10 @@ impl<'a> Iterator for CountAwareChars<'a> {
         self.remaining -= 1;
         std::mem::replace(&mut self.peeked, self.chars.next())
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
 }
 
 impl<'a> From<Chars<'a>> for CountAwareChars<'a> {

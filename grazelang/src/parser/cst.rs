@@ -224,6 +224,11 @@ impl<'a, T> Iterator for BorrowedCommaSeparatedIterator<'a, T> {
         }
         None
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.comma_separated.len() - self.index;
+        (len, Some(len))
+    }
 }
 
 impl<T> CommaSeparated<T> {
@@ -255,6 +260,14 @@ impl<T> Iterator for CommaSeparatedIterator<T> {
             .next()
             .map(|value| value.0)
             .or_else(|| self.tail_value.take())
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (lower, upper) = self.values_iterator.size_hint();
+        (
+            lower.saturating_add(self.tail_value.is_some() as usize),
+            upper.map(|value| value.saturating_add(self.tail_value.is_some() as usize)),
+        )
     }
 }
 
@@ -1718,8 +1731,8 @@ pub enum ParseError {
         source_span: SourceSpan,
     },
     #[assoc(internal_lint_id = "lexer_stuck")]
-    #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(internal_primary_message = "lexer got stuck")]
+    #[assoc(secondary_message = "lexer got stuck after this token")]
     #[error("the lexer got stuck after the token at {source_span:?}")]
     LexerStuck {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1727,8 +1740,8 @@ pub enum ParseError {
         source_span: SourceSpan,
     },
     #[assoc(internal_lint_id = "local_symbol_in_stage")]
-    #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(internal_primary_message = "cannot declare a local symbol in stage")]
+    #[assoc(secondary_message = "modifier is not applicable in this context")]
     #[error("tried to declare a local symbol in stage at {source_span:?}")]
     LocalSymbolInStage {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1736,8 +1749,8 @@ pub enum ParseError {
         source_span: SourceSpan,
     },
     #[assoc(internal_lint_id = "peeked_back_at_beginning")]
-    #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(internal_primary_message = "parser tried peeking back at the beginning of the parse")]
+    #[assoc(secondary_message = "token caused invalid backtracking")]
     #[error("tried to peek back at the beginning of the content")]
     PeekedBackAtBeginning {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1746,7 +1759,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "shadowed_symbol")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(secondary_message = "symbol redefined here")]
     #[error("tried to shadow symbol {symbol}")]
     ShadowedSymbol {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1755,8 +1768,8 @@ pub enum ParseError {
         source_span: SourceSpan,
     },
     #[assoc(internal_lint_id = "symbol_named_super")]
-    #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(internal_primary_message = "name of symbol cannot be \"super\"")]
+    #[assoc(secondary_message = "invalid symbol name")]
     #[error("tried to name a symbol \"super\"")]
     SymbolNamedSuper {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1764,8 +1777,8 @@ pub enum ParseError {
         source_span: SourceSpan,
     },
     #[assoc(internal_lint_id = "symbol_named_self")]
-    #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(internal_primary_message = "name of symbol cannot be \"self\"")]
+    #[assoc(secondary_message = "invalid symbol name")]
     #[error("tried to name a symbol \"self\"")]
     SymbolNamedSelf {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1774,7 +1787,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "missing_flat_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(secondary_message = "missing dictionary entry here")]
     #[error("expected key {key:?} in flat dictionary")]
     MissingFlatDictionaryEntry {
         key: IString,
@@ -1784,7 +1797,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "unknown_flat_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(secondary_message = "unexpected dictionary entry here")]
     #[error("unexpected key {key:?} in flat dictionary")]
     UnknownFlatDictionaryEntry {
         key: IString,
@@ -1794,7 +1807,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "repeated_flat_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(secondary_message = "repeated dictionary entry here")]
     #[error("repeated key {key:?} in flat dictionary")]
     RepeatedFlatDictionaryEntry {
         key: IString,
@@ -1804,7 +1817,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "incorrect_flat_dictionary_entry_type")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(secondary_message = "incorrect entry value type here")]
     #[error("key {key:?} with value {value:?} in flat dictionary has an incorrect type")]
     IncorrectFlatDictionaryEntryType {
         key: IString,
@@ -1815,7 +1828,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "invalid_constant_expression")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(secondary_message = "could not evaluate this expression")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
     InvalidConstantExpression {
         expression: Box<Expression>,
@@ -1841,14 +1854,61 @@ impl GetLintId for ParseError {
 }
 
 impl ParseError {
-    pub const fn primary_message(&self) -> Cow<'static, str> {
+    pub fn primary_message(&self) -> Cow<'static, str> {
         match self {
             Self::UnexpectedToken {
                 expected,
-                message,
+                message: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
                 found,
-                source_span,
+                source_span: _,
             } => return Cow::Owned(format!("expected {expected}, found {found:?}")),
+            Self::ShadowedSymbol {
+                symbol,
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
+                source_span: _,
+            } => return Cow::Owned(format!("the name `{symbol}` is defined multiple times")),
+            Self::MissingFlatDictionaryEntry {
+                key,
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
+                source_span: _,
+            } => return Cow::Owned(format!("missing dictionary entry with key \"{key}\"")),
+            Self::UnknownFlatDictionaryEntry {
+                key,
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
+                source_span: _,
+            } => return Cow::Owned(format!("unexpected dictionary entry with key \"{key}\"")),
+            Self::RepeatedFlatDictionaryEntry {
+                key,
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
+                source_span: _,
+            } => {
+                return Cow::Owned(format!(
+                    "dictionary entry with key \"{key}\" defined multiple times"
+                ));
+            }
+            Self::IncorrectFlatDictionaryEntryType {
+                key,
+                value: _,
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
+                source_span: _,
+            } => {
+                return Cow::Owned(format!(
+                    "value of dictionary entry with key \"{key}\" is of an incorrect type"
+                ));
+            }
+            Self::InvalidConstantExpression {
+                expression: _,
+                source,
+            } => {
+                todo!()
+            }
             _ => (),
         }
         Cow::Borrowed(self.internal_primary_message())

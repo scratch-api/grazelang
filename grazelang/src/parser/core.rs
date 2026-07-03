@@ -1222,22 +1222,21 @@ pub mod statement {
                 }
             };
 
-            if matches!(
-                (default_scope, &scope, &context.next_target),
-                (
-                    DataDeclarationScope::Local(_),
-                    DataDeclarationScope::Unset,
-                    Some(context::Target::Stage { .. })
-                ) | (
-                    _,
-                    DataDeclarationScope::Local(_),
-                    Some(context::Target::Stage { .. })
-                )
-            ) {
+            if let (
+                DataDeclarationScope::Local(source_span),
+                DataDeclarationScope::Unset,
+                Some(context::Target::Stage { .. }),
+            )
+            | (
+                _,
+                DataDeclarationScope::Local(source_span),
+                Some(context::Target::Stage { .. }),
+            ) = (default_scope, &scope, &context.next_target)
+            {
                 return Err(ParseError::LocalSymbolInStage {
                     #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
-                    source_span: token_stream.span_from_previous_to_current(start_pos.unwrap()),
+                    source_span: *source_span,
                 });
             }
             with_mut_target_scope_or_global_scope!(
@@ -1696,17 +1695,13 @@ pub mod statement {
                 emit_unexpected_token!(token_stream, "Expected '=' or ';'", "'=' or ';'", token);
             }
         };
-        if matches!(
-            (&scope, &context.next_target),
-            (
-                DataDeclarationScope::Local(_),
-                Some(context::Target::Stage { .. })
-            )
-        ) {
+        if let (DataDeclarationScope::Local(source_span), Some(context::Target::Stage { .. })) =
+            (&scope, &context.next_target)
+        {
             return Err(ParseError::LocalSymbolInStage {
                 #[cfg(feature = "include_context_in_parse_errors")]
                 context: literal!(static_current_context!()),
-                source_span: token_stream.span_from_previous_to_current(let_keyword_position.0.0),
+                source_span: *source_span,
             });
         }
         with_mut_target_scope_or_global_scope!(

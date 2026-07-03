@@ -75,7 +75,9 @@ pub fn try_convert_f64_into_i128(value: f64) -> Option<i128> {
 impl From<JsPrimitive> for Sb3PrimitiveOrBool {
     fn from(value: JsPrimitive) -> Self {
         match value {
-            JsPrimitive::JsString(value) => Sb3PrimitiveOrBool::String(String::from_utf16_lossy(&value)),
+            JsPrimitive::JsString(value) => {
+                Sb3PrimitiveOrBool::String(String::from_utf16_lossy(&value))
+            }
             JsPrimitive::String(value) => Sb3PrimitiveOrBool::String(value),
             JsPrimitive::IString(value) => Sb3PrimitiveOrBool::String(value.to_string()),
             JsPrimitive::Number(value) => {
@@ -89,7 +91,7 @@ impl From<JsPrimitive> for Sb3PrimitiveOrBool {
                     Sb3PrimitiveOrBool::Float(value)
                 }
             }
-            JsPrimitive::Bool(value) => Sb3PrimitiveOrBool::Bool(value)
+            JsPrimitive::Bool(value) => Sb3PrimitiveOrBool::Bool(value),
         }
     }
 }
@@ -759,5 +761,10 @@ where
         };
         self.buf_idx = 1;
         Some(self.buf[0])
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (lower, upper) = self.iterator.size_hint();
+        (lower, upper.map(|value| value.saturating_mul(8)))
     }
 }
