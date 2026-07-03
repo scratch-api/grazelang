@@ -1,6 +1,6 @@
 use std::{
     ffi::OsStr,
-    fmt::{Write, format},
+    fmt::Write,
     path::PathBuf,
 };
 

@@ -1858,6 +1858,199 @@ pub enum ParseError {
     },
 }
 
+impl PartialEq for ParseError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::UnexpectedEndOfInput {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::UnexpectedEndOfInput {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_source_span == r_source_span,
+            (
+                Self::UnexpectedToken {
+                    expected: l_expected,
+                    message: l_message,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    found: l_found,
+                    source_span: l_source_span,
+                },
+                Self::UnexpectedToken {
+                    expected: r_expected,
+                    message: r_message,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    found: r_found,
+                    source_span: r_source_span,
+                },
+            ) => l_message == r_message && l_found == r_found && l_source_span == r_source_span,
+            (
+                Self::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::LexerStuck {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_source_span == r_source_span,
+            (
+                Self::LocalSymbolInStage {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::LocalSymbolInStage {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_source_span == r_source_span,
+            (
+                Self::PeekedBackAtBeginning {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::PeekedBackAtBeginning {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_source_span == r_source_span,
+            (
+                Self::ShadowedSymbol {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    symbol: l_symbol,
+                    source_span: l_source_span,
+                },
+                Self::ShadowedSymbol {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    symbol: r_symbol,
+                    source_span: r_source_span,
+                },
+            ) => l_symbol == r_symbol && l_source_span == r_source_span,
+            (
+                Self::SymbolNamedSuper {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::SymbolNamedSuper {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_source_span == r_source_span,
+            (
+                Self::SymbolNamedSelf {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::SymbolNamedSelf {
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_source_span == r_source_span,
+            (
+                Self::MissingFlatDictionaryEntry {
+                    key: l_key,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::MissingFlatDictionaryEntry {
+                    key: r_key,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_key == r_key && l_source_span == r_source_span,
+            (
+                Self::UnknownFlatDictionaryEntry {
+                    key: l_key,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::UnknownFlatDictionaryEntry {
+                    key: r_key,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_key == r_key && l_source_span == r_source_span,
+            (
+                Self::RepeatedFlatDictionaryEntry {
+                    key: l_key,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::RepeatedFlatDictionaryEntry {
+                    key: r_key,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_key == r_key && l_source_span == r_source_span,
+            (
+                Self::IncorrectFlatDictionaryEntryType {
+                    key: l_key,
+                    value: l_value,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: l_source_span,
+                },
+                Self::IncorrectFlatDictionaryEntryType {
+                    key: r_key,
+                    value: r_value,
+                    #[cfg(feature = "include_context_in_parse_errors")]
+                        context: _,
+                    source_span: r_source_span,
+                },
+            ) => l_key == r_key && l_value == r_value && l_source_span == r_source_span,
+            (
+                Self::InvalidConstantExpression {
+                    expression: l_expression,
+                    source: l_source,
+                },
+                Self::InvalidConstantExpression {
+                    expression: r_expression,
+                    source: r_source,
+                },
+            ) => l_expression == r_expression && l_source == r_source,
+            (
+                Self::IoError {
+                    source: l_source,
+                    source_span: l_source_span,
+                },
+                Self::IoError {
+                    source: r_source,
+                    source_span: r_source_span,
+                },
+            ) => {
+                std::rc::Rc::as_ptr(l_source) == std::rc::Rc::as_ptr(r_source)
+                    && l_source_span == r_source_span
+            }
+            _ => false,
+        }
+    }
+}
+
 impl GetLintId for ParseError {
     #[inline]
     fn get_lint_id(&self) -> &'static str {

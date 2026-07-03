@@ -14,7 +14,7 @@ pub trait GetLintId {
     fn get_lint_id(&self) -> &'static str;
 }
 
-#[derive(Debug, Clone, thiserror::Error, enum_assoc::Assoc)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error, enum_assoc::Assoc)]
 pub enum GrazeError {
     #[error("{0}")]
     Plain(IString, SourceSpan),
@@ -230,7 +230,7 @@ impl GetPos for ConstantExprEvaluationError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GrazeWarning {
     Plain(IString, SourceSpan),
     Specific(GrazeWarningKind, IString, SourceSpan),
@@ -271,7 +271,7 @@ impl GetLintId for GrazeWarningKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GrazeInfo {
     Plain(IString, SourceSpan),
 }
@@ -284,7 +284,7 @@ pub enum GrazeSuggestion {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GrazeMessage {
     Error(GrazeError, Option<GrazeSuggestion>),
     Warning(GrazeWarning, Option<GrazeSuggestion>),

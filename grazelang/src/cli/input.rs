@@ -98,7 +98,25 @@ pub fn parse_project_directory(
         };
         let lexer = lexer::create_lexer(&graze_code);
         let mut lexer = PeekableLexer::new(lexer, file_id);
-        let parsed = parser::parse_graze_program(&mut lexer, context)?;
+        let parsed = parser::parse_graze_program(&mut lexer, context);
+        let Ok(parsed) = parsed else {
+            if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
+                source_files.insert(
+                    file_id,
+                    Source {
+                        line_starts: lexer.lexer.extras.0,
+                        content: graze_code,
+                        path: current_file,
+                    },
+                );
+                file_id += 1;
+                continue;
+            } else if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
+                std::process::exit(1);
+            } else {
+                return Err(parsed.unwrap_err());
+            }
+        };
         program.extend(parsed.0);
         source_files.insert(
             file_id,
@@ -132,7 +150,26 @@ pub fn parse_single_file(
     };
     let lexer = lexer::create_lexer(&graze_code);
     let mut lexer = PeekableLexer::new(lexer, 0);
-    let parsed = parser::parse_graze_program(&mut lexer, context)?;
+    let parsed = parser::parse_graze_program(&mut lexer, context);
+    let Ok(parsed) = parsed else {
+        if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
+            return Ok((
+                GrazeProgram(Vec::new()),
+                HashMap::from([(
+                    0,
+                    Source {
+                        line_starts: lexer.lexer.extras.0,
+                        content: graze_code,
+                        path: path.to_path_buf(),
+                    },
+                )]),
+            ));
+        } else if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
+            std::process::exit(1);
+        } else {
+            return Err(parsed.unwrap_err());
+        }
+    };
     Ok((
         parsed,
         HashMap::from([(
@@ -151,10 +188,10 @@ pub fn count_errors_and_warnings(messages: &[GrazeMessage]) -> (usize, usize) {
     let mut warnings = 0;
     for message in messages {
         match message {
-            GrazeMessage::Error(graze_error, graze_suggestion) => {
+            GrazeMessage::Error(..) => {
                 errors += 1;
             }
-            GrazeMessage::Warning(graze_warning, graze_suggestion) => {
+            GrazeMessage::Warning(..) => {
                 warnings += 1;
             }
             _ => (),

@@ -59,7 +59,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 pub enum GrazeSb3GeneratorError {
     #[error("the identifier {identifier:?} was not found")]
     UnknownIdentifier { identifier: Identifier },

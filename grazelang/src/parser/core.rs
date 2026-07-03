@@ -10,7 +10,7 @@ use crate::{
         self, SourceFileId, SourceSpan, TextSpan, Token,
         get_source_span as internal_get_source_span,
     },
-    messages::types::GrazeMessage,
+    messages::types::{GrazeError, GrazeMessage},
     parser::{
         context::{self, BroadcastDescriptor},
         cst::{
@@ -346,7 +346,12 @@ macro_rules! try_or_emit_message {
                 $context.successful = false;
                 match $context.settings.message_setting {
                     GrazeMessageSetting::ExitOnError => {
-                        $context.messages.push(err.clone().into());
+                        if !matches!(
+                            $context.messages.last(),
+                            Some(GrazeMessage::Error(GrazeError::ParseError(other_err), None)) if other_err == &err
+                        ) {
+                            $context.messages.push(err.clone().into());
+                        }
                         return Err(err);
                     }
                     GrazeMessageSetting::ExitOnErrorUnlogged => return Err(err),
@@ -491,7 +496,7 @@ pub fn emit_unexpected_token_message_or_return(
             source_span,
         }
         .into(),
-        GrazeMessageSetting::ExitOnError,
+        GrazeMessageSetting::Errors,
     );
     Ok(())
 }
@@ -2474,7 +2479,7 @@ pub mod statement {
                                 source_span: single_identifier.1,
                             });
                         }
-                        if let Some((key, (source_span, _))) = data.into_iter().next() {
+                        for (key, (source_span, _)) in data {
                             errors.push(ParseError::UnknownFlatDictionaryEntry {
                                 key,
                                 #[cfg(feature = "include_context_in_parse_errors")]
@@ -2485,6 +2490,17 @@ pub mod statement {
                     });
                     for error in errors {
                         context.successful = false;
+                        if matches!(
+                            context.settings.message_setting,
+                            GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+                        ) {
+                            if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
+                                context.messages.push(error.clone()
+                                    .into(),
+                                );
+                            }
+                            return Err(error);
+                        }
                         emit_message(context, error.into(), GrazeMessageSetting::Errors);
                     }
                     SingleAssetDeclaration(
@@ -2621,7 +2637,7 @@ pub mod statement {
                             source_span: single_identifier.1,
                         });
                     }
-                    if let Some((key, (source_span, _))) = data.into_iter().next() {
+                    for (key, (source_span, _)) in data {
                         errors.push(ParseError::UnknownFlatDictionaryEntry {
                             key,
                             #[cfg(feature = "include_context_in_parse_errors")]
@@ -2632,6 +2648,15 @@ pub mod statement {
                 });
                 for error in errors {
                     context.successful = false;
+                    if matches!(
+                        context.settings.message_setting,
+                        GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+                    ) {
+                        if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
+                            context.messages.push(error.clone().into());
+                        }
+                        return Err(error);
+                    }
                     emit_message(context, error.into(), GrazeMessageSetting::Errors);
                 }
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
@@ -2748,7 +2773,7 @@ pub mod statement {
                             source_span: single_identifier.1,
                         });
                     }
-                    if let Some((key, (source_span, _))) = data.into_iter().next() {
+                    for (key, (source_span, _)) in data {
                         errors.push(ParseError::UnknownFlatDictionaryEntry {
                             key,
                             #[cfg(feature = "include_context_in_parse_errors")]
@@ -2759,6 +2784,15 @@ pub mod statement {
                 });
                 for error in errors {
                     context.successful = false;
+                    if matches!(
+                        context.settings.message_setting,
+                        GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+                    ) {
+                        if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
+                            context.messages.push(error.clone().into());
+                        }
+                        return Err(error);
+                    }
                     emit_message(context, error.into(), GrazeMessageSetting::Errors);
                 }
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
