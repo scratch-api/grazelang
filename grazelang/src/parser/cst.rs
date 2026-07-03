@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use crate::{
     eval::{
@@ -975,7 +975,7 @@ impl Expression {
                         }
                     }
                     crate::library::ConstExpLookupError::UsedSuper => {
-                        ConstantExprEvaluationError::ConstIdentifierUsedSupper {
+                        ConstantExprEvaluationError::ConstIdentifierUsedSuper {
                             identifier: identifier.clone(),
                         }
                     }
@@ -986,11 +986,11 @@ impl Expression {
                 else {
                     return Err(match library_item.value {
                         Some(ConstantExprLibraryItemValue::AssociatedItem(_)) => {
-                            ConstantExprEvaluationError::NotConstFunctionButValue {
+                            ConstantExprEvaluationError::ConstValueNotCallable {
                                 identifier: identifier.clone(),
                             }
                         }
-                        None => ConstantExprEvaluationError::NotConstFunctionButNamespace {
+                        None => ConstantExprEvaluationError::ConstNamespaceNotCallable {
                             identifier: identifier.clone(),
                         },
                         Some(ConstantExprLibraryItemValue::Function(_, _)) => unreachable!(),
@@ -998,7 +998,7 @@ impl Expression {
                 };
 
                 let Ok(function) = ConstantExprFunction::try_from(function_id) else {
-                    return Err(ConstantExprEvaluationError::NotConstFunctionButNamespace {
+                    return Err(ConstantExprEvaluationError::ConstNamespaceNotCallable {
                         identifier: identifier.clone(),
                     });
                 };
@@ -1020,44 +1020,40 @@ impl Expression {
                         }
                     }
                     crate::library::ConstExpLookupError::UsedSuper => {
-                        ConstantExprEvaluationError::ConstIdentifierUsedSupper {
+                        ConstantExprEvaluationError::ConstIdentifierUsedSuper {
                             identifier: identifier.clone(),
                         }
                     }
                 })?;
-                let Ok(function) =
-                    (match &value.value {
-                        Some(ConstantExprLibraryItemValue::Function(function, true)) => {
-                            ConstantExprFunction::try_from(*function)
-                        }
-                        Some(ConstantExprLibraryItemValue::Function(_, _)) => {
-                            return Err(ConstantExprEvaluationError::NotSingletonConstFunction {
-                                identifier: identifier.clone(),
-                            });
-                        }
-                        Some(ConstantExprLibraryItemValue::AssociatedItem(_)) => {
-                            return Err(
-                                ConstantExprEvaluationError::NotSingletonConstFunctionButValue {
-                                    identifier: identifier.clone(),
-                                },
-                            );
-                        }
-                        None => return Err(
-                            ConstantExprEvaluationError::NotSingletonConstFunctionButNamespace {
-                                identifier: identifier.clone(),
-                            },
-                        ),
-                    })
-                else {
-                    return Err(ConstantExprEvaluationError::NotConstFunctionButNamespace {
+                let Ok(function) = (match &value.value {
+                    Some(ConstantExprLibraryItemValue::Function(function, true)) => {
+                        ConstantExprFunction::try_from(*function)
+                    }
+                    Some(ConstantExprLibraryItemValue::Function(_, _)) => {
+                        return Err(ConstantExprEvaluationError::ConstFunctionNotSingleton {
+                            identifier: identifier.clone(),
+                        });
+                    }
+                    Some(ConstantExprLibraryItemValue::AssociatedItem(_)) => {
+                        return Err(ConstantExprEvaluationError::ConstValueNotJsPrimitive {
+                            identifier: identifier.clone(),
+                        });
+                    }
+                    None => {
+                        return Err(ConstantExprEvaluationError::ConstNamespaceNotJsPrimitive {
+                            identifier: identifier.clone(),
+                        });
+                    }
+                }) else {
+                    return Err(ConstantExprEvaluationError::ConstNamespaceNotCallable {
                         identifier: identifier.clone(),
                     });
                 };
                 function.apply(std::iter::empty(), *identifier.get_source_span())
             }
-            Expression::GetItem(identifier, _, _, _, _) => {
+            Expression::GetItem(_, _, _, _, _) => {
                 Err(ConstantExprEvaluationError::ConstExprListAccess {
-                    identifier: identifier.clone(),
+                    expression: Box::new(self.clone()),
                 })
             }
         }
@@ -1638,6 +1634,22 @@ pub struct Identifier {
     pub source_span: SourceSpan,
 }
 
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (idx, segment) in self.path.iter().enumerate() {
+            if idx == 0 {
+                write!(f, "{}", segment.0)?;
+            } else {
+                write!(f, "::{}", segment.0)?;
+            }
+        }
+        for segment in &self.fields {
+            write!(f, ".{}", segment.0)?;
+        }
+        Ok(())
+    }
+}
+
 impl GetPos for Identifier {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -1705,13 +1717,13 @@ impl GetPos for CanonicalIdentifier {
 #[derive(Debug, Clone, Error, enum_assoc::Assoc)]
 #[func(const fn internal_lint_id(&self) -> &'static str)]
 #[func(const fn internal_primary_message(&self) -> &'static str)]
-#[func(pub const fn secondary_message(&self) -> &'static str)]
+#[func(pub const fn get_secondary_message(&self) -> &'static str)]
 pub enum ParseError {
     #[assoc(internal_lint_id = "unexpected_end_of_input")]
     #[assoc(
         internal_primary_message = "the lexer reached the end of input without the parser completing"
     )]
-    #[assoc(secondary_message = "unexpected end of input")]
+    #[assoc(get_secondary_message = "unexpected end of input")]
     #[error("the lexer reached the end of input without the parser completing")]
     UnexpectedEndOfInput {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1720,7 +1732,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "unexpected_token")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "unexpected token")]
+    #[assoc(get_secondary_message = "unexpected token")]
     #[error("unexpected token at {source_span:?}, expected {expected}")]
     UnexpectedToken {
         expected: IString,
@@ -1732,7 +1744,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "lexer_stuck")]
     #[assoc(internal_primary_message = "lexer got stuck")]
-    #[assoc(secondary_message = "lexer got stuck after this token")]
+    #[assoc(get_secondary_message = "lexer got stuck after this token")]
     #[error("the lexer got stuck after the token at {source_span:?}")]
     LexerStuck {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1741,7 +1753,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "local_symbol_in_stage")]
     #[assoc(internal_primary_message = "cannot declare a local symbol in stage")]
-    #[assoc(secondary_message = "modifier is not applicable in this context")]
+    #[assoc(get_secondary_message = "modifier is not applicable in this context")]
     #[error("tried to declare a local symbol in stage at {source_span:?}")]
     LocalSymbolInStage {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1750,7 +1762,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "peeked_back_at_beginning")]
     #[assoc(internal_primary_message = "parser tried peeking back at the beginning of the parse")]
-    #[assoc(secondary_message = "token caused invalid backtracking")]
+    #[assoc(get_secondary_message = "token caused invalid backtracking")]
     #[error("tried to peek back at the beginning of the content")]
     PeekedBackAtBeginning {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1759,7 +1771,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "shadowed_symbol")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "symbol redefined here")]
+    #[assoc(get_secondary_message = "symbol redefined here")]
     #[error("tried to shadow symbol {symbol}")]
     ShadowedSymbol {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1769,7 +1781,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "symbol_named_super")]
     #[assoc(internal_primary_message = "name of symbol cannot be \"super\"")]
-    #[assoc(secondary_message = "invalid symbol name")]
+    #[assoc(get_secondary_message = "invalid symbol name")]
     #[error("tried to name a symbol \"super\"")]
     SymbolNamedSuper {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1778,7 +1790,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "symbol_named_self")]
     #[assoc(internal_primary_message = "name of symbol cannot be \"self\"")]
-    #[assoc(secondary_message = "invalid symbol name")]
+    #[assoc(get_secondary_message = "invalid symbol name")]
     #[error("tried to name a symbol \"self\"")]
     SymbolNamedSelf {
         #[cfg(feature = "include_context_in_parse_errors")]
@@ -1787,7 +1799,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "missing_flat_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "missing dictionary entry here")]
+    #[assoc(get_secondary_message = "missing dictionary entry here")]
     #[error("expected key {key:?} in flat dictionary")]
     MissingFlatDictionaryEntry {
         key: IString,
@@ -1797,7 +1809,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "unknown_flat_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "unexpected dictionary entry here")]
+    #[assoc(get_secondary_message = "unexpected dictionary entry here")]
     #[error("unexpected key {key:?} in flat dictionary")]
     UnknownFlatDictionaryEntry {
         key: IString,
@@ -1807,7 +1819,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "repeated_flat_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "repeated dictionary entry here")]
+    #[assoc(get_secondary_message = "repeated dictionary entry here")]
     #[error("repeated key {key:?} in flat dictionary")]
     RepeatedFlatDictionaryEntry {
         key: IString,
@@ -1817,7 +1829,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "incorrect_flat_dictionary_entry_type")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "incorrect entry value type here")]
+    #[assoc(get_secondary_message = "incorrect entry value type here")]
     #[error("key {key:?} with value {value:?} in flat dictionary has an incorrect type")]
     IncorrectFlatDictionaryEntryType {
         key: IString,
@@ -1826,9 +1838,9 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
-    #[assoc(internal_lint_id = "invalid_constant_expression")]
+    #[assoc(internal_lint_id = "")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "could not evaluate this expression")]
+    #[assoc(get_secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
     InvalidConstantExpression {
         expression: Box<Expression>,
@@ -1837,7 +1849,7 @@ pub enum ParseError {
     },
     #[assoc(internal_lint_id = "io_error")]
     #[assoc(internal_primary_message = "")]
-    #[assoc(secondary_message = "")]
+    #[assoc(get_secondary_message = "")]
     #[error("{source}")]
     IoError {
         #[source]
@@ -1854,7 +1866,7 @@ impl GetLintId for ParseError {
 }
 
 impl ParseError {
-    pub fn primary_message(&self) -> Cow<'static, str> {
+    pub fn get_primary_message(&self) -> Cow<'static, str> {
         match self {
             Self::UnexpectedToken {
                 expected,
@@ -1906,9 +1918,7 @@ impl ParseError {
             Self::InvalidConstantExpression {
                 expression: _,
                 source,
-            } => {
-                todo!()
-            }
+            } => return source.primary_message(),
             _ => (),
         }
         Cow::Borrowed(self.internal_primary_message())

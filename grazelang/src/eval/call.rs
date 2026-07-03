@@ -1,4 +1,7 @@
-use std::sync::{LazyLock, Mutex, MutexGuard};
+use std::{
+    fmt::Display,
+    sync::{LazyLock, Mutex, MutexGuard},
+};
 
 use grazelang_types::ConstantExprLibraryItemValue;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -179,7 +182,7 @@ impl ConstantExprFunction {
                         }
                     }
                     crate::library::ConstExpLookupError::UsedSuper => {
-                        ConstantExprEvaluationError::ConstIdentifierUsedSupper {
+                        ConstantExprEvaluationError::ConstIdentifierUsedSuper {
                             identifier: identifier.clone(),
                         }
                     }
@@ -187,17 +190,17 @@ impl ConstantExprFunction {
                 .and_then(|value| match &value.value {
                     Some(ConstantExprLibraryItemValue::AssociatedItem(item)) => Ok(*item),
                     Some(ConstantExprLibraryItemValue::Function(_, _)) => {
-                        Err(ConstantExprEvaluationError::NotConstValueButFunction {
+                        Err(ConstantExprEvaluationError::ConstFunctionNotValue {
                             identifier: identifier.clone(),
                         })
                     }
-                    None => Err(ConstantExprEvaluationError::NotConstValueButNamespace {
+                    None => Err(ConstantExprEvaluationError::ConstNamespaceNotValue {
                         identifier: identifier.clone(),
                     }),
                 })
                 .and_then(|value| {
                     ConstantExprValue::try_from(value).map_err(|_| {
-                        ConstantExprEvaluationError::NotConstValueButNamespace {
+                        ConstantExprEvaluationError::ConstNamespaceNotValue {
                             identifier: identifier.clone(),
                         }
                     })
@@ -531,4 +534,25 @@ pub enum ConstantExprValue {
     Log = 11,
     Exp = 12,
     Pow = 13,
+}
+
+impl Display for ConstantExprValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            ConstantExprValue::Abs => "menus::abs",
+            ConstantExprValue::Floor => "menus::floor",
+            ConstantExprValue::Ceiling => "menus::ceil",
+            ConstantExprValue::Sqrt => "menus::sqrt",
+            ConstantExprValue::Sin => "menus::sin",
+            ConstantExprValue::Cos => "menus::cos",
+            ConstantExprValue::Tan => "menus::tan",
+            ConstantExprValue::Asin => "menus::asin",
+            ConstantExprValue::Acos => "menus::acos",
+            ConstantExprValue::Atan => "menus::atan",
+            ConstantExprValue::Ln => "menus::ln",
+            ConstantExprValue::Log => "menus::log",
+            ConstantExprValue::Exp => "menus::exp",
+            ConstantExprValue::Pow => "menus::pow",
+        })
+    }
 }

@@ -709,11 +709,11 @@ pub fn parse_single_identifier_as_identifier(
     context: &mut ParseContext,
 ) -> ParseOut<Identifier> {
     Ok(Identifier {
-        path: Vec::new(),
-        fields: vec![(
+        path: vec![(
             parse_single_identifier(token_stream, context)?,
             get_token_source_span(token_stream),
         )],
+        fields: Vec::new(),
         source_span: get_token_source_span(token_stream),
     })
 }
@@ -780,21 +780,21 @@ pub fn parse_full_identifier_starting_with(
 ) -> ParseOut<Identifier> {
     let mut names: Vec<(IString, SourceSpan)> = vec![(value, get_token_source_span(token_stream))];
     let start_pos = get_token_start(token_stream);
-    let mut scope: Option<Vec<(IString, SourceSpan)>> = None;
+    let mut path: Option<Vec<(IString, SourceSpan)>> = None;
     loop {
         match match peek_token!(token_stream => Option) {
             Some(value) => value,
             None => break,
         } {
             Token::ScopeResolution => {
-                if scope.is_some() {
+                if path.is_some() {
                     let token = next_token!(token_stream);
                     emit_unexpected_token!(token_stream, "Expected '.'.", "'.'", token);
                 }
             }
             Token::Dot => {
-                if scope.is_none() {
-                    scope = Some(names);
+                if path.is_none() {
+                    path = Some(names);
                     names = Vec::new();
                 }
             }
@@ -816,12 +816,11 @@ pub fn parse_full_identifier_starting_with(
             }
         });
     }
-    if names.len() > 1 && scope.is_none() {
-        scope = Some(names);
-        names = Vec::new();
+    if path.is_none() {
+        path = Some(std::mem::take(&mut names));
     }
     Ok(Identifier {
-        path: scope.unwrap_or_default(),
+        path: path.unwrap_or_default(),
         fields: names,
         source_span: token_stream.span_from_previous_to_current(start_pos),
     })
@@ -1093,8 +1092,8 @@ pub mod statement {
                         start_pos = Some(get_token_start(token_stream));
                     }
                     Identifier {
-                        path: Vec::new(),
-                        fields: vec![(value, get_token_source_span(token_stream))],
+                        path: vec![(value, get_token_source_span(token_stream))],
+                        fields: Vec::new(),
                         source_span: get_token_source_span(token_stream),
                     }
                 }
@@ -1597,8 +1596,8 @@ pub mod statement {
                     start_pos = from_stream_pos!(token_stream => Some);
                 }
                 Identifier {
-                    path: Vec::new(),
-                    fields: vec![(value, get_token_source_span(token_stream))],
+                    path: vec![(value, get_token_source_span(token_stream))],
+                    fields: Vec::new(),
                     source_span: get_token_source_span(token_stream),
                 }
             }
@@ -2329,11 +2328,11 @@ pub mod statement {
         asset_type: AssetDeclarationType,
     ) -> ParseOut<AssetDeclaration> {
         fn extract_f64_entry(
-            data: &mut HashMap<IString, cst::Literal>,
+            data: &mut HashMap<IString, (SourceSpan, cst::Literal)>,
             errors: &mut Vec<ParseError>,
             key: IString,
         ) -> Option<f64> {
-            data.remove(key.as_str()).and_then(|value| {
+            data.remove(key.as_str()).and_then(|(_, value)| {
                 value
                     .get_string_value()
                     .parse::<f64>()
@@ -2408,7 +2407,7 @@ pub mod statement {
                             cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                                 let mut data = HashMap::with_capacity(items.len());
                                 for (ident, _, value, _) in items {
-                                    if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
+                                    if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                         errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                             key: ident.to_single().unwrap().0.clone(),
                                             #[cfg(feature = "include_context_in_parse_errors")]
@@ -2417,7 +2416,7 @@ pub mod statement {
                                         });
                                     }
                                 }
-                                (data.remove("path").unwrap_or_else(|| {
+                                (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
                                     errors.push(ParseError::MissingFlatDictionaryEntry {
                                         key: literal!("path"),
                                         #[cfg(feature = "include_context_in_parse_errors")]
@@ -2475,12 +2474,12 @@ pub mod statement {
                                 source_span: single_identifier.1,
                             });
                         }
-                        if let Some((key, value)) = data.into_iter().next() {
+                        if let Some((key, (source_span, _))) = data.into_iter().next() {
                             errors.push(ParseError::UnknownFlatDictionaryEntry {
                                 key,
                                 #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
-                                source_span: *value.get_source_span()
+                                source_span,
                             });
                         }
                     });
@@ -2555,7 +2554,7 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
                             for (ident, _, value, _) in items {
-                                if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
+                                if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                         key: ident.to_single().unwrap().0.clone(),
                                         #[cfg(feature = "include_context_in_parse_errors")]
@@ -2564,7 +2563,7 @@ pub mod statement {
                                     });
                                 }
                             }
-                            (data.remove("path").unwrap_or_else(|| {
+                            (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
                                 errors.push(ParseError::MissingFlatDictionaryEntry {
                                     key: literal!("path"),
                                     #[cfg(feature = "include_context_in_parse_errors")]
@@ -2622,12 +2621,12 @@ pub mod statement {
                             source_span: single_identifier.1,
                         });
                     }
-                    if let Some((key, value)) = data.into_iter().next() {
+                    if let Some((key, (source_span, _))) = data.into_iter().next() {
                         errors.push(ParseError::UnknownFlatDictionaryEntry {
                             key,
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: *value.get_source_span()
+                            source_span,
                         });
                     }
                 });
@@ -2682,7 +2681,7 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
                             for (ident, _, value, _) in items {
-                                if data.insert(ident.to_single().unwrap().0.clone(), value.clone()).is_some() {
+                                if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                         key: ident.to_single().unwrap().0.clone(),
                                         #[cfg(feature = "include_context_in_parse_errors")]
@@ -2691,7 +2690,7 @@ pub mod statement {
                                     });
                                 }
                             }
-                            (data.remove("path").unwrap_or_else(|| {
+                            (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
                                 errors.push(ParseError::MissingFlatDictionaryEntry {
                                     key: literal!("path"),
                                     #[cfg(feature = "include_context_in_parse_errors")]
@@ -2749,12 +2748,12 @@ pub mod statement {
                             source_span: single_identifier.1,
                         });
                     }
-                    if let Some((key, value)) = data.into_iter().next() {
+                    if let Some((key, (source_span, _))) = data.into_iter().next() {
                         errors.push(ParseError::UnknownFlatDictionaryEntry {
                             key,
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: *value.get_source_span()
+                            source_span,
                         });
                     }
                 });
