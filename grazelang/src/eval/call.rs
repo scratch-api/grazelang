@@ -19,7 +19,7 @@ use crate::{
     eval::ops::{ConstantExprBinOp, ConstantExprUnOp},
     lexer::SourceSpan,
     library,
-    messages::ConstantExprEvaluationError,
+    messages::types::ConstantExprEvaluationError,
     parser::cst::{EMPTY_ISTRING_REF, Expression, Literal},
 };
 

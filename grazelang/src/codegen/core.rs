@@ -29,7 +29,7 @@ use super::ids::IdCounter;
 use crate::{
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
-    messages::{ConstantExprEvaluationError, GrazeMessage, GrazeWarning, GrazeWarningKind},
+    messages::types::{ConstantExprEvaluationError, GrazeMessage, GrazeWarning, GrazeWarningKind},
     names::Namespace,
     parser::{
         context::{

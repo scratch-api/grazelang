@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     codegen::{self, core::emit_message, ids::generate_random_id_as_string},
     lexer::SourceSpan,
-    messages::{GrazeMessage, GrazeWarning, GrazeWarningKind},
+    messages::types::{GrazeMessage, GrazeWarning, GrazeWarningKind},
     parser::cst::CustomBlockParamKindValue,
     settings::{GrazeMessageSetting, GrazeSettings},
 };

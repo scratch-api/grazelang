@@ -10,7 +10,7 @@ use crate::{
         self, SourceFileId, SourceSpan, TextSpan, Token,
         get_source_span as internal_get_source_span,
     },
-    messages::GrazeMessage,
+    messages::types::GrazeMessage,
     parser::{
         context::{self, BroadcastDescriptor},
         cst::{

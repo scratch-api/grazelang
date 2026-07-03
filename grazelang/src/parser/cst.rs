@@ -7,7 +7,7 @@ use crate::{
         ops::{ConstantExprBinOp, ConstantExprUnOp},
     },
     lexer::SourceSpan,
-    messages::ConstantExprEvaluationError,
+    messages::types::ConstantExprEvaluationError,
 };
 use arcstr::ArcStr as IString; // Immutable string
 use grazelang_types::{
