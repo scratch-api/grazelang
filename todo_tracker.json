@@ -486,5 +486,13 @@
         "lines": "L92-L92",
         "commit": "cc96d78279333a74b1c6c1c2a76a230cce1bb57b",
         "title": "More UnOps"
+    },
+    "68": {
+        "filepath": "grazelang/src/messages/annotations.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L42-L42",
+        "commit": "a3434cb85d1d81eba54dfd1b4da5251e80621418",
+        "title": "Implement suggestions"
     }
 }

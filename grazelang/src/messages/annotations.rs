@@ -40,6 +40,7 @@ impl GrazeMessage {
         match self {
             GrazeMessage::Error(graze_error, _graze_suggestion) => match graze_error {
                 // TODO: Implement suggestions
+                // Issue: #68
                 super::types::GrazeError::Plain(string, source_span) => {
                     let SourceDescriptor {
                         content,
