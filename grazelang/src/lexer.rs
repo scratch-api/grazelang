@@ -175,6 +175,8 @@ impl std::fmt::Debug for Token {
             Token::SoundKeyword => write!(f, "\"sound\""),
             Token::BroadcastKeyword => write!(f, "\"broadcast\""),
             Token::ContainsKeyword => write!(f, "\"contains\""),
+            // TODO: Config block for sprites etc
+            // Would allow for controlling initial position, hide/show state etc
             Token::LeftBrace => write!(f, "'{{'"),
             Token::RightBrace(_) => write!(f, "'}}'"),
             Token::LeftParens => write!(f, "'('"),
