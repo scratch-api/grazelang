@@ -1,5 +1,6 @@
 #![allow(clippy::result_large_err)]
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     io::Read,
     iter::{self, zip},
@@ -29,7 +30,9 @@ use super::ids::IdCounter;
 use crate::{
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
-    messages::types::{ConstantExprEvaluationError, GrazeMessage, GrazeWarning, GrazeWarningKind},
+    messages::types::{
+        ConstantExprEvaluationError, GetLintId, GrazeMessage, GrazeWarning, GrazeWarningKind,
+    },
     names::Namespace,
     parser::{
         context::{
@@ -59,19 +62,29 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Clone, PartialEq, Error, enum_assoc::Assoc)]
+#[func(const fn internal_lint_id(&self) -> &'static str)]
+#[func(pub const fn get_secondary_message(&self) -> &'static str)]
 pub enum GrazeSb3GeneratorError {
+    #[assoc(internal_lint_id = "unknown_identifier")]
+    #[assoc(get_secondary_message = "identifier does not exist")]
     #[error("the identifier {identifier:?} was not found")]
     UnknownIdentifier { identifier: Identifier },
+    #[assoc(internal_lint_id = "identifier_not_a_block")]
+    #[assoc(get_secondary_message = "identifier does not contain a value")]
     #[error("the identifier {identifier:?} is not a block")]
-    IdentifierIsNotABlock { identifier: Identifier },
+    IdentifierNotABlock { identifier: Identifier },
+    #[assoc(internal_lint_id = "unexpected_menu_input")]
+    #[assoc(get_secondary_message = "corresponds to menu block, which is not applicable here")]
     #[error(
-        "in this context, no menu input was expected, found {input_menu_value:?} at {source_span:?}"
+        "in this context, no menu input was expected, found {menu_input_value:?} at {source_span:?}"
     )]
-    UnexpectedInputMenu {
-        input_menu_value: Sb3FieldValue,
+    UnexpectedMenuInput {
+        menu_input_value: Sb3FieldValue,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "incorrect_param_count")]
+    #[assoc(get_secondary_message = "unexpected parameter count")]
     #[error(
         "the amount of parameters for this block was {unexpected:?} at {source_span:?}, expected {expected:?}"
     )]
@@ -80,13 +93,20 @@ pub enum GrazeSb3GeneratorError {
         expected: usize,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "list_access_for_non_list")]
+    #[assoc(get_secondary_message = "not a list")]
     #[error("tried to access non list {identifier:?} as a list")]
-    ListAccessForNonLists { identifier: Identifier },
-    #[error("cannot initialize stage multiple times")]
-    RepeatedStageInitialization { stage_keyword: cst::StageKeyword },
+    ListAccessForNonList { identifier: Identifier },
+    #[assoc(internal_lint_id = "repeated_stage_declaration")]
+    #[assoc(get_secondary_message = "stage redeclared here")]
+    #[error("cannot declare stage multiple times")]
+    RepeatedStageDeclaration { stage_keyword: cst::StageKeyword },
+    #[assoc(internal_lint_id = "block_not_c_block")]
+    #[assoc(get_secondary_message = "not a c block")]
     #[error("tried to call the identifier {identifier:?} as a c block when it was not possible")]
-    BlockIsNotCBlock { identifier: Identifier },
-    // This should only be able to happen if the transpiler has a bug
+    BlockNotCBlock { identifier: Identifier },
+    #[assoc(internal_lint_id = "passed_normal_param_as_block_stack")]
+    #[assoc(get_secondary_message = "did not get interpreted as block stack")]
     #[error(
         "tried to pass normal parameter {param:?} as a block stack, this is likely a bug in graze"
     )]
@@ -94,14 +114,24 @@ pub enum GrazeSb3GeneratorError {
         param: Box<Param>,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "block_stack_has_no_known_block")]
+    #[assoc(get_secondary_message = "cannot be interpreted as a known block")]
     #[error("tried to get the known block of a block stack")]
-    TriedGetKnownBlockOfBlockStack { source_span: SourceSpan },
+    BlockStackHasNoKnownBlock { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "shadowed_sprite")]
+    #[assoc(get_secondary_message = "sprite redeclared here")]
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
     ShadowedSprite { identifier: Identifier },
+    #[assoc(internal_lint_id = "identifier_not_callable")]
+    #[assoc(get_secondary_message = "not callable")]
     #[error("the identifier {identifier:?} is not callable")]
     IdentifierNotCallable { identifier: Identifier },
+    #[assoc(internal_lint_id = "identifier_not_assignable")]
+    #[assoc(get_secondary_message = "cannot be assigned to")]
     #[error("the identifier {identifier:?} is not assignable")]
     IdentifierNotAssignable { identifier: Identifier },
+    #[assoc(internal_lint_id = "")]
+    #[assoc(get_secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
     InvalidConstantExpression {
         expression: Box<Expression>,
@@ -110,20 +140,82 @@ pub enum GrazeSb3GeneratorError {
     },
 }
 
+impl GrazeSb3GeneratorError {
+    pub fn get_primary_message(&self) -> Cow<'static, str> {
+        Cow::Owned(match self {
+            GrazeSb3GeneratorError::UnknownIdentifier { identifier } => {
+                format!("name `{identifier}` could not be resolved")
+            }
+            GrazeSb3GeneratorError::IdentifierNotABlock { identifier } => {
+                format!("`{identifier}` is a namespace and cannot be used as an expression")
+            }
+            GrazeSb3GeneratorError::UnexpectedMenuInput {
+                menu_input_value: _,
+                source_span: _,
+            } => return Cow::Borrowed("got a menu input where it was not applicable"),
+            GrazeSb3GeneratorError::IncorrectParamCount {
+                unexpected,
+                expected,
+                source_span: _,
+            } => format!("expected {expected} parameters, got {unexpected}"),
+            GrazeSb3GeneratorError::ListAccessForNonList { identifier } => {
+                format!("tried to access a list item of `{identifier}`, which is not a list")
+            }
+            GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword: _ } => {
+                return Cow::Borrowed("stage is declared multiple times");
+            }
+            GrazeSb3GeneratorError::BlockNotCBlock { identifier } => {
+                format!("`{identifier}` cannot be used as a c block")
+            }
+            GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+                param: _,
+                source_span: _,
+            } => {
+                return Cow::Borrowed("expected a block stack, got a normal parameter instead");
+            }
+            GrazeSb3GeneratorError::BlockStackHasNoKnownBlock { source_span: _ } => {
+                return Cow::Borrowed("expected a normal parameter, got a block stack instead");
+            }
+            GrazeSb3GeneratorError::ShadowedSprite { identifier } => {
+                format!("sprite `{identifier}` is declared multiple times")
+            }
+            GrazeSb3GeneratorError::IdentifierNotCallable { identifier } => {
+                format!("`{identifier}` cannot be called")
+            }
+            GrazeSb3GeneratorError::IdentifierNotAssignable { identifier } => {
+                format!("`{identifier}` cannot be assigned to")
+            }
+            GrazeSb3GeneratorError::InvalidConstantExpression {
+                expression: _,
+                source,
+            } => {
+                return source.get_primary_message();
+            }
+        })
+    }
+}
+
+impl GetLintId for GrazeSb3GeneratorError {
+    #[inline]
+    fn get_lint_id(&self) -> &'static str {
+        self.internal_lint_id()
+    }
+}
+
 impl GetPos for GrazeSb3GeneratorError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             GrazeSb3GeneratorError::UnknownIdentifier { identifier }
-            | GrazeSb3GeneratorError::IdentifierIsNotABlock { identifier }
-            | GrazeSb3GeneratorError::ListAccessForNonLists { identifier }
-            | GrazeSb3GeneratorError::BlockIsNotCBlock { identifier }
+            | GrazeSb3GeneratorError::IdentifierNotABlock { identifier }
+            | GrazeSb3GeneratorError::ListAccessForNonList { identifier }
+            | GrazeSb3GeneratorError::BlockNotCBlock { identifier }
             | GrazeSb3GeneratorError::ShadowedSprite { identifier }
             | GrazeSb3GeneratorError::IdentifierNotCallable { identifier }
             | GrazeSb3GeneratorError::IdentifierNotAssignable { identifier } => {
                 identifier.get_source_span()
             }
-            GrazeSb3GeneratorError::UnexpectedInputMenu {
-                input_menu_value: _,
+            GrazeSb3GeneratorError::UnexpectedMenuInput {
+                menu_input_value: _,
                 source_span,
             }
             | GrazeSb3GeneratorError::IncorrectParamCount {
@@ -135,8 +227,8 @@ impl GetPos for GrazeSb3GeneratorError {
                 param: _,
                 source_span,
             }
-            | GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack { source_span } => source_span,
-            GrazeSb3GeneratorError::RepeatedStageInitialization { stage_keyword } => {
+            | GrazeSb3GeneratorError::BlockStackHasNoKnownBlock { source_span } => source_span,
+            GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword } => {
                 stage_keyword.get_source_span()
             }
             GrazeSb3GeneratorError::InvalidConstantExpression {
@@ -1348,14 +1440,14 @@ macro_rules! with_known_block {
                 let symbol = &$context.symbol_table[symbol_id];
                 let known_block_rc = symbol.known_block.clone();
                 let $known_block = known_block_rc.as_ref().ok_or_else(|| {
-                    GrazeSb3GeneratorError::IdentifierIsNotABlock {
+                    GrazeSb3GeneratorError::IdentifierNotABlock {
                         identifier: value.clone(),
                     }
                 })?;
                 $action
             }
             Param::BlockStack(_) => {
-                return Err(GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack {
+                return Err(GrazeSb3GeneratorError::BlockStackHasNoKnownBlock {
                     source_span: $param_source_span,
                 })
             }
@@ -1381,7 +1473,7 @@ pub fn get_known_block<'a>(
     symbol
         .known_block
         .as_ref()
-        .ok_or_else(|| GrazeSb3GeneratorError::IdentifierIsNotABlock {
+        .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotABlock {
             identifier: identifier.clone(),
         })
 }
@@ -1593,7 +1685,7 @@ pub fn add_known_block_to_params(
             );
         }
         CallBlockParamKind::BlockStack => {
-            return Err(GrazeSb3GeneratorError::TriedGetKnownBlockOfBlockStack {
+            return Err(GrazeSb3GeneratorError::BlockStackHasNoKnownBlock {
                 source_span: known_block_source_span,
             });
         }
@@ -1662,8 +1754,8 @@ pub fn known_block_to_input_repr_no_menu(
             IsShadow::No,
         ))),
         grazelang_types::KnownBlockInput::Menu(input_menu_value, _) => {
-            Err(GrazeSb3GeneratorError::UnexpectedInputMenu {
-                input_menu_value,
+            Err(GrazeSb3GeneratorError::UnexpectedMenuInput {
+                menu_input_value: input_menu_value,
                 source_span: known_block_source_span,
             })
         }
@@ -1751,7 +1843,7 @@ where
         name: substack_input_name,
     } = params.last().unwrap()
     else {
-        return Err(GrazeSb3GeneratorError::BlockIsNotCBlock {
+        return Err(GrazeSb3GeneratorError::BlockNotCBlock {
             identifier: identifier.clone(),
         });
     };
@@ -2195,7 +2287,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let (canonical_name, id) = match known_block.as_ref() {
                 KnownBlock::List { canonical_name, id } => (canonical_name, id),
                 _ => {
-                    return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
+                    return Err(GrazeSb3GeneratorError::ListAccessForNonList {
                         identifier: value.0.clone(),
                     });
                 }
@@ -2575,7 +2667,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let (canonical_name, id) = match known_block.as_ref() {
                 KnownBlock::List { canonical_name, id } => (canonical_name, id),
                 _ => {
-                    return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
+                    return Err(GrazeSb3GeneratorError::ListAccessForNonList {
                         identifier: value.0.clone(),
                     });
                 }
@@ -2626,7 +2718,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let (canonical_name, id) = match known_block.as_ref() {
             KnownBlock::List { canonical_name, id } => (canonical_name, id),
             _ => {
-                return Err(GrazeSb3GeneratorError::ListAccessForNonLists {
+                return Err(GrazeSb3GeneratorError::ListAccessForNonList {
                     identifier: value.0.clone(),
                 });
             }
@@ -3530,6 +3622,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
+        // TODO: Alias args into global scope
         context.current_previous_block = None;
         context.current_parent = None;
         context.arg_stack.clear();
@@ -3805,7 +3898,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 grazelang_types::KnownBlockInput::SimpleBlock(opcode, params) => {
                     introduce_input_simple_block(opcode, params.iter(), context)?;
                 },
-                grazelang_types::KnownBlockInput::Menu(input_menu_value, _) => return Err(GrazeSb3GeneratorError::UnexpectedInputMenu { input_menu_value, source_span: param_source_span }),
+                grazelang_types::KnownBlockInput::Menu(menu_input_value, _) => return Err(GrazeSb3GeneratorError::UnexpectedMenuInput { menu_input_value, source_span: param_source_span }),
                 grazelang_types::KnownBlockInput::Empty => (),
             }
         });
@@ -3917,7 +4010,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         let mut stage = context.uninitialized_stage.take().ok_or(
-            GrazeSb3GeneratorError::RepeatedStageInitialization {
+            GrazeSb3GeneratorError::RepeatedStageDeclaration {
                 stage_keyword: *value.0,
             },
         )?;

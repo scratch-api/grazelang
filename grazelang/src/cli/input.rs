@@ -280,7 +280,9 @@ impl Cli {
         let codegen_timer = Instant::now();
         let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
         let visitor = codegen::core::GrazeSb3Generator;
-        visitor.visit_graze_program(&parsed, &mut context).unwrap();
+        if let Err(err) = visitor.visit_graze_program(&parsed, &mut context) {
+            context.messages.push(err.into());
+        }
         let codegen_time = codegen_timer.elapsed();
         let renderer = Renderer::styled();
         let (error_count, warning_count) = count_errors_and_warnings(&context.messages);

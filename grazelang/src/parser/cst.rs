@@ -1890,7 +1890,12 @@ impl PartialEq for ParseError {
                     found: r_found,
                     source_span: r_source_span,
                 },
-            ) => l_message == r_message && l_found == r_found && l_source_span == r_source_span,
+            ) => {
+                l_expected == r_expected
+                    && l_message == r_message
+                    && l_found == r_found
+                    && l_source_span == r_source_span
+            }
             (
                 Self::LexerStuck {
                     #[cfg(feature = "include_context_in_parse_errors")]
@@ -2074,7 +2079,7 @@ impl ParseError {
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span: _,
-            } => return Cow::Owned(format!("the name `{symbol}` is defined multiple times")),
+            } => return Cow::Owned(format!("name `{symbol}` is defined multiple times")),
             Self::MissingFlatDictionaryEntry {
                 key,
                 #[cfg(feature = "include_context_in_parse_errors")]
@@ -2111,7 +2116,7 @@ impl ParseError {
             Self::InvalidConstantExpression {
                 expression: _,
                 source,
-            } => return source.primary_message(),
+            } => return source.get_primary_message(),
             _ => (),
         }
         Cow::Borrowed(self.internal_primary_message())

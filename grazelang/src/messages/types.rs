@@ -130,7 +130,7 @@ impl GetLintId for ConstantExprEvaluationError {
 }
 
 impl ConstantExprEvaluationError {
-    pub fn primary_message(&self) -> Cow<'static, str> {
+    pub fn get_primary_message(&self) -> Cow<'static, str> {
         Cow::Owned(match self {
             ConstantExprEvaluationError::ConstValueNotCallable { identifier } => {
                 format!(
@@ -297,6 +297,12 @@ pub enum GrazeMessage {
 
 impl From<ParseError> for GrazeMessage {
     fn from(value: ParseError) -> Self {
+        Self::Error(value.into(), None)
+    }
+}
+
+impl From<GrazeSb3GeneratorError> for GrazeMessage {
+    fn from(value: GrazeSb3GeneratorError) -> Self {
         Self::Error(value.into(), None)
     }
 }

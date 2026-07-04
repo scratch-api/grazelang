@@ -164,10 +164,44 @@ impl ParseError {
 }
 
 impl GrazeSb3GeneratorError {
-    pub fn annotate<'a, F>(&'a self, mut _source_getter: F) -> Group<'a>
+    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
-        todo!()
+        let (lint_id, secondary_message, source_span) =
+            if let GrazeSb3GeneratorError::InvalidConstantExpression {
+                expression: _,
+                source,
+            } = self
+            {
+                (
+                    source.get_lint_id(),
+                    source.get_secondary_message(),
+                    *source.get_source_span(),
+                )
+            } else {
+                (
+                    self.get_lint_id(),
+                    self.get_secondary_message(),
+                    *self.get_source_span(),
+                )
+            };
+        let SourceDescriptor {
+            content,
+            path,
+            line_starts,
+        } = source_getter(source_span.1);
+        Level::ERROR
+            .primary_title(self.get_primary_message())
+            .id(lint_id)
+            .element(
+                Snippet::source(content)
+                    .path(path.to_string_lossy())
+                    .annotation(
+                        AnnotationKind::Primary
+                            .span(convert_source_span(source_span.0, line_starts))
+                            .label(secondary_message),
+                    ),
+            )
     }
 }
