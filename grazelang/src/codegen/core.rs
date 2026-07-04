@@ -3623,6 +3623,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         // TODO: Alias args into global scope
+        // Issue: #69
         context.current_previous_block = None;
         context.current_parent = None;
         context.arg_stack.clear();
