@@ -177,6 +177,7 @@ impl std::fmt::Debug for Token {
             Token::ContainsKeyword => write!(f, "\"contains\""),
             // TODO: Config block for sprites etc
             // Would allow for controlling initial position, hide/show state etc
+            // Issue: #70
             Token::LeftBrace => write!(f, "'{{'"),
             Token::RightBrace(_) => write!(f, "'}}'"),
             Token::LeftParens => write!(f, "'('"),

@@ -502,5 +502,13 @@
         "lines": "L3625-L3625",
         "commit": "20c7415a5155ccb29dfefda582291a9dd98eacd2",
         "title": "Alias args into global scope"
+    },
+    "70": {
+        "filepath": "grazelang/src/lexer.rs",
+        "text": "Would allow for controlling initial position, hide/show state etc",
+        "status": "open",
+        "lines": "L178-L179",
+        "commit": "99c7ebf8214fa232ab40ec7edbe8d29329581ffa",
+        "title": "Config block for sprites etc"
     }
 }
