@@ -84,7 +84,7 @@ pub enum GrazeSb3GeneratorError {
         source_span: SourceSpan,
     },
     #[assoc(internal_lint_id = "incorrect_param_count")]
-    #[assoc(get_secondary_message = "unexpected parameter count")]
+    #[assoc(get_secondary_message = "incorrect parameter count")]
     #[error(
         "the amount of parameters for this block was {unexpected:?} at {source_span:?}, expected {expected:?}"
     )]
