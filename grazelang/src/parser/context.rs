@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     codegen::{self, core::emit_message, ids::generate_random_id_as_string},
     lexer::SourceSpan,
-    messages::types::{GrazeMessage, GrazeWarning, GrazeWarningKind},
+    messages::types::{GrazeMessage, GrazeWarning, SpecificGrazeWarning},
     parser::cst::CustomBlockParamKindValue,
     settings::{GrazeMessageSetting, GrazeSettings},
 };
@@ -202,10 +202,7 @@ impl ResolveKnownBlock for KnownBlock {
                     context,
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
-                            GrazeWarningKind::CallableAsInput,
-                            arcstr::format!(
-                                "Cannot reasonably use KnownBlock {self:?} as an input parameter, maybe you meant to call it instead."
-                            ),
+                            SpecificGrazeWarning::CallableAsInput,
                             source_span,
                         ),
                         None,
@@ -251,15 +248,12 @@ impl ResolveKnownBlock for KnownBlock {
                 &*LIST_CATEGORIES,
             ),
             KnownBlock::FieldValue { value, categories } => (value.clone(), categories),
-            KnownBlock::BlockRef { id } => {
+            KnownBlock::BlockRef { id: _ } => {
                 emit_message(
                     context,
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
-                            GrazeWarningKind::BlockRefAsField,
-                            arcstr::format!(
-                                "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."
-                            ),
+                            SpecificGrazeWarning::BlockRefAsField,
                             source_span,
                         ),
                         None,
@@ -267,7 +261,7 @@ impl ResolveKnownBlock for KnownBlock {
                     GrazeMessageSetting::Warnings,
                 );
                 // No need for a second warning, therefore `ANY_CATEGORIES` is used
-                (Sb3FieldValue::Normal(id.into()), &*ANY_CATEGORIES)
+                (Sb3FieldValue::Normal("".into()), &*ANY_CATEGORIES)
             }
             KnownBlock::PrimitiveBlock { value } => match value {
                 grazelang_types::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
@@ -330,10 +324,7 @@ impl ResolveKnownBlock for KnownBlock {
                     context,
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
-                            GrazeWarningKind::CallableAsField,
-                            arcstr::format!(
-                                "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to call it instead."
-                            ),
+                            SpecificGrazeWarning::CallableAsField,
                             source_span,
                         ),
                         None,
@@ -348,10 +339,7 @@ impl ResolveKnownBlock for KnownBlock {
                     context,
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
-                            GrazeWarningKind::EmptyExpressionAsField,
-                            arcstr::format!(
-                                "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."
-                            ),
+                            SpecificGrazeWarning::EmptyExpressionAsField,
                             source_span,
                         ),
                         None,
@@ -387,10 +375,7 @@ impl ResolveKnownBlock for KnownBlock {
                         context,
                         GrazeMessage::Warning(
                             GrazeWarning::Specific(
-                                GrazeWarningKind::NonFieldSingletonAsField,
-                                arcstr::format!(
-                                    "Cannot reasonably use KnownBlock {self:?} as a field parameter, maybe you meant to use it as a different parameter."
-                                ),
+                                SpecificGrazeWarning::NonFieldSingletonAsField,
                                 source_span,
                             ),
                             None,

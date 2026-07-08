@@ -27,6 +27,8 @@ pub struct BlockEntry {
     #[serde(default)]
     pub is_singleton: bool,
     pub assign: Option<AssignmentDescriptor>,
+    pub field_value: Option<MenuOption>,
+    pub field_category: Option<IString>,
     #[serde(default)]
     pub known_params: Vec<KnownParam>,
     pub constant_expr_function_id: Option<u32>,
@@ -157,7 +159,11 @@ pub fn get_menu_category_id(
 }
 
 impl BlockEntry {
-    fn process(self, menu_category_ids: &mut HashMap<IString, u32>) -> ProcessedBlockEntry {
+    fn process(
+        self,
+        menu_category_ids: &mut HashMap<IString, u32>,
+        category_entries: &mut HashMap<u32, HashSet<String>>,
+    ) -> ProcessedBlockEntry {
         pub fn convert_block_arg_into_call_block_param(
             arg: BlockArg,
             associated_items: Option<&mut Vec<AssociatedLibraryItem>>,
@@ -257,6 +263,8 @@ impl BlockEntry {
             alt_name,
             is_singleton,
             assign,
+            field_value,
+            field_category,
             known_params,
             constant_expr_function_id: _,
         } = self;
@@ -304,7 +312,15 @@ impl BlockEntry {
                                     )
                                 })
                                 .collect(),
-                            field: None,
+                            field: field_value.map(|value| {
+                                let field_value = value.value.clone();
+                                category_entries
+                                    .entry(get_menu_category_id(menu_category_ids, field_category.as_ref()))
+                                    .or_default()
+                                    .insert(field_value.clone())
+                                ;
+                                Sb3FieldValue::Normal(field_value.into())
+                            }),
                             assign: assign.map(
                                 |AssignmentDescriptor {
                                      opcode,
@@ -470,7 +486,7 @@ pub fn process_toolbox_category(
             opcode: _,
             library_item: item,
             associated_items: new_associated_items,
-        } = block.process(menu_category_ids);
+        } = block.process(menu_category_ids, category_entries);
         for AssociatedLibraryItem {
             name: associated_item_name,
             field_value: associated_item_field_value,
@@ -580,6 +596,8 @@ impl BlockEntry {
             alt_name,
             is_singleton,
             assign: _,
+            field_value: _,
+            field_category: _,
             known_params: _,
             constant_expr_function_id,
         } = self;

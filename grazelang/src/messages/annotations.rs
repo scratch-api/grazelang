@@ -1,15 +1,11 @@
-use std::{
-    ffi::OsStr,
-    fmt::Write,
-    path::PathBuf,
-};
+use std::{ffi::OsStr, fmt::Write, path::PathBuf};
 
 use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Renderer, Snippet};
 
 use crate::{
     codegen::core::GrazeSb3GeneratorError,
     lexer::TextSpan,
-    messages::types::GetLintId,
+    messages::types::{GetLintId, GrazeWarning},
     parser::cst::{GetPos, ParseError},
 };
 
@@ -64,7 +60,7 @@ impl GrazeMessage {
             GrazeMessage::Error(graze_error, _graze_suggestion) => match graze_error {
                 // TODO: Implement suggestions
                 // Issue: #68
-                super::types::GrazeError::Plain(string, source_span) => {
+                super::types::GrazeError::Custom(string, source_span) => {
                     let SourceDescriptor {
                         content,
                         path,
@@ -90,8 +86,10 @@ impl GrazeMessage {
                     graze_sb3_generator_error.annotate(source_getter)
                 }
             },
-            GrazeMessage::Warning(graze_warning, graze_suggestion) => todo!(),
-            GrazeMessage::Info(graze_info, graze_suggestion) => todo!(),
+            GrazeMessage::Warning(graze_warning, _graze_suggestion) => {
+                graze_warning.annotate(source_getter)
+            }
+            GrazeMessage::Info(graze_info, _graze_suggestion) => todo!(),
             GrazeMessage::Unsuccessful {
                 error_count,
                 warning_count,
@@ -201,6 +199,32 @@ impl GrazeSb3GeneratorError {
                         AnnotationKind::Primary
                             .span(convert_source_span(source_span.0, line_starts))
                             .label(secondary_message),
+                    ),
+            )
+    }
+}
+
+impl GrazeWarning {
+    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        let source_span = *self.get_source_span();
+        let SourceDescriptor {
+            content,
+            path,
+            line_starts,
+        } = source_getter(source_span.1);
+        Level::WARNING
+            .primary_title(self.get_primary_message())
+            .id(self.get_lint_id())
+            .element(
+                Snippet::<Annotation>::source(content)
+                    .path(path.to_string_lossy())
+                    .annotation(
+                        AnnotationKind::Primary
+                            .span(convert_source_span(source_span.0, line_starts))
+                            .label(self.get_secondary_message()),
                     ),
             )
     }

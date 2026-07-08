@@ -17,7 +17,7 @@ pub trait GetLintId {
 #[derive(Debug, Clone, PartialEq, thiserror::Error, enum_assoc::Assoc)]
 pub enum GrazeError {
     #[error("{0}")]
-    Plain(IString, SourceSpan),
+    Custom(IString, SourceSpan),
     #[error(transparent)]
     ParseError(#[from] ParseError),
     #[error(transparent)]
@@ -27,7 +27,7 @@ pub enum GrazeError {
 impl GetPos for GrazeError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeError::Plain(_, source_span) => source_span,
+            GrazeError::Custom(_, source_span) => source_span,
             GrazeError::ParseError(error) => error.get_source_span(),
             GrazeError::CodegenError(error) => error.get_source_span(),
         }
@@ -230,41 +230,85 @@ impl GetPos for ConstantExprEvaluationError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, enum_assoc::Assoc)]
 pub enum GrazeWarning {
-    Plain(IString, SourceSpan),
-    Specific(GrazeWarningKind, IString, SourceSpan),
+    Custom(IString, SourceSpan),
+    Specific(SpecificGrazeWarning, SourceSpan),
 }
 
 impl GetLintId for GrazeWarning {
     fn get_lint_id(&self) -> &'static str {
         match self {
-            GrazeWarning::Plain(_, _) => "plain_warning",
-            GrazeWarning::Specific(warning_kind, _, _) => warning_kind.get_lint_id(),
+            GrazeWarning::Custom(_, _) => "custom_warning",
+            GrazeWarning::Specific(warning_kind, _) => warning_kind.get_lint_id(),
+        }
+    }
+}
+
+impl GrazeWarning {
+    pub fn get_primary_message(&self) -> &str {
+        match self {
+            GrazeWarning::Custom(string, _) => string.as_str(),
+            GrazeWarning::Specific(graze_warning, _) => graze_warning.get_primary_message(),
+        }
+    }
+
+    pub fn get_secondary_message(&self) -> &str {
+        match self {
+            GrazeWarning::Custom(string, _) => string.as_str(),
+            GrazeWarning::Specific(graze_warning, _) => graze_warning.get_secondary_message(),
+        }
+    }
+}
+
+impl GetPos for GrazeWarning {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            GrazeWarning::Custom(_, p) | GrazeWarning::Specific(_, p) => p,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, enum_assoc::Assoc)]
 #[func(const fn internal_lint_id(&self) -> &'static str)]
-pub enum GrazeWarningKind {
+#[func(pub const fn get_primary_message(&self) -> &'static str)]
+#[func(pub const fn get_secondary_message(&self) -> &'static str)]
+pub enum SpecificGrazeWarning {
+    #[assoc(get_primary_message = "uncalled callable")]
+    #[assoc(get_secondary_message = "should be called")]
     #[assoc(internal_lint_id = "callable_as_input")]
     CallableAsInput,
+    #[assoc(get_primary_message = "reporter expression does not contain a field value")]
+    #[assoc(get_secondary_message = "should be a field value")]
     #[assoc(internal_lint_id = "block_ref_as_field")]
     BlockRefAsField,
+    #[assoc(get_primary_message = "uncalled callable does not contain a field value")]
+    #[assoc(get_secondary_message = "should be a field value")]
     #[assoc(internal_lint_id = "callable_as_field")]
     CallableAsField,
+    #[assoc(get_primary_message = "empty expression is likely not a valid field value")]
+    #[assoc(get_secondary_message = "field value should be specified")]
     #[assoc(internal_lint_id = "empty_expression_as_field")]
     EmptyExpressionAsField,
+    #[assoc(get_primary_message = "reporter expression does not contain a field value")]
+    #[assoc(get_secondary_message = "should be a field value")]
     #[assoc(internal_lint_id = "non_field_singleton_as_field")]
     NonFieldSingletonAsField,
+    #[assoc(get_primary_message = "incorrect value for field, try not specifying fields by value")]
+    #[assoc(get_secondary_message = "field value should not be specified by value")]
     #[assoc(internal_lint_id = "literal_field_value_incorrect")]
     LiteralFieldValueIncorrect,
+    #[assoc(get_primary_message = "incorrect value for field")]
+    #[assoc(get_secondary_message = "field value must fit the context")]
+    #[assoc(internal_lint_id = "field_value_incorrect")]
+    FieldValueIncorrect,
+    #[assoc(get_primary_message = "cannot create an isolated shadow expression")]
+    #[assoc(get_secondary_message = "should not be isolated")]
     #[assoc(internal_lint_id = "top_level_shadow_expression")]
     TopLevelShadowExpression,
 }
 
-impl GetLintId for GrazeWarningKind {
+impl GetLintId for SpecificGrazeWarning {
     #[inline]
     fn get_lint_id(&self) -> &'static str {
         self.internal_lint_id()
@@ -273,7 +317,7 @@ impl GetLintId for GrazeWarningKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GrazeInfo {
-    Plain(IString, SourceSpan),
+    Custom(IString, SourceSpan),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

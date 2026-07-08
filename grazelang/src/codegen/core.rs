@@ -31,7 +31,7 @@ use crate::{
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::types::{
-        ConstantExprEvaluationError, GetLintId, GrazeMessage, GrazeWarning, GrazeWarningKind,
+        ConstantExprEvaluationError, GetLintId, GrazeMessage, GrazeWarning, SpecificGrazeWarning,
     },
     names::Namespace,
     parser::{
@@ -1524,15 +1524,6 @@ pub fn add_known_block_to_params(
     inputs: &mut HashMap<String, Sb3InputValue>,
     fields: &mut HashMap<String, Sb3FieldValue>,
 ) -> Result<(), GrazeSb3GeneratorError> {
-    macro_rules! LITERAL_FIELD_VALUE_INCORRECT_MSG {
-        () => {
-            concat!(
-                "Cannot reasonably use KnownBlock {:?} as a field parameter in this context, ",
-                "maybe you meant to use it as a different parameter or you misspelt it. ",
-                "It is recommended to use singleton values instead of literal strings for fields."
-            )
-        };
-    }
     let param_name = param.name.to_string();
     match &param.kind {
         CallBlockParamKind::Input { default } => {
@@ -1552,8 +1543,12 @@ pub fn add_known_block_to_params(
                         context,
                         GrazeMessage::Warning(
                             GrazeWarning::Specific(
-                                GrazeWarningKind::LiteralFieldValueIncorrect,
-                                arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
+                                match value {
+                                    KnownBlock::PrimitiveBlock { .. } => {
+                                        SpecificGrazeWarning::LiteralFieldValueIncorrect
+                                    }
+                                    _ => SpecificGrazeWarning::FieldValueIncorrect,
+                                },
                                 known_block_source_span,
                             ),
                             None,
@@ -1593,11 +1588,7 @@ pub fn add_known_block_to_params(
                                     context,
                                     GrazeMessage::Warning(
                                         GrazeWarning::Specific(
-                                            GrazeWarningKind::LiteralFieldValueIncorrect,
-                                            arcstr::format!(
-                                                LITERAL_FIELD_VALUE_INCORRECT_MSG!(),
-                                                value
-                                            ),
+                                            SpecificGrazeWarning::LiteralFieldValueIncorrect,
                                             known_block_source_span,
                                         ),
                                         None,
@@ -1612,11 +1603,7 @@ pub fn add_known_block_to_params(
                                     context,
                                     GrazeMessage::Warning(
                                         GrazeWarning::Specific(
-                                            GrazeWarningKind::LiteralFieldValueIncorrect,
-                                            arcstr::format!(
-                                                LITERAL_FIELD_VALUE_INCORRECT_MSG!(),
-                                                value
-                                            ),
+                                            SpecificGrazeWarning::FieldValueIncorrect,
                                             known_block_source_span,
                                         ),
                                         None,
@@ -1644,8 +1631,7 @@ pub fn add_known_block_to_params(
                             context,
                             GrazeMessage::Warning(
                                 GrazeWarning::Specific(
-                                    GrazeWarningKind::LiteralFieldValueIncorrect,
-                                    arcstr::format!(LITERAL_FIELD_VALUE_INCORRECT_MSG!(), value),
+                                    SpecificGrazeWarning::FieldValueIncorrect,
                                     known_block_source_span,
                                 ),
                                 None,
@@ -3876,8 +3862,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 context,
                                 GrazeMessage::Warning(
                                     GrazeWarning::Specific(
-                                        GrazeWarningKind::TopLevelShadowExpression,
-                                        literal!("Cannot create an isolated shadow expression."),
+                                        SpecificGrazeWarning::TopLevelShadowExpression,
                                         param_source_span,
                                     ),
                                     None,

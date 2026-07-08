@@ -357,7 +357,12 @@
                             "options": null
                         }
                     }
-                }
+                },
+                "fieldValue": {
+                    "label": "x position",
+                    "value": "x position"
+                },
+                "fieldCategory": "properties"
             },
             {
                 "type": "motion_yposition",
@@ -377,7 +382,12 @@
                             "options": null
                         }
                     }
-                }
+                },
+                "fieldValue": {
+                    "label": "y position",
+                    "value": "y position"
+                },
+                "fieldCategory": "properties"
             },
             {
                 "type": "motion_direction",
@@ -397,7 +407,12 @@
                             "options": null
                         }
                     }
-                }
+                },
+                "fieldValue": {
+                    "label": "direction",
+                    "value": "direction"
+                },
+                "fieldCategory": "properties"
             }
         ]
     },
@@ -869,7 +884,123 @@
                             "options": null
                         }
                     }
-                }
+                },
+                "fieldValue": {
+                    "label": "size",
+                    "value": "size"
+                },
+                "fieldCategory": "properties"
+            }
+        ]
+    },
+    {
+        "category": "grazelang_costume_shorthands",
+        "id": "grazelang_costume_shorthands",
+        "altName": "costume",
+        "blocks": [
+            {
+                "type": "looks_costumenumbername",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "NUMBER_NAME",
+                            "fieldType": "field_dropdown",
+                            "value": "number",
+                            "options": [],
+                            "optionCategory": "number_name"
+                        },
+                        "value": [
+                            "number"
+                        ]
+                    }
+                ],
+                "args": [],
+                "altName": "costume_number",
+                "isSingleton": true,
+                "fieldValue": {
+                    "label": "costume #",
+                    "value": "costume #"
+                },
+                "fieldCategory": "properties"
+            },
+            {
+                "type": "looks_costumenumbername",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "NUMBER_NAME",
+                            "fieldType": "field_dropdown",
+                            "value": "number",
+                            "options": [],
+                            "optionCategory": "number_name"
+                        },
+                        "value": [
+                            "name"
+                        ]
+                    }
+                ],
+                "args": [],
+                "altName": "costume_name",
+                "isSingleton": true,
+                "fieldValue": {
+                    "label": "costume name",
+                    "value": "costume name"
+                },
+                "fieldCategory": "properties"
+            },
+            {
+                "type": "looks_backdropnumbername",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "NUMBER_NAME",
+                            "fieldType": "field_dropdown",
+                            "value": "number",
+                            "options": [],
+                            "optionCategory": "number_name"
+                        },
+                        "value": [
+                            "number"
+                        ]
+                    }
+                ],
+                "args": [],
+                "altName": "backdrop_number",
+                "isSingleton": true,
+                "fieldValue": {
+                    "label": "backdrop #",
+                    "value": "backdrop #"
+                },
+                "fieldCategory": "properties"
+            },
+            {
+                "type": "looks_backdropnumbername",
+                "knownParams": [
+                    {
+                        "param": {
+                            "kind": "field",
+                            "name": "NUMBER_NAME",
+                            "fieldType": "field_dropdown",
+                            "value": "number",
+                            "options": [],
+                            "optionCategory": "number_name"
+                        },
+                        "value": [
+                            "name"
+                        ]
+                    }
+                ],
+                "args": [],
+                "altName": "backdrop_name",
+                "isSingleton": true,
+                "fieldValue": {
+                    "label": "backdrop name",
+                    "value": "backdrop name"
+                },
+                "fieldCategory": "properties"
             }
         ]
     },
@@ -1030,7 +1161,26 @@
             {
                 "type": "sound_volume",
                 "args": [],
-                "altName": "get_volume"
+                "altName": "volume",
+                "fieldValue": {
+                    "label": "volume",
+                    "value": "volume"
+                },
+                "assign": {
+                    "opcode": "sound_setvolumeto",
+                    "value": {
+                        "kind": "input",
+                        "name": "VOLUME",
+                        "inputType": "value",
+                        "check": null,
+                        "shadow": {
+                            "type": "math_number",
+                            "defaultValue": "100",
+                            "options": null
+                        }
+                    }
+                },
+                "fieldCategory": "properties"
             }
         ]
     },
@@ -2012,9 +2162,9 @@
                         "shadow": {
                             "type": "sensing_of_object_menu",
                             "defaultValue": "",
-                            "options": []
-                        },
-                        "optionCategory": "objects"
+                            "options": [],
+                            "optionCategory": "objects"
+                        }
                     }
                 ],
                 "altName": "property_of_object"
