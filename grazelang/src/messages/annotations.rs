@@ -1,11 +1,11 @@
 use std::{ffi::OsStr, fmt::Write, path::PathBuf};
 
-use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Renderer, Snippet};
+use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Snippet};
 
 use crate::{
     codegen::core::GrazeSb3GeneratorError,
     lexer::TextSpan,
-    messages::types::{GetLintId, GrazeWarning},
+    messages::types::{GetLintId, GrazeInfo, GrazeWarning},
     parser::cst::{GetPos, ParseError},
 };
 
@@ -35,7 +35,7 @@ pub struct SourceDescriptor<'a> {
     pub line_starts: &'a [usize],
 }
 
-pub fn annotate<'a, I, F>(iter: I, renderer: &Renderer, mut source_getter: F) -> Vec<Group<'a>>
+pub fn annotate<'a, I, F>(iter: I, mut source_getter: F) -> Vec<Group<'a>>
 where
     I: Iterator<Item = &'a GrazeMessage>,
     F: FnMut(u32) -> SourceDescriptor<'a>,
@@ -89,7 +89,7 @@ impl GrazeMessage {
             GrazeMessage::Warning(graze_warning, _graze_suggestion) => {
                 graze_warning.annotate(source_getter)
             }
-            GrazeMessage::Info(graze_info, _graze_suggestion) => todo!(),
+            GrazeMessage::Info(graze_info, _graze_suggestion) => graze_info.annotate(source_getter),
             GrazeMessage::Unsuccessful {
                 error_count,
                 warning_count,
@@ -205,6 +205,32 @@ impl GrazeSb3GeneratorError {
 }
 
 impl GrazeWarning {
+    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        let source_span = *self.get_source_span();
+        let SourceDescriptor {
+            content,
+            path,
+            line_starts,
+        } = source_getter(source_span.1);
+        Level::WARNING
+            .primary_title(self.get_primary_message())
+            .id(self.get_lint_id())
+            .element(
+                Snippet::<Annotation>::source(content)
+                    .path(path.to_string_lossy())
+                    .annotation(
+                        AnnotationKind::Primary
+                            .span(convert_source_span(source_span.0, line_starts))
+                            .label(self.get_secondary_message()),
+                    ),
+            )
+    }
+}
+
+impl GrazeInfo {
     pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,

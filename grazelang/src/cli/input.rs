@@ -271,7 +271,7 @@ impl Cli {
                 error_count,
                 warning_count,
             });
-            let anns = annotations::annotate(context.messages.iter(), &renderer, |id| {
+            let anns = annotations::annotate(context.messages.iter(), |id| {
                 source_files.get(&id).unwrap().as_descriptor()
             });
             anstream::println!("{}", renderer.render(&anns));
@@ -292,7 +292,7 @@ impl Cli {
                 warning_count,
             });
         }
-        let anns = annotations::annotate(context.messages.iter(), &renderer, |id| {
+        let anns = annotations::annotate(context.messages.iter(), |id| {
             source_files.get(&id).unwrap().as_descriptor()
         });
         if !anns.is_empty() {

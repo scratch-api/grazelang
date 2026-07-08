@@ -232,14 +232,18 @@ impl GetPos for ConstantExprEvaluationError {
 
 #[derive(Debug, Clone, PartialEq, enum_assoc::Assoc)]
 pub enum GrazeWarning {
-    Custom(IString, SourceSpan),
+    Custom {
+        primary_message: IString,
+        secondary_message: Option<IString>,
+        source_span: SourceSpan,
+    },
     Specific(SpecificGrazeWarning, SourceSpan),
 }
 
 impl GetLintId for GrazeWarning {
     fn get_lint_id(&self) -> &'static str {
         match self {
-            GrazeWarning::Custom(_, _) => "custom_warning",
+            GrazeWarning::Custom { .. } => "custom_warning",
             GrazeWarning::Specific(warning_kind, _) => warning_kind.get_lint_id(),
         }
     }
@@ -248,14 +252,23 @@ impl GetLintId for GrazeWarning {
 impl GrazeWarning {
     pub fn get_primary_message(&self) -> &str {
         match self {
-            GrazeWarning::Custom(string, _) => string.as_str(),
+            GrazeWarning::Custom {
+                primary_message, ..
+            } => primary_message.as_str(),
             GrazeWarning::Specific(graze_warning, _) => graze_warning.get_primary_message(),
         }
     }
 
     pub fn get_secondary_message(&self) -> &str {
         match self {
-            GrazeWarning::Custom(string, _) => string.as_str(),
+            GrazeWarning::Custom {
+                primary_message,
+                secondary_message,
+                ..
+            } => secondary_message
+                .as_ref()
+                .unwrap_or(primary_message)
+                .as_str(),
             GrazeWarning::Specific(graze_warning, _) => graze_warning.get_secondary_message(),
         }
     }
@@ -264,7 +277,7 @@ impl GrazeWarning {
 impl GetPos for GrazeWarning {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeWarning::Custom(_, p) | GrazeWarning::Specific(_, p) => p,
+            GrazeWarning::Custom { source_span: p, .. } | GrazeWarning::Specific(_, p) => p,
         }
     }
 }
@@ -317,7 +330,50 @@ impl GetLintId for SpecificGrazeWarning {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GrazeInfo {
-    Custom(IString, SourceSpan),
+    Custom {
+        primary_message: IString,
+        secondary_message: Option<IString>,
+        source_span: SourceSpan,
+    },
+}
+
+impl GetLintId for GrazeInfo {
+    fn get_lint_id(&self) -> &'static str {
+        match self {
+            GrazeInfo::Custom { .. } => "custom_info",
+        }
+    }
+}
+
+impl GrazeInfo {
+    pub fn get_primary_message(&self) -> &str {
+        match self {
+            GrazeInfo::Custom {
+                primary_message, ..
+            } => primary_message.as_str(),
+        }
+    }
+
+    pub fn get_secondary_message(&self) -> &str {
+        match self {
+            GrazeInfo::Custom {
+                primary_message,
+                secondary_message,
+                ..
+            } => secondary_message
+                .as_ref()
+                .unwrap_or(primary_message)
+                .as_str(),
+        }
+    }
+}
+
+impl GetPos for GrazeInfo {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            GrazeInfo::Custom { source_span: p, .. } => p,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
