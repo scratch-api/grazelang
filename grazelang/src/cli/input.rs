@@ -10,6 +10,7 @@ use std::{
 
 use annotate_snippets::Renderer;
 use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     codegen, lexer,
@@ -21,7 +22,7 @@ use crate::{
         self,
         context::ParseContext,
         core::PeekableLexer,
-        cst::{GrazeProgram, ParseError},
+        cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
     visitor::GrazeVisitor,
@@ -63,37 +64,41 @@ pub enum Commands {
     },
 }
 
-pub fn parse_project_directory(
-    path: &Path,
-    context: &mut ParseContext,
-) -> Result<(GrazeProgram, HashMap<u32, Source>), ParseError> {
+pub type SourceFiles = HashMap<u32, Source>;
+pub type ContextualParseOut = Result<(GrazeProgram, SourceFiles), (ParseError, SourceFiles)>;
+
+#[expect(clippy::result_large_err)]
+pub fn parse_project_directory(path: &Path, context: &mut ParseContext) -> ContextualParseOut {
     let mut program = Vec::new();
     let mut file_id = 0_u32;
-    let mut source_files = HashMap::new();
-    for i in path.read_dir().map_err(|value| ParseError::IoError {
-        source: Rc::new(value),
-        source_span: Default::default(),
-    })? {
+    let mut source_files = HashMap::from([(
+        0,
+        Source {
+            content: String::new(),
+            path: PathBuf::new(),
+            line_starts: Vec::new(),
+        },
+    )]);
+    for i in path
+        .read_dir()
+        .into_result_with_source_span((Default::default(), file_id))
+        .map_err(|value| (value, std::mem::take(&mut source_files)))?
+    {
         let current_file = i
-            .map_err(|value| ParseError::IoError {
-                source: Rc::new(value),
-                source_span: Default::default(),
-            })?
+            .into_result_with_source_span((Default::default(), file_id))
+            .map_err(|value| (value, std::mem::take(&mut source_files)))?
             .path();
         if current_file.extension().and_then(OsStr::to_str) != Some("graze") {
             continue;
         }
         let graze_code = {
-            let mut file = File::open(&current_file).map_err(|value| ParseError::IoError {
-                source: Rc::new(value),
-                source_span: (Default::default(), file_id),
-            })?;
+            let mut file = File::open(&current_file)
+                .into_result_with_source_span((Default::default(), file_id))
+                .map_err(|value| (value, std::mem::take(&mut source_files)))?;
             let mut buf = String::new();
             file.read_to_string(&mut buf)
-                .map_err(|value| ParseError::IoError {
-                    source: Rc::new(value),
-                    source_span: (Default::default(), file_id),
-                })?;
+                .into_result_with_source_span((Default::default(), file_id))
+                .map_err(|value| (value, std::mem::take(&mut source_files)))?;
             buf
         };
         let lexer = lexer::create_lexer(&graze_code);
@@ -114,7 +119,15 @@ pub fn parse_project_directory(
             } else if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
                 std::process::exit(1);
             } else {
-                return Err(parsed.unwrap_err());
+                source_files.insert(
+                    file_id,
+                    Source {
+                        line_starts: lexer.lexer.extras.0,
+                        content: graze_code,
+                        path: current_file,
+                    },
+                );
+                return Err((parsed.unwrap_err(), source_files));
             }
         };
         program.extend(parsed.0);
@@ -127,24 +140,54 @@ pub fn parse_project_directory(
             },
         );
         file_id += 1;
+        source_files.insert(
+            file_id,
+            Source {
+                content: String::new(),
+                path: PathBuf::new(),
+                line_starts: Vec::new(),
+            },
+        );
     }
     Ok((GrazeProgram(program), source_files))
 }
 
-pub fn parse_single_file(
-    path: &Path,
-    context: &mut ParseContext,
-) -> Result<(GrazeProgram, HashMap<u32, Source>), ParseError> {
+#[expect(clippy::result_large_err)]
+pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualParseOut {
     let graze_code = {
-        let mut file = File::open(path).map_err(|value| ParseError::IoError {
-            source: Rc::new(value),
-            source_span: Default::default(),
-        })?;
+        let mut file = File::open(path)
+            .into_result_with_source_span(Default::default())
+            .map_err(|value| {
+                (
+                    value,
+                    HashMap::from([(
+                        0,
+                        Source {
+                            content: String::new(),
+                            path: PathBuf::new(),
+                            line_starts: Vec::new(),
+                        },
+                    )]),
+                )
+            })?;
         let mut buf = String::new();
         file.read_to_string(&mut buf)
             .map_err(|value| ParseError::IoError {
                 source: Rc::new(value),
                 source_span: Default::default(),
+            })
+            .map_err(|value| {
+                (
+                    value,
+                    HashMap::from([(
+                        0,
+                        Source {
+                            content: String::new(),
+                            path: PathBuf::new(),
+                            line_starts: Vec::new(),
+                        },
+                    )]),
+                )
             })?;
         buf
     };
@@ -167,7 +210,17 @@ pub fn parse_single_file(
         } else if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
             std::process::exit(1);
         } else {
-            return Err(parsed.unwrap_err());
+            return Err((
+                parsed.unwrap_err(),
+                HashMap::from([(
+                    0,
+                    Source {
+                        line_starts: lexer.lexer.extras.0,
+                        content: graze_code,
+                        path: path.to_path_buf(),
+                    },
+                )]),
+            ));
         }
     };
     Ok((
@@ -203,6 +256,12 @@ pub fn count_errors_and_warnings(messages: &[GrazeMessage]) -> (usize, usize) {
 // TODO: Check unwraps and possibly replace
 // Issue: #52
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Successful {
+    Yes,
+    No,
+}
+
 impl Cli {
     pub fn execute(&self) {
         match &self.command {
@@ -221,6 +280,33 @@ impl Cli {
                 path,
                 *log_time,
             ),
+        }
+    }
+
+    pub fn print_errors(
+        messages: &mut Vec<GrazeMessage>,
+        source_files: &HashMap<u32, Source>,
+        force_error: bool,
+    ) -> Successful {
+        let renderer = Renderer::styled();
+        let (error_count, warning_count) = count_errors_and_warnings(messages);
+        let error = error_count > 0 || force_error;
+        if error {
+            messages.push(GrazeMessage::Unsuccessful {
+                error_count,
+                warning_count,
+            });
+        }
+        let anns = annotations::annotate(messages.iter(), |id| {
+            source_files.get(&id).unwrap().as_descriptor()
+        });
+        if !anns.is_empty() {
+            anstream::println!("{}", renderer.render(&anns));
+        }
+        if error {
+            Successful::No
+        } else {
+            Successful::Yes
         }
     }
 
@@ -246,7 +332,7 @@ impl Cli {
                 use_shadows: *shadows,
                 resources_path: Some(resources.map(Path::to_path_buf).unwrap_or_else(|| {
                     if is_file {
-                        path.parent().unwrap().to_path_buf()
+                        path.parent().unwrap_or(Path::new("/")).to_path_buf()
                     } else {
                         path.to_path_buf()
                     }
@@ -257,55 +343,37 @@ impl Cli {
         let parse_timer = Instant::now();
         let path = path.canonicalize().unwrap();
         let (parsed, source_files) = if path.is_dir() {
-            parse_project_directory(&path, &mut context).unwrap()
+            parse_project_directory(&path, &mut context).unwrap_or_else(|(_, source_files)| {
+                Self::print_errors(&mut context.messages, &source_files, true);
+                std::process::exit(1);
+            })
         } else if is_file {
-            parse_single_file(&path, &mut context).unwrap()
+            parse_single_file(&path, &mut context).unwrap_or_else(|(_, source_files)| {
+                Self::print_errors(&mut context.messages, &source_files, true);
+                std::process::exit(1);
+            })
         } else {
             panic!();
         };
         let parse_time = parse_timer.elapsed();
         if !context.successful {
-            let renderer = Renderer::styled();
-            let (error_count, warning_count) = count_errors_and_warnings(&context.messages);
-            context.messages.push(GrazeMessage::Unsuccessful {
-                error_count,
-                warning_count,
-            });
-            let anns = annotations::annotate(context.messages.iter(), |id| {
-                source_files.get(&id).unwrap().as_descriptor()
-            });
-            anstream::println!("{}", renderer.render(&anns));
+            Self::print_errors(&mut context.messages, &source_files, true);
             std::process::exit(1);
         }
         let codegen_timer = Instant::now();
         let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
         let visitor = codegen::core::GrazeSb3Generator;
         if let Err(err) = visitor.visit_graze_program(&parsed, &mut context) {
+            if context.settings.message_setting == GrazeMessageSetting::None {
+                Self::print_errors(&mut context.messages, &source_files, true);
+                std::process::exit(1);
+            }
             context.messages.push(err.into());
         }
         let codegen_time = codegen_timer.elapsed();
-        let renderer = Renderer::styled();
-        let (error_count, warning_count) = count_errors_and_warnings(&context.messages);
-        if error_count > 0 {
-            context.messages.push(GrazeMessage::Unsuccessful {
-                error_count,
-                warning_count,
-            });
-        }
-        let anns = annotations::annotate(context.messages.iter(), |id| {
-            source_files.get(&id).unwrap().as_descriptor()
-        });
-        if !anns.is_empty() {
-            anstream::println!("{}", renderer.render(&anns));
-        }
-        if error_count > 0 {
+        if Self::print_errors(&mut context.messages, &source_files, false) == Successful::No {
             std::process::exit(1);
         }
-        // target.unwrap_or(&path).join(
-        //     path.file_name()
-        //         .and_then(OsStr::to_str)
-        //         .unwrap_or("project"),
-        // )
         let (mut output_path, set_extension) = match target {
             Some(target) if target.is_file() => (target.to_path_buf(), false),
             Some(target) => (

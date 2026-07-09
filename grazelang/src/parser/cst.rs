@@ -2206,3 +2206,51 @@ impl GetPos for ParseError {
         }
     }
 }
+
+pub trait FromWithSourceSpan<T>: Sized {
+    fn from_with_source_span(value: T, source_span: SourceSpan) -> Self;
+
+    fn from_result_with_source_span<O>(
+        value: Result<O, T>,
+        source_span: SourceSpan,
+    ) -> Result<O, Self> {
+        value.map_err(|err| Self::from_with_source_span(err, source_span))
+    }
+}
+
+pub trait IntoWithSourceSpan<T>: Sized {
+    fn into_with_source_span(self, source_span: SourceSpan) -> T;
+}
+
+pub trait IntoResultWithSourceSpan<T>: Sized {
+    type Out: Sized;
+    fn into_result_with_source_span(self, source_span: SourceSpan) -> Result<Self::Out, T>;
+}
+
+impl FromWithSourceSpan<std::io::Error> for ParseError {
+    fn from_with_source_span(value: std::io::Error, source_span: SourceSpan) -> Self {
+        Self::IoError {
+            source: std::rc::Rc::new(value),
+            source_span,
+        }
+    }
+}
+
+impl<A, B> IntoWithSourceSpan<A> for B
+where
+    A: FromWithSourceSpan<B>,
+{
+    fn into_with_source_span(self, source_span: SourceSpan) -> A {
+        A::from_with_source_span(self, source_span)
+    }
+}
+
+impl<O, A, B> IntoResultWithSourceSpan<A> for Result<O, B>
+where
+    A: FromWithSourceSpan<B>,
+{
+    type Out = O;
+    fn into_result_with_source_span(self, source_span: SourceSpan) -> Result<Self::Out, A> {
+        FromWithSourceSpan::from_result_with_source_span(self, source_span)
+    }
+}

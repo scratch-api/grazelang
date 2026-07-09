@@ -97,13 +97,17 @@ impl GrazeMessage {
                 let error_count = *error_count;
                 let warning_count = *warning_count;
                 let mut error = String::with_capacity(100);
-                write!(
-                    error,
-                    "could not complete transpilation due to {error_count} previous error",
-                )
-                .unwrap();
-                if error_count != 1 {
-                    write!(error, "s").unwrap();
+                if error_count == 0 {
+                    write!(error, "could not complete transpilation due to some error",).unwrap();
+                } else {
+                    write!(
+                        error,
+                        "could not complete transpilation due to {error_count} previous error",
+                    )
+                    .unwrap();
+                    if error_count != 1 {
+                        write!(error, "s").unwrap();
+                    }
                 }
                 if warning_count > 0 {
                     write!(error, "; {warning_count} warning").unwrap();
