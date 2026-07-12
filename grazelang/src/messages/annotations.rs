@@ -3,9 +3,9 @@ use std::{ffi::OsStr, fmt::Write, path::PathBuf};
 use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Snippet};
 
 use crate::{
-    codegen::core::GrazeSb3GeneratorError,
+    codegen::core::{GrazeSb3GeneratorCreationError, GrazeSb3GeneratorError},
     lexer::TextSpan,
-    messages::types::{GetLintId, GrazeInfo, GrazeWarning},
+    messages::types::{CLIError, GetLintId, GrazeInfo, GrazeWarning},
     parser::cst::{GetPos, ParseError},
 };
 
@@ -82,9 +82,13 @@ impl GrazeMessage {
                 super::types::GrazeError::ParseError(parse_error) => {
                     parse_error.annotate(source_getter)
                 }
+                super::types::GrazeError::CodegenInitializationError(error) => {
+                    error.annotate(source_getter)
+                }
                 super::types::GrazeError::CodegenError(graze_sb3_generator_error) => {
                     graze_sb3_generator_error.annotate(source_getter)
                 }
+                super::types::GrazeError::CLIError(error) => error.annotate(),
             },
             GrazeMessage::Warning(graze_warning, _graze_suggestion) => {
                 graze_warning.annotate(source_getter)
@@ -255,6 +259,53 @@ impl GrazeInfo {
                         AnnotationKind::Primary
                             .span(convert_source_span(source_span.0, line_starts))
                             .label(self.get_secondary_message()),
+                    ),
+            )
+    }
+}
+
+impl CLIError {
+    pub fn annotate<'a>(&'a self) -> Group<'a> {
+        Group::with_title(
+            Level::ERROR
+                .primary_title(self.get_primary_message())
+                .id(self.get_lint_id()),
+        )
+    }
+}
+
+impl GrazeSb3GeneratorCreationError {
+    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        let (lint_id, secondary_message, source_span) = (
+            self.get_lint_id(),
+            self.get_secondary_message(),
+            *self.get_source_span(),
+        );
+        if let Self::ResourceDirectoryDoesNotExist { .. } = self {
+            return Group::with_title(
+                Level::ERROR
+                    .primary_title(self.get_primary_message())
+                    .id(self.get_lint_id()),
+            );
+        }
+        let SourceDescriptor {
+            content,
+            path,
+            line_starts,
+        } = source_getter(source_span.1);
+        Level::ERROR
+            .primary_title(self.get_primary_message())
+            .id(lint_id)
+            .element(
+                Snippet::source(content)
+                    .path(path.to_string_lossy())
+                    .annotation(
+                        AnnotationKind::Primary
+                            .span(convert_source_span(source_span.0, line_starts))
+                            .label(secondary_message),
                     ),
             )
     }

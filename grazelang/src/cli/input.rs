@@ -16,12 +16,12 @@ use crate::{
     codegen, lexer,
     messages::{
         annotations::{self, Source},
-        types::GrazeMessage,
+        types::{CLIError, GrazeMessage},
     },
     parser::{
         self,
         context::ParseContext,
-        core::PeekableLexer,
+        core::{PeekableLexer, emit_message},
         cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
@@ -341,7 +341,15 @@ impl Cli {
             Default::default(),
         );
         let parse_timer = Instant::now();
-        let path = path.canonicalize().unwrap();
+        let Ok(path) = path.canonicalize() else {
+            emit_message(
+                &mut context,
+                CLIError::PathDoesNotExist.into(),
+                GrazeMessageSetting::Errors,
+            );
+            Self::print_errors(&mut context.messages, &HashMap::new(), true);
+            std::process::exit(1);
+        };
         let (parsed, source_files) = if path.is_dir() {
             parse_project_directory(&path, &mut context).unwrap_or_else(|(_, source_files)| {
                 Self::print_errors(&mut context.messages, &source_files, true);
@@ -361,7 +369,19 @@ impl Cli {
             std::process::exit(1);
         }
         let codegen_timer = Instant::now();
-        let mut context = codegen::core::GrazeSb3GeneratorContext::new(context).unwrap();
+        let mut context = {
+            let message_setting = context.settings.message_setting;
+            match codegen::core::GrazeSb3GeneratorContext::new(context) {
+                Ok(value) => value,
+                Err((err, mut messages)) => {
+                    if message_setting >= GrazeMessageSetting::ExitOnError {
+                        messages.push(err.into());
+                    }
+                    Self::print_errors(&mut messages, &source_files, true);
+                    std::process::exit(1);
+                }
+            }
+        };
         let visitor = codegen::core::GrazeSb3Generator;
         if let Err(err) = visitor.visit_graze_program(&parsed, &mut context) {
             if context.settings.message_setting == GrazeMessageSetting::None {

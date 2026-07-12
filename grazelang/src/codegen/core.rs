@@ -239,19 +239,49 @@ impl GetPos for GrazeSb3GeneratorError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, PartialEq, Error, enum_assoc::Assoc)]
+#[func(const fn internal_lint_id(&self) -> &'static str)]
+#[func(pub const fn get_primary_message(&self) -> &'static str)]
+#[func(pub const fn get_secondary_message(&self) -> &'static str)]
 pub enum GrazeSb3GeneratorCreationError {
-    #[error(transparent)]
-    IoError {
-        #[from]
-        error: std::io::Error,
-    },
-    #[error("you cannot call two sprites the same name: {name:?}")]
-    ShadowedSprite { name: String },
-    #[error("you cannot call a sprite \"stage\", try using a canonical name")]
-    ShadowedStage,
+    #[assoc(internal_lint_id = "could_not_find_asset")]
+    #[assoc(get_primary_message = "could not find the file of an asset")]
+    #[assoc(get_secondary_message = "could not find asset")]
+    #[error("could not find asset")]
+    CouldNotFindAsset { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "resource_directory_does_not_exist")]
+    #[assoc(get_primary_message = "resource directory does not exist")]
+    #[assoc(get_secondary_message = "")]
+    #[error("resource directory does not exist")]
+    ResourceDirectoryDoesNotExist { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "path_tries_to_escape_resource_directory")]
+    #[assoc(get_primary_message = "asset file path tries to escape resource directory")]
+    #[assoc(get_secondary_message = "path tries to escape resource directory")]
     #[error("path {path:?} tries to escape the resource directory")]
-    PathTriesToEscapeResourceDirectory { path: PathBuf },
+    PathTriesToEscapeResourceDirectory {
+        path: PathBuf,
+        source_span: SourceSpan,
+    },
+}
+
+impl GetLintId for GrazeSb3GeneratorCreationError {
+    #[inline]
+    fn get_lint_id(&self) -> &'static str {
+        self.internal_lint_id()
+    }
+}
+
+impl GetPos for GrazeSb3GeneratorCreationError {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            GrazeSb3GeneratorCreationError::CouldNotFindAsset { source_span }
+            | GrazeSb3GeneratorCreationError::ResourceDirectoryDoesNotExist { source_span }
+            | GrazeSb3GeneratorCreationError::PathTriesToEscapeResourceDirectory {
+                path: _,
+                source_span,
+            } => source_span,
+        }
+    }
 }
 
 pub struct GrazeSb3Generator;
@@ -381,7 +411,9 @@ pub const MY_BLOCKS_ISTRING: &IString = &literal!("my_blocks");
 pub const CURRENT_DIRECTORY_STR: &str = ".";
 
 impl GrazeSb3GeneratorContext {
-    pub fn new(parse_context: ParseContext) -> Result<Self, GrazeSb3GeneratorCreationError> {
+    pub fn new(
+        parse_context: ParseContext,
+    ) -> Result<Self, (GrazeSb3GeneratorCreationError, Vec<GrazeMessage>)> {
         let mut this = Self::without_standard_namespaces(parse_context)?;
         library::add_standard_library_namespaces(&mut this, Default::default());
         Self::alias_standard_namespaces(&mut this.symbol_table, Default::default());
@@ -411,16 +443,28 @@ impl GrazeSb3GeneratorContext {
         settings: &mut GrazeSettings,
     ) -> Result<(), GrazeSb3GeneratorCreationError> {
         if let Some(current_path) = &mut settings.resources_path {
-            *current_path = current_path.canonicalize()?;
+            *current_path = current_path.canonicalize().map_err(|_| {
+                GrazeSb3GeneratorCreationError::ResourceDirectoryDoesNotExist {
+                    source_span: Default::default(),
+                }
+            })?;
         } else {
-            settings.resources_path = Some(Path::new(CURRENT_DIRECTORY_STR).canonicalize()?);
+            settings.resources_path = Some(
+                Path::new(CURRENT_DIRECTORY_STR)
+                    .canonicalize()
+                    .map_err(
+                        |_| GrazeSb3GeneratorCreationError::ResourceDirectoryDoesNotExist {
+                            source_span: Default::default(),
+                        },
+                    )?,
+            );
         }
         Ok(())
     }
 
     pub fn without_standard_namespaces(
         mut parse_context: ParseContext,
-    ) -> Result<Self, GrazeSb3GeneratorCreationError> {
+    ) -> Result<Self, (GrazeSb3GeneratorCreationError, Vec<GrazeMessage>)> {
         fn extend_categories_for_field_value<I>(
             categories: I,
             field_name_istring: IString,
@@ -462,7 +506,9 @@ impl GrazeSb3GeneratorContext {
                 field_category_entries.insert(category, HashSet::from([field_name_istring]));
             }
         }
-        Self::canonicalize_resource_directory(&mut parse_context.settings)?;
+        if let Err(err) = Self::canonicalize_resource_directory(&mut parse_context.settings) {
+            return Err((err, parse_context.messages));
+        }
         let mut rng = Xoshiro256StarStar::from_seed(parse_context.random_seed);
         let targets: Vec<Target> = parse_context.parsed_targets.into();
         let standard_library_namespace_count = library::get_standard_library_namespace_count();
@@ -486,15 +532,6 @@ impl GrazeSb3GeneratorContext {
         let mut asset_files = HashMap::new();
         let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
-            if let Target::Sprite {
-                name,
-                canonical_name: _,
-                symbols: _,
-            } = target
-                && name.as_str() == "stage"
-            {
-                return Err(GrazeSb3GeneratorCreationError::ShadowedStage);
-            }
             let mut namespace = Namespace::new();
 
             let is_stage = matches!(target, Target::Stage { .. });
@@ -534,7 +571,7 @@ impl GrazeSb3GeneratorContext {
                 })),
                 symbol_count,
             );
-            let (mut symbols, attachments) = target
+            let (mut symbols, attachments) = match target
                 .borrow_symbols()
                 .iter()
                 .map(|(key, value)| {
@@ -570,7 +607,10 @@ impl GrazeSb3GeneratorContext {
                         }
                         Ok((symbols, target_attachments))
                     },
-                )?;
+                ) {
+                Ok(value) => value,
+                Err(err) => return Err((err, parse_context.messages)),
+            };
             symbols.extend(if is_stage {
                 create_stage_dependent_symbols(STAGE_FIELD_VALUE_ISTRING)
             } else {
@@ -610,14 +650,7 @@ impl GrazeSb3GeneratorContext {
                     | TargetAttachment::Broadcast { .. } => (),
                 }
             }
-            if target_attachments
-                .insert(target.get_namespace_name().clone(), attachments)
-                .is_some()
-            {
-                return Err(GrazeSb3GeneratorCreationError::ShadowedSprite {
-                    name: target.get_namespace_name().to_string(),
-                });
-            }
+            target_attachments.insert(target.get_namespace_name().clone(), attachments);
             for (key, symbol) in symbols {
                 let is_list = symbol
                     .known_block
@@ -833,6 +866,7 @@ pub mod symbol_data_derivation {
             core::{AssetFile, GrazeSb3GeneratorCreationError, compute_hash},
             ids::generate_random_id_string,
         },
+        lexer::SourceSpan,
         names::Namespace,
         parser::{
             context::{
@@ -1011,7 +1045,7 @@ pub mod symbol_data_derivation {
         this: &TargetSymbolDescriptor,
         rng: &mut T,
         namespace: &mut Namespace,
-        resources_directory: &Path,
+        resource_directory: &Path,
     ) -> Result<TargetSymbolData, GrazeSb3GeneratorCreationError>
     where
         T: Rng,
@@ -1028,8 +1062,9 @@ pub mod symbol_data_derivation {
                 &descriptor.name,
                 descriptor.canonical_name.as_ref(),
                 &descriptor.source,
-                resources_directory,
+                resource_directory,
                 HashSet::from([COSTUMES_CATEGORY_ID]),
+                descriptor.source_span,
                 |asset_id, name, md5ext, data_format| {
                     TargetAttachment::Costume(
                         Sb3Costume {
@@ -1049,8 +1084,9 @@ pub mod symbol_data_derivation {
                 &descriptor.name,
                 descriptor.canonical_name.as_ref(),
                 &descriptor.source,
-                resources_directory,
+                resource_directory,
                 HashSet::from([BACKDROPS_CATEGORY_ID, BACKDROP_TARGETS_CATEGORY_ID]),
+                descriptor.source_span,
                 |asset_id, name, md5ext, data_format| {
                     TargetAttachment::Costume(
                         Sb3Costume {
@@ -1070,8 +1106,9 @@ pub mod symbol_data_derivation {
                 &descriptor.name,
                 descriptor.canonical_name.as_ref(),
                 &descriptor.source,
-                resources_directory,
+                resource_directory,
                 HashSet::from([SOUNDS_CATEGORY_ID]),
+                descriptor.source_span,
                 |asset_id, name, md5ext, data_format| {
                     TargetAttachment::Sound(
                         Sb3Sound {
@@ -1092,12 +1129,17 @@ pub mod symbol_data_derivation {
     pub fn extend_path_safely(
         directory: &Path,
         rest: &str,
+        source_span: SourceSpan,
     ) -> Result<PathBuf, GrazeSb3GeneratorCreationError> {
-        let new_path = directory.join(rest).canonicalize()?;
+        let new_path = directory
+            .join(rest)
+            .canonicalize()
+            .map_err(|_| GrazeSb3GeneratorCreationError::CouldNotFindAsset { source_span })?;
         if !new_path.starts_with(directory) {
             return Err(
                 GrazeSb3GeneratorCreationError::PathTriesToEscapeResourceDirectory {
                     path: new_path,
+                    source_span,
                 },
             );
         }
@@ -1108,15 +1150,17 @@ pub mod symbol_data_derivation {
         name: &str,
         canonical_name: Option<&IString>,
         source: &str,
-        resources_directory: &Path,
+        resource_directory: &Path,
         categories: HashSet<u32>,
+        source_span: SourceSpan,
         create_attachment: F,
     ) -> Result<TargetSymbolData, GrazeSb3GeneratorCreationError>
     where
         F: FnOnce(String, String, String, String) -> TargetAttachment,
     {
-        let path = extend_path_safely(resources_directory, source)?;
-        let asset_id = compute_hash(&path)?;
+        let path = extend_path_safely(resource_directory, source, source_span)?;
+        let asset_id = compute_hash(&path)
+            .map_err(|_| GrazeSb3GeneratorCreationError::CouldNotFindAsset { source_span })?;
         let ext = Path::new(source)
             .extension()
             .and_then(OsStr::to_str)

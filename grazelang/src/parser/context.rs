@@ -108,6 +108,7 @@ pub struct CostumeDescriptor {
     pub rotation_center_x: Option<f64>,
     pub rotation_center_y: Option<f64>,
     pub symbol_idx: usize,
+    pub source_span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -118,6 +119,7 @@ pub struct BackdropDescriptor {
     pub rotation_center_x: Option<f64>,
     pub rotation_center_y: Option<f64>,
     pub symbol_idx: usize,
+    pub source_span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -126,6 +128,7 @@ pub struct SoundDescriptor {
     pub canonical_name: Option<IString>,
     pub source: IString,
     pub symbol_idx: usize,
+    pub source_span: SourceSpan,
 }
 
 pub trait ResolveKnownBlock {

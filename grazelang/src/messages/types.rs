@@ -4,7 +4,7 @@ use arcstr::ArcStr as IString;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen::core::GrazeSb3GeneratorError,
+    codegen::core::{GrazeSb3GeneratorCreationError, GrazeSb3GeneratorError},
     eval::call::ConstantExprValue,
     lexer::SourceSpan,
     parser::cst::{Expression, GetPos, Identifier, ParseError},
@@ -14,22 +14,30 @@ pub trait GetLintId {
     fn get_lint_id(&self) -> &'static str;
 }
 
-#[derive(Debug, Clone, PartialEq, thiserror::Error, enum_assoc::Assoc)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum GrazeError {
     #[error("{0}")]
     Custom(IString, SourceSpan),
     #[error(transparent)]
     ParseError(#[from] ParseError),
     #[error(transparent)]
+    CodegenInitializationError(#[from] GrazeSb3GeneratorCreationError),
+    #[error(transparent)]
     CodegenError(#[from] GrazeSb3GeneratorError),
+    #[error(transparent)]
+    CLIError(#[from] CLIError),
 }
+
+const EMPTY_SOURCE_SPAN: &SourceSpan = &(((0, 0), (0, 0)), 0);
 
 impl GetPos for GrazeError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             GrazeError::Custom(_, source_span) => source_span,
             GrazeError::ParseError(error) => error.get_source_span(),
+            GrazeError::CodegenInitializationError(error) => error.get_source_span(),
             GrazeError::CodegenError(error) => error.get_source_span(),
+            GrazeError::CLIError(_) => EMPTY_SOURCE_SPAN,
         }
     }
 }
@@ -403,6 +411,34 @@ impl From<ParseError> for GrazeMessage {
 
 impl From<GrazeSb3GeneratorError> for GrazeMessage {
     fn from(value: GrazeSb3GeneratorError) -> Self {
+        Self::Error(value.into(), None)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, thiserror::Error, enum_assoc::Assoc)]
+#[func(const fn internal_lint_id(&self) -> &'static str)]
+#[func(pub const fn get_primary_message(&self) -> &'static str)]
+pub enum CLIError {
+    #[assoc(internal_lint_id = "path_does_not_exist")]
+    #[assoc(get_primary_message = "path does not exist")]
+    #[error("path does not exist")]
+    PathDoesNotExist,
+}
+
+impl GetLintId for CLIError {
+    fn get_lint_id(&self) -> &'static str {
+        self.internal_lint_id()
+    }
+}
+
+impl From<CLIError> for GrazeMessage {
+    fn from(value: CLIError) -> Self {
+        Self::Error(value.into(), None)
+    }
+}
+
+impl From<GrazeSb3GeneratorCreationError> for GrazeMessage {
+    fn from(value: GrazeSb3GeneratorCreationError) -> Self {
         Self::Error(value.into(), None)
     }
 }

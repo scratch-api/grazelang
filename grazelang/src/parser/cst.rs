@@ -1797,6 +1797,15 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "sprite_named_stage")]
+    #[assoc(internal_primary_message = "name of sprite cannot be \"stage\"")]
+    #[assoc(get_secondary_message = "sprite cannot be named \"stage\"")]
+    #[error("you cannot call a sprite \"stage\", try using a canonical name")]
+    SpriteNamedStage {
+        #[cfg(feature = "include_context_in_parse_errors")]
+        context: IString,
+        source_span: SourceSpan,
+    },
     #[assoc(internal_lint_id = "missing_flat_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "missing dictionary entry here")]
@@ -1848,7 +1857,7 @@ pub enum ParseError {
         source: ConstantExprEvaluationError,
     },
     #[assoc(internal_lint_id = "io_error")]
-    #[assoc(internal_primary_message = "")]
+    #[assoc(internal_primary_message = "an io error occurred")]
     #[assoc(get_secondary_message = "")]
     #[error("{source}")]
     IoError {
@@ -2166,6 +2175,11 @@ impl GetPos for ParseError {
                 source_span,
             } => source_span,
             ParseError::SymbolNamedSelf {
+                #[cfg(feature = "include_context_in_parse_errors")]
+                    context: _,
+                source_span,
+            } => source_span,
+            ParseError::SpriteNamedStage {
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span,

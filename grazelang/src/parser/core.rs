@@ -338,26 +338,34 @@ pub fn create_unexpected_token_error(
     }
 }
 
+macro_rules! emit_error {
+    ($err:expr, $context:expr) => {{
+        let err = $err;
+        let context = &mut *$context;
+        context.successful = false;
+        match context.settings.message_setting {
+            GrazeMessageSetting::ExitOnError => {
+                if !matches!(
+                    context.messages.last(),
+                    Some(GrazeMessage::Error(GrazeError::ParseError(other_err), None)) if other_err == &err
+                ) {
+                    context.messages.push(err.clone().into());
+                }
+                return Err(err);
+            }
+            GrazeMessageSetting::ExitOnErrorUnlogged => return Err(err),
+            _ => (),
+        }
+        emit_message(context, err.into(), GrazeMessageSetting::Errors);
+    }};
+}
+
 macro_rules! try_or_emit_message {
     ($value:expr, $context:expr, $default_value:expr) => {
         match $value {
             Ok(value) => value,
             Err(err) => {
-                $context.successful = false;
-                match $context.settings.message_setting {
-                    GrazeMessageSetting::ExitOnError => {
-                        if !matches!(
-                            $context.messages.last(),
-                            Some(GrazeMessage::Error(GrazeError::ParseError(other_err), None)) if other_err == &err
-                        ) {
-                            $context.messages.push(err.clone().into());
-                        }
-                        return Err(err);
-                    }
-                    GrazeMessageSetting::ExitOnErrorUnlogged => return Err(err),
-                    _ => (),
-                }
-                emit_message($context, err.into(), GrazeMessageSetting::Errors);
+                emit_error!(err, $context);
                 return $default_value;
             }
         }
@@ -1237,12 +1245,16 @@ pub mod statement {
                 Some(context::Target::Stage { .. }),
             ) = (default_scope, &scope, &context.next_target)
             {
-                return Err(ParseError::LocalSymbolInStage {
-                    #[cfg(feature = "include_context_in_parse_errors")]
-                    context: literal!(static_current_context!()),
-                    source_span: *source_span,
-                });
+                emit_error!(
+                    ParseError::LocalSymbolInStage {
+                        #[cfg(feature = "include_context_in_parse_errors")]
+                        context: literal!(static_current_context!()),
+                        source_span: *source_span,
+                    },
+                    context
+                );
             }
+            let mut errors = Vec::new();
             with_mut_target_scope_or_global_scope!(
                 context,
                 matches!(
@@ -1265,12 +1277,12 @@ pub mod statement {
                 symbols => {
                     let name = &identifier.to_single().unwrap().0;
                     match name.as_str() {
-                        "super" => return Err(ParseError::SymbolNamedSuper {
+                        "super" => errors.push(ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
                         }),
-                        "self" => return Err(ParseError::SymbolNamedSelf {
+                        "self" => errors.push(ParseError::SymbolNamedSelf {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
                             source_span: identifier.to_single().unwrap().1,
@@ -1333,6 +1345,9 @@ pub mod statement {
                     }
                 }
             );
+            for error in errors {
+                emit_error!(error, context);
+            }
             let declaration = match value {
                 DeclarationValue::None => match dec_type {
                     SingleDataDeclarationType::Unset => match default_type {
@@ -1708,6 +1723,7 @@ pub mod statement {
                 source_span: *source_span,
             });
         }
+        let mut errors = Vec::new();
         with_mut_target_scope_or_global_scope!(
             context,
             matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) ||
@@ -1715,12 +1731,12 @@ pub mod statement {
             symbols => {
                 let name = &identifier.to_single().unwrap().0;
                 match name.as_str() {
-                    "super" => return Err(ParseError::SymbolNamedSuper {
+                    "super" => errors.push(ParseError::SymbolNamedSuper {
                         #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
                         source_span: identifier.to_single().unwrap().1,
                     }),
-                    "self" => return Err(ParseError::SymbolNamedSelf {
+                    "self" => errors.push(ParseError::SymbolNamedSelf {
                         #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
                         source_span: identifier.to_single().unwrap().1,
@@ -1791,6 +1807,9 @@ pub mod statement {
                 }
             }
         );
+        for error in errors {
+            emit_error!(error, context);
+        }
         let declaration = match value {
             DeclarationValue::None => match dec_type {
                 SingleDataDeclarationType::Unset => SingleDataDeclaration::EmptyVariable(
@@ -2447,6 +2466,7 @@ pub mod statement {
                                         rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
                                         rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
                                         symbol_idx,
+                                        source_span: token_stream.span_from_previous_to_current(start_pos)
                                     }
                                 ),
                                 AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
@@ -2457,6 +2477,7 @@ pub mod statement {
                                         rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
                                         rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
                                         symbol_idx,
+                                        source_span: token_stream.span_from_previous_to_current(start_pos)
                                     }
                                 ),
                                 AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
@@ -2465,6 +2486,7 @@ pub mod statement {
                                         canonical_name,
                                         source: path,
                                         symbol_idx,
+                                        source_span: token_stream.span_from_previous_to_current(start_pos)
                                     }
                                 ),
                             }
@@ -2489,19 +2511,7 @@ pub mod statement {
                         }
                     });
                     for error in errors {
-                        context.successful = false;
-                        if matches!(
-                            context.settings.message_setting,
-                            GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
-                        ) {
-                            if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
-                                context.messages.push(error.clone()
-                                    .into(),
-                                );
-                            }
-                            return Err(error);
-                        }
-                        emit_message(context, error.into(), GrazeMessageSetting::Errors);
+                        emit_error!(error, context);
                     }
                     SingleAssetDeclaration(
                         canonical_identifier,
@@ -2605,6 +2615,7 @@ pub mod statement {
                                     rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
                                     rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
                                     symbol_idx,
+                                    source_span: token_stream.span_from_previous_to_current(start_pos)
                                 }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
@@ -2615,6 +2626,7 @@ pub mod statement {
                                     rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
                                     rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
                                     symbol_idx,
+                                    source_span: token_stream.span_from_previous_to_current(start_pos)
                                 }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
@@ -2623,6 +2635,7 @@ pub mod statement {
                                     canonical_name,
                                     source: path,
                                     symbol_idx,
+                                    source_span: token_stream.span_from_previous_to_current(start_pos)
                                 }
                             ),
                         }
@@ -2647,17 +2660,7 @@ pub mod statement {
                     }
                 });
                 for error in errors {
-                    context.successful = false;
-                    if matches!(
-                        context.settings.message_setting,
-                        GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
-                    ) {
-                        if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
-                            context.messages.push(error.clone().into());
-                        }
-                        return Err(error);
-                    }
-                    emit_message(context, error.into(), GrazeMessageSetting::Errors);
+                    emit_error!(error, context);
                 }
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     Some(canonical_identifier),
@@ -2741,6 +2744,7 @@ pub mod statement {
                                     rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
                                     rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
                                     symbol_idx,
+                                    source_span: token_stream.span_from_previous_to_current(start_pos),
                                 }
                             ),
                             AssetDeclarationType::Backdrop => TargetSymbolDescriptor::Backdrop(
@@ -2751,6 +2755,7 @@ pub mod statement {
                                     rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
                                     rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
                                     symbol_idx,
+                                    source_span: token_stream.span_from_previous_to_current(start_pos),
                                 }
                             ),
                             AssetDeclarationType::Sound => TargetSymbolDescriptor::Sound(
@@ -2759,6 +2764,7 @@ pub mod statement {
                                     canonical_name,
                                     source: path,
                                     symbol_idx,
+                                    source_span: token_stream.span_from_previous_to_current(start_pos),
                                 }
                             ),
                         }
@@ -2783,17 +2789,7 @@ pub mod statement {
                     }
                 });
                 for error in errors {
-                    context.successful = false;
-                    if matches!(
-                        context.settings.message_setting,
-                        GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
-                    ) {
-                        if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
-                            context.messages.push(error.clone().into());
-                        }
-                        return Err(error);
-                    }
-                    emit_message(context, error.into(), GrazeMessageSetting::Errors);
+                    emit_error!(error, context);
                 }
                 Ok(AssetDeclaration::Single(SingleAssetDeclaration(
                     None,
@@ -2922,17 +2918,18 @@ pub mod statement {
             params.push((param_kind, canonical_identifier, identifier, comma));
         };
         let code_block = parse_code_block(token_stream, context)?;
+        let mut errors = Vec::new();
         with_mut_next_target!(context, target => {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
             let name = &identifier.to_single().unwrap().0;
             match name.as_str() {
-                "super" => return Err(ParseError::SymbolNamedSuper {
+                "super" => errors.push(ParseError::SymbolNamedSuper {
                     #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: identifier.to_single().unwrap().1,
                 }),
-                "self" => return Err(ParseError::SymbolNamedSelf {
+                "self" => errors.push(ParseError::SymbolNamedSelf {
                     #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
                     source_span: identifier.to_single().unwrap().1,
@@ -2965,6 +2962,9 @@ pub mod statement {
                 });
             }
         });
+        for error in errors {
+            emit_error!(error, context);
+        }
         Ok((
             warp_specifier,
             proc_keyword,
@@ -3934,6 +3934,40 @@ pub fn parse_top_level_statement(
                     TopLevelStatement
                 )
             );
+            let name = &identifier.to_single().unwrap().0;
+            match name.as_str() {
+                "super" => {
+                    emit_error!(
+                        ParseError::SymbolNamedSuper {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        },
+                        context
+                    );
+                }
+                "self" => {
+                    emit_error!(
+                        ParseError::SymbolNamedSelf {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        },
+                        context
+                    );
+                }
+                "stage" => {
+                    emit_error!(
+                        ParseError::SpriteNamedStage {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        },
+                        context
+                    );
+                }
+                _ => (),
+            }
             context.next_target = Some(context::Target::new_sprite(
                 identifier.to_single().unwrap().0.clone(),
                 canonical_identifier
@@ -3982,18 +4016,24 @@ pub fn parse_top_level_statement(
             let name = &identifier.to_single().unwrap().0;
             match name.as_str() {
                 "super" => {
-                    return Err(ParseError::SymbolNamedSuper {
-                        #[cfg(feature = "include_context_in_parse_errors")]
-                        context: literal!(static_current_context!()),
-                        source_span: identifier.to_single().unwrap().1,
-                    });
+                    emit_error!(
+                        ParseError::SymbolNamedSuper {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        },
+                        context
+                    );
                 }
                 "self" => {
-                    return Err(ParseError::SymbolNamedSelf {
-                        #[cfg(feature = "include_context_in_parse_errors")]
-                        context: literal!(static_current_context!()),
-                        source_span: identifier.to_single().unwrap().1,
-                    });
+                    emit_error!(
+                        ParseError::SymbolNamedSelf {
+                            #[cfg(feature = "include_context_in_parse_errors")]
+                            context: literal!(static_current_context!()),
+                            source_span: identifier.to_single().unwrap().1,
+                        },
+                        context
+                    );
                 }
                 _ => (),
             }
