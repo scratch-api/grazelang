@@ -35,13 +35,14 @@ pub struct SourceDescriptor<'a> {
     pub line_starts: &'a [usize],
 }
 
-pub fn annotate<'a, I, F>(iter: I, mut source_getter: F) -> Vec<Group<'a>>
+pub fn annotate<'a, I, S, P>(iter: I, mut source_getter: S, mut printer: P)
 where
     I: Iterator<Item = &'a GrazeMessage>,
-    F: FnMut(u32) -> SourceDescriptor<'a>,
+    S: FnMut(u32) -> SourceDescriptor<'a>,
+    P: for<'b> FnMut(&'b [Group<'a>]),
 {
-    iter.map(|value| value.annotate(&mut source_getter))
-        .collect()
+    let mut groups = Vec::with_capacity(4);
+    iter.for_each(move |value| printer(value.annotate(&mut source_getter, &mut groups)));
 }
 
 pub fn convert_source_span(text_span: TextSpan, line_starts: &[usize]) -> std::ops::Range<usize> {
@@ -52,11 +53,16 @@ pub fn convert_source_span(text_span: TextSpan, line_starts: &[usize]) -> std::o
 }
 
 impl GrazeMessage {
-    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
+    pub fn annotate<'a, 'b, F>(
+        &'a self,
+        mut source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
-        match self {
+        groups.clear();
+        let value = match self {
             GrazeMessage::Error(graze_error, _graze_suggestion) => match graze_error {
                 // TODO: Implement suggestions
                 // Issue: #68
@@ -122,7 +128,9 @@ impl GrazeMessage {
                 }
                 error
             })),
-        }
+        };
+        groups.push(value);
+        &*groups
     }
 }
 

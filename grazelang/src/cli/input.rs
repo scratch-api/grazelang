@@ -297,12 +297,13 @@ impl Cli {
                 warning_count,
             });
         }
-        let anns = annotations::annotate(messages.iter(), |id| {
-            source_files.get(&id).unwrap().as_descriptor()
-        });
-        for ann in anns {
-            anstream::println!("{}", renderer.render(std::slice::from_ref(&ann)));
-        }
+        annotations::annotate(
+            messages.iter(),
+            |id| source_files.get(&id).unwrap().as_descriptor(),
+            |ann| {
+                anstream::println!("{}", renderer.render(ann));
+            },
+        );
         if error {
             Successful::No
         } else {
