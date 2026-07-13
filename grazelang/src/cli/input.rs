@@ -300,8 +300,8 @@ impl Cli {
         let anns = annotations::annotate(messages.iter(), |id| {
             source_files.get(&id).unwrap().as_descriptor()
         });
-        if !anns.is_empty() {
-            anstream::println!("{}", renderer.render(&anns));
+        for ann in anns {
+            anstream::println!("{}", renderer.render(std::slice::from_ref(&ann)));
         }
         if error {
             Successful::No
