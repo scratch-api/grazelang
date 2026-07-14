@@ -253,9 +253,6 @@ pub fn count_errors_and_warnings(messages: &[GrazeMessage]) -> (usize, usize) {
     (errors, warnings)
 }
 
-// TODO: Check unwraps and possibly replace
-// Issue: #52
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Successful {
     Yes,
