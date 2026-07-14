@@ -7,6 +7,7 @@ use crate::{
     lexer::TextSpan,
     messages::types::{CLIError, GetLintId, GrazeInfo, GrazeWarning},
     parser::cst::{GetPos, ParseError},
+    zipper::WriteIntoZipError,
 };
 
 use super::types::GrazeMessage;
@@ -94,6 +95,7 @@ impl GrazeMessage {
                 super::types::GrazeError::CodegenError(graze_sb3_generator_error) => {
                     graze_sb3_generator_error.annotate(source_getter)
                 }
+                super::types::GrazeError::ZipError(error) => error.annotate(),
                 super::types::GrazeError::CLIError(error) => error.annotate(),
             },
             GrazeMessage::Warning(graze_warning, _graze_suggestion) => {
@@ -316,5 +318,15 @@ impl GrazeSb3GeneratorCreationError {
                             .label(secondary_message),
                     ),
             )
+    }
+}
+
+impl WriteIntoZipError {
+    pub fn annotate<'a>(&'a self) -> Group<'a> {
+        Group::with_title(
+            Level::ERROR
+                .primary_title(self.get_primary_message())
+                .id(self.get_lint_id()),
+        )
     }
 }

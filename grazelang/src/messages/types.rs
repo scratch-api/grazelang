@@ -8,6 +8,7 @@ use crate::{
     eval::call::ConstantExprValue,
     lexer::SourceSpan,
     parser::cst::{Expression, GetPos, Identifier, ParseError},
+    zipper::WriteIntoZipError,
 };
 
 pub trait GetLintId {
@@ -25,6 +26,8 @@ pub enum GrazeError {
     #[error(transparent)]
     CodegenError(#[from] GrazeSb3GeneratorError),
     #[error(transparent)]
+    ZipError(#[from] WriteIntoZipError),
+    #[error(transparent)]
     CLIError(#[from] CLIError),
 }
 
@@ -37,7 +40,7 @@ impl GetPos for GrazeError {
             GrazeError::ParseError(error) => error.get_source_span(),
             GrazeError::CodegenInitializationError(error) => error.get_source_span(),
             GrazeError::CodegenError(error) => error.get_source_span(),
-            GrazeError::CLIError(_) => EMPTY_SOURCE_SPAN,
+            GrazeError::CLIError(_) | GrazeError::ZipError(_) => EMPTY_SOURCE_SPAN,
         }
     }
 }
@@ -439,6 +442,12 @@ impl From<CLIError> for GrazeMessage {
 
 impl From<GrazeSb3GeneratorCreationError> for GrazeMessage {
     fn from(value: GrazeSb3GeneratorCreationError) -> Self {
+        Self::Error(value.into(), None)
+    }
+}
+
+impl From<WriteIntoZipError> for GrazeMessage {
+    fn from(value: WriteIntoZipError) -> Self {
         Self::Error(value.into(), None)
     }
 }

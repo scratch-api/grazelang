@@ -392,11 +392,15 @@ impl Cli {
             context.messages.push(err.into());
         }
         let codegen_time = codegen_timer.elapsed();
-        if Self::print_errors(&mut context.messages, &source_files, false) == Successful::No {
-            std::process::exit(1);
+        {
+            let (errors, _) = count_errors_and_warnings(&context.messages);
+            if errors > 0 {
+                Self::print_errors(&mut context.messages, &source_files, true);
+                std::process::exit(1);
+            }
         }
         let (mut output_path, set_extension) = match target {
-            Some(target) if target.is_file() => (target.to_path_buf(), false),
+            Some(target) if target.is_file() || !target.exists() => (target.to_path_buf(), false),
             Some(target) => (
                 target.join(
                     path.file_name()
@@ -405,7 +409,21 @@ impl Cli {
                 ),
                 true,
             ),
-            None if is_file => (path, true),
+            None if is_file => (
+                {
+                    let mut path = path;
+                    if path
+                        .extension()
+                        .map(|value| value == OsStr::new("sb3"))
+                        .unwrap_or_default()
+                    {
+                        path.set_extension("out");
+                        path.add_extension("sb3");
+                    }
+                    path
+                },
+                true,
+            ),
             None => (
                 path.join(
                     path.file_name()
@@ -419,6 +437,16 @@ impl Cli {
             output_path.set_extension("sb3");
         }
         let zip_timer = Instant::now();
+        if let Err(err) = zipper::write_to_zip_path(&output_path, &context) {
+            if context.settings.message_setting >= GrazeMessageSetting::ExitOnError {
+                context.messages.push(err.into());
+            }
+            Self::print_errors(&mut context.messages, &source_files, true);
+            std::process::exit(1);
+        }
+        if Self::print_errors(&mut context.messages, &source_files, false) == Successful::No {
+            std::process::exit(1);
+        }
         zipper::write_to_zip_path(&output_path, &context).unwrap();
         let zip_time = zip_timer.elapsed();
         if log_time {
