@@ -362,7 +362,7 @@
     "52": {
         "filepath": "grazelang/src/cli/input.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L97-L97",
         "commit": "40282eddc0379746324c64a9cf92c463e68cdf32",
         "title": "Check unwraps and possibly replace"
