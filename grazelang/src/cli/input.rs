@@ -447,7 +447,6 @@ impl Cli {
         if Self::print_errors(&mut context.messages, &source_files, false) == Successful::No {
             std::process::exit(1);
         }
-        zipper::write_to_zip_path(&output_path, &context).unwrap();
         let zip_time = zip_timer.elapsed();
         if log_time {
             println!("Parsing took: {:?}", parse_time);
