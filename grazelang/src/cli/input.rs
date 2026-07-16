@@ -317,12 +317,6 @@ impl Cli {
         log_time: bool,
     ) {
         let total_time = Instant::now();
-        // TODO: Improve logging
-        //  - [x] Indicate which source file a message originated from
-        //  - [x] Improve error messages
-        //  - [x] Decide on a consistent logging format
-        //  - [x] Replace panics
-        // Issue: #54
         let path_is_file = path.is_file();
         let mut context = ParseContext::new(
             GrazeSettings {
