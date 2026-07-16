@@ -426,6 +426,10 @@ pub enum CLIError {
     #[assoc(get_primary_message = "path does not exist")]
     #[error("path does not exist")]
     PathDoesNotExist,
+    #[assoc(internal_lint_id = "path_neither_file_nor_directory")]
+    #[assoc(get_primary_message = "path is neither a file nor a directory")]
+    #[error("path is neither a file nor a directory")]
+    PathNeitherFileNorDirectory,
 }
 
 impl GetLintId for CLIError {

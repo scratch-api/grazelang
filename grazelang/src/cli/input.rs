@@ -21,7 +21,7 @@ use crate::{
     parser::{
         self,
         context::ParseContext,
-        core::{PeekableLexer, emit_message},
+        core::{PeekableLexer, emit_message as emit_message_parse_context},
         cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
@@ -318,18 +318,18 @@ impl Cli {
     ) {
         let total_time = Instant::now();
         // TODO: Improve logging
-        //  - [ ] Indicate which source file a message originated from
-        //  - [ ] Improve error messages
-        //  - [ ] Decide on a consistent logging format
-        //  - [ ] Replace panics
+        //  - [x] Indicate which source file a message originated from
+        //  - [x] Improve error messages
+        //  - [x] Decide on a consistent logging format
+        //  - [x] Replace panics
         // Issue: #54
-        let is_file = path.is_file();
+        let path_is_file = path.is_file();
         let mut context = ParseContext::new(
             GrazeSettings {
                 message_setting: *logging,
                 use_shadows: *shadows,
                 resources_path: Some(resources.map(Path::to_path_buf).unwrap_or_else(|| {
-                    if is_file {
+                    if path_is_file {
                         path.parent().unwrap_or(Path::new("/")).to_path_buf()
                     } else {
                         path.to_path_buf()
@@ -340,7 +340,7 @@ impl Cli {
         );
         let parse_timer = Instant::now();
         let Ok(path) = path.canonicalize() else {
-            emit_message(
+            emit_message_parse_context(
                 &mut context,
                 CLIError::PathDoesNotExist.into(),
                 GrazeMessageSetting::Errors,
@@ -353,13 +353,19 @@ impl Cli {
                 Self::print_errors(&mut context.messages, &source_files, true);
                 std::process::exit(1);
             })
-        } else if is_file {
+        } else if path_is_file {
             parse_single_file(&path, &mut context).unwrap_or_else(|(_, source_files)| {
                 Self::print_errors(&mut context.messages, &source_files, true);
                 std::process::exit(1);
             })
         } else {
-            panic!();
+            emit_message_parse_context(
+                &mut context,
+                CLIError::PathNeitherFileNorDirectory.into(),
+                GrazeMessageSetting::Errors,
+            );
+            Self::print_errors(&mut context.messages, &HashMap::new(), true);
+            std::process::exit(1);
         };
         let parse_time = parse_timer.elapsed();
         if !context.successful {
@@ -406,7 +412,7 @@ impl Cli {
                 ),
                 true,
             ),
-            None if is_file => (
+            None if path_is_file => (
                 {
                     let mut path = path;
                     if path
