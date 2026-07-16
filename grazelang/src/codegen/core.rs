@@ -1928,17 +1928,29 @@ where
     Ok(value)
 }
 
-pub fn use_symbol_as(context: &mut GrazeSb3GeneratorContext, symbol: SymbolId, name: IString) {
-    let previous_value =
-        context
+pub fn use_symbol_as(
+    context: &mut GrazeSb3GeneratorContext,
+    symbol: SymbolId,
+    name: IString,
+    overwrite: bool,
+) {
+    if overwrite
+        || context
             .symbol_table
-            .insert_alias(Default::default(), name.clone(), symbol);
-    context
-        .scope_stack
-        .last_mut()
-        .unwrap()
-        .entry(name)
-        .or_insert(previous_value);
+            .get_child(Default::default(), &name)
+            .is_none()
+    {
+        let previous_value =
+            context
+                .symbol_table
+                .insert_alias(Default::default(), name.clone(), symbol);
+        context
+            .scope_stack
+            .last_mut()
+            .unwrap()
+            .entry(name)
+            .or_insert(previous_value);
+    }
 }
 
 pub fn emit_message(
@@ -3860,9 +3872,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context
                     .symbol_table
                     .insert_child(arguments_symbol_id, key.clone(), arg);
-                use_symbol_as(context, arg, key);
+                use_symbol_as(context, arg, key, false);
             }
-            use_symbol_as(context, arguments_symbol_id, ARGUMENTS_ISTRING.clone());
+            use_symbol_as(
+                context,
+                arguments_symbol_id,
+                ARGUMENTS_ISTRING.clone(),
+                true,
+            );
             default_visit_custom_block_definition(self, value, context)
         })?;
         context.symbol_table[Default::default()]
@@ -3989,7 +4006,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         .as_ref()
                         .map(|(_, name)| name.to_single().unwrap().0.clone())
                         .unwrap_or_else(|| path.last().unwrap_or(EMPTY_ISTRING_REF).clone());
-                    use_symbol_as(context, symbol, name);
+                    use_symbol_as(context, symbol, name, true);
                     for _ in 0..size {
                         path.pop();
                     }
@@ -4093,9 +4110,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_sb3_target = Some(stage);
         context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
         wrap_in_scope(context, |context| {
-            let mut insert_symbols = Vec::new();
+            let namespace = &context.symbol_table[sprite_symbol_id].namespace;
+            let mut insert_symbols = Vec::with_capacity(namespace.len());
             let root_symbol_id = Default::default();
-            for (key, symbol_id) in &context.symbol_table[sprite_symbol_id].namespace {
+            for (key, symbol_id) in namespace {
                 if context
                     .symbol_table
                     .get_child(root_symbol_id, key)
@@ -4106,7 +4124,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 insert_symbols.push((key.clone(), *symbol_id));
             }
             for (key, symbol_id) in insert_symbols {
-                use_symbol_as(context, symbol_id, key);
+                use_symbol_as(context, symbol_id, key, false);
             }
             default_visit_top_level_statement_stage(self, value, context)
         })?;
@@ -4193,9 +4211,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_sb3_target = Some(new_sprite);
         context.current_target_symbol_name = Some(value.2.to_single().unwrap().0.clone());
         wrap_in_scope(context, |context| {
-            let mut insert_symbols = Vec::new();
+            let namespace = &context.symbol_table[sprite_symbol_id].namespace;
+            let mut insert_symbols = Vec::with_capacity(namespace.len());
             let root_symbol_id = Default::default();
-            for (key, symbol_id) in &context.symbol_table[sprite_symbol_id].namespace {
+            for (key, symbol_id) in namespace {
                 if context
                     .symbol_table
                     .get_child(root_symbol_id, key)
@@ -4206,7 +4225,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 insert_symbols.push((key.clone(), *symbol_id));
             }
             for (key, symbol_id) in insert_symbols {
-                use_symbol_as(context, symbol_id, key);
+                use_symbol_as(context, symbol_id, key, false);
             }
             default_visit_top_level_statement_sprite(self, value, context)
         })?;
