@@ -1928,6 +1928,19 @@ where
     Ok(value)
 }
 
+pub fn use_symbol_as(context: &mut GrazeSb3GeneratorContext, symbol: SymbolId, name: IString) {
+    let previous_value =
+        context
+            .symbol_table
+            .insert_alias(Default::default(), name.clone(), symbol);
+    context
+        .scope_stack
+        .last_mut()
+        .unwrap()
+        .entry(name)
+        .or_insert(previous_value);
+}
+
 pub fn emit_message(
     context: &mut GrazeSb3GeneratorContext,
     message: GrazeMessage,
@@ -3652,8 +3665,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        // TODO: Alias args into global scope
-        // Issue: #69
         context.current_previous_block = None;
         context.current_parent = None;
         context.arg_stack.clear();
@@ -3790,7 +3801,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             );
             Ok(())
         })?;
-        let arguments = value
+        let arguments: HashMap<IString, Symbol> = value
             .5
             .iter()
             .map(|value| {
@@ -3838,19 +3849,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             })
             .collect::<HashMap<_, _>>();
         const ARGUMENTS_ISTRING: &IString = &literal!("args");
-        let arguments_symbol_id = context.symbol_table.new_child_symbol(
-            Default::default(),
-            ARGUMENTS_ISTRING.clone(),
-            None,
-            arguments.len(),
-        );
-        for (key, arg) in arguments {
-            let arg = context.symbol_table.new_symbol(arg);
-            context
-                .symbol_table
-                .insert_child(arguments_symbol_id, key, arg);
-        }
         wrap_in_scope(context, |context| {
+            let arguments_symbol_id = context.symbol_table.new_symbol(Symbol {
+                known_block: None,
+                namespace: HashMap::with_capacity(arguments.len()),
+                parent: Default::default(),
+            });
+            for (key, arg) in arguments {
+                let arg = context.symbol_table.new_symbol(arg);
+                context
+                    .symbol_table
+                    .insert_child(arguments_symbol_id, key.clone(), arg);
+                use_symbol_as(context, arg, key);
+            }
+            use_symbol_as(context, arguments_symbol_id, ARGUMENTS_ISTRING.clone());
             default_visit_custom_block_definition(self, value, context)
         })?;
         context.symbol_table[Default::default()]
@@ -3977,16 +3989,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         .as_ref()
                         .map(|(_, name)| name.to_single().unwrap().0.clone())
                         .unwrap_or_else(|| path.last().unwrap_or(EMPTY_ISTRING_REF).clone());
-                    let previous_value =
-                        context
-                            .symbol_table
-                            .insert_alias(Default::default(), name.clone(), symbol);
-                    context
-                        .scope_stack
-                        .last_mut()
-                        .unwrap()
-                        .entry(name)
-                        .or_insert(previous_value);
+                    use_symbol_as(context, symbol, name);
                     for _ in 0..size {
                         path.pop();
                     }
@@ -4048,6 +4051,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.data_symbol_context.local_lists = context.data_symbol_context.global_lists;
         let assets = context.target_attachments.remove("stage").unwrap();
         let my_blocks_symbol_id = static_resolve_identifier!(context, [MY_BLOCKS_ISTRING]);
+        let sprite_symbol_id =
+            static_resolve_identifier!(context, [SPRITES_ISTRING, STAGE_ISTRING]);
         let mut costumes = Vec::new();
         let mut sounds = Vec::new();
         for asset in assets {
@@ -4088,6 +4093,21 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_sb3_target = Some(stage);
         context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
         wrap_in_scope(context, |context| {
+            let mut insert_symbols = Vec::new();
+            let root_symbol_id = Default::default();
+            for (key, symbol_id) in &context.symbol_table[sprite_symbol_id].namespace {
+                if context
+                    .symbol_table
+                    .get_child(root_symbol_id, key)
+                    .is_some()
+                {
+                    continue;
+                }
+                insert_symbols.push((key.clone(), *symbol_id));
+            }
+            for (key, symbol_id) in insert_symbols {
+                use_symbol_as(context, symbol_id, key);
+            }
             default_visit_top_level_statement_stage(self, value, context)
         })?;
         context
@@ -4127,26 +4147,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             static_resolve_identifier!(context, [SPRITES_ISTRING, &value.2.to_single().unwrap().0]);
         context.data_symbol_context.local_vars = sprite_symbol_id;
         context.data_symbol_context.local_lists = sprite_symbol_id;
-        let inserted_symbols = {
-            let mut insert_symbols = Vec::new();
-            let root_symbol_id = Default::default();
-            for (key, symbol_id) in &context.symbol_table[sprite_symbol_id].namespace {
-                if context
-                    .symbol_table
-                    .get_child(root_symbol_id, key)
-                    .is_some()
-                {
-                    continue;
-                }
-                insert_symbols.push((key.clone(), *symbol_id));
-            }
-            for (key, symbol_id) in &insert_symbols {
-                context
-                    .symbol_table
-                    .insert_alias(root_symbol_id, key.clone(), *symbol_id);
-            }
-            insert_symbols
-        };
         let mut costumes = Vec::new();
         let mut sounds = Vec::new();
         for asset in assets {
@@ -4193,18 +4193,27 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_sb3_target = Some(new_sprite);
         context.current_target_symbol_name = Some(value.2.to_single().unwrap().0.clone());
         wrap_in_scope(context, |context| {
+            let mut insert_symbols = Vec::new();
+            let root_symbol_id = Default::default();
+            for (key, symbol_id) in &context.symbol_table[sprite_symbol_id].namespace {
+                if context
+                    .symbol_table
+                    .get_child(root_symbol_id, key)
+                    .is_some()
+                {
+                    continue;
+                }
+                insert_symbols.push((key.clone(), *symbol_id));
+            }
+            for (key, symbol_id) in insert_symbols {
+                use_symbol_as(context, symbol_id, key);
+            }
             default_visit_top_level_statement_sprite(self, value, context)
         })?;
         context
             .sb3
             .targets
             .push(context.current_sb3_target.take().unwrap());
-        {
-            let root_symbol_id = Default::default();
-            for (key, _) in inserted_symbols {
-                context.symbol_table[root_symbol_id].namespace.remove(&key);
-            }
-        }
         context.symbol_table[my_blocks_symbol_id].namespace.clear();
         Ok(())
     }

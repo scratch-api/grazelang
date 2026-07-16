@@ -112,12 +112,14 @@ impl<'a> From<&'a str> for CountAwareChars<'a> {
 pub struct Unescaper<'a> {
     /// [`str`] cache, in reverse order.
     pub chars: CountAwareChars<'a>,
+    pub allow_escaped_dollar: bool,
 }
 impl<'a> Unescaper<'a> {
     /// Build a new [`Unescaper`] from the given [`str`].
-    pub fn new(s: &'a str) -> Self {
+    pub fn new(s: &'a str, allow_escaped_dollar: bool) -> Self {
         Self {
             chars: s.chars().into(),
+            allow_escaped_dollar,
         }
     }
 
@@ -151,6 +153,7 @@ impl<'a> Unescaper<'a> {
                 'n' => '\n',
                 'r' => '\r',
                 't' => '\t',
+                '$' if self.allow_escaped_dollar => '$',
                 // https://github.com/hack-ink/unescaper/pull/10#issuecomment-1676443635
                 //
                 // https://www.ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf
@@ -278,5 +281,10 @@ impl<'a> Unescaper<'a> {
 
 /// Unescape the given [`str`].
 pub fn unescape(s: &str) -> UResult<String> {
-    Unescaper::new(s).unescape()
+    Unescaper::new(s, false).unescape()
+}
+
+/// Unescape the given [`str`].
+pub fn unescape_format_string(s: &str) -> UResult<String> {
+    Unescaper::new(s, true).unescape()
 }

@@ -7,10 +7,10 @@ stage {
         rotation_center_y = 0.0,
     };
     {
-        switch_to_backdrop_and_wait(stage.test_costume);
+        switch_to_backdrop_and_wait(test_costume);
     }
     {
-        switch_to_backdrop(stage.test_costume);
+        switch_to_backdrop(test_costume);
     }
 }
 
@@ -28,7 +28,7 @@ sprite `Sprite1` sprite_1 {
         sin(45),
     ];
     let local list list_2;
-    events.when_green_flag_clicked {
+    when_green_flag_clicked {
         list_.clear();
         list_2.clear();
         // delete_all_of_list(list_);
@@ -52,7 +52,7 @@ sprite `Sprite1` sprite_1 {
     ("0b${list_}" + 10)
     (test)
     warp proc test_proc(str a, bool b, num c) {
-        say("a = ${args.a}; b = ${args.b}; c = ${args.c}");
+        say("a = ${a}; b = ${b}; c = ${c}");
     }
     {
         my_blocks::test_proc("tea", 5 >= 4, 1);

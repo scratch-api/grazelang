@@ -8,6 +8,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use crate::string_unescape::unescape;
+use crate::string_unescape::unescape_format_string;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Logos)]
 #[logos(extras = (Vec<usize>, usize))]
@@ -148,7 +149,10 @@ pub enum Token {
     #[token("true", |_| true)]
     #[token("false", |_| false)]
     Bool(bool),
-    #[regex(r#""(?:[^\\"$\r\n]|(?:\\.))*\$\{"#, parse_left_format_string)]
+    #[regex(
+        r#""(?:[^\\"$\r\n]|(?:\\.)|(?:\$[^\\"{\r\n]))*\$\{"#,
+        parse_left_format_string
+    )]
     LeftFormattedString(IString),
 }
 
@@ -245,8 +249,7 @@ pub fn parse_string(lex: &mut Lexer<Token>) -> IString {
 }
 
 pub fn parse_number(lex: &mut Lexer<Token>) -> IString {
-    lex
-        .slice()
+    lex.slice()
         //.replace('_', "")
         .into()
 }
@@ -254,17 +257,20 @@ pub fn parse_number(lex: &mut Lexer<Token>) -> IString {
 pub fn parse_left_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
     lex.extras.1 += 1;
     let slice = lex.slice();
-    unescape(&slice[1..slice.len() - 2]).map(Into::into).ok()
+    unescape_format_string(&slice[1..slice.len() - 2])
+        .map(Into::into)
+        .ok()
 }
 
 fn middle_regex_continuation() -> &'static Regex {
     static REGEX_LOCK: OnceLock<Regex> = OnceLock::new();
-    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.))*\$\{"#).unwrap())
+    REGEX_LOCK
+        .get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.)|(?:\$[^\\"{\r\n]))*\$\{"#).unwrap())
 }
 
 fn end_regex_continuation() -> &'static Regex {
     static REGEX_LOCK: OnceLock<Regex> = OnceLock::new();
-    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.))*""#).unwrap())
+    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.)|(?:\$[^\\"{\r\n]))*""#).unwrap())
 }
 
 pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
@@ -291,11 +297,15 @@ pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
 }
 
 pub fn parse_middle_format_string(slice: &str) -> Option<IString> {
-    unescape(&slice[..slice.len() - 2]).map(Into::into).ok()
+    unescape_format_string(&slice[..slice.len() - 2])
+        .map(Into::into)
+        .ok()
 }
 
 pub fn parse_right_format_string(slice: &str) -> Option<IString> {
-    unescape(&slice[..slice.len() - 1]).map(Into::into).ok()
+    unescape_format_string(&slice[..slice.len() - 1])
+        .map(Into::into)
+        .ok()
 }
 
 pub fn register_newline(lex: &mut Lexer<Token>) {
