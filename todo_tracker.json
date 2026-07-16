@@ -498,7 +498,7 @@
     "69": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L3625-L3625",
         "commit": "20c7415a5155ccb29dfefda582291a9dd98eacd2",
         "title": "Alias args into global scope"
