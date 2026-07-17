@@ -14,7 +14,7 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 - [ ] Raw blocks
 - [ ] Block position control
 - [ ] Full LSP support
-- [ ] Compile time calculation of expressions
+- [x] Compile time calculation of expressions
 - [ ] Preprocessing
 
 ## Credits
