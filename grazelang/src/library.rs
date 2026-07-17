@@ -19,11 +19,11 @@ use crate::{
 };
 
 pub fn get_generated_library() -> (HashMap<String, LibraryItem>, HashMap<u32, HashSet<IString>>) {
-    generate_library!("schemas/toolbox_schema.json")
+    generate_library!("src/schemas/toolbox_schema.json")
 }
 
 pub static CONSTANT_EXPR_LIBRARY: LazyLock<ConstantExprLibraryItem> = LazyLock::new(|| {
-    let mut library = generate_constant_expr_library!("schemas/toolbox_schema.json");
+    let mut library = generate_constant_expr_library!("src/schemas/toolbox_schema.json");
     let mut flattened = HashMap::<String, Option<ConstantExprLibraryItem>>::new();
     for namespace in library.namespace.values() {
         for (key, value) in &namespace.namespace {
