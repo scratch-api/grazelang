@@ -6,7 +6,7 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 
 - [x] Parser
 - [x] SB3 generation
-- [ ] Command Line interface
+- [x] Command Line interface
 - [ ] Extensions
 - [ ] Comments
 - [ ] SB3 detranspiler
