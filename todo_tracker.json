@@ -504,11 +504,11 @@
         "title": "Alias args into global scope"
     },
     "70": {
-        "filepath": "grazelang/src/lexer.rs",
-        "text": "Would allow for controlling initial position, hide/show state etc",
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "- [x] Parser\n- [x] CST components\n- [ ] Errors\n- [ ] Codegen",
         "status": "open",
-        "lines": "L178-L179",
-        "commit": "99c7ebf8214fa232ab40ec7edbe8d29329581ffa",
-        "title": "Config block for sprites etc"
+        "lines": "L4256-L4261",
+        "commit": "03acc7d475787c971fe72bb95882c756b6bdf68a",
+        "title": "Config block for stage and sprites"
     }
 }
