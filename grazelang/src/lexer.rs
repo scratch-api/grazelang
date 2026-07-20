@@ -24,6 +24,8 @@ pub enum Token {
     SpriteKeyword,
     #[token("stage")]
     StageKeyword,
+    #[token("config")]
+    ConfigKeyword,
     #[token("proc")]
     ProcKeyword,
     #[token("warp")]
@@ -82,6 +84,8 @@ pub enum Token {
     ScopeResolution,
     #[token("=")]
     Assign,
+    #[token(":")]
+    Colon,
     #[token("+")]
     Plus,
     #[token("-")]
@@ -161,6 +165,7 @@ impl std::fmt::Debug for Token {
         match self {
             Token::SpriteKeyword => write!(f, "\"sprite\""),
             Token::StageKeyword => write!(f, "\"stage\""),
+            Token::ConfigKeyword => write!(f, "\"config\""),
             Token::ProcKeyword => write!(f, "\"proc\""),
             Token::WarpKeyword => write!(f, "\"warp\""),
             Token::NowarpKeyword => write!(f, "\"nowarp\""),
@@ -179,9 +184,6 @@ impl std::fmt::Debug for Token {
             Token::SoundKeyword => write!(f, "\"sound\""),
             Token::BroadcastKeyword => write!(f, "\"broadcast\""),
             Token::ContainsKeyword => write!(f, "\"contains\""),
-            // TODO: Config block for sprites etc
-            // Would allow for controlling initial position, hide/show state etc
-            // Issue: #70
             Token::LeftBrace => write!(f, "'{{'"),
             Token::RightBrace(_) => write!(f, "'}}'"),
             Token::LeftParens => write!(f, "'('"),
@@ -192,6 +194,7 @@ impl std::fmt::Debug for Token {
             Token::Comma => write!(f, "','"),
             Token::Dot => write!(f, "'.'"),
             Token::Assign => write!(f, "'='"),
+            Token::Colon => write!(f, "':'"),
             Token::Plus => write!(f, "'+'"),
             Token::Minus => write!(f, "'-'"),
             Token::Not => write!(f, "'!'"),
@@ -270,7 +273,8 @@ fn middle_regex_continuation() -> &'static Regex {
 
 fn end_regex_continuation() -> &'static Regex {
     static REGEX_LOCK: OnceLock<Regex> = OnceLock::new();
-    REGEX_LOCK.get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.)|(?:\$[^\\"{\r\n]))*""#).unwrap())
+    REGEX_LOCK
+        .get_or_init(|| Regex::new(r#"^(?:[^\\"$\r\n]|(?:\\.)|(?:\$[^\\"{\r\n]))*""#).unwrap())
 }
 
 pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {

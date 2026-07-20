@@ -433,6 +433,119 @@ macro_rules! parse_comma_separated {
     }};
 }
 
+macro_rules! parse_flat_dictionary {
+    ($token_stream:expr, $context:expr, ($token_stream_ident:pat, $start_pos_ident:pat) => $invalid_ret:expr) => {{
+        let token_stream = &mut *$token_stream;
+        let context = &mut *$context;
+        let start_pos = peek_token_start(token_stream);
+        let left_brace = expect_token_or_message!(
+            token_stream,
+            context,
+            Token::LeftBrace => from_stream_pos!(token_stream => LeftBrace),
+            "Expected '{'.",
+            "'{'",
+            {
+                let $token_stream_ident = &mut *token_stream;
+                let $start_pos_ident = start_pos;
+                $invalid_ret
+            }
+        );
+        let mut items = Vec::new();
+        let right_brace = loop {
+            let identifier = try_or_emit_message!(
+                parse_single_identifier_as_identifier(token_stream, context),
+                context,
+                {
+                    let $token_stream_ident = &mut *token_stream;
+                    let $start_pos_ident = start_pos;
+                    $invalid_ret
+                }
+            );
+            let colon = expect_token_or_message!(
+                token_stream,
+                context,
+                Token::Colon => from_stream_pos!(token_stream => Colon),
+                "Expected '='.",
+                "'='",
+                {
+                    let $token_stream_ident = &mut *token_stream;
+                    let $start_pos_ident = start_pos;
+                    $invalid_ret
+                }
+            );
+            let literal = try_or_emit_message!(
+                parse_literal(token_stream, context),
+                context,
+                {
+                    let $token_stream_ident = &mut *token_stream;
+                    let $start_pos_ident = start_pos;
+                    $invalid_ret
+                }
+            );
+            let comma = match peek_token!(token_stream) {
+                Token::RightBrace(LexedRightBrace::Normal) => None,
+                Token::Comma => {
+                    skip_token!(token_stream);
+                    Some(from_stream_pos!(token_stream => Comma))
+                }
+                _ => {
+                    let token = next_token!(token_stream);
+                    emit_unexpected_token_message_or_return(
+                        context,
+                        token_stream,
+                        literal!("Expected '}' or ','."),
+                        literal!("'}' or ','"),
+                        #[cfg(feature = "include_context_in_parse_errors")]
+                        literal!(static_current_context!()),
+                        token,
+                    )?;
+                    return {
+                        let $token_stream_ident = &mut *token_stream;
+                        let $start_pos_ident = start_pos;
+                        $invalid_ret
+                    };
+                }
+            };
+            items.push((identifier, colon, literal, comma));
+            consume_then_never_if!(token_stream, Token::RightBrace(LexedRightBrace::Normal) => {
+                break from_stream_pos!(token_stream => RightBrace);
+            });
+        };
+        (
+            left_brace,
+            items,
+            right_brace,
+            left_brace.range_to(&right_brace),
+        )
+    }}
+}
+
+macro_rules! parse_config_statement {
+    ($token_stream:expr, $context:expr, $statement_ty:ty) => {{
+        let token_stream = &mut *$token_stream;
+        let context = &mut *$context;
+        let config_keyword = expect_token!(
+            token_stream,
+            Token::ConfigKeyword => from_stream_pos!(token_stream => ConfigKeyword),
+            "Expected \"config\".",
+            "\"config\""
+        );
+        let start_pos = get_token_start(token_stream);
+        let (left_brace, items, right_brace, source_span) = parse_flat_dictionary!(
+            token_stream,
+            context,
+            (token_stream, _) => find_statement_end_and_return_invalid!(token_stream, start_pos, $statement_ty)
+        );
+        Ok(<$statement_ty>::ConfigStatement(
+            config_keyword,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        ))
+    }}
+}
+
 pub fn emit_message(
     context: &mut ParseContext,
     message: GrazeMessage,
@@ -848,12 +961,13 @@ pub mod statement {
     use crate::{
         lexer::{self, LexedRightBrace},
         parser::cst::{
-            AssetDeclaration, CanonicalIdentifier, Comma, CustomBlockParamKind,
-            CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF,
-            LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
-            NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
-            Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
-            SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier,
+            AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword,
+            CustomBlockParamKind, CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope,
+            EMPTY_ISTRING_REF, LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry,
+            ListKeyword, ListsKeyword, NormalAssignmentOperator, ProcKeyword, RightBrace,
+            RightBracket, RightParens, Semicolon, SingleAssetDeclaration, SingleDataDeclaration,
+            SingleDataDeclarationType, SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword,
+            WarpSpecifier,
         },
     };
 
@@ -1878,8 +1992,12 @@ pub mod statement {
         identifier: Identifier,
     ) -> ParseOut<Statement> {
         let start_pos = get_token_start(token_stream);
-        expect_token!(token_stream, Token::Assign => (), "Expected '='.", "'='");
-        let assignment_operator = from_stream_pos!(token_stream => NormalAssignmentOperator);
+        let assignment_operator = expect_token!(
+            token_stream,
+            Token::Assign => from_stream_pos!(token_stream => NormalAssignmentOperator),
+            "Expected '='.",
+            "'='"
+        );
         if matches!(peek_token!(token_stream), Token::LeftBracket) {
             let (left_brace, expressions, right_brace) = parse_list_content(token_stream, context)?;
             return Ok(Statement::ListAssignment(
@@ -2226,86 +2344,34 @@ pub mod statement {
         ))
     }
 
-    pub fn parse_flat_directionary_asset_value(
+    pub fn parse_config_stage_statement(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+    ) -> ParseOut<StageStatement> {
+        parse_config_statement!(token_stream, context, StageStatement)
+    }
+
+    pub fn parse_config_sprite_statement(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+    ) -> ParseOut<SpriteStatement> {
+        parse_config_statement!(token_stream, context, SpriteStatement)
+    }
+
+    pub fn parse_flat_dictionary_asset_value(
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<cst::SingleAssetDeclarationValue> {
-        let start_pos = peek_token_start(token_stream);
-        let left_brace = expect_token_or_message!(
+        let (left_brace, items, right_brace, source_span) = parse_flat_dictionary!(
             token_stream,
             context,
-            Token::LeftBrace => from_stream_pos!(token_stream => LeftBrace),
-            "Expected '{'.",
-            "'{'",
-            find_statement_end_and_return_invalid!(token_stream, start_pos, cst::SingleAssetDeclarationValue)
+            (token_stream, start_pos) => find_statement_end_and_return_invalid!(token_stream, start_pos, cst::SingleAssetDeclarationValue)
         );
-        let mut items = Vec::<(
-            Identifier,
-            NormalAssignmentOperator,
-            cst::Literal,
-            Option<Comma>,
-        )>::new();
-        let right_brace = loop {
-            let identifier = try_or_emit_message!(
-                parse_single_identifier_as_identifier(token_stream, context),
-                context,
-                find_statement_end_and_return_invalid!(
-                    token_stream,
-                    start_pos,
-                    cst::SingleAssetDeclarationValue
-                )
-            );
-            let assignment_operator = expect_token_or_message!(
-                token_stream,
-                context,
-                Token::Assign => from_stream_pos!(token_stream => NormalAssignmentOperator),
-                "Expected '='.",
-                "'='",
-                find_statement_end_and_return_invalid!(token_stream, start_pos, cst::SingleAssetDeclarationValue)
-            );
-            let literal = try_or_emit_message!(
-                parse_literal(token_stream, context),
-                context,
-                find_statement_end_and_return_invalid!(
-                    token_stream,
-                    start_pos,
-                    cst::SingleAssetDeclarationValue
-                )
-            );
-            let comma = match peek_token!(token_stream) {
-                Token::RightBrace(LexedRightBrace::Normal) => None,
-                Token::Comma => {
-                    skip_token!(token_stream);
-                    Some(from_stream_pos!(token_stream => Comma))
-                }
-                _ => {
-                    let token = next_token!(token_stream);
-                    emit_unexpected_token_message_or_return(
-                        context,
-                        token_stream,
-                        literal!("Expected '}' or ','."),
-                        literal!("'}' or ','"),
-                        #[cfg(feature = "include_context_in_parse_errors")]
-                        literal!(static_current_context!()),
-                        token,
-                    )?;
-                    return find_statement_end_and_return_invalid!(
-                        token_stream,
-                        start_pos,
-                        cst::SingleAssetDeclarationValue
-                    );
-                }
-            };
-            items.push((identifier, assignment_operator, literal, comma));
-            consume_then_never_if!(token_stream, Token::RightBrace(LexedRightBrace::Normal) => {
-                break from_stream_pos!(token_stream => RightBrace);
-            });
-        };
         Ok(cst::SingleAssetDeclarationValue::FlatDictionary(
             left_brace,
             items,
             right_brace,
-            left_brace.range_to(&right_brace),
+            source_span,
         ))
     }
 
@@ -2395,7 +2461,7 @@ pub mod statement {
                     let value = match peek_token!(token_stream) {
                         Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
                         Token::LeftBrace => {
-                            parse_flat_directionary_asset_value(token_stream, context)?
+                            parse_flat_dictionary_asset_value(token_stream, context)?
                         }
                         _ => {
                             let token = next_token!(token_stream);
@@ -2545,7 +2611,7 @@ pub mod statement {
                 let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
                 let value = match peek_token!(token_stream) {
                     Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
-                    Token::LeftBrace => parse_flat_directionary_asset_value(token_stream, context)?,
+                    Token::LeftBrace => parse_flat_dictionary_asset_value(token_stream, context)?,
                     _ => {
                         let token = next_token!(token_stream);
                         emit_unexpected_token!(
@@ -2674,7 +2740,7 @@ pub mod statement {
                 let start_pos = get_token_start(token_stream);
                 let value = match peek_token!(token_stream) {
                     Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
-                    Token::LeftBrace => parse_flat_directionary_asset_value(token_stream, context)?,
+                    Token::LeftBrace => parse_flat_dictionary_asset_value(token_stream, context)?,
                     _ => {
                         let token = next_token!(token_stream);
                         emit_unexpected_token!(
@@ -3531,6 +3597,14 @@ pub fn parse_sprite_statement(
                 token_stream.span_from_previous_to_current(start_pos),
             ))
         }
+        Token::ConfigKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            Ok(try_or_emit_message!(
+                statement::parse_config_sprite_statement(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, SpriteStatement)
+            ))
+        }
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos!(token_stream => cst::UseKeyword);
@@ -3838,6 +3912,14 @@ pub fn parse_stage_statement(
                 right_parens,
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos!(token_stream => cst::Semicolon)),
                 token_stream.span_from_previous_to_current(start_pos),
+            ))
+        }
+        Token::ConfigKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            Ok(try_or_emit_message!(
+                statement::parse_config_stage_statement(token_stream, context),
+                context,
+                find_statement_end_and_return_invalid!(token_stream, start_pos, StageStatement)
             ))
         }
         Token::UseKeyword => {

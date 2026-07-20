@@ -127,6 +127,16 @@ impl GetPos for UseKeyword {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConfigKeyword(pub SourceSpan);
+
+impl GetPos for ConfigKeyword {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AsKeyword(pub SourceSpan);
 
 impl GetPos for AsKeyword {
@@ -388,6 +398,13 @@ pub enum StageStatement {
         Option<Semicolon>,
         SourceSpan,
     ),
+    ConfigStatement(
+        ConfigKeyword,
+        LeftBrace,
+        Vec<(Identifier, Colon, Literal, Option<Comma>)>,
+        RightBrace,
+        SourceSpan,
+    ),
     UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
@@ -405,6 +422,7 @@ impl GetPos for StageStatement {
             StageStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
             StageStatement::IsolatedBlock(_, _, p) => p,
             StageStatement::IsolatedExpression(_, _, _, _, p) => p,
+            StageStatement::ConfigStatement(_, _, _, _, p) => p,
             StageStatement::UseStatement(_, _, _, p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
             StageStatement::Invalid(p) => p,
@@ -454,6 +472,13 @@ pub enum SpriteStatement {
         Option<Semicolon>,
         SourceSpan,
     ),
+    ConfigStatement(
+        ConfigKeyword,
+        LeftBrace,
+        Vec<(Identifier, Colon, Literal, Option<Comma>)>,
+        RightBrace,
+        SourceSpan,
+    ),
     UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
@@ -471,6 +496,7 @@ impl GetPos for SpriteStatement {
             SpriteStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
             SpriteStatement::IsolatedBlock(_, _, p) => p,
             SpriteStatement::IsolatedExpression(_, _, _, _, p) => p,
+            SpriteStatement::ConfigStatement(_, _, _, _, p) => p,
             SpriteStatement::UseStatement(_, _, _, p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
             SpriteStatement::Invalid(p) => p,
@@ -518,7 +544,7 @@ pub enum SingleAssetDeclarationValue {
     Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
     FlatDictionary(
         LeftBrace,
-        Vec<(Identifier, NormalAssignmentOperator, Literal, Option<Comma>)>,
+        Vec<(Identifier, Colon, Literal, Option<Comma>)>,
         RightBrace,
         SourceSpan,
     ),
@@ -728,6 +754,16 @@ pub enum DataDeclarationScope {
 pub struct NormalAssignmentOperator(pub SourceSpan);
 
 impl GetPos for NormalAssignmentOperator {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Colon(pub SourceSpan);
+
+impl GetPos for Colon {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
         &self.0

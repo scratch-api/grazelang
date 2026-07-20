@@ -47,18 +47,19 @@ use crate::{
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
     visitor::{
-        GrazeVisitor, default_visit_code_block, default_visit_custom_block_definition,
-        default_visit_expression_binary_operation, default_visit_expression_call,
-        default_visit_expression_formatted_string, default_visit_expression_get_item,
-        default_visit_expression_get_letter, default_visit_expression_identifier,
-        default_visit_expression_literal, default_visit_expression_unary_operation,
-        default_visit_formatted_string_content, default_visit_isolated_block,
-        default_visit_isolated_expression, default_visit_multi_input_hat_statement,
-        default_visit_no_input_hat_statement, default_visit_single_input_hat_statement,
-        default_visit_statement_assignment, default_visit_statement_call,
-        default_visit_statement_forever, default_visit_statement_multi_input_control,
-        default_visit_statement_set_item, default_visit_statement_single_input_control,
-        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
+        GrazeVisitor, default_visit_code_block, default_visit_config_statement,
+        default_visit_custom_block_definition, default_visit_expression_binary_operation,
+        default_visit_expression_call, default_visit_expression_formatted_string,
+        default_visit_expression_get_item, default_visit_expression_get_letter,
+        default_visit_expression_identifier, default_visit_expression_literal,
+        default_visit_expression_unary_operation, default_visit_formatted_string_content,
+        default_visit_isolated_block, default_visit_isolated_expression,
+        default_visit_multi_input_hat_statement, default_visit_no_input_hat_statement,
+        default_visit_single_input_hat_statement, default_visit_statement_assignment,
+        default_visit_statement_call, default_visit_statement_forever,
+        default_visit_statement_multi_input_control, default_visit_statement_set_item,
+        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
+        default_visit_top_level_statement_stage,
     },
 };
 
@@ -302,6 +303,7 @@ pub struct GrazeSb3GeneratorContext {
     pub current_parent: Option<String>,
     pub current_sb3_target: Option<Sb3Target>,
     pub current_target_symbol_name: Option<IString>,
+    pub current_target_configured: bool,
     /// Is None while and after being initialized
     pub uninitialized_stage: Option<Sb3Target>,
     pub current_previous_block: Option<IdString>,
@@ -780,6 +782,7 @@ impl GrazeSb3GeneratorContext {
             current_parent: None,
             current_sb3_target: None,
             current_target_symbol_name: None,
+            current_target_configured: false,
             uninitialized_stage: Some(Sb3Target::new_stage()),
             current_previous_block: None,
             formatted_string_context: FormattedStringContext::new(),
@@ -4109,6 +4112,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         context.current_sb3_target = Some(stage);
         context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
+        context.current_target_configured = false;
         wrap_in_scope(context, |context| {
             let namespace = &context.symbol_table[sprite_symbol_id].namespace;
             let mut insert_symbols = Vec::with_capacity(namespace.len());
@@ -4210,6 +4214,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             };
         context.current_sb3_target = Some(new_sprite);
         context.current_target_symbol_name = Some(value.2.to_single().unwrap().0.clone());
+        context.current_target_configured = false;
         wrap_in_scope(context, |context| {
             let namespace = &context.symbol_table[sprite_symbol_id].namespace;
             let mut insert_symbols = Vec::with_capacity(namespace.len());
@@ -4235,5 +4240,25 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .push(context.current_sb3_target.take().unwrap());
         context.symbol_table[my_blocks_symbol_id].namespace.clear();
         Ok(())
+    }
+
+    fn visit_config_statement(
+        &self,
+        value: (
+            &cst::ConfigKeyword,
+            &cst::LeftBrace,
+            &[(Identifier, cst::Colon, Literal, Option<cst::Comma>)],
+            &cst::RightBrace,
+            &SourceSpan,
+        ),
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        // TODO: Config block for stage and sprites
+        //  - [x] Parser
+        //  - [x] CST components
+        //  - [ ] Errors
+        //  - [ ] Codegen
+        // Issue: #70
+        default_visit_config_statement(self, value, context)
     }
 }

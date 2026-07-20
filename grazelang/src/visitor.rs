@@ -1,15 +1,6 @@
 use crate::{
-    lexer::SourceSpan,
-    parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
-        Comma, CommaSeparated, CostumeKeyword, CustomBlockParamKind, DataDeclaration,
-        DataDeclarationScope, Expression, FormattedStringContent, GrazeProgram, Identifier,
-        LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry,
-        ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace,
-        RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock,
-        SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement,
-        SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent,
-        VarKeyword, VarsKeyword, WarpSpecifier,
+    lexer::SourceSpan, parser::cst::{
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Colon, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier,
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -217,6 +208,20 @@ pub trait GrazeVisitor<C, E> {
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_sprite_statement_costume_declaration(self, value, context)
+    }
+
+    fn visit_config_statement(
+        &self,
+        value: (
+            &ConfigKeyword,
+            &LeftBrace,
+            &[(Identifier, Colon, Literal, Option<Comma>)],
+            &RightBrace,
+            &SourceSpan,
+        ),
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_config_statement(self, value, context)
     }
 
     fn visit_code_block(&self, value: &CodeBlock, context: &mut C) -> Result<(), E> {
@@ -904,6 +909,18 @@ where
                 context,
             )?;
         }
+        StageStatement::ConfigStatement(
+            config_keyword,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        ) => {
+            visitor.visit_config_statement(
+                (config_keyword, left_brace, items, right_brace, source_span),
+                context,
+            )?;
+        }
         StageStatement::UseStatement(
             use_keyword,
             use_statement_content,
@@ -1052,6 +1069,18 @@ where
                     semicolon.as_ref(),
                     source_span,
                 ),
+                context,
+            )?;
+        }
+        SpriteStatement::ConfigStatement(
+            config_keyword,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        ) => {
+            visitor.visit_config_statement(
+                (config_keyword, left_brace, items, right_brace, source_span),
                 context,
             )?;
         }
@@ -1235,6 +1264,23 @@ where
 pub fn default_visit_sprite_statement_costume_declaration<V, C, E>(
     _visitor: &V,
     _value: (&CostumeKeyword, &AssetDeclaration, &Semicolon, &SourceSpan),
+    _context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    Ok(())
+}
+
+pub fn default_visit_config_statement<V, C, E>(
+    _visitor: &V,
+    _value: (
+        &ConfigKeyword,
+        &LeftBrace,
+        &[(Identifier, Colon, Literal, Option<Comma>)],
+        &RightBrace,
+        &SourceSpan,
+    ),
     _context: &mut C,
 ) -> Result<(), E>
 where
