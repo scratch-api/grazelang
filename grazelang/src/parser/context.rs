@@ -13,7 +13,9 @@ use grazelang_types::{
     BROADCASTS_CATEGORY_ID, CallBlockParam, CallableKnownBlockSignature, KnownBlockInput,
     LISTS_CATEGORY_ID, PROPERTIES_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     VARIABLES_CATEGORY_ID,
-    project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool, TargetAttachment},
+    project_json::{
+        Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool, TargetAttachment,
+    },
 };
 use rand::{Rng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
@@ -204,10 +206,7 @@ impl ResolveKnownBlock for KnownBlock {
                 emit_message(
                     context,
                     GrazeMessage::Warning(
-                        GrazeWarning::Specific(
-                            SpecificGrazeWarning::CallableAsInput,
-                            source_span,
-                        ),
+                        GrazeWarning::Specific(SpecificGrazeWarning::CallableAsInput, source_span),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -255,10 +254,7 @@ impl ResolveKnownBlock for KnownBlock {
                 emit_message(
                     context,
                     GrazeMessage::Warning(
-                        GrazeWarning::Specific(
-                            SpecificGrazeWarning::BlockRefAsField,
-                            source_span,
-                        ),
+                        GrazeWarning::Specific(SpecificGrazeWarning::BlockRefAsField, source_span),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -268,9 +264,7 @@ impl ResolveKnownBlock for KnownBlock {
             }
             KnownBlock::PrimitiveBlock { value } => match value {
                 grazelang_types::project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
-                | grazelang_types::project_json::Sb3PrimitiveBlock::PositiveNumber(
-                    sb3_primitive,
-                )
+                | grazelang_types::project_json::Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
                 | grazelang_types::project_json::Sb3PrimitiveBlock::PositiveInteger(
                     sb3_primitive,
                 )
@@ -326,10 +320,7 @@ impl ResolveKnownBlock for KnownBlock {
                 emit_message(
                     context,
                     GrazeMessage::Warning(
-                        GrazeWarning::Specific(
-                            SpecificGrazeWarning::CallableAsField,
-                            source_span,
-                        ),
+                        GrazeWarning::Specific(SpecificGrazeWarning::CallableAsField, source_span),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -833,6 +824,7 @@ pub struct ParseContext {
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
     pub messages: Vec<GrazeMessage>,
     pub settings: GrazeSettings,
+    /// If no error was returned, this can indicate failure
     pub successful: bool,
 }
 

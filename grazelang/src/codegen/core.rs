@@ -4,8 +4,11 @@ use std::{
     collections::{HashMap, HashSet},
     io::Read,
     iter::{self, zip},
+    panic,
     path::{Path, PathBuf},
     rc::Rc,
+    sync::{LazyLock, Mutex, MutexGuard},
+    unreachable, vec,
 };
 
 use arcstr::{ArcStr as IString, literal};
@@ -17,10 +20,14 @@ use grazelang_types::{
     SimpleCallableKnownBlockSignature,
     project_json::{
         IsShadow, Sb3Block, Sb3BlockMutation, Sb3FieldValue, Sb3InputRepr, Sb3InputValue,
-        Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock, Sb3Root, Sb3Target, TargetAttachment,
+        Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool, Sb3Root, Sb3Target,
+        TargetAttachment,
     },
 };
-use rand::SeedableRng;
+use rand::{
+    SeedableRng,
+    rngs::{StdRng, SysRng},
+};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -28,6 +35,10 @@ use thiserror::Error;
 use super::ids::IdCounter;
 
 use crate::{
+    eval::{
+        call::random_range,
+        cast::{JsPrimitive, ScratchVmToNumber},
+    },
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::types::{
@@ -131,6 +142,20 @@ pub enum GrazeSb3GeneratorError {
     #[assoc(get_secondary_message = "cannot be assigned to")]
     #[error("the identifier {identifier:?} is not assignable")]
     IdentifierNotAssignable { identifier: Identifier },
+    #[assoc(internal_lint_id = "unknown_flat_dictionary_entry")]
+    #[assoc(get_secondary_message = "unexpected dictionary entry here")]
+    #[error("unexpected key {key:?} in flat dictionary")]
+    UnknownFlatDictionaryEntry {
+        key: IString,
+        source_span: SourceSpan,
+    },
+    #[assoc(internal_lint_id = "repeated_flat_dictionary_entry")]
+    #[assoc(get_secondary_message = "repeated dictionary entry here")]
+    #[error("repeated key {key:?} in flat dictionary")]
+    RepeatedFlatDictionaryEntry {
+        key: IString,
+        source_span: SourceSpan,
+    },
     #[assoc(internal_lint_id = "")]
     #[assoc(get_secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
@@ -186,6 +211,16 @@ impl GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::IdentifierNotAssignable { identifier } => {
                 format!("`{identifier}` cannot be assigned to")
             }
+            GrazeSb3GeneratorError::UnknownFlatDictionaryEntry {
+                key,
+                source_span: _,
+            } => format!("unexpected dictionary entry key: \"{key}\""),
+            GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+                key,
+                source_span: _,
+            } => {
+                format!("dictionary entry with key \"{key}\" defined multiple times")
+            }
             GrazeSb3GeneratorError::InvalidConstantExpression {
                 expression: _,
                 source,
@@ -228,7 +263,15 @@ impl GetPos for GrazeSb3GeneratorError {
                 param: _,
                 source_span,
             }
-            | GrazeSb3GeneratorError::BlockStackHasNoKnownBlock { source_span } => source_span,
+            | GrazeSb3GeneratorError::BlockStackHasNoKnownBlock { source_span }
+            | GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+                key: _,
+                source_span,
+            }
+            | GrazeSb3GeneratorError::UnknownFlatDictionaryEntry {
+                key: _,
+                source_span,
+            } => source_span,
             GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword } => {
                 stage_keyword.get_source_span()
             }
@@ -312,6 +355,8 @@ pub struct GrazeSb3GeneratorContext {
     pub asset_files: HashMap<String, IString>,
     pub settings: GrazeSettings,
     pub messages: Vec<GrazeMessage>,
+    /// If no error was returned, this can indicate failure
+    pub successful: bool,
 }
 
 pub type PreviousSymbolStates = HashMap<IString, PreviousSymbolState>;
@@ -790,6 +835,7 @@ impl GrazeSb3GeneratorContext {
             asset_files,
             settings: std::mem::take(&mut parse_context.settings),
             messages: Vec::new(),
+            successful: true,
         })
     }
 
@@ -1963,7 +2009,21 @@ pub fn emit_message(
 ) {
     if context.settings.message_setting >= message_type {
         context.messages.push(message);
-    };
+    }
+}
+
+macro_rules! emit_error {
+    ($err:expr, $context:expr) => {{
+        let err = $err;
+        let context = &mut *$context;
+        if matches!(
+            context.settings.message_setting,
+            GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+        ) {
+            return Err(err);
+        }
+        emit_message(context, err.into(), GrazeMessageSetting::Errors);
+    }};
 }
 
 impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3Generator {
@@ -4256,9 +4316,78 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         // TODO: Config block for stage and sprites
         //  - [x] Parser
         //  - [x] CST components
-        //  - [ ] Errors
+        //  - [x] Errors
         //  - [ ] Codegen
         // Issue: #70
+        let is_stage = context
+            .current_sb3_target
+            .as_ref()
+            .is_some_and(|value| value.is_stage);
+        let mut data = HashMap::with_capacity(value.2.len());
+        for (ident, _, value, _) in value.2 {
+            let key = ident.to_single().unwrap().0.clone();
+            if is_stage
+                && ((key == "costume" && data.contains_key("backdrop"))
+                    || (key == "backdrop" && data.contains_key("costume")))
+            {
+                emit_error!(
+                    GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+                        key: ident.to_single().unwrap().0.clone(),
+                        source_span: *ident.get_source_span(),
+                    },
+                    context
+                );
+            }
+            if data
+                .insert(key, (*ident.get_source_span(), value.clone()))
+                .is_some()
+            {
+                emit_error!(
+                    GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+                        key: ident.to_single().unwrap().0.clone(),
+                        source_span: *ident.get_source_span(),
+                    },
+                    context
+                );
+            }
+        }
+        fn extract_f64_entry(
+            data: &mut HashMap<IString, (SourceSpan, cst::Literal)>,
+            key: &str,
+        ) -> Option<f64> {
+            data.remove(key)
+                .map(|(_, value)| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number())
+        }
+        if is_stage {
+            let backdrop = data
+                .remove("backdrop")
+                .or_else(|| data.remove("costume"))
+                .map(|(_, value)| value);
+            if let Some(backdrop) = backdrop {
+                let target = context.current_sb3_target.as_mut().unwrap();
+                let costume_number = if let Literal::String(string, _) = &backdrop {
+                    target
+                        .costumes
+                        .iter()
+                        .enumerate()
+                        .find(|(_, value)| &value.name == string)
+                        .map(|value| value.0 + 1)
+                        .or_else(|| {
+                            matches!(string.as_str(), "random backdrop" | "random costume")
+                                .then(|| random_range(0..target.costumes.len()))
+                        })
+                } else {
+                    None
+                };
+                target.current_costume = costume_number.unwrap_or_else(|| {
+                    let num = JsPrimitive::from(Sb3PrimitiveOrBool::from(&backdrop)).to_number();
+                    if num.is_infinite() {
+                        return 0;
+                    }
+                    (num.round().clamp(1.0, target.costumes.len() as f64) - 1.0) as usize
+                });
+            }
+        }
         default_visit_config_statement(self, value, context)
     }
 }

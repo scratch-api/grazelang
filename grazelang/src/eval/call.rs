@@ -7,6 +7,7 @@ use grazelang_types::ConstantExprLibraryItemValue;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use rand::{
     RngExt, SeedableRng,
+    distr::uniform::{SampleRange, SampleUniform},
     rngs::{StdRng, SysRng},
 };
 use serde::{Deserialize, Serialize};
@@ -297,11 +298,6 @@ impl ConstantExprFunction {
                 Ok(ops::DivBinOp.apply_operation(value_a, value_b))
             }
             ConstantExprFunction::OperatorRandom => {
-                static RNG: LazyLock<Mutex<StdRng>> =
-                    LazyLock::new(|| Mutex::new(StdRng::try_from_rng(&mut SysRng).unwrap()));
-                fn acquire_rng() -> MutexGuard<'static, StdRng> {
-                    RNG.lock().unwrap_or_else(|err| err.into_inner())
-                }
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
                 let (value_a, value_b) =
                     (expr_a.calculate_value_js()?, expr_b.calculate_value_js()?);
@@ -312,11 +308,9 @@ impl ConstantExprFunction {
                     && let Some(from) = try_convert_f64_into_i128(from)
                     && let Some(to) = try_convert_f64_into_i128(to)
                 {
-                    return Ok(JsPrimitive::Number(
-                        acquire_rng().random_range(from..=to) as f64
-                    ));
+                    return Ok(JsPrimitive::Number(random_range(from..=to) as f64));
                 }
-                Ok(JsPrimitive::Number(acquire_rng().random_range(from..=to)))
+                Ok(JsPrimitive::Number(random_range(from..=to)))
             }
             ConstantExprFunction::OperatorGreaterThan => {
                 let (expr_a, expr_b) = bin_op_args(args, source_span)?;
@@ -555,4 +549,16 @@ impl Display for ConstantExprValue {
             ConstantExprValue::Pow => "menus::pow",
         })
     }
+}
+
+pub fn random_range<T, R>(range: R) -> T
+where
+    T: SampleUniform,
+    R: SampleRange<T>,
+{
+    static RNG: LazyLock<Mutex<StdRng>> =
+        LazyLock::new(|| Mutex::new(StdRng::try_from_rng(&mut SysRng).unwrap()));
+    RNG.lock()
+        .unwrap_or_else(|err| err.into_inner())
+        .random_range(range)
 }

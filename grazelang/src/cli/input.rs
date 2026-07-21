@@ -382,7 +382,10 @@ impl Cli {
         };
         let visitor = codegen::core::GrazeSb3Generator;
         if let Err(err) = visitor.visit_graze_program(&parsed, &mut context) {
-            if context.settings.message_setting == GrazeMessageSetting::None {
+            if matches!(
+                context.settings.message_setting,
+                GrazeMessageSetting::None | GrazeMessageSetting::ExitOnErrorUnlogged
+            ) {
                 Self::print_errors(&mut context.messages, &source_files, true);
                 std::process::exit(1);
             }

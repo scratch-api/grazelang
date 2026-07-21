@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt::Display};
+use std::{borrow::Cow, collections::HashMap, fmt::Display, matches};
 
 use crate::{
     eval::{
@@ -1872,17 +1872,6 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
-    #[assoc(internal_lint_id = "incorrect_flat_dictionary_entry_type")]
-    #[assoc(internal_primary_message = "")]
-    #[assoc(get_secondary_message = "incorrect entry value type here")]
-    #[error("key {key:?} with value {value:?} in flat dictionary has an incorrect type")]
-    IncorrectFlatDictionaryEntryType {
-        key: IString,
-        value: Box<Literal>,
-        #[cfg(feature = "include_context_in_parse_errors")]
-        context: IString,
-        source_span: SourceSpan,
-    },
     #[assoc(internal_lint_id = "")]
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "")]
@@ -2058,22 +2047,6 @@ impl PartialEq for ParseError {
                 },
             ) => l_key == r_key && l_source_span == r_source_span,
             (
-                Self::IncorrectFlatDictionaryEntryType {
-                    key: l_key,
-                    value: l_value,
-                    #[cfg(feature = "include_context_in_parse_errors")]
-                        context: _,
-                    source_span: l_source_span,
-                },
-                Self::IncorrectFlatDictionaryEntryType {
-                    key: r_key,
-                    value: r_value,
-                    #[cfg(feature = "include_context_in_parse_errors")]
-                        context: _,
-                    source_span: r_source_span,
-                },
-            ) => l_key == r_key && l_value == r_value && l_source_span == r_source_span,
-            (
                 Self::InvalidConstantExpression {
                     expression: l_expression,
                     source: l_source,
@@ -2145,17 +2118,6 @@ impl ParseError {
             } => {
                 return Cow::Owned(format!(
                     "dictionary entry with key \"{key}\" defined multiple times"
-                ));
-            }
-            Self::IncorrectFlatDictionaryEntryType {
-                key,
-                value: _,
-                #[cfg(feature = "include_context_in_parse_errors")]
-                    context: _,
-                source_span: _,
-            } => {
-                return Cow::Owned(format!(
-                    "value of dictionary entry with key \"{key}\" is of an incorrect type"
                 ));
             }
             Self::InvalidConstantExpression {
@@ -2234,13 +2196,6 @@ impl GetPos for ParseError {
             } => source_span,
             ParseError::RepeatedFlatDictionaryEntry {
                 key: _,
-                #[cfg(feature = "include_context_in_parse_errors")]
-                    context: _,
-                source_span,
-            } => source_span,
-            ParseError::IncorrectFlatDictionaryEntryType {
-                key: _,
-                value: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span,

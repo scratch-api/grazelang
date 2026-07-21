@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     char::DecodeUtf16Error,
     fmt::{Debug, Write},
+    vec,
 };
 
 use arcstr::ArcStr as IString;
@@ -205,11 +206,10 @@ impl ScratchVmToString for JsPrimitive {
             JsPrimitive::JsString(value) => string.extend(value),
             JsPrimitive::String(value) => string.extend(value.encode_utf16()),
             JsPrimitive::IString(value) => string.extend(value.encode_utf16()),
-            JsPrimitive::Number(value) => string.extend(ryu_js::Buffer::new()
-                .format(*value)
-                .encode_utf16()),
-            JsPrimitive::Bool(value) => write!(U16Sink { data: string }, "{}", value)
-                .unwrap(),
+            JsPrimitive::Number(value) => {
+                string.extend(ryu_js::Buffer::new().format(*value).encode_utf16())
+            }
+            JsPrimitive::Bool(value) => write!(U16Sink { data: string }, "{}", value).unwrap(),
         }
     }
 }
@@ -282,6 +282,8 @@ impl ScratchVmIsInt for JsPrimitive {
 }
 
 pub mod parse_ecmascript_string_numeric_literal {
+    use std::matches;
+
     #[cfg(feature = "include_ecmascript_string_numeric_literal_cst")]
     pub mod string_numeric_literal_cst {
         pub trait BooleanType {}

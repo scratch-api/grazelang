@@ -956,9 +956,11 @@ pub fn parse_full_identifier_starting_with(
 pub mod statement {
     use std::collections::HashMap;
 
+    use grazelang_types::project_json::Sb3PrimitiveOrBool;
     use serde::{Deserialize, Serialize};
 
     use crate::{
+        eval::cast::{JsPrimitive, ScratchVmToNumber},
         lexer::{self, LexedRightBrace},
         parser::cst::{
             AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword,
@@ -2419,27 +2421,11 @@ pub mod statement {
     ) -> ParseOut<AssetDeclaration> {
         fn extract_f64_entry(
             data: &mut HashMap<IString, (SourceSpan, cst::Literal)>,
-            errors: &mut Vec<ParseError>,
-            key: IString,
+            key: &str,
         ) -> Option<f64> {
-            data.remove(key.as_str()).and_then(|(_, value)| {
-                value
-                    .get_string_value()
-                    .parse::<f64>()
-                    .map_err(|_| {
-                        errors.push(ParseError::IncorrectFlatDictionaryEntryType {
-                            key,
-                            source_span: *value.get_source_span(),
-                            value: Box::new(value),
-                            #[cfg(feature = "include_context_in_parse_errors")]
-                            context: literal!(static_current_context!()),
-                        })
-                    })
-                    .ok()
-            })
+            data.remove(key)
+                .map(|(_, value)| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number())
         }
-        const ROTATION_CENTER_X_KEY: &IString = &literal!("rotation_center_x");
-        const ROTATION_CENTER_Y_KEY: &IString = &literal!("rotation_center_y");
         match peek_token!(token_stream) {
             Token::LeftParens => {
                 skip_token!(token_stream);
@@ -2529,8 +2515,8 @@ pub mod statement {
                                         name: name.clone(),
                                         canonical_name,
                                         source: path,
-                                        rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
-                                        rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                        rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
+                                        rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
                                         symbol_idx,
                                         source_span: token_stream.span_from_previous_to_current(start_pos)
                                     }
@@ -2540,8 +2526,8 @@ pub mod statement {
                                         name: name.clone(),
                                         canonical_name,
                                         source: path,
-                                        rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
-                                        rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                        rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
+                                        rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
                                         symbol_idx,
                                         source_span: token_stream.span_from_previous_to_current(start_pos)
                                     }
@@ -2678,8 +2664,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
-                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
+                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos)
                                 }
@@ -2689,8 +2675,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
-                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
+                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos)
                                 }
@@ -2807,8 +2793,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
-                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
+                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos),
                                 }
@@ -2818,8 +2804,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_X_KEY.clone()),
-                                    rotation_center_y: extract_f64_entry(&mut data, &mut errors, ROTATION_CENTER_Y_KEY.clone()),
+                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
+                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos),
                                 }
