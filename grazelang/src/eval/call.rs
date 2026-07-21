@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    sync::{LazyLock, Mutex, MutexGuard},
+    sync::{LazyLock, Mutex},
 };
 
 use grazelang_types::ConstantExprLibraryItemValue;

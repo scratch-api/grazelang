@@ -121,8 +121,7 @@ pub enum ConstantExprEvaluationError {
     #[assoc(internal_lint_id = "const_expr_list_access")]
     #[assoc(get_secondary_message = "cannot access a list item in a constant expression")]
     #[error(
-        "tried to access a list item in constant expression {expression:?}, which is not possible, \
-        maybe you meant to access a letter of the value of the identifier using \"@[\" instead of '['"
+        "tried to access a list item in constant expression {expression:?}, which is not possible, maybe you meant to access a letter of the value of the identifier using \"@[\" instead of '['"
     )]
     ConstExprListAccess { expression: Box<Expression> },
     #[assoc(internal_lint_id = "expected_identifier")]

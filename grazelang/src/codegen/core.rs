@@ -4,11 +4,8 @@ use std::{
     collections::{HashMap, HashSet},
     io::Read,
     iter::{self, zip},
-    panic,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{LazyLock, Mutex, MutexGuard},
-    unreachable, vec,
 };
 
 use arcstr::{ArcStr as IString, literal};
@@ -19,14 +16,13 @@ use grazelang_types::{
     LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID,
     SimpleCallableKnownBlockSignature,
     project_json::{
-        IsShadow, Sb3Block, Sb3BlockMutation, Sb3FieldValue, Sb3InputRepr, Sb3InputValue,
-        Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool, Sb3Root, Sb3Target,
-        TargetAttachment,
+        IsShadow, Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
+        Sb3InputValue, Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool,
+        Sb3Root, Sb3Target, TargetAttachment,
     },
 };
 use rand::{
     SeedableRng,
-    rngs::{StdRng, SysRng},
 };
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
@@ -4358,6 +4354,23 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             data.remove(key)
                 .map(|(_, value)| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number())
         }
+        fn get_costume_number_from_name<F>(
+            costumes: &[Sb3Costume],
+            name: &str,
+            predicate_for_random: F,
+        ) -> Option<usize>
+        where
+            F: for<'a> FnOnce(&'a str) -> bool,
+        {
+            costumes
+                .iter()
+                .enumerate()
+                .find(|(_, value)| value.name == name)
+                .map(|value| value.0 + 1)
+                .or_else(|| {
+                    predicate_for_random(name).then(|| random_range(0..costumes.len()))
+                })
+        }
         if is_stage {
             let backdrop = data
                 .remove("backdrop")
@@ -4366,21 +4379,35 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             if let Some(backdrop) = backdrop {
                 let target = context.current_sb3_target.as_mut().unwrap();
                 let costume_number = if let Literal::String(string, _) = &backdrop {
-                    target
-                        .costumes
-                        .iter()
-                        .enumerate()
-                        .find(|(_, value)| &value.name == string)
-                        .map(|value| value.0 + 1)
-                        .or_else(|| {
-                            matches!(string.as_str(), "random backdrop" | "random costume")
-                                .then(|| random_range(0..target.costumes.len()))
-                        })
+                    get_costume_number_from_name(&target.costumes, string, |value| {
+                        matches!(value, "random backdrop" | "random costume")
+                    })
                 } else {
                     None
                 };
                 target.current_costume = costume_number.unwrap_or_else(|| {
                     let num = JsPrimitive::from(Sb3PrimitiveOrBool::from(&backdrop)).to_number();
+                    if num.is_infinite() {
+                        return 0;
+                    }
+                    (num.round().clamp(1.0, target.costumes.len() as f64) - 1.0) as usize
+                });
+            }
+        } else {
+            let costume = data
+                .remove("costume")
+                .map(|(_, value)| value);
+            if let Some(costume) = costume {
+                let target = context.current_sb3_target.as_mut().unwrap();
+                let costume_number = if let Literal::String(string, _) = &costume {
+                    get_costume_number_from_name(&target.costumes, string, |value| {
+                        matches!(value, "random costume")
+                    })
+                } else {
+                    None
+                };
+                target.current_costume = costume_number.unwrap_or_else(|| {
+                    let num = JsPrimitive::from(Sb3PrimitiveOrBool::from(&costume)).to_number();
                     if num.is_infinite() {
                         return 0;
                     }
