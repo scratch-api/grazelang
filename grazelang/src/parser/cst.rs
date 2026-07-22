@@ -76,6 +76,12 @@ impl GetPos for TopLevelStatement {
     }
 }
 
+impl InvalidVariantFromSourceSpan for TopLevelStatement {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SpriteKeyword(pub SourceSpan);
 
@@ -396,6 +402,12 @@ impl GetPos for UseStatementContent {
     }
 }
 
+impl InvalidVariantFromSourceSpan for UseStatementContent {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockParamKind {
     pub kind: CustomBlockParamKindValue,
@@ -490,6 +502,12 @@ impl GetPos for StageStatement {
     }
 }
 
+impl InvalidVariantFromSourceSpan for StageStatement {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SpriteStatement {
     DataDeclaration(LetKeyword, DataDeclaration, Semicolon, SourceSpan),
@@ -564,6 +582,12 @@ impl GetPos for SpriteStatement {
     }
 }
 
+impl InvalidVariantFromSourceSpan for SpriteStatement {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AssetDeclaration {
     Multiple(
@@ -618,6 +642,12 @@ impl GetPos for SingleAssetDeclarationValue {
             | SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span)
             | SingleAssetDeclarationValue::Invalid(source_span) => source_span,
         }
+    }
+}
+
+impl InvalidVariantFromSourceSpan for SingleAssetDeclarationValue {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
     }
 }
 
@@ -703,6 +733,12 @@ impl GetPos for Statement {
             Statement::EmptyStatement(p) => &p.0,
             Statement::Invalid(p) => p,
         }
+    }
+}
+
+impl InvalidVariantFromSourceSpan for Statement {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
     }
 }
 
@@ -2440,6 +2476,10 @@ where
 
 pub trait FromSourceSpan {
     fn from_source_span(source_span: SourceSpan) -> Self;
+}
+
+pub trait InvalidVariantFromSourceSpan {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self;
 }
 
 // TODO: Create traits InvalidFromSourceSpan etc
