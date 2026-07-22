@@ -2523,9 +2523,3 @@ pub trait ConfigStatementFromContent {
         source_span: SourceSpan,
     ) -> Self;
 }
-
-// TODO: Create traits InvalidFromSourceSpan etc
-//  - [x] FromSourceSpan
-//  - [x] InvalidVariantFromSourceSpan
-//  - [x] ConfigStatementFromContent
-// Issue: #71
