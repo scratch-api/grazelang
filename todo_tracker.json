@@ -510,5 +510,13 @@
         "lines": "L4316-L4321",
         "commit": "4ae00e0b7abfe6adf466ac7effe5b07c6ee350fd",
         "title": "Config block for stage and sprites"
+    },
+    "71": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L2263-L2263",
+        "commit": "8be5a67404ceb8fa653f8be58cd0e7a9f17477a2",
+        "title": "Create traits InvalidFromSourceSpan etc"
     }
 }
