@@ -514,7 +514,7 @@
     "71": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "- [x] FromSourceSpan\n- [x] InvalidVariantFromSourceSpan\n- [x] ConfigStatementFromContent",
-        "status": "open",
+        "status": "closed",
         "lines": "L2527-L2531",
         "commit": "bd53c3cada3ff0c9ef532ebb91e6fd03fbdcae77",
         "title": "Create traits InvalidFromSourceSpan etc"
