@@ -2259,3 +2259,5 @@ where
         FromWithSourceSpan::from_result_with_source_span(self, source_span)
     }
 }
+
+// TODO: Create traits InvalidFromSourceSpan etc
