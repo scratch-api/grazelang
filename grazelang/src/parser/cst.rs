@@ -1905,8 +1905,10 @@ pub struct Identifier {
 }
 
 // TODO: add dot and :: metadata to `Identifier`
+// Issue: #77
 
 // TODO: create `SingleIdentifier`
+// Issue: #76
 
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2529,3 +2531,4 @@ pub trait ConfigStatementFromContent {
 }
 
 // TODO: implement monitors
+// Issue: #75
