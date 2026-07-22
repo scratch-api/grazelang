@@ -1908,6 +1908,8 @@ pub struct Identifier {
 // Issue: #77
 
 // TODO: create `SingleIdentifier`
+//  - [x] add type
+//  - [ ] use type in appropriate contexts
 // Issue: #76
 
 impl Display for Identifier {
@@ -1954,6 +1956,27 @@ impl Identifier {
         self.to_single().and_then(|(value, source_span)| {
             (value.as_str() == "else").then_some(SyntacticElse(*source_span))
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SingleIdentifier {
+    pub value: IString,
+    pub source_span: SourceSpan,
+}
+
+impl GetPos for SingleIdentifier {
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.source_span
+    }
+}
+
+impl From<&(IString, SourceSpan)> for SingleIdentifier {
+    fn from(value: &(IString, SourceSpan)) -> Self {
+        Self {
+            value: value.0.clone(),
+            source_span: value.1,
+        }
     }
 }
 
