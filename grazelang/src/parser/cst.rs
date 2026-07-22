@@ -1904,6 +1904,10 @@ pub struct Identifier {
     pub source_span: SourceSpan,
 }
 
+// TODO: add dot and :: metadata to `Identifier`
+
+// TODO: create `SingleIdentifier`
+
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (idx, segment) in self.path.iter().enumerate() {
@@ -2523,3 +2527,5 @@ pub trait ConfigStatementFromContent {
         source_span: SourceSpan,
     ) -> Self;
 }
+
+// TODO: implement monitors
