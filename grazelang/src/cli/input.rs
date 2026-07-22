@@ -392,12 +392,9 @@ impl Cli {
             context.messages.push(err.into());
         }
         let codegen_time = codegen_timer.elapsed();
-        {
-            let (errors, _) = count_errors_and_warnings(&context.messages);
-            if errors > 0 {
-                Self::print_errors(&mut context.messages, &source_files, true);
-                std::process::exit(1);
-            }
+        if !context.successful {
+            Self::print_errors(&mut context.messages, &source_files, true);
+            std::process::exit(1);
         }
         let (mut output_path, set_extension) = match target {
             Some(target) if target.is_file() || !target.exists() => (target.to_path_buf(), false),

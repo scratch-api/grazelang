@@ -401,7 +401,7 @@ pub enum StageStatement {
     ConfigStatement(
         ConfigKeyword,
         LeftBrace,
-        Vec<(Identifier, Colon, Literal, Option<Comma>)>,
+        Vec<(Identifier, Colon, Literal, Option<Comma>)>, // TODO: Use CommaSeparated here
         RightBrace,
         SourceSpan,
     ),
@@ -475,7 +475,7 @@ pub enum SpriteStatement {
     ConfigStatement(
         ConfigKeyword,
         LeftBrace,
-        Vec<(Identifier, Colon, Literal, Option<Comma>)>,
+        Vec<(Identifier, Colon, Literal, Option<Comma>)>, // TODO: Use CommaSeparated here
         RightBrace,
         SourceSpan,
     ),
@@ -544,7 +544,7 @@ pub enum SingleAssetDeclarationValue {
     Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
     FlatDictionary(
         LeftBrace,
-        Vec<(Identifier, Colon, Literal, Option<Comma>)>,
+        Vec<(Identifier, Colon, Literal, Option<Comma>)>, // TODO: Use CommaSeparated here
         RightBrace,
         SourceSpan,
     ),

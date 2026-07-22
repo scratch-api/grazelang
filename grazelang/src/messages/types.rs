@@ -329,6 +329,18 @@ pub enum SpecificGrazeWarning {
     #[assoc(get_secondary_message = "should not be isolated")]
     #[assoc(internal_lint_id = "top_level_shadow_expression")]
     TopLevelShadowExpression,
+    #[assoc(get_primary_message = "configured a target multiple times")]
+    #[assoc(get_secondary_message = "repeated target config here")]
+    #[assoc(internal_lint_id = "repeated_target_config")]
+    RepeatedTargetConfig,
+    #[assoc(get_primary_message = "invalid value for rotation style")]
+    #[assoc(get_secondary_message = "must be \"all around\", \"left-right\" or \"don't rotate\"")]
+    #[assoc(internal_lint_id = "invalid_rotation_style_value")]
+    InvalidRotationStyleValue,
+    #[assoc(get_primary_message = "invalid value for video state")]
+    #[assoc(get_secondary_message = "must be \"on\", \"off\" and \"on-flipped\"")]
+    #[assoc(internal_lint_id = "invalid_video_state_value")]
+    InvalidVideoStateValue,
 }
 
 impl GetLintId for SpecificGrazeWarning {

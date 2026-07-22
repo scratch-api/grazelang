@@ -21,9 +21,7 @@ use grazelang_types::{
         Sb3Root, Sb3Target, TargetAttachment,
     },
 };
-use rand::{
-    SeedableRng,
-};
+use rand::SeedableRng;
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -33,7 +31,7 @@ use super::ids::IdCounter;
 use crate::{
     eval::{
         call::random_range,
-        cast::{JsPrimitive, ScratchVmToNumber},
+        cast::{JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
     },
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
@@ -4309,44 +4307,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ),
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        // TODO: Config block for stage and sprites
-        //  - [x] Parser
-        //  - [x] CST components
-        //  - [x] Errors
-        //  - [ ] Codegen
-        // Issue: #70
-        let is_stage = context
-            .current_sb3_target
-            .as_ref()
-            .is_some_and(|value| value.is_stage);
-        let mut data = HashMap::with_capacity(value.2.len());
-        for (ident, _, value, _) in value.2 {
-            let key = ident.to_single().unwrap().0.clone();
-            if is_stage
-                && ((key == "costume" && data.contains_key("backdrop"))
-                    || (key == "backdrop" && data.contains_key("costume")))
-            {
-                emit_error!(
-                    GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
-                        key: ident.to_single().unwrap().0.clone(),
-                        source_span: *ident.get_source_span(),
-                    },
-                    context
-                );
-            }
-            if data
-                .insert(key, (*ident.get_source_span(), value.clone()))
-                .is_some()
-            {
-                emit_error!(
-                    GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
-                        key: ident.to_single().unwrap().0.clone(),
-                        source_span: *ident.get_source_span(),
-                    },
-                    context
-                );
-            }
-        }
         fn extract_f64_entry(
             data: &mut HashMap<IString, (SourceSpan, cst::Literal)>,
             key: &str,
@@ -4367,17 +4327,62 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 .enumerate()
                 .find(|(_, value)| value.name == name)
                 .map(|value| value.0 + 1)
-                .or_else(|| {
-                    predicate_for_random(name).then(|| random_range(0..costumes.len()))
-                })
+                .or_else(|| predicate_for_random(name).then(|| random_range(0..costumes.len())))
+        }
+        fn parse_costume_number_from_name(costumes: &[Sb3Costume], backdrop: &Literal) -> usize {
+            let num = JsPrimitive::from(Sb3PrimitiveOrBool::from(backdrop)).to_number();
+            if num.is_infinite() {
+                return 0;
+            }
+            (num.round().clamp(1.0, costumes.len() as f64) - 1.0) as usize
+        }
+        // TODO: Config block for stage and sprites
+        //  - [x] Parser
+        //  - [x] CST components
+        //  - [x] Errors
+        //  - [x] Codegen
+        // Issue: #70
+        if context.current_target_configured {
+            emit_message(
+                context,
+                GrazeMessage::Warning(
+                    GrazeWarning::Specific(SpecificGrazeWarning::RepeatedTargetConfig, *value.4),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
+        let is_stage = context
+            .current_sb3_target
+            .as_ref()
+            .is_some_and(|value| value.is_stage);
+        let mut data = HashMap::with_capacity(value.2.len());
+        for (ident, _, value, _) in value.2 {
+            let mut key = ident.to_single().unwrap().0.clone();
+            if let Some(new_key) = match key.as_str() {
+                "costume" if is_stage => Some(literal!("backdrop")),
+                "show" | "shown" if !is_stage => Some(literal!("visible")),
+                _ => None,
+            } {
+                key = new_key;
+            }
+            if data
+                .insert(key, (*ident.get_source_span(), value.clone()))
+                .is_some()
+            {
+                emit_error!(
+                    GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+                        key: ident.to_single().unwrap().0.clone(),
+                        source_span: *ident.get_source_span(),
+                    },
+                    context
+                );
+            }
         }
         if is_stage {
-            let backdrop = data
-                .remove("backdrop")
-                .or_else(|| data.remove("costume"))
-                .map(|(_, value)| value);
+            let backdrop = data.remove("backdrop").map(|(_, value)| value);
+            let target = context.current_sb3_target.as_mut().unwrap();
             if let Some(backdrop) = backdrop {
-                let target = context.current_sb3_target.as_mut().unwrap();
                 let costume_number = if let Literal::String(string, _) = &backdrop {
                     get_costume_number_from_name(&target.costumes, string, |value| {
                         matches!(value, "random backdrop" | "random costume")
@@ -4385,18 +4390,42 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } else {
                     None
                 };
-                target.current_costume = costume_number.unwrap_or_else(|| {
-                    let num = JsPrimitive::from(Sb3PrimitiveOrBool::from(&backdrop)).to_number();
-                    if num.is_infinite() {
-                        return 0;
-                    }
-                    (num.round().clamp(1.0, target.costumes.len() as f64) - 1.0) as usize
-                });
+                target.current_costume = costume_number
+                    .unwrap_or_else(|| parse_costume_number_from_name(&target.costumes, &backdrop));
+            }
+            if let Some(volume) = extract_f64_entry(&mut data, "volume") {
+                target.volume = volume;
+            }
+            if let Some(layer_order) = extract_f64_entry(&mut data, "layer_order") {
+                target.layer_order = layer_order as usize;
+            }
+            if let Some((_, text_to_speech_language)) = data.remove("text_to_speech_language") {
+                target.text_to_speech_language =
+                    Some(text_to_speech_language.get_string_value().to_string());
+            }
+            if let Some(video_transparency) = extract_f64_entry(&mut data, "video_transparency") {
+                target.video_transparency = Some(video_transparency);
+            }
+            if let Some((_, video_state)) = data.remove("video_state") {
+                let source_span = *video_state.get_source_span();
+                let video_state = video_state.get_string_value().to_string();
+                if !matches!(video_state.as_str(), "on" | "off" | "on-flipped") {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                SpecificGrazeWarning::InvalidVideoStateValue,
+                                source_span,
+                            ),
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                context.current_sb3_target.as_mut().unwrap().video_state = Some(video_state);
             }
         } else {
-            let costume = data
-                .remove("costume")
-                .map(|(_, value)| value);
+            let costume = data.remove("costume").map(|(_, value)| value);
             if let Some(costume) = costume {
                 let target = context.current_sb3_target.as_mut().unwrap();
                 let costume_number = if let Literal::String(string, _) = &costume {
@@ -4406,15 +4435,69 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } else {
                     None
                 };
-                target.current_costume = costume_number.unwrap_or_else(|| {
-                    let num = JsPrimitive::from(Sb3PrimitiveOrBool::from(&costume)).to_number();
-                    if num.is_infinite() {
-                        return 0;
-                    }
-                    (num.round().clamp(1.0, target.costumes.len() as f64) - 1.0) as usize
-                });
+                target.current_costume = costume_number
+                    .unwrap_or_else(|| parse_costume_number_from_name(&target.costumes, &costume));
+            }
+            {
+                let target = context.current_sb3_target.as_mut().unwrap();
+                if let Some(x_position) = extract_f64_entry(&mut data, "x_position") {
+                    target.x = Some(x_position);
+                }
+                if let Some(y_position) = extract_f64_entry(&mut data, "y_position") {
+                    target.y = Some(y_position);
+                }
+                if let Some(direction) = extract_f64_entry(&mut data, "direction") {
+                    target.direction = Some(direction);
+                }
+                if let Some(size) = extract_f64_entry(&mut data, "size") {
+                    target.size = Some(size);
+                }
+                if let Some(volume) = extract_f64_entry(&mut data, "volume") {
+                    target.volume = volume;
+                }
+                if let Some(draggable) = data.remove("draggable").map(|(_, value)| {
+                    JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
+                }) {
+                    target.draggable = Some(draggable);
+                }
+                if let Some(visible) = data.remove("visible").map(|(_, value)| {
+                    JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
+                }) {
+                    target.visible = Some(visible);
+                }
+                if let Some(layer_order) = extract_f64_entry(&mut data, "layer_order") {
+                    target.layer_order = layer_order as usize;
+                }
+            }
+            if let Some((_, rotation_style)) = data.remove("rotation_style") {
+                let source_span = *rotation_style.get_source_span();
+                let rotation_style = rotation_style.get_string_value().to_string();
+                if !matches!(
+                    rotation_style.as_str(),
+                    "all around" | "left-right" | "don't rotate"
+                ) {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                SpecificGrazeWarning::InvalidRotationStyleValue,
+                                source_span,
+                            ),
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                context.current_sb3_target.as_mut().unwrap().rotation_style = Some(rotation_style);
             }
         }
+        for (key, (source_span, _)) in data {
+            emit_error!(
+                GrazeSb3GeneratorError::UnknownFlatDictionaryEntry { key, source_span },
+                context
+            );
+        }
+        context.current_target_configured = true;
         default_visit_config_statement(self, value, context)
     }
 }

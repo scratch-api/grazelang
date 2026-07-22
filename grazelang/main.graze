@@ -2,9 +2,9 @@
 stage {
     backdrop `backdrop1` test_costume("empty.svg");
     backdrop `backdrop2` test_costume_2 {
-        path = "empty.svg",
-        rotation_center_x = 0.0,
-        rotation_center_y = 0.0,
+        path: "empty.svg",
+        rotation_center_x: 0.0,
+        rotation_center_y: 0.0,
     };
     {
         switch_to_backdrop_and_wait(test_costume);
@@ -15,6 +15,10 @@ stage {
 }
 
 sprite `Sprite1` sprite_1 {
+    config {
+        x_position: 10,
+        y_position: -15,
+    }
     costume `costume1` test_costume("empty.svg");
     let global test;
     let global list `list` list_ = [.."1000000"];
