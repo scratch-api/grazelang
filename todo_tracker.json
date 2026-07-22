@@ -506,7 +506,7 @@
     "70": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "- [x] Parser\n- [x] CST components\n- [x] Errors\n- [x] Codegen",
-        "status": "open",
+        "status": "closed",
         "lines": "L4339-L4344",
         "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
         "title": "Config block for stage and sprites"
