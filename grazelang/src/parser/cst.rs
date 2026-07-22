@@ -79,6 +79,12 @@ impl GetPos for TopLevelStatement {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SpriteKeyword(pub SourceSpan);
 
+impl FromSourceSpan for SpriteKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for SpriteKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -88,6 +94,12 @@ impl GetPos for SpriteKeyword {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StageKeyword(pub SourceSpan);
+
+impl FromSourceSpan for StageKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for StageKeyword {
     #[inline]
@@ -99,6 +111,12 @@ impl GetPos for StageKeyword {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CostumeKeyword(pub SourceSpan);
 
+impl FromSourceSpan for CostumeKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for CostumeKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -108,6 +126,12 @@ impl GetPos for CostumeKeyword {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BroadcastKeyword(pub SourceSpan);
+
+impl FromSourceSpan for BroadcastKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for BroadcastKeyword {
     #[inline]
@@ -119,6 +143,12 @@ impl GetPos for BroadcastKeyword {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UseKeyword(pub SourceSpan);
 
+impl FromSourceSpan for UseKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for UseKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -128,6 +158,12 @@ impl GetPos for UseKeyword {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConfigKeyword(pub SourceSpan);
+
+impl FromSourceSpan for ConfigKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for ConfigKeyword {
     #[inline]
@@ -139,6 +175,12 @@ impl GetPos for ConfigKeyword {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AsKeyword(pub SourceSpan);
 
+impl FromSourceSpan for AsKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for AsKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -148,6 +190,12 @@ impl GetPos for AsKeyword {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct BackdropKeyword(pub SourceSpan);
+
+impl FromSourceSpan for BackdropKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for BackdropKeyword {
     #[inline]
@@ -159,6 +207,12 @@ impl GetPos for BackdropKeyword {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SoundKeyword(pub SourceSpan);
 
+impl FromSourceSpan for SoundKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for SoundKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -168,6 +222,12 @@ impl GetPos for SoundKeyword {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ProcKeyword(pub SourceSpan);
+
+impl FromSourceSpan for ProcKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for ProcKeyword {
     #[inline]
@@ -652,6 +712,12 @@ impl GetPos for Statement {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LetKeyword(pub SourceSpan);
 
+impl FromSourceSpan for LetKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for LetKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -661,6 +727,12 @@ impl GetPos for LetKeyword {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct VarsKeyword(pub SourceSpan);
+
+impl FromSourceSpan for VarsKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for VarsKeyword {
     #[inline]
@@ -672,6 +744,12 @@ impl GetPos for VarsKeyword {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ListsKeyword(pub SourceSpan);
 
+impl FromSourceSpan for ListsKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for ListsKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -682,6 +760,12 @@ impl GetPos for ListsKeyword {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct VarKeyword(pub SourceSpan);
 
+impl FromSourceSpan for VarKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for VarKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -691,6 +775,12 @@ impl GetPos for VarKeyword {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ListKeyword(pub SourceSpan);
+
+impl FromSourceSpan for ListKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for ListKeyword {
     #[inline]
@@ -756,6 +846,12 @@ pub enum DataDeclarationScope {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct NormalAssignmentOperator(pub SourceSpan);
 
+impl FromSourceSpan for NormalAssignmentOperator {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for NormalAssignmentOperator {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -765,6 +861,12 @@ impl GetPos for NormalAssignmentOperator {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Colon(pub SourceSpan);
+
+impl FromSourceSpan for Colon {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for Colon {
     #[inline]
@@ -840,6 +942,12 @@ impl GetPos for SingleDataDeclaration {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Comma(pub SourceSpan);
 
+impl FromSourceSpan for Comma {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for Comma {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -850,6 +958,12 @@ impl GetPos for Comma {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LeftBrace(pub SourceSpan);
 
+impl FromSourceSpan for LeftBrace {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for LeftBrace {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -859,6 +973,12 @@ impl GetPos for LeftBrace {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RightBrace(pub SourceSpan);
+
+impl FromSourceSpan for RightBrace {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for RightBrace {
     #[inline]
@@ -1109,6 +1229,12 @@ impl Expression {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LeftParens(pub SourceSpan);
 
+impl FromSourceSpan for LeftParens {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for LeftParens {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -1118,6 +1244,12 @@ impl GetPos for LeftParens {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RightParens(pub SourceSpan);
+
+impl FromSourceSpan for RightParens {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for RightParens {
     #[inline]
@@ -1129,6 +1261,12 @@ impl GetPos for RightParens {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LeftBracket(pub SourceSpan);
 
+impl FromSourceSpan for LeftBracket {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for LeftBracket {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -1138,6 +1276,12 @@ impl GetPos for LeftBracket {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RightBracket(pub SourceSpan);
+
+impl FromSourceSpan for RightBracket {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for RightBracket {
     #[inline]
@@ -1149,6 +1293,12 @@ impl GetPos for RightBracket {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct LetterAccessLeftBracket(pub SourceSpan);
 
+impl FromSourceSpan for LetterAccessLeftBracket {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for LetterAccessLeftBracket {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -1158,6 +1308,12 @@ impl GetPos for LetterAccessLeftBracket {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Semicolon(pub SourceSpan);
+
+impl FromSourceSpan for Semicolon {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for Semicolon {
     #[inline]
@@ -1723,6 +1879,12 @@ impl Identifier {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SyntacticIf(pub SourceSpan);
 
+impl FromSourceSpan for SyntacticIf {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
 impl GetPos for SyntacticIf {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
@@ -1732,6 +1894,12 @@ impl GetPos for SyntacticIf {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct SyntacticElse(pub SourceSpan);
+
+impl FromSourceSpan for SyntacticElse {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
 
 impl GetPos for SyntacticElse {
     #[inline]
@@ -2261,6 +2429,10 @@ where
     fn into_result_with_source_span(self, source_span: SourceSpan) -> Result<Self::Out, A> {
         FromWithSourceSpan::from_result_with_source_span(self, source_span)
     }
+}
+
+pub trait FromSourceSpan {
+    fn from_source_span(source_span: SourceSpan) -> Self;
 }
 
 // TODO: Create traits InvalidFromSourceSpan etc
