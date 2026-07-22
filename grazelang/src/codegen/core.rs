@@ -4336,12 +4336,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
             (num.round().clamp(1.0, costumes.len() as f64) - 1.0) as usize
         }
-        // TODO: Config block for stage and sprites
-        //  - [x] Parser
-        //  - [x] CST components
-        //  - [x] Errors
-        //  - [x] Codegen
-        // Issue: #70
         if context.current_target_configured {
             emit_message(
                 context,
