@@ -1,6 +1,6 @@
 use crate::{
     lexer::SourceSpan, parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Colon, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier,
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -215,7 +215,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &ConfigKeyword,
             &LeftBrace,
-            &[(Identifier, Colon, Literal, Option<Comma>)],
+            &CommaSeparated<FlatDictionaryEntry>,
             &RightBrace,
             &SourceSpan,
         ),
@@ -1277,7 +1277,7 @@ pub fn default_visit_config_statement<V, C, E>(
     _value: (
         &ConfigKeyword,
         &LeftBrace,
-        &[(Identifier, Colon, Literal, Option<Comma>)],
+        &CommaSeparated<FlatDictionaryEntry>,
         &RightBrace,
         &SourceSpan,
     ),

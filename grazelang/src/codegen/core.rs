@@ -45,9 +45,7 @@ use crate::{
             ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
-            self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FormattedStringContent, GetPos,
-            Identifier, ListEntry, Literal, UnOpDescriptor,
+            self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FlatDictionaryEntry, FormattedStringContent, GetPos, Identifier, ListEntry, Literal, UnOpDescriptor
         },
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
@@ -4301,7 +4299,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &cst::ConfigKeyword,
             &cst::LeftBrace,
-            &[(Identifier, cst::Colon, Literal, Option<cst::Comma>)],
+            &cst::CommaSeparated<cst::FlatDictionaryEntry>,
             &cst::RightBrace,
             &SourceSpan,
         ),
@@ -4351,7 +4349,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .as_ref()
             .is_some_and(|value| value.is_stage);
         let mut data = HashMap::with_capacity(value.2.len());
-        for (ident, _, value, _) in value.2 {
+        for FlatDictionaryEntry(ident, _, value, _) in value.2 {
             let mut key = ident.to_single().unwrap().0.clone();
             if let Some(new_key) = match key.as_str() {
                 "costume" if is_stage => Some(literal!("backdrop")),

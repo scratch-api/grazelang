@@ -434,7 +434,11 @@ macro_rules! parse_comma_separated {
 }
 
 macro_rules! parse_flat_dictionary {
-    ($token_stream:expr, $context:expr, ($token_stream_ident:pat, $start_pos_ident:pat) => $invalid_ret:expr) => {{
+    (
+        $token_stream:expr,
+        $context:expr,
+        ($token_stream_ident:pat, $start_pos_ident:pat) => $invalid_ret:expr
+    ) => {{
         let token_stream = &mut *$token_stream;
         let context = &mut *$context;
         let start_pos = peek_token_start(token_stream);
@@ -450,75 +454,159 @@ macro_rules! parse_flat_dictionary {
                 $invalid_ret
             }
         );
-        let mut items = Vec::new();
-        let right_brace = loop {
-            let identifier = try_or_emit_message!(
-                parse_single_identifier_as_identifier(token_stream, context),
-                context,
-                {
-                    let $token_stream_ident = &mut *token_stream;
-                    let $start_pos_ident = start_pos;
-                    $invalid_ret
-                }
-            );
-            let colon = expect_token_or_message!(
-                token_stream,
-                context,
-                Token::Colon => from_stream_pos::<Colon>(token_stream),
-                "Expected '='.",
-                "'='",
-                {
-                    let $token_stream_ident = &mut *token_stream;
-                    let $start_pos_ident = start_pos;
-                    $invalid_ret
-                }
-            );
-            let literal = try_or_emit_message!(
-                parse_literal(token_stream, context),
-                context,
-                {
-                    let $token_stream_ident = &mut *token_stream;
-                    let $start_pos_ident = start_pos;
-                    $invalid_ret
-                }
-            );
-            let comma = match peek_token!(token_stream) {
-                Token::RightBrace(LexedRightBrace::Normal) => None,
-                Token::Comma => {
-                    skip_token!(token_stream);
-                    Some(from_stream_pos::<Comma>(token_stream))
-                }
-                _ => {
-                    let token = next_token!(token_stream);
-                    emit_unexpected_token_message_or_return(
-                        context,
-                        token_stream,
-                        literal!("Expected '}' or ','."),
-                        literal!("'}' or ','"),
-                        #[cfg(feature = "include_context_in_parse_errors")]
-                        literal!(static_current_context!()),
-                        token,
-                    )?;
-                    return {
+
+        let items = parse_comma_separated!(
+            token_stream,
+            context,
+            (token_stream, context) => {
+                let identifier = try_or_emit_message!(
+                    parse_single_identifier_as_identifier(token_stream, context),
+                    context,
+                    {
                         let $token_stream_ident = &mut *token_stream;
                         let $start_pos_ident = start_pos;
                         $invalid_ret
-                    };
-                }
-            };
-            items.push((identifier, colon, literal, comma));
-            consume_then_never_if!(token_stream, Token::RightBrace(LexedRightBrace::Normal) => {
-                break from_stream_pos::<RightBrace>(token_stream);
-            });
-        };
+                    }
+                );
+                let start_pos = identifier.get_source_span().0.0;
+                FlatDictionaryEntry(
+                    identifier,
+                    expect_token_or_message!(
+                        token_stream,
+                        context,
+                        Token::Colon => from_stream_pos::<Colon>(token_stream),
+                        "Expected ':'.",
+                        "':'",
+                        {
+                            let $token_stream_ident = &mut *token_stream;
+                            let $start_pos_ident = start_pos;
+                            $invalid_ret
+                        }
+                    ),
+                    try_or_emit_message!(
+                        parse_literal(token_stream, context),
+                        context,
+                        {
+                            let $token_stream_ident = &mut *token_stream;
+                            let $start_pos_ident = start_pos;
+                            $invalid_ret
+                        }
+                    ),
+                    token_stream.span_from_previous_to_current(start_pos)
+                )
+            },
+            Token::RightBrace(LexedRightBrace::Normal),
+            "'}'"
+        );
+
+        let right_brace = expect_token_or_message!(
+            token_stream,
+            context,
+            Token::RightBrace(LexedRightBrace::Normal) => from_stream_pos::<RightBrace>(token_stream),
+            "Expected '}'.",
+            "'}'",
+            {
+                let $token_stream_ident = &mut *token_stream;
+                let $start_pos_ident = start_pos;
+                $invalid_ret
+            }
+        );
+
         (
             left_brace,
             items,
             right_brace,
             left_brace.range_to(&right_brace),
         )
-    }}
+    }};
 }
+
+// macro_rules! parse_flat_dictionary {
+//     ($token_stream:expr, $context:expr, ($token_stream_ident:pat, $start_pos_ident:pat) => $invalid_ret:expr) => {{
+//         let token_stream = &mut *$token_stream;
+//         let context = &mut *$context;
+//         let start_pos = peek_token_start(token_stream);
+//         let left_brace = expect_token_or_message!(
+//             token_stream,
+//             context,
+//             Token::LeftBrace => from_stream_pos::<LeftBrace>(token_stream),
+//             "Expected '{'.",
+//             "'{'",
+//             {
+//                 let $token_stream_ident = &mut *token_stream;
+//                 let $start_pos_ident = start_pos;
+//                 $invalid_ret
+//             }
+//         );
+//         let mut items = Vec::new();
+//         let right_brace = loop {
+//             let identifier = try_or_emit_message!(
+//                 parse_single_identifier_as_identifier(token_stream, context),
+//                 context,
+//                 {
+//                     let $token_stream_ident = &mut *token_stream;
+//                     let $start_pos_ident = start_pos;
+//                     $invalid_ret
+//                 }
+//             );
+//             let colon = expect_token_or_message!(
+//                 token_stream,
+//                 context,
+//                 Token::Colon => from_stream_pos::<Colon>(token_stream),
+//                 "Expected '='.",
+//                 "'='",
+//                 {
+//                     let $token_stream_ident = &mut *token_stream;
+//                     let $start_pos_ident = start_pos;
+//                     $invalid_ret
+//                 }
+//             );
+//             let literal = try_or_emit_message!(
+//                 parse_literal(token_stream, context),
+//                 context,
+//                 {
+//                     let $token_stream_ident = &mut *token_stream;
+//                     let $start_pos_ident = start_pos;
+//                     $invalid_ret
+//                 }
+//             );
+//             let comma = match peek_token!(token_stream) {
+//                 Token::RightBrace(LexedRightBrace::Normal) => None,
+//                 Token::Comma => {
+//                     skip_token!(token_stream);
+//                     Some(from_stream_pos::<Comma>(token_stream))
+//                 }
+//                 _ => {
+//                     let token = next_token!(token_stream);
+//                     emit_unexpected_token_message_or_return(
+//                         context,
+//                         token_stream,
+//                         literal!("Expected '}' or ','."),
+//                         literal!("'}' or ','"),
+//                         #[cfg(feature = "include_context_in_parse_errors")]
+//                         literal!(static_current_context!()),
+//                         token,
+//                     )?;
+//                     return {
+//                         let $token_stream_ident = &mut *token_stream;
+//                         let $start_pos_ident = start_pos;
+//                         $invalid_ret
+//                     };
+//                 }
+//             };
+//             items.push((identifier, colon, literal, comma));
+//             consume_then_never_if!(token_stream, Token::RightBrace(LexedRightBrace::Normal) => {
+//                 break from_stream_pos::<RightBrace>(token_stream);
+//             });
+//         };
+//         (
+//             left_brace,
+//             items,
+//             right_brace,
+//             left_brace.range_to(&right_brace),
+//         )
+//     }}
+// }
 
 macro_rules! parse_config_statement {
     ($token_stream:expr, $context:expr, $statement_ty:ty) => {{
@@ -972,11 +1060,11 @@ pub mod statement {
         parser::cst::{
             AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword,
             CustomBlockParamKind, CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope,
-            EMPTY_ISTRING_REF, LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry,
-            ListKeyword, ListsKeyword, NormalAssignmentOperator, ProcKeyword, RightBrace,
-            RightBracket, RightParens, Semicolon, SingleAssetDeclaration, SingleDataDeclaration,
-            SingleDataDeclarationType, SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword,
-            WarpSpecifier,
+            EMPTY_ISTRING_REF, FlatDictionaryEntry, LeftBrace, LeftBracket, LeftParens, LetKeyword,
+            ListEntry, ListKeyword, ListsKeyword, NormalAssignmentOperator, ProcKeyword,
+            RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration,
+            SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf,
+            VarKeyword, VarsKeyword, WarpSpecifier,
         },
     };
 
@@ -2488,7 +2576,7 @@ pub mod statement {
                             cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                             cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                                 let mut data = HashMap::with_capacity(items.len());
-                                for (ident, _, value, _) in items {
+                                for FlatDictionaryEntry(ident, _, value, _) in items {
                                     if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                         errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                             key: ident.to_single().unwrap().0.clone(),
@@ -2637,7 +2725,7 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                         cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
-                            for (ident, _, value, _) in items {
+                            for FlatDictionaryEntry(ident, _, value, _) in items {
                                 if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                         key: ident.to_single().unwrap().0.clone(),
@@ -2766,7 +2854,7 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                         cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
-                            for (ident, _, value, _) in items {
+                            for FlatDictionaryEntry(ident, _, value, _) in items {
                                 if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
                                         key: ident.to_single().unwrap().0.clone(),

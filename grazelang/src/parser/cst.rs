@@ -461,8 +461,7 @@ pub enum StageStatement {
     ConfigStatement(
         ConfigKeyword,
         LeftBrace,
-        Vec<(Identifier, Colon, Literal, Option<Comma>)>, // TODO: Use CommaSeparated here
-        // Issue: #74
+        CommaSeparated<FlatDictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -536,8 +535,7 @@ pub enum SpriteStatement {
     ConfigStatement(
         ConfigKeyword,
         LeftBrace,
-        Vec<(Identifier, Colon, Literal, Option<Comma>)>, // TODO: Use CommaSeparated here
-        // Issue: #73
+        CommaSeparated<FlatDictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -606,8 +604,7 @@ pub enum SingleAssetDeclarationValue {
     Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
     FlatDictionary(
         LeftBrace,
-        Vec<(Identifier, Colon, Literal, Option<Comma>)>, // TODO: Use CommaSeparated here
-        // Issue: #72
+        CommaSeparated<FlatDictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -856,6 +853,16 @@ impl GetPos for NormalAssignmentOperator {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatDictionaryEntry(pub Identifier, pub Colon, pub Literal, pub SourceSpan);
+
+impl GetPos for FlatDictionaryEntry {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.3
     }
 }
 
