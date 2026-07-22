@@ -505,10 +505,10 @@
     },
     "70": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": "- [x] Parser\n- [x] CST components\n- [x] Errors\n- [ ] Codegen",
+        "text": "- [x] Parser\n- [x] CST components\n- [x] Errors\n- [x] Codegen",
         "status": "open",
-        "lines": "L4316-L4321",
-        "commit": "4ae00e0b7abfe6adf466ac7effe5b07c6ee350fd",
+        "lines": "L4339-L4344",
+        "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
         "title": "Config block for stage and sprites"
     },
     "71": {
@@ -518,5 +518,29 @@
         "lines": "L2263-L2263",
         "commit": "8be5a67404ceb8fa653f8be58cd0e7a9f17477a2",
         "title": "Create traits InvalidFromSourceSpan etc"
+    },
+    "72": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L547-L547",
+        "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
+        "title": "Use CommaSeparated here"
+    },
+    "73": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L478-L478",
+        "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
+        "title": "Use CommaSeparated here"
+    },
+    "74": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L404-L404",
+        "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
+        "title": "Use CommaSeparated here"
     }
 }
