@@ -77,6 +77,7 @@ impl GetPos for TopLevelStatement {
 }
 
 impl InvalidVariantFromSourceSpan for TopLevelStatement {
+    #[inline]
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
         Self::Invalid(source_span)
     }
@@ -403,6 +404,7 @@ impl GetPos for UseStatementContent {
 }
 
 impl InvalidVariantFromSourceSpan for UseStatementContent {
+    #[inline]
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
         Self::Invalid(source_span)
     }
@@ -503,8 +505,22 @@ impl GetPos for StageStatement {
 }
 
 impl InvalidVariantFromSourceSpan for StageStatement {
+    #[inline]
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
         Self::Invalid(source_span)
+    }
+}
+
+impl ConfigStatementFromContent for StageStatement {
+    #[inline]
+    fn config_statement_from_content(
+        config_keyword: ConfigKeyword,
+        left_brace: LeftBrace,
+        items: CommaSeparated<FlatDictionaryEntry>,
+        right_brace: RightBrace,
+        source_span: SourceSpan,
+    ) -> Self {
+        Self::ConfigStatement(config_keyword, left_brace, items, right_brace, source_span)
     }
 }
 
@@ -583,8 +599,22 @@ impl GetPos for SpriteStatement {
 }
 
 impl InvalidVariantFromSourceSpan for SpriteStatement {
+    #[inline]
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
         Self::Invalid(source_span)
+    }
+}
+
+impl ConfigStatementFromContent for SpriteStatement {
+    #[inline]
+    fn config_statement_from_content(
+        config_keyword: ConfigKeyword,
+        left_brace: LeftBrace,
+        items: CommaSeparated<FlatDictionaryEntry>,
+        right_brace: RightBrace,
+        source_span: SourceSpan,
+    ) -> Self {
+        Self::ConfigStatement(config_keyword, left_brace, items, right_brace, source_span)
     }
 }
 
@@ -646,6 +676,7 @@ impl GetPos for SingleAssetDeclarationValue {
 }
 
 impl InvalidVariantFromSourceSpan for SingleAssetDeclarationValue {
+    #[inline]
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
         Self::Invalid(source_span)
     }
@@ -737,6 +768,7 @@ impl GetPos for Statement {
 }
 
 impl InvalidVariantFromSourceSpan for Statement {
+    #[inline]
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
         Self::Invalid(source_span)
     }
@@ -2482,5 +2514,18 @@ pub trait InvalidVariantFromSourceSpan {
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self;
 }
 
+pub trait ConfigStatementFromContent {
+    fn config_statement_from_content(
+        config_keyword: ConfigKeyword,
+        left_brace: LeftBrace,
+        items: CommaSeparated<FlatDictionaryEntry>,
+        right_brace: RightBrace,
+        source_span: SourceSpan,
+    ) -> Self;
+}
+
 // TODO: Create traits InvalidFromSourceSpan etc
+//  - [x] FromSourceSpan
+//  - [x] InvalidVariantFromSourceSpan
+//  - [x] ConfigStatementFromContent
 // Issue: #71

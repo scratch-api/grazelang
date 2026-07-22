@@ -529,119 +529,6 @@ macro_rules! parse_flat_dictionary {
     }};
 }
 
-// macro_rules! parse_flat_dictionary {
-//     ($token_stream:expr, $context:expr, ($token_stream_ident:pat, $start_pos_ident:pat) => $invalid_ret:expr) => {{
-//         let token_stream = &mut *$token_stream;
-//         let context = &mut *$context;
-//         let start_pos = peek_token_start(token_stream);
-//         let left_brace = expect_token_or_message!(
-//             token_stream,
-//             context,
-//             Token::LeftBrace => from_stream_pos::<LeftBrace>(token_stream),
-//             "Expected '{'.",
-//             "'{'",
-//             {
-//                 let $token_stream_ident = &mut *token_stream;
-//                 let $start_pos_ident = start_pos;
-//                 $invalid_ret
-//             }
-//         );
-//         let mut items = Vec::new();
-//         let right_brace = loop {
-//             let identifier = try_or_emit_message!(
-//                 parse_single_identifier_as_identifier(token_stream, context),
-//                 context,
-//                 {
-//                     let $token_stream_ident = &mut *token_stream;
-//                     let $start_pos_ident = start_pos;
-//                     $invalid_ret
-//                 }
-//             );
-//             let colon = expect_token_or_message!(
-//                 token_stream,
-//                 context,
-//                 Token::Colon => from_stream_pos::<Colon>(token_stream),
-//                 "Expected '='.",
-//                 "'='",
-//                 {
-//                     let $token_stream_ident = &mut *token_stream;
-//                     let $start_pos_ident = start_pos;
-//                     $invalid_ret
-//                 }
-//             );
-//             let literal = try_or_emit_message!(
-//                 parse_literal(token_stream, context),
-//                 context,
-//                 {
-//                     let $token_stream_ident = &mut *token_stream;
-//                     let $start_pos_ident = start_pos;
-//                     $invalid_ret
-//                 }
-//             );
-//             let comma = match peek_token!(token_stream) {
-//                 Token::RightBrace(LexedRightBrace::Normal) => None,
-//                 Token::Comma => {
-//                     skip_token!(token_stream);
-//                     Some(from_stream_pos::<Comma>(token_stream))
-//                 }
-//                 _ => {
-//                     let token = next_token!(token_stream);
-//                     emit_unexpected_token_message_or_return(
-//                         context,
-//                         token_stream,
-//                         literal!("Expected '}' or ','."),
-//                         literal!("'}' or ','"),
-//                         #[cfg(feature = "include_context_in_parse_errors")]
-//                         literal!(static_current_context!()),
-//                         token,
-//                     )?;
-//                     return {
-//                         let $token_stream_ident = &mut *token_stream;
-//                         let $start_pos_ident = start_pos;
-//                         $invalid_ret
-//                     };
-//                 }
-//             };
-//             items.push((identifier, colon, literal, comma));
-//             consume_then_never_if!(token_stream, Token::RightBrace(LexedRightBrace::Normal) => {
-//                 break from_stream_pos::<RightBrace>(token_stream);
-//             });
-//         };
-//         (
-//             left_brace,
-//             items,
-//             right_brace,
-//             left_brace.range_to(&right_brace),
-//         )
-//     }}
-// }
-
-macro_rules! parse_config_statement {
-    ($token_stream:expr, $context:expr, $statement_ty:ty) => {{
-        let token_stream = &mut *$token_stream;
-        let context = &mut *$context;
-        let config_keyword = expect_token!(
-            token_stream,
-            Token::ConfigKeyword => from_stream_pos::<ConfigKeyword>(token_stream),
-            "Expected \"config\".",
-            "\"config\""
-        );
-        let start_pos = get_token_start(token_stream);
-        let (left_brace, items, right_brace, source_span) = parse_flat_dictionary!(
-            token_stream,
-            context,
-            (token_stream, _) => find_statement_end_and_create_invalid::<$statement_ty>(token_stream, start_pos)
-        );
-        Ok(<$statement_ty>::ConfigStatement(
-            config_keyword,
-            left_brace,
-            items,
-            right_brace,
-            source_span,
-        ))
-    }}
-}
-
 pub fn emit_message(
     context: &mut ParseContext,
     message: GrazeMessage,
@@ -1067,12 +954,12 @@ pub mod statement {
         lexer::{self, LexedRightBrace},
         parser::cst::{
             AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword,
-            CustomBlockParamKind, CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope,
-            EMPTY_ISTRING_REF, FlatDictionaryEntry, LeftBrace, LeftBracket, LeftParens, LetKeyword,
-            ListEntry, ListKeyword, ListsKeyword, NormalAssignmentOperator, ProcKeyword,
-            RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration,
-            SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf,
-            VarKeyword, VarsKeyword, WarpSpecifier,
+            ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue,
+            DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF, FlatDictionaryEntry,
+            LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
+            NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
+            Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
+            SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier,
         },
     };
 
@@ -2448,18 +2335,29 @@ pub mod statement {
         ))
     }
 
-    pub fn parse_config_stage_statement(
+    pub fn parse_config_statement<T>(
         token_stream: ParseIn,
         context: &mut ParseContext,
-    ) -> ParseOut<StageStatement> {
-        parse_config_statement!(token_stream, context, StageStatement)
-    }
-
-    pub fn parse_config_sprite_statement(
-        token_stream: ParseIn,
-        context: &mut ParseContext,
-    ) -> ParseOut<SpriteStatement> {
-        parse_config_statement!(token_stream, context, SpriteStatement)
+    ) -> ParseOut<T>
+    where
+        T: ConfigStatementFromContent + InvalidVariantFromSourceSpan,
+    {
+        let token_stream = &mut *token_stream;
+        let context = &mut *context;
+        let config_keyword = expect_token!(token_stream,Token::ConfigKeyword => from_stream_pos::<ConfigKeyword>(token_stream),"Expected \"config\".","\"config\"");
+        let start_pos = get_token_start(token_stream);
+        let (left_brace, items, right_brace, source_span) = parse_flat_dictionary!(
+            token_stream,
+            context,
+            (token_stream, _) => find_statement_end_and_create_invalid::<T>(token_stream, start_pos)
+        );
+        Ok(T::config_statement_from_content(
+            config_keyword,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        ))
     }
 
     pub fn parse_flat_dictionary_asset_value(
@@ -3418,7 +3316,10 @@ pub fn parse_sprite_statement(
                         statement::AssetDeclarationType::Costume,
                     ),
                     context,
-                    find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                    find_statement_end_and_create_invalid::<SpriteStatement>(
+                        token_stream,
+                        start_pos
+                    )
                 ),
                 expect_token_or_message!(
                     token_stream,
@@ -3444,7 +3345,10 @@ pub fn parse_sprite_statement(
                         statement::AssetDeclarationType::Sound,
                     ),
                     context,
-                    find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                    find_statement_end_and_create_invalid::<SpriteStatement>(
+                        token_stream,
+                        start_pos
+                    )
                 ),
                 expect_token_or_message!(
                     token_stream,
@@ -3511,7 +3415,10 @@ pub fn parse_sprite_statement(
                     try_or_emit_message!(
                         parse_code_block(token_stream, context),
                         context,
-                        find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<SpriteStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                     token_stream.span_from_previous_to_current(start_pos),
@@ -3528,7 +3435,10 @@ pub fn parse_sprite_statement(
                     let (left_parens, expressions, right_parens) = try_or_emit_message!(
                         parse_expression_list(token_stream, context),
                         context,
-                        find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<SpriteStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     );
                     if expressions.is_empty() {
                         let source_span = (left_parens.0.0, right_parens.0.1);
@@ -3567,7 +3477,10 @@ pub fn parse_sprite_statement(
                         try_or_emit_message!(
                             parse_code_block(token_stream, context),
                             context,
-                            find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                            find_statement_end_and_create_invalid::<SpriteStatement>(
+                                token_stream,
+                                start_pos
+                            )
                         ),
                         consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                         token_stream.span_from_previous_to_current(start_pos),
@@ -3578,7 +3491,10 @@ pub fn parse_sprite_statement(
                     try_or_emit_message!(
                         parse_code_block(token_stream, context),
                         context,
-                        find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<SpriteStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                     token_stream.span_from_previous_to_current(start_pos),
@@ -3591,7 +3507,10 @@ pub fn parse_sprite_statement(
                             literal!("'(', '{' or an expression"),
                         ),
                         context,
-                        find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<SpriteStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     );
                     Ok(try_or_emit_message!(
                         parse_sprite_rest_of_single_input_control(
@@ -3602,7 +3521,10 @@ pub fn parse_sprite_statement(
                             start_pos,
                         ),
                         context,
-                        find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<SpriteStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     ))
                 }
             }
@@ -3648,7 +3570,7 @@ pub fn parse_sprite_statement(
         Token::ConfigKeyword => {
             let start_pos = peek_token_start(token_stream);
             Ok(try_or_emit_message!(
-                statement::parse_config_sprite_statement(token_stream, context),
+                statement::parse_config_statement(token_stream, context),
                 context,
                 find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
             ))
@@ -3719,7 +3641,10 @@ pub fn parse_stage_statement(
                         statement::AssetDeclarationType::Backdrop,
                     ),
                     context,
-                    find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+                    find_statement_end_and_create_invalid::<StageStatement>(
+                        token_stream,
+                        start_pos
+                    )
                 ),
                 expect_token_or_message!(
                     token_stream,
@@ -3745,7 +3670,10 @@ pub fn parse_stage_statement(
                         statement::AssetDeclarationType::Sound,
                     ),
                     context,
-                    find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+                    find_statement_end_and_create_invalid::<StageStatement>(
+                        token_stream,
+                        start_pos
+                    )
                 ),
                 expect_token_or_message!(
                     token_stream,
@@ -3812,7 +3740,10 @@ pub fn parse_stage_statement(
                     try_or_emit_message!(
                         parse_code_block(token_stream, context),
                         context,
-                        find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<StageStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                     token_stream.span_from_previous_to_current(start_pos),
@@ -3829,7 +3760,10 @@ pub fn parse_stage_statement(
                     let (left_parens, expressions, right_parens) = try_or_emit_message!(
                         parse_expression_list(token_stream, context),
                         context,
-                        find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<StageStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     );
                     if expressions.is_empty() {
                         let source_span = (left_parens.0.0, right_parens.0.1);
@@ -3868,7 +3802,10 @@ pub fn parse_stage_statement(
                         try_or_emit_message!(
                             parse_code_block(token_stream, context),
                             context,
-                            find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+                            find_statement_end_and_create_invalid::<StageStatement>(
+                                token_stream,
+                                start_pos
+                            )
                         ),
                         consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                         token_stream.span_from_previous_to_current(start_pos),
@@ -3879,7 +3816,10 @@ pub fn parse_stage_statement(
                     try_or_emit_message!(
                         parse_code_block(token_stream, context),
                         context,
-                        find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<StageStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     ),
                     consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                     token_stream.span_from_previous_to_current(start_pos),
@@ -3892,7 +3832,10 @@ pub fn parse_stage_statement(
                             literal!("'(', '{' or an expression"),
                         ),
                         context,
-                        find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+                        find_statement_end_and_create_invalid::<StageStatement>(
+                            token_stream,
+                            start_pos
+                        )
                     );
                     parse_stage_rest_of_single_input_control(
                         token_stream,
@@ -3945,7 +3888,7 @@ pub fn parse_stage_statement(
         Token::ConfigKeyword => {
             let start_pos = peek_token_start(token_stream);
             Ok(try_or_emit_message!(
-                statement::parse_config_stage_statement(token_stream, context),
+                statement::parse_config_statement(token_stream, context),
                 context,
                 find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
             ))
@@ -4012,7 +3955,10 @@ pub fn parse_top_level_statement(
                 try_or_emit_message!(
                     parse_stage_code_block(token_stream, context),
                     context,
-                    find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(token_stream, start_pos)
+                    find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(
+                        token_stream,
+                        start_pos
+                    )
                 ),
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                 token_stream.span_from_previous_to_current(start_pos),
@@ -4034,7 +3980,10 @@ pub fn parse_top_level_statement(
             let identifier = try_or_emit_message!(
                 parse_single_identifier_as_identifier(token_stream, context),
                 context,
-                find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(token_stream, start_pos)
+                find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(
+                    token_stream,
+                    start_pos
+                )
             );
             let name = &identifier.to_single().unwrap().0;
             match name.as_str() {
@@ -4083,7 +4032,10 @@ pub fn parse_top_level_statement(
                 try_or_emit_message!(
                     parse_sprite_code_block(token_stream, context),
                     context,
-                    find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(token_stream, start_pos)
+                    find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(
+                        token_stream,
+                        start_pos
+                    )
                 ),
                 consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon>(token_stream)),
                 token_stream.span_from_previous_to_current(start_pos),
@@ -4105,7 +4057,10 @@ pub fn parse_top_level_statement(
             let identifier = try_or_emit_message!(
                 parse_single_identifier_as_identifier(token_stream, context),
                 context,
-                find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(token_stream, start_pos)
+                find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(
+                    token_stream,
+                    start_pos
+                )
             );
             let name = &identifier.to_single().unwrap().0;
             match name.as_str() {
@@ -4191,7 +4146,10 @@ pub fn parse_top_level_statement(
                     token
                 )),
                 context,
-                find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(token_stream, start)
+                find_top_level_statement_end_and_create_invalid::<TopLevelStatement>(
+                    token_stream,
+                    start
+                )
             )
         }
     }
