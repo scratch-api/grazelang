@@ -522,7 +522,7 @@
     "72": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L547-L547",
         "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
         "title": "Use CommaSeparated here"
@@ -530,7 +530,7 @@
     "73": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L478-L478",
         "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
         "title": "Use CommaSeparated here"
@@ -538,7 +538,7 @@
     "74": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L404-L404",
         "commit": "3d9215a1f86c05e108aaed56f6eaf9b605a35d34",
         "title": "Use CommaSeparated here"
