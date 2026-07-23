@@ -553,10 +553,10 @@
     },
     "76": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [x] add type\n- [ ] use type in appropriate contexts",
+        "text": "- [x] add type\n- [x] use type in appropriate contexts",
         "status": "open",
-        "lines": "L1910-L1913",
-        "commit": "799e2bff37df1ef34a1a20e7b5207f961c61a605",
+        "lines": "L1924-L1927",
+        "commit": "466ce6a5c3d2846555717b976fa8a189b7beb443",
         "title": "create `SingleIdentifier`"
     },
     "77": {
