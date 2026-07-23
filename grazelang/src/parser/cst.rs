@@ -1923,7 +1923,7 @@ pub struct Identifier {
 
 // TODO: create `SingleIdentifier`
 //  - [x] add type
-//  - [ ] use type in appropriate contexts
+//  - [x] use type in appropriate contexts
 // Issue: #76
 
 impl Display for Identifier {
