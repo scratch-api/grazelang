@@ -15,7 +15,7 @@ use crate::{
         context::{self, BroadcastDescriptor},
         cst::{
             CommaSeparated, FromSourceSpan, GetPos, GrazeProgram, InvalidVariantFromSourceSpan,
-            SpriteCodeBlock, StageCodeBlock, TopLevelStatement,
+            SingleIdentifier, SpriteCodeBlock, StageCodeBlock, TopLevelStatement,
         },
     },
     settings::GrazeMessageSetting,
@@ -61,6 +61,7 @@ macro_rules! expect_token_or_message {
                     literal!(static_current_context!()),
                     token,
                 )?;
+                #[allow(unreachable_code)]
                 return $default_value;
             }
         }
@@ -366,6 +367,7 @@ macro_rules! try_or_emit_message {
             Ok(value) => value,
             Err(err) => {
                 emit_error!(err, $context);
+                #[allow(unreachable_code)]
                 return $default_value;
             }
         }
@@ -444,25 +446,18 @@ macro_rules! parse_comma_separated {
 macro_rules! parse_flat_dictionary {
     (
         $token_stream:expr,
-        $context:expr,
-        ($token_stream_ident:pat, $start_pos_ident:pat) => $invalid_ret:expr
+        $context:expr
     ) => {{
         let token_stream = &mut *$token_stream;
         let context = &mut *$context;
-        let start_pos = peek_token_start(token_stream);
-        let left_brace = expect_token_or_message!(
+        let left_brace = expect_token!(
             token_stream,
-            context,
             Token::LeftBrace => from_stream_pos::<LeftBrace>(token_stream),
             "Expected '{'.",
-            "'{'",
-            {
-                let $token_stream_ident = &mut *token_stream;
-                let $start_pos_ident = start_pos;
-                $invalid_ret
-            }
+            "'{'"
         );
         let items = {
+            let item_start_pos = peek_token_start(token_stream);
             let mut comma_separated_start_pos = None;
             let mut values = Vec::new();
             let tail_value = loop {
@@ -481,13 +476,23 @@ macro_rules! parse_flat_dictionary {
                             ),
                             context,
                             {
-                                let $token_stream_ident = &mut *token_stream;
-                                let $start_pos_ident = start_pos;
-                                $invalid_ret
+                                find_comma_separated_entry_end(token_stream)?;
+                                let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                let comma = match peek_token!(token_stream) {
+                                    Token::Comma => {
+                                        skip_token!(token_stream);
+                                        cst::Comma(get_token_source_span(token_stream))
+                                    }
+                                    _ => {
+                                        break Some(Box::new(value))
+                                    }
+                                };
+                                values.push((value, comma));
+                                continue;
                             }
                         );
                         let start_pos = identifier.get_source_span().0.0;
-                        FlatDictionaryEntry(
+                        FlatDictionaryEntry::Valid(
                             identifier,
                             expect_token_or_message!(
                                 token_stream,
@@ -496,18 +501,38 @@ macro_rules! parse_flat_dictionary {
                                 "Expected ':'.",
                                 "':'",
                                 {
-                                    let $token_stream_ident = &mut *token_stream;
-                                    let $start_pos_ident = start_pos;
-                                    $invalid_ret
+                                    find_comma_separated_entry_end(token_stream)?;
+                                    let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                    let comma = match peek_token!(token_stream) {
+                                        Token::Comma => {
+                                            skip_token!(token_stream);
+                                            cst::Comma(get_token_source_span(token_stream))
+                                        }
+                                        _ => {
+                                            break Some(Box::new(value))
+                                        }
+                                    };
+                                    values.push((value, comma));
+                                    continue;
                                 }
                             ),
                             try_or_emit_message!(
                                 parse_literal(token_stream, context),
                                 context,
                                 {
-                                    let $token_stream_ident = &mut *token_stream;
-                                    let $start_pos_ident = start_pos;
-                                    $invalid_ret
+                                    find_comma_separated_entry_end(token_stream)?;
+                                    let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                    let comma = match peek_token!(token_stream) {
+                                        Token::Comma => {
+                                            skip_token!(token_stream);
+                                            cst::Comma(get_token_source_span(token_stream))
+                                        }
+                                        _ => {
+                                            break Some(Box::new(value))
+                                        }
+                                    };
+                                    values.push((value, comma));
+                                    continue;
                                 }
                             ),
                             token_stream.span_from_previous_to_current(start_pos)
@@ -537,9 +562,19 @@ macro_rules! parse_flat_dictionary {
                             )),
                             context,
                             {
-                                let $token_stream_ident = &mut *token_stream;
-                                let $start_pos_ident = start_pos;
-                                $invalid_ret
+                                find_comma_separated_entry_end(token_stream)?;
+                                let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                let comma = match peek_token!(token_stream) {
+                                    Token::Comma => {
+                                        skip_token!(token_stream);
+                                        cst::Comma(get_token_source_span(token_stream))
+                                    }
+                                    _ => {
+                                        break Some(Box::new(value))
+                                    }
+                                };
+                                values.push((value, comma));
+                                continue;
                             }
                         )
                     }
@@ -556,17 +591,11 @@ macro_rules! parse_flat_dictionary {
                 ),
             }
         };
-        let right_brace = expect_token_or_message!(
+        let right_brace = expect_token!(
             token_stream,
-            context,
             Token::RightBrace(LexedRightBrace::Normal) => from_stream_pos::<RightBrace>(token_stream),
             "Expected '}'.",
-            "'}'",
-            {
-                let $token_stream_ident = &mut *token_stream;
-                let $start_pos_ident = start_pos;
-                $invalid_ret
-            }
+            "'}'"
         );
         (
             left_brace,
@@ -871,13 +900,9 @@ pub fn parse_single_identifier(
 pub fn parse_single_identifier_as_identifier(
     token_stream: ParseIn,
     context: &mut ParseContext,
-) -> ParseOut<Identifier> {
-    Ok(Identifier {
-        path: vec![(
-            parse_single_identifier(token_stream, context)?,
-            get_token_source_span(token_stream),
-        )],
-        fields: Vec::new(),
+) -> ParseOut<SingleIdentifier> {
+    Ok(SingleIdentifier {
+        value: parse_single_identifier(token_stream, context)?,
         source_span: get_token_source_span(token_stream),
     })
 }
@@ -1258,9 +1283,8 @@ pub mod statement {
                     if start_pos.is_none() {
                         start_pos = Some(get_token_start(token_stream));
                     }
-                    Identifier {
-                        path: vec![(value, get_token_source_span(token_stream))],
-                        fields: Vec::new(),
+                    SingleIdentifier {
+                        value,
                         source_span: get_token_source_span(token_stream),
                     }
                 }
@@ -1429,17 +1453,17 @@ pub mod statement {
                     )
                 ),
                 symbols => {
-                    let name = &identifier.to_single().unwrap().0;
+                    let name = &identifier.value;
                     match name.as_str() {
                         "super" => errors.push(ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         }),
                         "self" => errors.push(ParseError::SymbolNamedSelf {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         }),
                         _ => ()
                     }
@@ -1489,12 +1513,11 @@ pub mod statement {
                     });
                     if let Some(previous_symbol) = previous_symbol {
                         symbols.insert(name.clone(), previous_symbol);
-                        let single_identifier = identifier.to_single().unwrap();
                         return Err(ParseError::ShadowedSymbol {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            symbol: single_identifier.0.clone(),
-                            source_span: single_identifier.1,
+                            symbol: identifier.value.clone(),
+                            source_span: *identifier.get_source_span(),
                         });
                     }
                 }
@@ -1769,9 +1792,8 @@ pub mod statement {
                 if start_pos.is_none() {
                     start_pos = variant_from_stream_pos!(token_stream => Some);
                 }
-                Identifier {
-                    path: vec![(value, get_token_source_span(token_stream))],
-                    fields: Vec::new(),
+                SingleIdentifier {
+                    value,
                     source_span: get_token_source_span(token_stream),
                 }
             }
@@ -1882,17 +1904,17 @@ pub mod statement {
             matches!(scope, DataDeclarationScope::Global(_) | DataDeclarationScope::Cloud(_)) ||
             matches!((&scope, &context.next_target), (DataDeclarationScope::Unset, Some(context::Target::Stage { .. }))),
             symbols => {
-                let name = &identifier.to_single().unwrap().0;
+                let name = &identifier.value;
                 match name.as_str() {
                     "super" => errors.push(ParseError::SymbolNamedSuper {
                         #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
-                        source_span: identifier.to_single().unwrap().1,
+                        source_span: *identifier.get_source_span(),
                     }),
                     "self" => errors.push(ParseError::SymbolNamedSelf {
                         #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
-                        source_span: identifier.to_single().unwrap().1,
+                        source_span: *identifier.get_source_span(),
                     }),
                     _ => ()
                 }
@@ -1950,12 +1972,11 @@ pub mod statement {
                 );
                 if let Some(previous_symbol) = previous_symbol {
                     symbols.insert(name.clone(), previous_symbol);
-                    let single_identifier = identifier.to_single().unwrap();
                     return Err(ParseError::ShadowedSymbol {
                         #[cfg(feature = "include_context_in_parse_errors")]
                         context: literal!(static_current_context!()),
-                        symbol: single_identifier.0.clone(),
-                        source_span: single_identifier.1,
+                        symbol: identifier.value.clone(),
+                        source_span: *identifier.get_source_span(),
                     });
                 }
             }
@@ -2393,12 +2414,8 @@ pub mod statement {
         let token_stream = &mut *token_stream;
         let context = &mut *context;
         let config_keyword = expect_token!(token_stream,Token::ConfigKeyword => from_stream_pos::<ConfigKeyword>(token_stream),"Expected \"config\".","\"config\"");
-        let start_pos = get_token_start(token_stream);
-        let (left_brace, items, right_brace, source_span) = parse_flat_dictionary!(
-            token_stream,
-            context,
-            (token_stream, _) => find_statement_end_and_create_invalid::<T>(token_stream, start_pos)
-        );
+        let (left_brace, items, right_brace, source_span) =
+            parse_flat_dictionary!(token_stream, context);
         Ok(T::config_statement_from_content(
             config_keyword,
             left_brace,
@@ -2412,11 +2429,8 @@ pub mod statement {
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<cst::SingleAssetDeclarationValue> {
-        let (left_brace, items, right_brace, source_span) = parse_flat_dictionary!(
-            token_stream,
-            context,
-            (token_stream, start_pos) => find_statement_end_and_create_invalid::<cst::SingleAssetDeclarationValue>(token_stream, start_pos)
-        );
+        let (left_brace, items, right_brace, source_span) =
+            parse_flat_dictionary!(token_stream, context);
         Ok(cst::SingleAssetDeclarationValue::FlatDictionary(
             left_brace,
             items,
@@ -2511,17 +2525,17 @@ pub mod statement {
                     with_mut_next_target!(context, target => {
                         use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                         let symbols = target.borrow_symbols_mut();
-                        let name = &identifier.to_single().unwrap().0;
+                        let name = &identifier.value;
                         match name.as_str() {
                             "super" => errors.push(ParseError::SymbolNamedSuper {
                                 #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
-                                source_span: identifier.to_single().unwrap().1,
+                                source_span: *identifier.get_source_span(),
                             }),
                             "self" => errors.push(ParseError::SymbolNamedSelf {
                                 #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
-                                source_span: identifier.to_single().unwrap().1,
+                                source_span: *identifier.get_source_span(),
                             }),
                             _ => ()
                         }
@@ -2530,10 +2544,15 @@ pub mod statement {
                             cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                             cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                                 let mut data = HashMap::with_capacity(items.len());
-                                for FlatDictionaryEntry(ident, _, value, _) in items {
-                                    if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
+                                for entry in items {
+                                    let Some((ident, _, value, _)) = entry
+                                        .to_valid()
+                                    else {
+                                        continue
+                                    };
+                                    if data.insert(ident.value.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                         errors.push(ParseError::RepeatedFlatDictionaryEntry {
-                                            key: ident.to_single().unwrap().0.clone(),
+                                            key: ident.value.clone(),
                                             #[cfg(feature = "include_context_in_parse_errors")]
                                             context: literal!(static_current_context!()),
                                             source_span: *ident.get_source_span(),
@@ -2550,9 +2569,6 @@ pub mod statement {
                                     cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                                 }).cast_to_string(), data)
                             },
-                            cst::SingleAssetDeclarationValue::Invalid(_) => {
-                                (EMPTY_ISTRING_REF.clone(), HashMap::new())
-                            }
                         };
                         let symbol_idx = symbols.len();
                         let previous_symbol = symbols.insert(
@@ -2593,12 +2609,11 @@ pub mod statement {
                         );
                         if let Some(previous_symbol) = previous_symbol {
                             symbols.insert(name.clone(), previous_symbol);
-                            let single_identifier = identifier.to_single().unwrap();
                             errors.push(ParseError::ShadowedSymbol {
                                 #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
-                                symbol: single_identifier.0.clone(),
-                                source_span: single_identifier.1,
+                                symbol: identifier.value.clone(),
+                                source_span: *identifier.get_source_span(),
                             });
                         }
                         for (key, (source_span, _)) in data {
@@ -2660,17 +2675,17 @@ pub mod statement {
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
-                    let name = &identifier.to_single().unwrap().0;
+                    let name = &identifier.value;
                     match name.as_str() {
                         "super" => errors.push(ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         }),
                         "self" => errors.push(ParseError::SymbolNamedSelf {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         }),
                         _ => ()
                     }
@@ -2679,10 +2694,15 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                         cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
-                            for FlatDictionaryEntry(ident, _, value, _) in items {
-                                if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
+                            for entry in items {
+                                let Some((ident, _, value, _)) = entry
+                                    .to_valid()
+                                else {
+                                    continue
+                                };
+                                if data.insert(ident.value.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
-                                        key: ident.to_single().unwrap().0.clone(),
+                                        key: ident.value.clone(),
                                         #[cfg(feature = "include_context_in_parse_errors")]
                                         context: literal!(static_current_context!()),
                                         source_span: *ident.get_source_span(),
@@ -2699,9 +2719,6 @@ pub mod statement {
                                 cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                             }).cast_to_string(), data)
                         },
-                        cst::SingleAssetDeclarationValue::Invalid(_) => {
-                            (EMPTY_ISTRING_REF.clone(), HashMap::new())
-                        }
                     };
                     let symbol_idx = symbols.len();
                     let previous_symbol = symbols.insert(
@@ -2742,12 +2759,11 @@ pub mod statement {
                     );
                     if let Some(previous_symbol) = previous_symbol {
                         symbols.insert(name.clone(), previous_symbol);
-                        let single_identifier = identifier.to_single().unwrap();
                         errors.push(ParseError::ShadowedSymbol {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            symbol: single_identifier.0.clone(),
-                            source_span: single_identifier.1,
+                            symbol: identifier.value.clone(),
+                            source_span: *identifier.get_source_span(),
                         });
                     }
                     for (key, (source_span, _)) in data {
@@ -2789,17 +2805,17 @@ pub mod statement {
                 with_mut_next_target!(context, target => {
                     use context::{TargetSymbolDescriptor, CostumeDescriptor, BackdropDescriptor, SoundDescriptor};
                     let symbols = target.borrow_symbols_mut();
-                    let name = &identifier.to_single().unwrap().0;
+                    let name = &identifier.value;
                     match name.as_str() {
                         "super" => errors.push(ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         }),
                         "self" => errors.push(ParseError::SymbolNamedSelf {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         }),
                         _ => ()
                     }
@@ -2808,10 +2824,15 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                         cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
-                            for FlatDictionaryEntry(ident, _, value, _) in items {
-                                if data.insert(ident.to_single().unwrap().0.clone(), (*ident.get_source_span(), value.clone())).is_some() {
+                            for entry in items {
+                                let Some((ident, _, value, _)) = entry
+                                    .to_valid()
+                                else {
+                                    continue
+                                };
+                                if data.insert(ident.value.clone(), (*ident.get_source_span(), value.clone())).is_some() {
                                     errors.push(ParseError::RepeatedFlatDictionaryEntry {
-                                        key: ident.to_single().unwrap().0.clone(),
+                                        key: ident.value.clone(),
                                         #[cfg(feature = "include_context_in_parse_errors")]
                                         context: literal!(static_current_context!()),
                                         source_span: *ident.get_source_span(),
@@ -2828,9 +2849,6 @@ pub mod statement {
                                 cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
                             }).cast_to_string(), data)
                         },
-                        cst::SingleAssetDeclarationValue::Invalid(_) => {
-                            (EMPTY_ISTRING_REF.clone(), HashMap::new())
-                        }
                     };
                     let symbol_idx = symbols.len();
                     let previous_symbol = symbols.insert(
@@ -2871,12 +2889,11 @@ pub mod statement {
                     );
                     if let Some(previous_symbol) = previous_symbol {
                         symbols.insert(name.clone(), previous_symbol);
-                        let single_identifier = identifier.to_single().unwrap();
                         errors.push(ParseError::ShadowedSymbol {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            symbol: single_identifier.0.clone(),
-                            source_span: single_identifier.1,
+                            symbol: identifier.value.clone(),
+                            source_span: *identifier.get_source_span(),
                         });
                     }
                     for (key, (source_span, _)) in data {
@@ -2917,12 +2934,12 @@ pub mod statement {
         Option<WarpSpecifier>,
         ProcKeyword,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         LeftParens,
         Vec<(
             Option<CustomBlockParamKind>,
             Option<CanonicalIdentifier>,
-            Identifier,
+            SingleIdentifier,
             Option<Comma>,
         )>,
         RightParens,
@@ -3022,28 +3039,28 @@ pub mod statement {
         with_mut_next_target!(context, target => {
             use context::{TargetSymbolDescriptor, CustomBlockDescriptor, CustomBlockParamDescriptor};
             let symbols = target.borrow_symbols_mut();
-            let name = &identifier.to_single().unwrap().0;
+            let name = &identifier.value;
             match name.as_str() {
                 "super" => errors.push(ParseError::SymbolNamedSuper {
                     #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
-                    source_span: identifier.to_single().unwrap().1,
+                    source_span: *identifier.get_source_span(),
                 }),
                 "self" => errors.push(ParseError::SymbolNamedSelf {
                     #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
-                    source_span: identifier.to_single().unwrap().1,
+                    source_span: *identifier.get_source_span(),
                 }),
                 _ => ()
             }
             let previous_symbol = symbols.insert(
                 name.clone(),
                 TargetSymbolDescriptor::CustomBlockDescriptor(CustomBlockDescriptor {
-                    name: identifier.to_single().unwrap().0.clone(),
+                    name: identifier.value.clone(),
                     canonical_name: canonical_identifier.as_ref().map(|value| &value.name).cloned(),
                     args: params.iter().map(|value| {
                         CustomBlockParamDescriptor {
-                            name: value.2.to_single().unwrap().0.clone(),
+                            name: value.2.value.clone(),
                             canonical_name: value.1.as_ref().map(|value| &value.name).cloned(),
                             kind: value.0.as_ref().map(|value| &value.kind).copied().unwrap_or(CustomBlockParamKindValue::String),
                         }
@@ -3053,12 +3070,11 @@ pub mod statement {
             );
             if let Some(previous_symbol) = previous_symbol {
                 symbols.insert(name.clone(), previous_symbol);
-                let single_identifier = identifier.to_single().unwrap();
                 return Err(ParseError::ShadowedSymbol {
                     #[cfg(feature = "include_context_in_parse_errors")]
                     context: literal!(static_current_context!()),
-                    symbol: single_identifier.0.clone(),
-                    source_span: single_identifier.1,
+                    symbol: identifier.value.clone(),
+                    source_span: *identifier.get_source_span(),
                 });
             }
         });
@@ -3210,6 +3226,33 @@ pub mod statement {
             identifier: ident,
             rename: None,
         })
+    }
+
+    pub fn find_comma_separated_entry_end(token_stream: ParseIn) -> ParseOut<()> {
+        let mut layers = 0_usize;
+        let mut step_back = false;
+        find_next_token(token_stream, |token| match token {
+            Token::Comma => layers == 0,
+            Token::Semicolon => layers == 0,
+            Token::LeftBrace => {
+                layers += 1;
+                false
+            }
+            Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+                if layers > 0 {
+                    layers -= 1;
+                    false
+                } else {
+                    step_back = true;
+                    true
+                }
+            }
+            _ => false,
+        })?;
+        if step_back {
+            token_stream.step_back_if_unpeeked();
+        }
+        Ok(())
     }
 
     pub fn find_statement_end(token_stream: ParseIn) -> ParseOut<()> {
@@ -4033,14 +4076,14 @@ pub fn parse_top_level_statement(
                     start_pos
                 )
             );
-            let name = &identifier.to_single().unwrap().0;
+            let name = &identifier.value;
             match name.as_str() {
                 "super" => {
                     emit_error!(
                         ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         },
                         context
                     );
@@ -4050,7 +4093,7 @@ pub fn parse_top_level_statement(
                         ParseError::SymbolNamedSelf {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         },
                         context
                     );
@@ -4060,7 +4103,7 @@ pub fn parse_top_level_statement(
                         ParseError::SpriteNamedStage {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         },
                         context
                     );
@@ -4068,7 +4111,7 @@ pub fn parse_top_level_statement(
                 _ => (),
             }
             context.next_target = Some(context::Target::new_sprite(
-                identifier.to_single().unwrap().0.clone(),
+                identifier.value.clone(),
                 canonical_identifier
                     .as_ref()
                     .map(|value| value.name.clone()),
@@ -4110,14 +4153,14 @@ pub fn parse_top_level_statement(
                     start_pos
                 )
             );
-            let name = &identifier.to_single().unwrap().0;
+            let name = &identifier.value;
             match name.as_str() {
                 "super" => {
                     emit_error!(
                         ParseError::SymbolNamedSuper {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         },
                         context
                     );
@@ -4127,7 +4170,7 @@ pub fn parse_top_level_statement(
                         ParseError::SymbolNamedSelf {
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
-                            source_span: identifier.to_single().unwrap().1,
+                            source_span: *identifier.get_source_span(),
                         },
                         context
                     );

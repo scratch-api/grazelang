@@ -45,7 +45,10 @@ use crate::{
             ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
-            self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FlatDictionaryEntry, FormattedStringContent, GetPos, Identifier, ListEntry, Literal, UnOpDescriptor
+            self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
+            DataDeclarationScope, EMPTY_ISTRING_REF, Expression,
+            FormattedStringContent, GetPos, Identifier, ListEntry, Literal, SingleIdentifier,
+            UnOpDescriptor,
         },
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
@@ -125,7 +128,7 @@ pub enum GrazeSb3GeneratorError {
     #[assoc(internal_lint_id = "shadowed_sprite")]
     #[assoc(get_secondary_message = "sprite redeclared here")]
     #[error("tried to name two separate sprites {identifier:?}, try canonical names")]
-    ShadowedSprite { identifier: Identifier },
+    ShadowedSprite { identifier: SingleIdentifier },
     #[assoc(internal_lint_id = "identifier_not_callable")]
     #[assoc(get_secondary_message = "not callable")]
     #[error("the identifier {identifier:?} is not callable")]
@@ -237,11 +240,11 @@ impl GetPos for GrazeSb3GeneratorError {
             | GrazeSb3GeneratorError::IdentifierNotABlock { identifier }
             | GrazeSb3GeneratorError::ListAccessForNonList { identifier }
             | GrazeSb3GeneratorError::BlockNotCBlock { identifier }
-            | GrazeSb3GeneratorError::ShadowedSprite { identifier }
             | GrazeSb3GeneratorError::IdentifierNotCallable { identifier }
             | GrazeSb3GeneratorError::IdentifierNotAssignable { identifier } => {
                 identifier.get_source_span()
             }
+            GrazeSb3GeneratorError::ShadowedSprite { identifier } => identifier.get_source_span(),
             GrazeSb3GeneratorError::UnexpectedMenuInput {
                 menu_input_value: _,
                 source_span,
@@ -2964,7 +2967,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             expression,
                             _,
                         ) => {
-                            let var = identifier.to_single().unwrap().0.clone();
+                            let var = identifier.value.clone();
                             let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
@@ -2999,7 +3002,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             identifier,
                             _,
                         ) => {
-                            let var = identifier.to_single().unwrap().0.clone();
+                            let var = identifier.value.clone();
                             let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
@@ -3029,7 +3032,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             _,
                             _,
                         ) => {
-                            let list = identifier.to_single().unwrap().0.clone();
+                            let list = identifier.value.clone();
                             let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
@@ -3077,7 +3080,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             identifier,
                             _,
                         ) => {
-                            let list = identifier.to_single().unwrap().0.clone();
+                            let list = identifier.value.clone();
                             let scope = if matches!(
                                 (parent_scope, my_scope),
                                 (
@@ -3111,7 +3114,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         expression,
                         _,
                     ) => {
-                        let var = identifier.to_single().unwrap().0.clone();
+                        let var = identifier.value.clone();
                         let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
@@ -3138,7 +3141,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                     ) => {
-                        let var = identifier.to_single().unwrap().0.clone();
+                        let var = identifier.value.clone();
                         let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
@@ -3160,7 +3163,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                     ) => {
-                        let list = identifier.to_single().unwrap().0.clone();
+                        let list = identifier.value.clone();
                         let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
@@ -3200,7 +3203,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                     ) => {
-                        let list = identifier.to_single().unwrap().0.clone();
+                        let list = identifier.value.clone();
                         let scope = if matches!(
                             my_scope,
                             DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
@@ -3717,12 +3720,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             Option<&crate::parser::cst::WarpSpecifier>,
             &crate::parser::cst::ProcKeyword,
             Option<&crate::parser::cst::CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &crate::parser::cst::LeftParens,
             &[(
                 Option<crate::parser::cst::CustomBlockParamKind>,
                 Option<crate::parser::cst::CanonicalIdentifier>,
-                Identifier,
+                SingleIdentifier,
                 Option<crate::parser::cst::Comma>,
             )],
             &crate::parser::cst::RightParens,
@@ -3737,7 +3740,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.arg_stack.clear();
         let current_target = context.current_sb3_target.as_ref().unwrap();
 
-        let proc_name = value.3.to_single().unwrap().0.clone();
+        let proc_name = value.3.value.clone();
         let proc_symbol_id = context
             .resolve_path(
                 if current_target.is_stage {
@@ -3831,9 +3834,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                         .1
                                         .as_ref()
                                         .map(|value| value.name.to_string())
-                                        .unwrap_or_else(|| {
-                                            value.2.to_single().unwrap().0.to_string()
-                                        })
+                                        .unwrap_or_else(|| value.2.value.to_string())
                                 })
                                 .collect(),
                             argument_defaults: params
@@ -3876,7 +3877,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     .1
                     .as_ref()
                     .map(|value| value.name.to_string())
-                    .unwrap_or_else(|| value.2.to_single().unwrap().0.to_string());
+                    .unwrap_or_else(|| value.2.value.to_string());
                 (
                     name.as_str().into(),
                     Symbol {
@@ -4059,7 +4060,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     })?;
                     let name = rename
                         .as_ref()
-                        .map(|(_, name)| name.to_single().unwrap().0.clone())
+                        .map(|(_, name)| name.value.clone())
                         .unwrap_or_else(|| path.last().unwrap_or(EMPTY_ISTRING_REF).clone());
                     use_symbol_as(context, symbol, name, true);
                     for _ in 0..size {
@@ -4197,7 +4198,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: (
             &crate::parser::cst::SpriteKeyword,
             Option<&crate::parser::cst::CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &crate::parser::cst::SpriteCodeBlock,
             Option<&crate::parser::cst::Semicolon>,
             &crate::lexer::SourceSpan,
@@ -4208,17 +4209,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .1
             .as_ref()
             .map(|value| value.name.clone())
-            .unwrap_or_else(|| value.2.fields.last().unwrap().0.clone());
+            .unwrap_or_else(|| value.2.value.clone());
         let assets = context
             .target_attachments
-            .remove(&value.2.to_single().unwrap().0)
+            .remove(&value.2.value)
             .ok_or_else(|| GrazeSb3GeneratorError::ShadowedSprite {
                 identifier: value.2.clone(),
             })?;
         let mut new_sprite = Sb3Target::new_sprite(target_name.to_string());
         let my_blocks_symbol_id = static_resolve_identifier!(context, [MY_BLOCKS_ISTRING]);
         let sprite_symbol_id =
-            static_resolve_identifier!(context, [SPRITES_ISTRING, &value.2.to_single().unwrap().0]);
+            static_resolve_identifier!(context, [SPRITES_ISTRING, &value.2.value]);
         context.data_symbol_context.local_vars = sprite_symbol_id;
         context.data_symbol_context.local_lists = sprite_symbol_id;
         let mut costumes = Vec::new();
@@ -4265,7 +4266,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 0
             };
         context.current_sb3_target = Some(new_sprite);
-        context.current_target_symbol_name = Some(value.2.to_single().unwrap().0.clone());
+        context.current_target_symbol_name = Some(value.2.value.clone());
         context.current_target_configured = false;
         wrap_in_scope(context, |context| {
             let namespace = &context.symbol_table[sprite_symbol_id].namespace;
@@ -4349,8 +4350,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .as_ref()
             .is_some_and(|value| value.is_stage);
         let mut data = HashMap::with_capacity(value.2.len());
-        for FlatDictionaryEntry(ident, _, value, _) in value.2 {
-            let mut key = ident.to_single().unwrap().0.clone();
+        for entry in value.2 {
+            let (ident, _, value, _) = entry
+                .to_valid()
+                .expect("You must pass a valid AST to the visitor.");
+            let mut key = ident.value.clone();
             if let Some(new_key) = match key.as_str() {
                 "costume" if is_stage => Some(literal!("backdrop")),
                 "show" | "shown" if !is_stage => Some(literal!("visible")),
@@ -4364,7 +4368,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             {
                 emit_error!(
                     GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
-                        key: ident.to_single().unwrap().0.clone(),
+                        key: ident.value.clone(),
                         source_span: *ident.get_source_span(),
                     },
                     context

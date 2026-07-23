@@ -46,7 +46,7 @@ pub enum TopLevelStatement {
     Sprite(
         SpriteKeyword,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         SpriteCodeBlock,
         Option<Semicolon>,
         SourceSpan,
@@ -54,7 +54,7 @@ pub enum TopLevelStatement {
     BroadcastDeclaration(
         BroadcastKeyword,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         Semicolon,
         SourceSpan,
     ),
@@ -370,7 +370,7 @@ impl<T> GetPos for CommaSeparated<T> {
 pub enum UseStatementContent {
     SingleUse {
         identifier: Identifier,
-        rename: Option<(AsKeyword, Identifier)>,
+        rename: Option<(AsKeyword, SingleIdentifier)>,
         source_span: SourceSpan,
     },
     MultiUse {
@@ -426,7 +426,7 @@ impl GetPos for CustomBlockParamKind {
 type CustomBlockParams = Vec<(
     Option<CustomBlockParamKind>,
     Option<CanonicalIdentifier>,
-    Identifier,
+    SingleIdentifier,
     Option<Comma>,
 )>;
 
@@ -456,7 +456,7 @@ pub enum StageStatement {
         Option<WarpSpecifier>,
         ProcKeyword,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         LeftParens,
         CustomBlockParams,
         RightParens,
@@ -550,7 +550,7 @@ pub enum SpriteStatement {
         Option<WarpSpecifier>,
         ProcKeyword,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         LeftParens,
         CustomBlockParams,
         RightParens,
@@ -641,7 +641,7 @@ impl GetPos for AssetDeclaration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SingleAssetDeclaration(
     pub Option<CanonicalIdentifier>,
-    pub Identifier,
+    pub SingleIdentifier,
     pub SingleAssetDeclarationValue,
     pub SourceSpan,
 );
@@ -662,23 +662,14 @@ pub enum SingleAssetDeclarationValue {
         RightBrace,
         SourceSpan,
     ),
-    Invalid(SourceSpan),
 }
 
 impl GetPos for SingleAssetDeclarationValue {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             SingleAssetDeclarationValue::Simple(_, _, _, source_span)
-            | SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span)
-            | SingleAssetDeclarationValue::Invalid(source_span) => source_span,
+            | SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span) => source_span,
         }
-    }
-}
-
-impl InvalidVariantFromSourceSpan for SingleAssetDeclarationValue {
-    #[inline]
-    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
-        Self::Invalid(source_span)
     }
 }
 
@@ -925,12 +916,35 @@ impl GetPos for NormalAssignmentOperator {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FlatDictionaryEntry(pub Identifier, pub Colon, pub Literal, pub SourceSpan);
+#[expect(clippy::large_enum_variant)]
+pub enum FlatDictionaryEntry {
+    Valid(SingleIdentifier, Colon, Literal, SourceSpan),
+    Invalid(SourceSpan),
+}
 
 impl GetPos for FlatDictionaryEntry {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
-        &self.3
+        match self {
+            FlatDictionaryEntry::Valid(_, _, _, p) | FlatDictionaryEntry::Invalid(p) => p,
+        }
+    }
+}
+
+impl InvalidVariantFromSourceSpan for FlatDictionaryEntry {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
+    }
+}
+
+impl FlatDictionaryEntry {
+    pub fn to_valid(&self) -> Option<(&SingleIdentifier, &Colon, &Literal, &SourceSpan)> {
+        match self {
+            FlatDictionaryEntry::Valid(single_identifier, colon, literal, p) => {
+                Some((single_identifier, colon, literal, p))
+            }
+            FlatDictionaryEntry::Invalid(_) => None,
+        }
     }
 }
 
@@ -971,7 +985,7 @@ pub enum SingleDataDeclaration {
         Option<VarKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         NormalAssignmentOperator,
         Expression,
         SourceSpan,
@@ -980,14 +994,14 @@ pub enum SingleDataDeclaration {
         Option<VarKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         SourceSpan,
     ),
     List(
         Option<ListKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         NormalAssignmentOperator,
         LeftBracket,
         CommaSeparated<ListEntry>,
@@ -998,7 +1012,7 @@ pub enum SingleDataDeclaration {
         Option<ListKeyword>,
         DataDeclarationScope,
         Option<CanonicalIdentifier>,
-        Identifier,
+        SingleIdentifier,
         SourceSpan,
     ),
 }
@@ -1963,6 +1977,12 @@ impl Identifier {
 pub struct SingleIdentifier {
     pub value: IString,
     pub source_span: SourceSpan,
+}
+
+impl Display for SingleIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.value)
+    }
 }
 
 impl GetPos for SingleIdentifier {
