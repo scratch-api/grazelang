@@ -169,43 +169,39 @@ impl ConstantExprFunction {
             expr: &Expression,
         ) -> Result<ConstantExprValue, ConstantExprEvaluationError> {
             match expr {
-                Expression::Identifier(identifier) => library::const_expr_lookup(
-                    identifier
-                        .path
-                        .iter()
-                        .chain(identifier.fields.iter())
-                        .map(|(next, _)| next as &str),
-                )
-                .map_err(|err| match err {
-                    crate::library::ConstExpLookupError::NotFound => {
-                        ConstantExprEvaluationError::ConstIdentifierDoesNotExist {
-                            identifier: identifier.clone(),
-                        }
-                    }
-                    crate::library::ConstExpLookupError::UsedSuper => {
-                        ConstantExprEvaluationError::ConstIdentifierUsedSuper {
-                            identifier: identifier.clone(),
-                        }
-                    }
-                })
-                .and_then(|value| match &value.value {
-                    Some(ConstantExprLibraryItemValue::AssociatedItem(item)) => Ok(*item),
-                    Some(ConstantExprLibraryItemValue::Function(_, _)) => {
-                        Err(ConstantExprEvaluationError::ConstFunctionNotValue {
-                            identifier: identifier.clone(),
+                Expression::Identifier(identifier) => {
+                    library::const_expr_lookup(identifier.iter().map(|value| value.value.as_str()))
+                        .map_err(|err| match err {
+                            crate::library::ConstExpLookupError::NotFound => {
+                                ConstantExprEvaluationError::ConstIdentifierDoesNotExist {
+                                    identifier: Box::new(identifier.clone()),
+                                }
+                            }
+                            crate::library::ConstExpLookupError::UsedSuper => {
+                                ConstantExprEvaluationError::ConstIdentifierUsedSuper {
+                                    identifier: Box::new(identifier.clone()),
+                                }
+                            }
                         })
-                    }
-                    None => Err(ConstantExprEvaluationError::ConstNamespaceNotValue {
-                        identifier: identifier.clone(),
-                    }),
-                })
-                .and_then(|value| {
-                    ConstantExprValue::try_from(value).map_err(|_| {
-                        ConstantExprEvaluationError::ConstNamespaceNotValue {
-                            identifier: identifier.clone(),
-                        }
-                    })
-                }),
+                        .and_then(|value| match &value.value {
+                            Some(ConstantExprLibraryItemValue::AssociatedItem(item)) => Ok(*item),
+                            Some(ConstantExprLibraryItemValue::Function(_, _)) => {
+                                Err(ConstantExprEvaluationError::ConstFunctionNotValue {
+                                    identifier: Box::new(identifier.clone()),
+                                })
+                            }
+                            None => Err(ConstantExprEvaluationError::ConstNamespaceNotValue {
+                                identifier: Box::new(identifier.clone()),
+                            }),
+                        })
+                        .and_then(|value| {
+                            ConstantExprValue::try_from(value).map_err(|_| {
+                                ConstantExprEvaluationError::ConstNamespaceNotValue {
+                                    identifier: Box::new(identifier.clone()),
+                                }
+                            })
+                        })
+                }
                 Expression::Literal(Literal::String(value, _)) => Ok(match value.as_str() {
                     "abs" => ConstantExprValue::Abs,
                     "floor" => ConstantExprValue::Floor,

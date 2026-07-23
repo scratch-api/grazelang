@@ -54,45 +54,45 @@ pub enum ConstantExprEvaluationError {
     #[error(
         "the identifier {identifier:?} is not a constant expression function, is instead a constant expression value"
     )]
-    ConstValueNotCallable { identifier: Identifier },
+    ConstValueNotCallable { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "const_namespace_not_callable")]
     #[assoc(get_secondary_message = "not callable")]
     #[error(
         "the identifier {identifier:?} is not a constant expression function, is instead a constant expression namespace"
     )]
-    ConstNamespaceNotCallable { identifier: Identifier },
+    ConstNamespaceNotCallable { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "const_function_not_singleton")]
     #[assoc(get_secondary_message = "must be called")]
     #[error("the identifier {identifier:?} is not a singleton constant expression function")]
-    ConstFunctionNotSingleton { identifier: Identifier },
+    ConstFunctionNotSingleton { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "const_value_not_js_primitve")]
     #[assoc(get_secondary_message = "can only be used in a compatible const function")]
     #[error(
         "the identifier {identifier:?} is not a singleton constant expression function, is instead a constant expression value"
     )]
-    ConstValueNotJsPrimitive { identifier: Identifier },
+    ConstValueNotJsPrimitive { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "const_namespace_not_js_primitive")]
     #[assoc(get_secondary_message = "does not contain a value, only its children might")]
     #[error(
         "the identifier {identifier:?} is not a singleton constant expression function, is instead a constant expression namespace"
     )]
-    ConstNamespaceNotJsPrimitive { identifier: Identifier },
+    ConstNamespaceNotJsPrimitive { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "const_function_not_value")]
     #[assoc(get_secondary_message = "must be called")]
     #[error(
         "the identifier {identifier:?} is not a constant expression value, is instead a constant expression function"
     )]
-    ConstFunctionNotValue { identifier: Identifier },
+    ConstFunctionNotValue { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "const_namespace_not_value")]
     #[assoc(get_secondary_message = "does not contain a value, only its children might")]
     #[error(
         "the identifier {identifier:?} is not a constant expression value, is instead a constant expression namespace"
     )]
-    ConstNamespaceNotValue { identifier: Identifier },
+    ConstNamespaceNotValue { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "const_identifier_does_not_exist")]
     #[assoc(get_secondary_message = "identifier does not exist as a constant expression symbol")]
     #[error("the identifier {identifier:?} does not exist as a constant expression symbol")]
-    ConstIdentifierDoesNotExist { identifier: Identifier },
+    ConstIdentifierDoesNotExist { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "incorrect_const_expr_value_for_math_op")]
     #[assoc(get_secondary_message = "cannot use this as a math op")]
     #[error(
@@ -107,7 +107,7 @@ pub enum ConstantExprEvaluationError {
     #[error(
         "the identifier {identifier:?} contains \"super\", which is not allowed, maybe try a normalized path to the constant expression symbol"
     )]
-    ConstIdentifierUsedSuper { identifier: Identifier },
+    ConstIdentifierUsedSuper { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "incorrect_param_count")]
     #[assoc(get_secondary_message = "incorrect parameter count")]
     #[error(

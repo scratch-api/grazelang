@@ -46,9 +46,8 @@ use crate::{
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclarationScope, EMPTY_ISTRING_REF, Expression,
-            FormattedStringContent, GetPos, Identifier, ListEntry, Literal, SingleIdentifier,
-            UnOpDescriptor,
+            DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FormattedStringContent, GetPos,
+            Identifier, ListEntry, Literal, SingleIdentifier, UnOpDescriptor,
         },
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
@@ -852,10 +851,10 @@ impl GrazeSb3GeneratorContext {
 
     pub fn resolve_path<'a, I>(&self, mut iterator: I) -> Option<SymbolId>
     where
-        I: Iterator<Item = &'a IString>,
+        I: Iterator<Item = &'a str>,
     {
         iterator.try_fold(SymbolId::default(), |current, next| {
-            if next.as_str() == "super" {
+            if next == "super" {
                 Some(self.symbol_table[current].parent)
             } else {
                 self.symbol_table.get_child(current, next)
@@ -864,13 +863,7 @@ impl GrazeSb3GeneratorContext {
     }
 
     pub fn resolve_identifier(&self, identifier: &Identifier) -> Option<SymbolId> {
-        self.resolve_path(
-            identifier
-                .path
-                .iter()
-                .chain(identifier.fields.iter())
-                .map(|(next, _)| next),
-        )
+        self.resolve_path(identifier.iter().map(|value| value.value.as_str()))
     }
 }
 
@@ -3744,20 +3737,23 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         let proc_symbol_id = context
             .resolve_path(
                 if current_target.is_stage {
-                    [SPRITES_ISTRING.clone(), STAGE_ISTRING.clone(), proc_name]
+                    [
+                        SPRITES_ISTRING.as_str(),
+                        STAGE_ISTRING.as_str(),
+                        proc_name.as_str(),
+                    ]
                 } else {
                     [
-                        SPRITES_ISTRING.clone(),
+                        SPRITES_ISTRING.as_str(),
                         context
                             .current_target_symbol_name
                             .as_ref()
                             .unwrap()
-                            .as_str()
-                            .into(),
-                        proc_name,
+                            .as_str(),
+                        proc_name.as_str(),
                     ]
                 }
-                .iter(),
+                .into_iter(),
             )
             .unwrap();
         let proc_symbol = &context.symbol_table[proc_symbol_id];
@@ -4045,19 +4041,23 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } => {
                     let mut self_used = false;
                     let mut size = 0_usize;
-                    for (seg, _) in &identifier.path {
-                        if size == 0 && !self_used && seg.as_str() == "self" {
+                    for SingleIdentifier {
+                        value,
+                        source_span: _,
+                    } in identifier
+                    {
+                        if size == 0 && !self_used && value.as_str() == "self" {
                             self_used = true;
                             continue;
                         }
                         size += 1;
-                        path.push(seg.clone());
+                        path.push(value.clone());
                     }
-                    let symbol = context.resolve_path(path.iter()).ok_or_else(|| {
-                        GrazeSb3GeneratorError::UnknownIdentifier {
+                    let symbol = context
+                        .resolve_path(path.iter().map(|value| value.as_str()))
+                        .ok_or_else(|| GrazeSb3GeneratorError::UnknownIdentifier {
                             identifier: identifier.clone(),
-                        }
-                    })?;
+                        })?;
                     let name = rename
                         .as_ref()
                         .map(|(_, name)| name.value.clone())
@@ -4077,13 +4077,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } => {
                     let mut self_used = false;
                     let mut size = 0_usize;
-                    for (seg, _) in &root.path {
-                        if size == 0 && !self_used && seg.as_str() == "self" {
+                    for SingleIdentifier {
+                        value,
+                        source_span: _,
+                    } in root
+                    {
+                        if size == 0 && !self_used && value.as_str() == "self" {
                             self_used = true;
                             continue;
                         }
                         size += 1;
-                        path.push(seg.clone());
+                        path.push(value.clone());
                     }
                     for child in content {
                         add_symbols(context, path, child)?;

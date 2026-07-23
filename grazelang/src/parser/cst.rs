@@ -964,6 +964,38 @@ impl GetPos for Colon {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Dot(pub SourceSpan);
+
+impl FromSourceSpan for Dot {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
+impl GetPos for Dot {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct DoubleColon(pub SourceSpan);
+
+impl FromSourceSpan for DoubleColon {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
+impl GetPos for DoubleColon {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ListEntry {
     Expression(Expression),
@@ -1210,21 +1242,17 @@ impl Expression {
             }
             Expression::Call(identifier, _, exprs, _, source_span) => {
                 let library_item = crate::library::const_expr_lookup(
-                    identifier
-                        .path
-                        .iter()
-                        .chain(identifier.fields.iter())
-                        .map(|(next, _)| next as &str),
+                    identifier.iter().map(|value| value.value.as_str()),
                 )
                 .map_err(|err| match err {
                     crate::library::ConstExpLookupError::NotFound => {
                         ConstantExprEvaluationError::ConstIdentifierDoesNotExist {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         }
                     }
                     crate::library::ConstExpLookupError::UsedSuper => {
                         ConstantExprEvaluationError::ConstIdentifierUsedSuper {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         }
                     }
                 })?;
@@ -1235,11 +1263,11 @@ impl Expression {
                     return Err(match library_item.value {
                         Some(ConstantExprLibraryItemValue::AssociatedItem(_)) => {
                             ConstantExprEvaluationError::ConstValueNotCallable {
-                                identifier: identifier.clone(),
+                                identifier: Box::new(identifier.clone()),
                             }
                         }
                         None => ConstantExprEvaluationError::ConstNamespaceNotCallable {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         },
                         Some(ConstantExprLibraryItemValue::Function(_, _)) => unreachable!(),
                     });
@@ -1247,7 +1275,7 @@ impl Expression {
 
                 let Ok(function) = ConstantExprFunction::try_from(function_id) else {
                     return Err(ConstantExprEvaluationError::ConstNamespaceNotCallable {
-                        identifier: identifier.clone(),
+                        identifier: Box::new(identifier.clone()),
                     });
                 };
 
@@ -1255,21 +1283,17 @@ impl Expression {
             }
             Expression::Identifier(identifier) => {
                 let value = crate::library::const_expr_lookup(
-                    identifier
-                        .path
-                        .iter()
-                        .chain(identifier.fields.iter())
-                        .map(|(next, _)| next as &str),
+                    identifier.iter().map(|value| value.value.as_str()),
                 )
                 .map_err(|err| match err {
                     crate::library::ConstExpLookupError::NotFound => {
                         ConstantExprEvaluationError::ConstIdentifierDoesNotExist {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         }
                     }
                     crate::library::ConstExpLookupError::UsedSuper => {
                         ConstantExprEvaluationError::ConstIdentifierUsedSuper {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         }
                     }
                 })?;
@@ -1279,22 +1303,22 @@ impl Expression {
                     }
                     Some(ConstantExprLibraryItemValue::Function(_, _)) => {
                         return Err(ConstantExprEvaluationError::ConstFunctionNotSingleton {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         });
                     }
                     Some(ConstantExprLibraryItemValue::AssociatedItem(_)) => {
                         return Err(ConstantExprEvaluationError::ConstValueNotJsPrimitive {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         });
                     }
                     None => {
                         return Err(ConstantExprEvaluationError::ConstNamespaceNotJsPrimitive {
-                            identifier: identifier.clone(),
+                            identifier: Box::new(identifier.clone()),
                         });
                     }
                 }) else {
                     return Err(ConstantExprEvaluationError::ConstNamespaceNotCallable {
-                        identifier: identifier.clone(),
+                        identifier: Box::new(identifier.clone()),
                     });
                 };
                 function.apply(std::iter::empty(), *identifier.get_source_span())
@@ -1913,26 +1937,20 @@ impl GetPos for FormattedStringContent {
 /// Anything before a dot is a path
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Identifier {
-    pub path: Vec<(IString, SourceSpan)>,   // abc::def
-    pub fields: Vec<(IString, SourceSpan)>, // .ghi.jkl
+    pub root: SingleIdentifier,
+    pub path: Vec<(DoubleColon, SingleIdentifier)>,
+    pub fields: Vec<(Dot, SingleIdentifier)>,
     pub source_span: SourceSpan,
 }
 
-// TODO: add dot and :: metadata to `Identifier`
-// Issue: #77
-
-
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (idx, segment) in self.path.iter().enumerate() {
-            if idx == 0 {
-                write!(f, "{}", segment.0)?;
-            } else {
-                write!(f, "::{}", segment.0)?;
-            }
+        write!(f, "{}", self.root)?;
+        for (_, segment) in &self.path {
+            write!(f, "::{}", segment.value)?;
         }
-        for segment in &self.fields {
-            write!(f, ".{}", segment.0)?;
+        for (_, segment) in &self.fields {
+            write!(f, ".{}", segment.value)?;
         }
         Ok(())
     }
@@ -1945,27 +1963,140 @@ impl GetPos for Identifier {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum OwnedIdentifierIterator {
+    Root(
+        SingleIdentifier,
+        Vec<(DoubleColon, SingleIdentifier)>,
+        Vec<(Dot, SingleIdentifier)>,
+    ),
+    Path(
+        <Vec<(DoubleColon, SingleIdentifier)> as IntoIterator>::IntoIter,
+        Vec<(Dot, SingleIdentifier)>,
+    ),
+    Fields(<Vec<(Dot, SingleIdentifier)> as IntoIterator>::IntoIter),
+}
+
+impl Iterator for OwnedIdentifierIterator {
+    type Item = SingleIdentifier;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            OwnedIdentifierIterator::Root(_, path, fields) => {
+                let path = std::mem::take(path);
+                let fields = std::mem::take(fields);
+                let OwnedIdentifierIterator::Root(value, _, _) = std::mem::replace(
+                    self,
+                    OwnedIdentifierIterator::Path(path.into_iter(), fields),
+                ) else {
+                    unreachable!()
+                };
+                Some(value)
+            }
+            OwnedIdentifierIterator::Path(path, fields) => {
+                if let Some((_, value)) = path.next() {
+                    return Some(value);
+                }
+                let fields = std::mem::take(fields);
+                *self = OwnedIdentifierIterator::Fields(fields.into_iter());
+                self.next()
+            }
+            OwnedIdentifierIterator::Fields(fields) => fields.next().map(|(_, value)| value),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub enum BorrowedIdentifierIteratorState {
+    #[default]
+    Root,
+    Path(usize),
+    Fields(usize),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BorrowedIdentifierIterator<'a> {
+    pub identifier: &'a Identifier,
+    pub state: BorrowedIdentifierIteratorState,
+}
+
+impl<'a> Iterator for BorrowedIdentifierIterator<'a> {
+    type Item = &'a SingleIdentifier;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.state {
+            BorrowedIdentifierIteratorState::Root => {
+                self.state = BorrowedIdentifierIteratorState::Path(0);
+                Some(&self.identifier.root)
+            }
+            BorrowedIdentifierIteratorState::Path(idx) => {
+                if idx >= self.identifier.path.len() {
+                    self.state = BorrowedIdentifierIteratorState::Fields(0);
+                    return self.next();
+                }
+                Some(&self.identifier.path[idx].1)
+            }
+            BorrowedIdentifierIteratorState::Fields(idx) => {
+                if idx >= self.identifier.fields.len() {
+                    return None;
+                }
+                Some(&self.identifier.fields[idx].1)
+            }
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Identifier {
+    type Item = &'a SingleIdentifier;
+    type IntoIter = BorrowedIdentifierIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BorrowedIdentifierIterator {
+            identifier: self,
+            state: Default::default(),
+        }
+    }
+}
+
+impl IntoIterator for Identifier {
+    type Item = SingleIdentifier;
+    type IntoIter = OwnedIdentifierIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        OwnedIdentifierIterator::Root(self.root, self.path, self.fields)
+    }
+}
+
 impl Identifier {
-    pub fn to_single(&self) -> Option<&(IString, SourceSpan)> {
-        match (self.path.len(), self.fields.len()) {
-            (0, 1) => self.fields.first(),
-            (1, 0) => self.path.first(),
-            _ => None,
+    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+}
+
+impl Identifier {
+    pub fn to_single(&self) -> Option<&SingleIdentifier> {
+        if let (0, 0) = (self.path.len(), self.fields.len()) {
+            Some(&self.root)
+        } else {
+            None
         }
     }
 }
 
 impl Identifier {
     pub fn to_syntactic_if(&self) -> Option<SyntacticIf> {
-        self.to_single().and_then(|(value, source_span)| {
-            (value.as_str() == "if").then_some(SyntacticIf(*source_span))
-        })
+        self.to_single()
+            .and_then(|SingleIdentifier { value, source_span }| {
+                (value.as_str() == "if").then_some(SyntacticIf(*source_span))
+            })
+    }
+}
+
+impl SingleIdentifier {
+    pub fn to_syntactic_if(&self) -> Option<SyntacticIf> {
+        (self.value.as_str() == "if").then_some(SyntacticIf(self.source_span))
     }
 
     pub fn to_syntactic_else(&self) -> Option<SyntacticElse> {
-        self.to_single().and_then(|(value, source_span)| {
-            (value.as_str() == "else").then_some(SyntacticElse(*source_span))
-        })
+        (self.value.as_str() == "else").then_some(SyntacticElse(self.source_span))
     }
 }
 
@@ -2551,7 +2682,7 @@ where
     }
 }
 
-pub trait FromSourceSpan {
+pub trait FromSourceSpan: GetPos {
     fn from_source_span(source_span: SourceSpan) -> Self;
 }
 

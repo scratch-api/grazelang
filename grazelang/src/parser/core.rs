@@ -22,7 +22,7 @@ use crate::{
 };
 use arcstr::{ArcStr as IString, literal};
 use logos::{Lexer, Logos};
-use std::{collections::VecDeque, vec};
+use std::collections::VecDeque;
 
 #[cfg(feature = "include_context_in_parse_errors")]
 macro_rules! static_current_context {
@@ -920,57 +920,57 @@ pub fn parse_single_identifier_as_identifier(
     })
 }
 
+macro_rules! parse_identifier_segments_with_sep {
+    ($token_stream:expr, $segment_token:pat, $store:expr) => {
+        parse_identifier_segments_with_sep!($token_stream, $segment_token, $store, false, panic!())
+    };
+    ($token_stream:expr, $segment_token:pat, $store:expr, $allow_left_brace:expr, $left_brace_ret:expr) => {
+        let token_stream = &mut *$token_stream;
+        loop {
+            let sep = match match peek_token!(token_stream => Option) {
+                Some(value) => value,
+                None => break,
+            } {
+                $segment_token => {
+                    skip_token!(token_stream);
+                    from_stream_pos(token_stream)
+                }
+                _ => break,
+            };
+            $store.push({
+                let (value, source_span) = match next_token!(token_stream) {
+                    Token::Identifier(value) => (value, get_token_source_span(token_stream)),
+                    Token::StageKeyword => (literal!("stage"), get_token_source_span(token_stream)),
+                    Token::VarsKeyword => (literal!("vars"), get_token_source_span(token_stream)),
+                    Token::ListsKeyword => (literal!("lists"), get_token_source_span(token_stream)),
+                    Token::LeftBrace if $allow_left_brace => $left_brace_ret,
+                    token => emit_unexpected_token!(
+                        token_stream,
+                        "Expected a segment of an identifier.",
+                        "a segment of an identifier",
+                        token
+                    ),
+                };
+                (sep, SingleIdentifier { value, source_span })
+            });
+        }
+    };
+}
+
 pub fn parse_full_identifier(
     token_stream: ParseIn,
     context: &mut ParseContext,
 ) -> ParseOut<Identifier> {
-    let mut names: Vec<(IString, SourceSpan)> = vec![(
-        parse_single_identifier(token_stream, context)?,
-        get_token_source_span(token_stream),
-    )];
+    let root = parse_single_identifier_as_identifier(token_stream, context)?;
     let start_pos = get_token_start(token_stream);
-    let mut path: Option<Vec<(IString, SourceSpan)>> = None;
-    loop {
-        match match peek_token!(token_stream => Option) {
-            Some(value) => value,
-            None => break,
-        } {
-            Token::ScopeResolution => {
-                if path.is_some() {
-                    let token = next_token!(token_stream);
-                    emit_unexpected_token!(token_stream, "Expected '.'.", "'.'", token);
-                }
-            }
-            Token::Dot => {
-                if path.is_none() {
-                    path = Some(names);
-                    names = Vec::new();
-                }
-            }
-            _ => break,
-        }
-        skip_token!(token_stream);
-        names.push({
-            match next_token!(token_stream) {
-                Token::Identifier(value) => (value, get_token_source_span(token_stream)),
-                Token::StageKeyword => (literal!("stage"), get_token_source_span(token_stream)),
-                Token::VarsKeyword => (literal!("vars"), get_token_source_span(token_stream)),
-                Token::ListsKeyword => (literal!("lists"), get_token_source_span(token_stream)),
-                token => emit_unexpected_token!(
-                    token_stream,
-                    "Expected an identifier.",
-                    "an identifier",
-                    token
-                ),
-            }
-        });
-    }
-    if path.is_none() {
-        path = Some(std::mem::take(&mut names));
-    }
+    let mut path = Vec::new();
+    parse_identifier_segments_with_sep!(token_stream, Token::DoubleColon, path);
+    let mut fields = Vec::new();
+    parse_identifier_segments_with_sep!(token_stream, Token::Dot, fields);
     Ok(Identifier {
-        path: path.unwrap_or_default(),
-        fields: names,
+        root,
+        path,
+        fields,
         source_span: token_stream.span_from_previous_to_current(start_pos),
     })
 }
@@ -980,50 +980,19 @@ pub fn parse_full_identifier_starting_with(
     _context: &mut ParseContext,
     value: IString,
 ) -> ParseOut<Identifier> {
-    let mut names: Vec<(IString, SourceSpan)> = vec![(value, get_token_source_span(token_stream))];
+    let root = SingleIdentifier {
+        value,
+        source_span: get_token_source_span(token_stream),
+    };
     let start_pos = get_token_start(token_stream);
-    let mut path: Option<Vec<(IString, SourceSpan)>> = None;
-    loop {
-        match match peek_token!(token_stream => Option) {
-            Some(value) => value,
-            None => break,
-        } {
-            Token::ScopeResolution => {
-                if path.is_some() {
-                    let token = next_token!(token_stream);
-                    emit_unexpected_token!(token_stream, "Expected '.'.", "'.'", token);
-                }
-            }
-            Token::Dot => {
-                if path.is_none() {
-                    path = Some(names);
-                    names = Vec::new();
-                }
-            }
-            _ => break,
-        }
-        skip_token!(token_stream);
-        names.push({
-            match next_token!(token_stream) {
-                Token::Identifier(value) => (value, get_token_source_span(token_stream)),
-                Token::StageKeyword => (literal!("stage"), get_token_source_span(token_stream)),
-                Token::VarsKeyword => (literal!("vars"), get_token_source_span(token_stream)),
-                Token::ListsKeyword => (literal!("lists"), get_token_source_span(token_stream)),
-                token => emit_unexpected_token!(
-                    token_stream,
-                    "Expected an identifier.",
-                    "an identifier",
-                    token
-                ),
-            }
-        });
-    }
-    if path.is_none() {
-        path = Some(std::mem::take(&mut names));
-    }
+    let mut path = Vec::new();
+    parse_identifier_segments_with_sep!(token_stream, Token::DoubleColon, path);
+    let mut fields = Vec::new();
+    parse_identifier_segments_with_sep!(token_stream, Token::Dot, fields);
     Ok(Identifier {
-        path: path.unwrap_or_default(),
-        fields: names,
+        root,
+        path,
+        fields,
         source_span: token_stream.span_from_previous_to_current(start_pos),
     })
 }
@@ -2135,42 +2104,25 @@ pub mod statement {
                         } else {
                             break None;
                         }
-                        let else_identifier = parse_full_identifier(token_stream, context)?;
-                        let syntactic_else =
-                            if let Some(value) = else_identifier.to_syntactic_else() {
-                                value
-                            } else {
-                                emit_unexpected_token!(
-                                    token_stream,
-                                    "Expected \"else\".",
-                                    "\"else\"",
-                                    Token::Identifier(
-                                        else_identifier
-                                            .fields
-                                            .last()
-                                            .or_else(|| else_identifier.path.last())
-                                            .unwrap()
-                                            .0
-                                            .clone()
-                                    )
-                                );
-                            };
+                        let else_identifier =
+                            parse_single_identifier_as_identifier(token_stream, context)?;
+                        let Some(syntactic_else) = else_identifier.to_syntactic_else() else {
+                            emit_unexpected_token!(
+                                token_stream,
+                                "Expected \"else\".",
+                                "\"else\"",
+                                Token::Identifier(else_identifier.value.clone())
+                            );
+                        };
                         if matches!(peek_token!(token_stream), Token::Identifier(_)) {
-                            let if_identifier = parse_full_identifier(token_stream, context)?;
+                            let if_identifier =
+                                parse_single_identifier_as_identifier(token_stream, context)?;
                             let Some(syntactic_if) = if_identifier.to_syntactic_if() else {
                                 emit_unexpected_token!(
                                     token_stream,
                                     "Expected \"if\".",
                                     "\"if\"",
-                                    Token::Identifier(
-                                        if_identifier
-                                            .fields
-                                            .last()
-                                            .or_else(|| if_identifier.path.last())
-                                            .unwrap()
-                                            .0
-                                            .clone()
-                                    )
+                                    Token::Identifier(if_identifier.value.clone())
                                 );
                             };
                             code_blocks.push((
@@ -3116,74 +3068,76 @@ pub mod statement {
             token_stream: ParseIn,
             context: &mut ParseContext,
         ) -> ParseOut<(Identifier, Option<LeftBrace>)> {
-            let mut names: Vec<(IString, SourceSpan)> = vec![(
-                parse_single_identifier(token_stream, context)?,
-                get_token_source_span(token_stream),
-            )];
+            let root = parse_single_identifier_as_identifier(token_stream, context)?;
             let start_pos = get_token_start(token_stream);
-            let mut path: Option<Vec<(IString, SourceSpan)>> = None;
-            loop {
-                match match peek_token!(token_stream => Option) {
-                    Some(value) => value,
-                    None => break,
-                } {
-                    Token::ScopeResolution => {
-                        if path.is_some() {
-                            let token = next_token!(token_stream);
-                            emit_unexpected_token!(token_stream, "Expected '.'.", "'.'", token);
-                        }
-                    }
-                    Token::Dot => {
-                        if path.is_none() {
-                            path = Some(names);
-                            names = Vec::new();
-                        }
-                    }
-                    _ => break,
-                }
-                skip_token!(token_stream);
-                names.push({
-                    match next_token!(token_stream) {
-                        Token::Identifier(value) => (value, get_token_source_span(token_stream)),
-                        Token::LeftBrace => {
-                            if path.is_none() {
-                                path = Some(std::mem::take(&mut names));
-                            }
-                            return Ok((
-                                Identifier {
-                                    path: path.unwrap_or_default(),
-                                    fields: names,
-                                    source_span: token_stream
-                                        .span_from_previous_to_current(start_pos),
-                                },
-                                Some(from_stream_pos::<LeftBrace>(token_stream)),
-                            ));
-                        }
-                        Token::StageKeyword => {
-                            (literal!("stage"), get_token_source_span(token_stream))
-                        }
-                        Token::VarsKeyword => {
-                            (literal!("vars"), get_token_source_span(token_stream))
-                        }
-                        Token::ListsKeyword => {
-                            (literal!("lists"), get_token_source_span(token_stream))
-                        }
-                        token => emit_unexpected_token!(
-                            token_stream,
-                            "Expected an identifier possibly ending with '{'.",
-                            "an identifier possibly ending with '{'",
-                            token
-                        ),
-                    }
-                });
-            }
-            if path.is_none() {
-                path = Some(std::mem::take(&mut names));
-            }
+            let mut path = Vec::new();
+            parse_identifier_segments_with_sep!(token_stream, Token::DoubleColon, path, true, {
+                return Ok((
+                    Identifier {
+                        source_span: {
+                            let last_source_span = path
+                                .last()
+                                .map(
+                                    |(
+                                        _,
+                                        SingleIdentifier {
+                                            value: _,
+                                            source_span,
+                                        },
+                                    )| *source_span,
+                                )
+                                .unwrap_or(root.source_span);
+                            ((start_pos, last_source_span.0.1), last_source_span.1)
+                        },
+                        root,
+                        path,
+                        fields: Vec::new(),
+                    },
+                    Some(from_stream_pos::<LeftBrace>(token_stream)),
+                ));
+            });
+            let mut fields = Vec::new();
+            parse_identifier_segments_with_sep!(token_stream, Token::Dot, fields, true, {
+                return Ok((
+                    Identifier {
+                        source_span: {
+                            let last_source_span = fields
+                                .last()
+                                .map(
+                                    |(
+                                        _,
+                                        SingleIdentifier {
+                                            value: _,
+                                            source_span,
+                                        },
+                                    )| *source_span,
+                                )
+                                .or_else(|| {
+                                    path.last().map(
+                                        |(
+                                            _,
+                                            SingleIdentifier {
+                                                value: _,
+                                                source_span,
+                                            },
+                                        )| *source_span,
+                                    )
+                                })
+                                .unwrap_or(root.source_span);
+                            ((start_pos, last_source_span.0.1), last_source_span.1)
+                        },
+                        root,
+                        path,
+                        fields,
+                    },
+                    Some(from_stream_pos::<LeftBrace>(token_stream)),
+                ));
+            });
             Ok((
                 Identifier {
-                    path: path.unwrap_or_default(),
-                    fields: names,
+                    root,
+                    path,
+                    fields,
                     source_span: token_stream.span_from_previous_to_current(start_pos),
                 },
                 None,
@@ -3304,7 +3258,7 @@ pub mod statement {
                 } else {
                     false
                 }
-            },
+            }
             Token::Semicolon => layers == 0,
             Token::LeftBrace => {
                 layers += 1;

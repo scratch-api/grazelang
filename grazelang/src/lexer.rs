@@ -81,7 +81,7 @@ pub enum Token {
     #[token(".")]
     Dot,
     #[token("::")]
-    ScopeResolution,
+    DoubleColon,
     #[token("=")]
     Assign,
     #[token(":")]
@@ -204,7 +204,7 @@ impl std::fmt::Debug for Token {
             Token::LessThan => write!(f, "'<'"),
             Token::GreaterThan => write!(f, "'>'"),
             Token::LetterAccessLeftBracket => write!(f, "\"@[\""),
-            Token::ScopeResolution => write!(f, "\"::\""),
+            Token::DoubleColon => write!(f, "\"::\""),
             Token::Exp => write!(f, "\"e^\""),
             Token::Pow => write!(f, "\"10^\""),
             Token::Join => write!(f, "\"join\""),
