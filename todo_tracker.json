@@ -562,7 +562,7 @@
     "77": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L1907-L1907",
         "commit": "41b2801e339a23ea70b07e24b973f63b9b5958b5",
         "title": "add dot and :: metadata to `Identifier`"
