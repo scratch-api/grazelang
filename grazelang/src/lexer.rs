@@ -129,7 +129,7 @@ pub enum Token {
     SimpleString(IString),
     #[regex(r#"`(?:[^\\`\r\n]|(?:\\.))*`"#, parse_canonical_name)]
     CanonicalIdentifier(IString),
-    #[regex(r#"\w+"#, parse_string)]
+    #[regex(r#"[a-zA-Z_]\w*"#, parse_string, priority = 3)]
     Identifier(IString),
     #[regex(r#"\$\w+"#, parse_string)]
     MacroIdentifier(IString),

@@ -374,6 +374,19 @@ macro_rules! try_or_emit_message {
     };
 }
 
+pub fn find_comma_separated_entry_end_and_create_invalid<T>(
+    token_stream: ParseIn,
+    start_pos: (usize, usize),
+) -> ParseOut<T>
+where
+    T: InvalidVariantFromSourceSpan,
+{
+    statement::find_comma_separated_entry_end(token_stream)?;
+    Ok(T::invalid_variant_from_source_span(
+        token_stream.span_from_previous_to_current(start_pos),
+    ))
+}
+
 pub fn find_statement_end_and_create_invalid<T>(
     token_stream: ParseIn,
     start_pos: (usize, usize),
@@ -3180,25 +3193,77 @@ pub mod statement {
         let (ident, left_brace) = try_or_emit_message!(
             parse_use_identifier(token_stream, context),
             context,
-            find_statement_end_and_create_invalid::<cst::UseStatementContent>(token_stream, start)
+            find_comma_separated_entry_end_and_create_invalid::<cst::UseStatementContent>(
+                token_stream,
+                start
+            )
         );
         if let Some(left_brace) = left_brace {
-            let inner = parse_comma_separated!(
-                token_stream,
-                context,
-                (token_stream, context) => {
-                    parse_use_statement_content(token_stream, context)?
-                },
-                Token::RightBrace(LexedRightBrace::Normal),
-                "'}'"
-            );
+            let inner = {
+                let mut start_pos = None;
+                let mut values = Vec::new();
+                let tail_value = loop {
+                    let item_start_pos = peek_token_start(token_stream);
+                    if matches!(
+                        peek_token!(token_stream),
+                        Token::RightBrace(LexedRightBrace::Normal)
+                    ) {
+                        break None;
+                    }
+                    let value = parse_use_statement_content(token_stream, context)?;
+                    start_pos.get_or_insert_with(|| value.get_source_span().0.0);
+                    let comma = match peek_token!(token_stream) {
+                        Token::Comma => {
+                            skip_token!(token_stream);
+                            cst::Comma(get_token_source_span(token_stream))
+                        }
+                        Token::RightBrace(LexedRightBrace::Normal) => break Some(Box::new(value)),
+                        _ => {
+                            let token = next_token!(token_stream);
+                            try_or_emit_message!(
+                                Err(create_unexpected_token_error(
+                                    token_stream,
+                                    literal!("Expected ',' or '}'."),
+                                    literal!("',' or '}'"),
+                                    #[cfg(feature = "include_context_in_parse_errors")]
+                                    literal!(static_current_context!()),
+                                    token
+                                )),
+                                context,
+                                {
+                                    find_comma_separated_entry_end(token_stream)?;
+                                    let value = cst::UseStatementContent::Invalid(
+                                        token_stream.span_from_previous_to_current(item_start_pos),
+                                    );
+                                    let comma = match peek_token!(token_stream) {
+                                        Token::Comma => {
+                                            skip_token!(token_stream);
+                                            cst::Comma(get_token_source_span(token_stream))
+                                        }
+                                        _ => break Some(Box::new(value)),
+                                    };
+                                    values.push((value, comma));
+                                    continue;
+                                }
+                            )
+                        }
+                    };
+                    values.push((value, comma));
+                };
+                let start_pos = start_pos.unwrap_or_else(|| get_token_end(token_stream));
+                cst::CommaSeparated {
+                    values,
+                    tail_value,
+                    source_span: token_stream.span_from_previous_to_current(start_pos),
+                }
+            };
             let right_brace = expect_token_or_message!(
                 token_stream,
                 context,
                 Token::RightBrace(LexedRightBrace::Normal) => from_stream_pos::<RightBrace>(token_stream),
                 "Expected '}'.",
                 "'}'",
-                find_statement_end_and_create_invalid::<cst::UseStatementContent>(token_stream, start)
+                find_comma_separated_entry_end_and_create_invalid::<cst::UseStatementContent>(token_stream, start)
             );
             return Ok(cst::UseStatementContent::MultiUse {
                 root: ident,
@@ -3213,7 +3278,7 @@ pub mod statement {
             let new_name = try_or_emit_message!(
                 parse_single_identifier_as_identifier(token_stream, context),
                 context,
-                find_statement_end_and_create_invalid::<cst::UseStatementContent>(token_stream, start)
+                find_comma_separated_entry_end_and_create_invalid::<cst::UseStatementContent>(token_stream, start)
             );
             return Ok(cst::UseStatementContent::SingleUse {
                 source_span: ident.range_to(&new_name),
@@ -3232,7 +3297,14 @@ pub mod statement {
         let mut layers = 0_usize;
         let mut step_back = false;
         find_next_token(token_stream, |token| match token {
-            Token::Comma => layers == 0,
+            Token::Comma => {
+                if layers == 0 {
+                    step_back = true;
+                    true
+                } else {
+                    false
+                }
+            },
             Token::Semicolon => layers == 0,
             Token::LeftBrace => {
                 layers += 1;

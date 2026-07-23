@@ -5,6 +5,7 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 ## Roadmap
 
 - [x] Parser
+- [x] Local syntax errors
 - [x] SB3 generation
 - [x] Command Line interface
 - [ ] Extensions
