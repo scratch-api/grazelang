@@ -1,6 +1,7 @@
 use crate::{
-    lexer::SourceSpan, parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
+    lexer::SourceSpan,
+    parser::cst::{
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
     },
 };
 pub trait GrazeVisitor<C, E> {
@@ -38,7 +39,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &SpriteKeyword,
             Option<&CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &SpriteCodeBlock,
             Option<&Semicolon>,
             &SourceSpan,
@@ -57,7 +58,7 @@ pub trait GrazeVisitor<C, E> {
         value: (
             &BroadcastKeyword,
             Option<&CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &Semicolon,
             &SourceSpan,
         ),
@@ -154,12 +155,12 @@ pub trait GrazeVisitor<C, E> {
             Option<&WarpSpecifier>,
             &ProcKeyword,
             Option<&CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &LeftParens,
             &[(
                 Option<CustomBlockParamKind>,
                 Option<CanonicalIdentifier>,
-                Identifier,
+                SingleIdentifier,
                 Option<Comma>,
             )],
             &RightParens,
@@ -428,7 +429,7 @@ pub trait GrazeVisitor<C, E> {
             Option<&VarKeyword>,
             &DataDeclarationScope,
             Option<&CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &NormalAssignmentOperator,
             &Expression,
             &SourceSpan,
@@ -444,7 +445,7 @@ pub trait GrazeVisitor<C, E> {
             Option<&VarKeyword>,
             &DataDeclarationScope,
             Option<&CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &SourceSpan,
         ),
         context: &mut C,
@@ -458,7 +459,7 @@ pub trait GrazeVisitor<C, E> {
             Option<&ListKeyword>,
             &DataDeclarationScope,
             Option<&CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &NormalAssignmentOperator,
             &LeftBracket,
             &CommaSeparated<ListEntry>,
@@ -476,7 +477,7 @@ pub trait GrazeVisitor<C, E> {
             Option<&ListKeyword>,
             &DataDeclarationScope,
             Option<&CanonicalIdentifier>,
-            &Identifier,
+            &SingleIdentifier,
             &SourceSpan,
         ),
         context: &mut C,
@@ -710,7 +711,7 @@ pub fn default_visit_top_level_statement_sprite<V, C, E>(
     value: (
         &SpriteKeyword,
         Option<&CanonicalIdentifier>,
-        &Identifier,
+        &SingleIdentifier,
         &SpriteCodeBlock,
         Option<&Semicolon>,
         &SourceSpan,
@@ -743,7 +744,7 @@ pub fn default_visit_top_level_statement_broadcast_declaration<V, C, E>(
     _value: (
         &BroadcastKeyword,
         Option<&CanonicalIdentifier>,
-        &Identifier,
+        &SingleIdentifier,
         &Semicolon,
         &SourceSpan,
     ),
@@ -1197,12 +1198,12 @@ pub fn default_visit_custom_block_definition<V, C, E>(
         Option<&WarpSpecifier>,
         &ProcKeyword,
         Option<&CanonicalIdentifier>,
-        &Identifier,
+        &SingleIdentifier,
         &LeftParens,
         &[(
             Option<CustomBlockParamKind>,
             Option<CanonicalIdentifier>,
-            Identifier,
+            SingleIdentifier,
             Option<Comma>,
         )],
         &RightParens,
@@ -1972,7 +1973,7 @@ pub fn default_visit_single_variable_declaration<V, C, E>(
         Option<&VarKeyword>,
         &DataDeclarationScope,
         Option<&CanonicalIdentifier>,
-        &Identifier,
+        &SingleIdentifier,
         &NormalAssignmentOperator,
         &Expression,
         &SourceSpan,
@@ -1992,7 +1993,7 @@ pub fn default_visit_single_empty_variable_declaration<V, C, E>(
         Option<&VarKeyword>,
         &DataDeclarationScope,
         Option<&CanonicalIdentifier>,
-        &Identifier,
+        &SingleIdentifier,
         &SourceSpan,
     ),
     _context: &mut C,
@@ -2009,7 +2010,7 @@ pub fn default_visit_single_list_declaration<V, C, E>(
         Option<&ListKeyword>,
         &DataDeclarationScope,
         Option<&CanonicalIdentifier>,
-        &Identifier,
+        &SingleIdentifier,
         &NormalAssignmentOperator,
         &LeftBracket,
         &CommaSeparated<ListEntry>,
@@ -2031,7 +2032,7 @@ pub fn default_visit_single_empty_list_declaration<V, C, E>(
         Option<&ListKeyword>,
         &DataDeclarationScope,
         Option<&CanonicalIdentifier>,
-        &Identifier,
+        &SingleIdentifier,
         &SourceSpan,
     ),
     _context: &mut C,
@@ -2188,3 +2189,7 @@ where
     }
     Ok(())
 }
+
+// TODO: Simplify types with type defintions
+//  - [ ] Visitor
+//  - [ ] `parse_custom_block`
