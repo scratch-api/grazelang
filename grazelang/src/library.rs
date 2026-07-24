@@ -5,13 +5,13 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
+use grazelang_library_parser::{generate_constant_expr_library, generate_library};
 use grazelang_types::{
     AliasSegment, BACKDROPS_CATEGORY_ID, BindInfo, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, ConstantExprLibraryItem, KnownBlock, LibraryItem, LibraryItemValue,
     NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3PrimitiveBlock},
 };
-use grazelang_library_parser::{generate_constant_expr_library, generate_library};
 
 use crate::{
     codegen::core::GrazeSb3GeneratorContext,
@@ -165,10 +165,53 @@ pub fn add_standard_library_namespaces(
     }
 }
 
+#[inline]
+fn sensing_bind_info(target_name: &IString, property: &str) -> BindInfo {
+    BindInfo {
+        parent_target: target_name.clone(),
+        property_of_params: vec![property_param(property), object_param(target_name)],
+    }
+}
+
+fn property_param(property: &str) -> (CallBlockParam, KnownBlock) {
+    (
+        CallBlockParam {
+            kind: CallBlockParamKind::Field {
+                default: None,
+                category: NO_CATEGORY_ID,
+            },
+            name: PROPERTY_ISTRING.clone(),
+        },
+        KnownBlock::FieldValue {
+            value: Sb3FieldValue::Normal(property.into()),
+            categories: HashSet::from([NO_CATEGORY_ID]),
+        },
+    )
+}
+
+fn object_param(target_name: &IString) -> (CallBlockParam, KnownBlock) {
+    (
+        CallBlockParam {
+            kind: CallBlockParamKind::MenuInput {
+                opcode: literal!("sensing_of_object_menu"),
+                field_name: OBJECT_ISTRING.clone(),
+                default: Sb3FieldValue::Normal("_stage_".into()),
+                category: NO_CATEGORY_ID,
+            },
+            name: OBJECT_ISTRING.clone(),
+        },
+        KnownBlock::FieldValue {
+            value: Sb3FieldValue::Normal(target_name.as_str().into()),
+            categories: HashSet::from([NO_CATEGORY_ID]),
+        },
+    )
+}
+
+pub const OBJECT_ISTRING: &IString = &literal!("OBJECT");
+pub const PROPERTY_ISTRING: &IString = &literal!("PROPERTY");
+
 /// Creates symbols like `sprites.<sprite_name>.x` that are to be accessed as `sensing_of` blocks for a sprite
 pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, Symbol)> {
-    const OBJECT_ISTRING: &IString = &literal!("OBJECT");
-    const PROPERTY_ISTRING: &IString = &literal!("PROPERTY");
     #[inline]
     fn symbol_of(name: IString, known_block: KnownBlock) -> (IString, Symbol) {
         (
@@ -197,41 +240,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("x position".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "x position")),
             },
         ),
         symbol_of(
@@ -250,41 +259,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("y position".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "y position")),
             },
         ),
         symbol_of(
@@ -303,41 +278,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("direction".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "direction")),
             },
         ),
         symbol_of(
@@ -374,41 +315,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("costume #".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "costume #")),
             },
         ),
         symbol_of(
@@ -445,41 +352,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("costume name".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "costume name")),
             },
         ),
         symbol_of(
@@ -498,41 +371,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("size".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "size")),
             },
         ),
         symbol_of(
@@ -551,41 +390,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("volume".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "volume")),
             },
         ),
     ]
@@ -593,8 +398,6 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
 
 /// Creates symbols like `sprites.<sprite_name>.x` that are to be accessed as `sensing_of` blocks for the stage
 pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Symbol)> {
-    const OBJECT_ISTRING: &IString = &literal!("OBJECT");
-    const PROPERTY_ISTRING: &IString = &literal!("PROPERTY");
     #[inline]
     fn symbol_of(name: IString, known_block: KnownBlock) -> (IString, Symbol) {
         (
@@ -641,41 +444,7 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("backdrop #".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "backdrop #")),
             },
         ),
         symbol_of(
@@ -712,41 +481,7 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("backdrop name".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "backdrop name")),
             },
         ),
         symbol_of(
@@ -765,41 +500,7 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
                     },
                     Vec::new(),
                 )),
-                bind_info: Some(BindInfo {
-                    parent_target: target_name.clone(),
-                    property_of_params: vec![
-                        (
-                            CallBlockParam {
-                                kind: CallBlockParamKind::Field {
-                                    default: None,
-                                    category: NO_CATEGORY_ID,
-                                },
-                                name: PROPERTY_ISTRING.clone(),
-                            },
-                            KnownBlock::FieldValue {
-                                value: Sb3FieldValue::Normal("volume".into()),
-                                categories: HashSet::from([NO_CATEGORY_ID]),
-                            },
-                        ),
-                        {
-                            (
-                                CallBlockParam {
-                                    kind: CallBlockParamKind::MenuInput {
-                                        opcode: literal!("sensing_of_object_menu"),
-                                        field_name: OBJECT_ISTRING.clone(),
-                                        default: Sb3FieldValue::Normal("_stage_".into()),
-                                        category: NO_CATEGORY_ID,
-                                    },
-                                    name: OBJECT_ISTRING.clone(),
-                                },
-                                KnownBlock::FieldValue {
-                                    value: Sb3FieldValue::Normal(target_name.as_str().into()),
-                                    categories: HashSet::from([NO_CATEGORY_ID]),
-                                },
-                            )
-                        },
-                    ],
-                }),
+                bind_info: Some(sensing_bind_info(target_name, "volume")),
             },
         ),
     ]
