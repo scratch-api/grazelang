@@ -130,41 +130,6 @@ impl ConstantExprFunction {
             }
             Ok(expr)
         }
-        // fn n_ary_args<'a, I, const N: usize>(
-        //     mut args: I,
-        //     source_span: SourceSpan,
-        // ) -> Result<[&'a Expression; N], ConstantExprEvaluationError>
-        // where
-        //     I: Iterator<Item = &'a Expression>,
-        // {
-        //     let mut maybe_expressions = [MaybeUninit::<&Expression>::uninit(); N];
-        //     let mut i = 0;
-        //     while i < N {
-        //         maybe_expressions[i].write(args.next().ok_or_else(|| {
-        //             ConstantExprEvaluationError::IncorrectParamCount {
-        //                 unexpected: i,
-        //                 expected: N,
-        //                 source_span,
-        //             }
-        //         })?);
-        //         i += 1;
-        //     }
-        //     let rest = args.count();
-        //     if rest > 0 {
-        //         Err(ConstantExprEvaluationError::IncorrectParamCount {
-        //             unexpected: N + rest,
-        //             expected: N,
-        //             source_span,
-        //         })
-        //     } else {
-        //         let maybe_expressions_ptr = &maybe_expressions as *const _;
-        //         let expressions_ptr = maybe_expressions_ptr as *const [&Expression; N];
-        //         // SAFETY: when i >= N, all array indices in 0..N have been written to and therefore it is safe
-        //         // to assume all MaybeUninit are init
-        //         let expressions = unsafe { expressions_ptr.read() };
-        //         Ok(expressions)
-        //     }
-        // }
         fn extract_const_expr_value(
             expr: &Expression,
         ) -> Result<ConstantExprValue, ConstantExprEvaluationError> {
