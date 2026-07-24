@@ -569,10 +569,10 @@
     },
     "78": {
         "filepath": "grazelang/src/visitor.rs",
-        "text": "- [ ] Visitor\n- [ ] `parse_custom_block`",
+        "text": "- [x] Visitor\n- [ ] `parse_custom_block`",
         "status": "open",
-        "lines": "L2193-L2195",
-        "commit": "ba9387a205f5b255e20e687af40941aeb9ca2031",
+        "lines": "L2139-L2142",
+        "commit": "ab8ad8a18b3076073b42ed20307609dd5f4d5200",
         "title": "Simplify types with type defintions"
     }
 }
