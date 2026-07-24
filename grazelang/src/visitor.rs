@@ -2135,8 +2135,3 @@ where
     }
     Ok(())
 }
-
-// TODO: Simplify types with type defintions
-//  - [x] Visitor
-//  - [x] `parse_custom_block`
-// Issue: #78
