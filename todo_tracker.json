@@ -570,7 +570,7 @@
     "78": {
         "filepath": "grazelang/src/visitor.rs",
         "text": "- [x] Visitor\n- [x] `parse_custom_block`",
-        "status": "open",
+        "status": "closed",
         "lines": "L2139-L2142",
         "commit": "a6ec2372233445a3fd95617a11c827b2797326c3",
         "title": "Simplify types with type defintions"
