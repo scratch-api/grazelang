@@ -1314,7 +1314,7 @@ pub mod symbol_data_derivation {
     {
         let id = generate_random_id_string(rng);
         let namespace_input_name = if descriptor.is_cloud {
-            ("☁ ".to_string() + descriptor.name.as_str()).into()
+            ("\u{2601} ".to_string() + descriptor.name.as_str()).into()
         } else {
             descriptor.name.clone()
         };
