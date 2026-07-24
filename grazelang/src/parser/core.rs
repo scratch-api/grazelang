@@ -1012,7 +1012,7 @@ pub mod statement {
             ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue,
             DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF, FlatDictionaryEntry,
             LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
-            NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
+            NormalAssignmentOperator, RightBrace, RightBracket, RightParens,
             Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
             SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier,
         },
@@ -2895,23 +2895,7 @@ pub mod statement {
     pub fn parse_custom_block(
         token_stream: ParseIn,
         context: &mut ParseContext,
-    ) -> ParseOut<(
-        Option<WarpSpecifier>,
-        ProcKeyword,
-        Option<CanonicalIdentifier>,
-        SingleIdentifier,
-        LeftParens,
-        Vec<(
-            Option<CustomBlockParamKind>,
-            Option<CanonicalIdentifier>,
-            SingleIdentifier,
-            Option<Comma>,
-        )>,
-        RightParens,
-        CodeBlock,
-        Option<Semicolon>,
-        SourceSpan,
-    )> {
+    ) -> ParseOut<cst::CustomBlockDefinition> {
         let (warp_specifier, start_pos) = match peek_token!(token_stream) {
             Token::WarpKeyword => (
                 Some(WarpSpecifier {

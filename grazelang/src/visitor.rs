@@ -2138,5 +2138,5 @@ where
 
 // TODO: Simplify types with type defintions
 //  - [x] Visitor
-//  - [ ] `parse_custom_block`
+//  - [x] `parse_custom_block`
 // Issue: #78

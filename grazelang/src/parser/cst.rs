@@ -484,6 +484,24 @@ pub enum StageStatement {
     Invalid(SourceSpan),
 }
 
+pub type CustomBlockDefinition = (
+    Option<WarpSpecifier>,
+    ProcKeyword,
+    Option<CanonicalIdentifier>,
+    SingleIdentifier,
+    LeftParens,
+    Vec<(
+        Option<CustomBlockParamKind>,
+        Option<CanonicalIdentifier>,
+        SingleIdentifier,
+        Option<Comma>,
+    )>,
+    RightParens,
+    CodeBlock,
+    Option<Semicolon>,
+    SourceSpan,
+);
+
 impl GetPos for StageStatement {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
