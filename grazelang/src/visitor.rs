@@ -1,9 +1,326 @@
 use crate::{
     lexer::SourceSpan,
     parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
+        Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind,
+        DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry,
+        FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens,
+        LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
+        NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon,
+        SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword,
+        SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse,
+        SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword,
+        VarsKeyword, WarpSpecifier,
     },
 };
+
+pub type BorrowedTopLevelStatementStage<'a> = (
+    &'a StageKeyword,
+    &'a StageCodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedTopLevelStatementSprite<'a> = (
+    &'a SpriteKeyword,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a SpriteCodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedTopLevelStatementBroadcastDeclaration<'a> = (
+    &'a BroadcastKeyword,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedUseStatement<'a> = (
+    &'a UseKeyword,
+    &'a UseStatementContent,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStageStatementDataDeclaration<'a> = (
+    &'a LetKeyword,
+    &'a DataDeclaration,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStageStatementBackdropDeclaration<'a> = (
+    &'a BackdropKeyword,
+    &'a AssetDeclaration,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSoundDeclaration<'a> = (
+    &'a SoundKeyword,
+    &'a AssetDeclaration,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedNoInputHatStatement<'a> = (
+    &'a Identifier,
+    &'a CodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSingleInputHatStatement<'a> = (
+    &'a Identifier,
+    &'a Expression,
+    &'a CodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedMultiInputHatStatement<'a> = (
+    &'a Identifier,
+    &'a LeftParens,
+    &'a CommaSeparated<Expression>,
+    &'a RightParens,
+    &'a CodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedCustomBlockDefinition<'a> = (
+    Option<&'a WarpSpecifier>,
+    &'a ProcKeyword,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a LeftParens,
+    &'a [(
+        Option<CustomBlockParamKind>,
+        Option<CanonicalIdentifier>,
+        SingleIdentifier,
+        Option<Comma>,
+    )],
+    &'a RightParens,
+    &'a CodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedIsolatedBlock<'a> = (&'a CodeBlock, Option<&'a Semicolon>, &'a SourceSpan);
+
+pub type BorrowedIsolatedExpression<'a> = (
+    &'a LeftParens,
+    &'a Expression,
+    &'a RightParens,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSpriteStatementDataDeclaration<'a> = (
+    &'a LetKeyword,
+    &'a DataDeclaration,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSpriteStatementCostumeDeclaration<'a> = (
+    &'a CostumeKeyword,
+    &'a AssetDeclaration,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedConfigStatement<'a> = (
+    &'a ConfigKeyword,
+    &'a LeftBrace,
+    &'a CommaSeparated<FlatDictionaryEntry>,
+    &'a RightBrace,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementDataDeclaration<'a> = (
+    &'a LetKeyword,
+    &'a DataDeclaration,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementAssignment<'a> = (
+    &'a Identifier,
+    &'a NormalAssignmentOperator,
+    &'a Expression,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementListAssignment<'a> = (
+    &'a Identifier,
+    &'a NormalAssignmentOperator,
+    &'a LeftBracket,
+    &'a CommaSeparated<ListEntry>,
+    &'a RightBracket,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementSetItem<'a> = (
+    &'a Identifier,
+    &'a LeftBracket,
+    &'a Expression,
+    &'a RightBracket,
+    &'a NormalAssignmentOperator,
+    &'a Expression,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementCall<'a> = (
+    &'a Identifier,
+    &'a LeftParens,
+    &'a CommaSeparated<Expression>,
+    &'a RightParens,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementSingleInputControl<'a> = (
+    &'a Identifier,
+    &'a Expression,
+    &'a CodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementMultiInputControl<'a> = (
+    &'a Identifier,
+    &'a LeftParens,
+    &'a CommaSeparated<Expression>,
+    &'a RightParens,
+    &'a CodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementForever<'a> = (
+    &'a Identifier,
+    &'a CodeBlock,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementIfElse<'a> = (
+    &'a (SyntacticIf, Expression, CodeBlock),
+    &'a [(SyntacticElse, SyntacticIf, Expression, CodeBlock)],
+    Option<&'a (SyntacticElse, CodeBlock)>,
+    Option<&'a Semicolon>,
+    &'a SourceSpan,
+);
+
+pub type BorrowedMixedDataDeclaration<'a> = (
+    &'a DataDeclarationScope,
+    &'a LeftParens,
+    &'a CommaSeparated<SingleDataDeclaration>,
+    &'a RightParens,
+    &'a SourceSpan,
+);
+
+pub type BorrowedVarsDataDeclaration<'a> = (
+    &'a DataDeclarationScope,
+    &'a VarsKeyword,
+    &'a LeftBrace,
+    &'a CommaSeparated<SingleDataDeclaration>,
+    &'a RightBrace,
+    &'a SourceSpan,
+);
+
+pub type BorrowedListsDataDeclaration<'a> = (
+    &'a DataDeclarationScope,
+    &'a ListsKeyword,
+    &'a LeftBrace,
+    &'a CommaSeparated<SingleDataDeclaration>,
+    &'a RightBrace,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSingleVariableDeclaration<'a> = (
+    Option<&'a VarKeyword>,
+    &'a DataDeclarationScope,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a NormalAssignmentOperator,
+    &'a Expression,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSingleEmptyVariableDeclaration<'a> = (
+    Option<&'a VarKeyword>,
+    &'a DataDeclarationScope,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSingleListDeclaration<'a> = (
+    Option<&'a ListKeyword>,
+    &'a DataDeclarationScope,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a NormalAssignmentOperator,
+    &'a LeftBracket,
+    &'a CommaSeparated<ListEntry>,
+    &'a RightBracket,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSingleEmptyListDeclaration<'a> = (
+    Option<&'a ListKeyword>,
+    &'a DataDeclarationScope,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a SourceSpan,
+);
+
+pub type BorrowedExpressionFormattedString<'a> = (&'a [FormattedStringContent], &'a SourceSpan);
+
+pub type BorrowedExpressionBinaryOperation<'a> =
+    (&'a Expression, &'a BinOp, &'a Expression, &'a SourceSpan);
+
+pub type BorrowedExpressionUnaryOperation<'a> = (&'a UnOp, &'a Expression, &'a SourceSpan);
+
+pub type BorrowedExpressionCall<'a> = (
+    &'a Identifier,
+    &'a LeftParens,
+    &'a CommaSeparated<Expression>,
+    &'a RightParens,
+    &'a SourceSpan,
+);
+
+pub type BorrowedExpressionGetItem<'a> = (
+    &'a Identifier,
+    &'a LeftBracket,
+    &'a Expression,
+    &'a RightBracket,
+    &'a SourceSpan,
+);
+
+pub type BorrowedExpressionGetLetter<'a> = (
+    &'a Expression,
+    &'a LetterAccessLeftBracket,
+    &'a Expression,
+    &'a RightBracket,
+    &'a SourceSpan,
+);
+
+pub type BorrowedExpressionParentheses<'a> = (
+    &'a LeftParens,
+    &'a Expression,
+    &'a RightParens,
+    &'a SourceSpan,
+);
+
 pub trait GrazeVisitor<C, E> {
     fn visit_graze_program(&self, value: &GrazeProgram, context: &mut C) -> Result<(), E> {
         default_visit_graze_program(self, value, context)
@@ -19,12 +336,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_top_level_statement_stage(
         &self,
-        value: (
-            &StageKeyword,
-            &StageCodeBlock,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedTopLevelStatementStage,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_top_level_statement_stage(self, value, context)
@@ -36,14 +348,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_top_level_statement_sprite(
         &self,
-        value: (
-            &SpriteKeyword,
-            Option<&CanonicalIdentifier>,
-            &SingleIdentifier,
-            &SpriteCodeBlock,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedTopLevelStatementSprite,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_top_level_statement_sprite(self, value, context)
@@ -55,23 +360,13 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_top_level_statement_broadcast_declaration(
         &self,
-        value: (
-            &BroadcastKeyword,
-            Option<&CanonicalIdentifier>,
-            &SingleIdentifier,
-            &Semicolon,
-            &SourceSpan,
-        ),
+        value: BorrowedTopLevelStatementBroadcastDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_top_level_statement_broadcast_declaration(self, value, context)
     }
 
-    fn visit_use_statement(
-        &self,
-        value: (&UseKeyword, &UseStatementContent, &Semicolon, &SourceSpan),
-        context: &mut C,
-    ) -> Result<(), E> {
+    fn visit_use_statement(&self, value: BorrowedUseStatement, context: &mut C) -> Result<(), E> {
         default_visit_use_statement(self, value, context)
     }
 
@@ -89,7 +384,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_stage_statement_data_declaration(
         &self,
-        value: (&LetKeyword, &DataDeclaration, &Semicolon, &SourceSpan),
+        value: BorrowedStageStatementDataDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_stage_statement_data_declaration(self, value, context)
@@ -97,7 +392,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_stage_statement_backdrop_declaration(
         &self,
-        value: (&BackdropKeyword, &AssetDeclaration, &Semicolon, &SourceSpan),
+        value: BorrowedStageStatementBackdropDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_stage_statement_backdrop_declaration(self, value, context)
@@ -105,7 +400,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_sound_declaration(
         &self,
-        value: (&SoundKeyword, &AssetDeclaration, &Semicolon, &SourceSpan),
+        value: BorrowedSoundDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_sound_declaration(self, value, context)
@@ -113,7 +408,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_no_input_hat_statement(
         &self,
-        value: (&Identifier, &CodeBlock, Option<&Semicolon>, &SourceSpan),
+        value: BorrowedNoInputHatStatement,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_no_input_hat_statement(self, value, context)
@@ -121,13 +416,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_single_input_hat_statement(
         &self,
-        value: (
-            &Identifier,
-            &Expression,
-            &CodeBlock,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedSingleInputHatStatement,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_single_input_hat_statement(self, value, context)
@@ -135,15 +424,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_multi_input_hat_statement(
         &self,
-        value: (
-            &Identifier,
-            &LeftParens,
-            &CommaSeparated<Expression>,
-            &RightParens,
-            &CodeBlock,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedMultiInputHatStatement,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_multi_input_hat_statement(self, value, context)
@@ -151,45 +432,19 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_custom_block_definition(
         &self,
-        value: (
-            Option<&WarpSpecifier>,
-            &ProcKeyword,
-            Option<&CanonicalIdentifier>,
-            &SingleIdentifier,
-            &LeftParens,
-            &[(
-                Option<CustomBlockParamKind>,
-                Option<CanonicalIdentifier>,
-                SingleIdentifier,
-                Option<Comma>,
-            )],
-            &RightParens,
-            &CodeBlock,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedCustomBlockDefinition,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_custom_block_definition(self, value, context)
     }
 
-    fn visit_isolated_block(
-        &self,
-        value: (&CodeBlock, Option<&Semicolon>, &SourceSpan),
-        context: &mut C,
-    ) -> Result<(), E> {
+    fn visit_isolated_block(&self, value: BorrowedIsolatedBlock, context: &mut C) -> Result<(), E> {
         default_visit_isolated_block(self, value, context)
     }
 
     fn visit_isolated_expression(
         &self,
-        value: (
-            &LeftParens,
-            &Expression,
-            &RightParens,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedIsolatedExpression,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_isolated_expression(self, value, context)
@@ -197,7 +452,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_sprite_statement_data_declaration(
         &self,
-        value: (&LetKeyword, &DataDeclaration, &Semicolon, &SourceSpan),
+        value: BorrowedSpriteStatementDataDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_sprite_statement_data_declaration(self, value, context)
@@ -205,7 +460,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_sprite_statement_costume_declaration(
         &self,
-        value: (&CostumeKeyword, &AssetDeclaration, &Semicolon, &SourceSpan),
+        value: BorrowedSpriteStatementCostumeDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_sprite_statement_costume_declaration(self, value, context)
@@ -213,13 +468,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_config_statement(
         &self,
-        value: (
-            &ConfigKeyword,
-            &LeftBrace,
-            &CommaSeparated<FlatDictionaryEntry>,
-            &RightBrace,
-            &SourceSpan,
-        ),
+        value: BorrowedConfigStatement,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_config_statement(self, value, context)
@@ -235,7 +484,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_data_declaration(
         &self,
-        value: (&LetKeyword, &DataDeclaration, &Semicolon, &SourceSpan),
+        value: BorrowedStatementDataDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_data_declaration(self, value, context)
@@ -243,13 +492,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_assignment(
         &self,
-        value: (
-            &Identifier,
-            &NormalAssignmentOperator,
-            &Expression,
-            &Semicolon,
-            &SourceSpan,
-        ),
+        value: BorrowedStatementAssignment,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_assignment(self, value, context)
@@ -257,15 +500,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_list_assignment(
         &self,
-        value: (
-            &Identifier,
-            &NormalAssignmentOperator,
-            &LeftBracket,
-            &CommaSeparated<ListEntry>,
-            &RightBracket,
-            &Semicolon,
-            &SourceSpan,
-        ),
+        value: BorrowedStatementListAssignment,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_list_assignment(self, value, context)
@@ -273,45 +508,19 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_set_item(
         &self,
-        value: (
-            &Identifier,
-            &LeftBracket,
-            &Expression,
-            &RightBracket,
-            &NormalAssignmentOperator,
-            &Expression,
-            &Semicolon,
-            &SourceSpan,
-        ),
+        value: BorrowedStatementSetItem,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_set_item(self, value, context)
     }
 
-    fn visit_statement_call(
-        &self,
-        value: (
-            &Identifier,
-            &LeftParens,
-            &CommaSeparated<Expression>,
-            &RightParens,
-            &Semicolon,
-            &SourceSpan,
-        ),
-        context: &mut C,
-    ) -> Result<(), E> {
+    fn visit_statement_call(&self, value: BorrowedStatementCall, context: &mut C) -> Result<(), E> {
         default_visit_statement_call(self, value, context)
     }
 
     fn visit_statement_single_input_control(
         &self,
-        value: (
-            &Identifier,
-            &Expression,
-            &CodeBlock,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedStatementSingleInputControl,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_single_input_control(self, value, context)
@@ -319,15 +528,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_multi_input_control(
         &self,
-        value: (
-            &Identifier,
-            &LeftParens,
-            &CommaSeparated<Expression>,
-            &RightParens,
-            &CodeBlock,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedStatementMultiInputControl,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_multi_input_control(self, value, context)
@@ -335,7 +536,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_forever(
         &self,
-        value: (&Identifier, &CodeBlock, Option<&Semicolon>, &SourceSpan),
+        value: BorrowedStatementForever,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_forever(self, value, context)
@@ -343,13 +544,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_statement_if_else(
         &self,
-        value: (
-            &(SyntacticIf, Expression, CodeBlock),
-            &[(SyntacticElse, SyntacticIf, Expression, CodeBlock)],
-            Option<&(SyntacticElse, CodeBlock)>,
-            Option<&Semicolon>,
-            &SourceSpan,
-        ),
+        value: BorrowedStatementIfElse,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_if_else(self, value, context)
@@ -373,13 +568,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_mixed_data_declaration(
         &self,
-        value: (
-            &DataDeclarationScope,
-            &LeftParens,
-            &CommaSeparated<SingleDataDeclaration>,
-            &RightParens,
-            &SourceSpan,
-        ),
+        value: BorrowedMixedDataDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_mixed_data_declaration(self, value, context)
@@ -387,14 +576,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_vars_data_declaration(
         &self,
-        value: (
-            &DataDeclarationScope,
-            &VarsKeyword,
-            &LeftBrace,
-            &CommaSeparated<SingleDataDeclaration>,
-            &RightBrace,
-            &SourceSpan,
-        ),
+        value: BorrowedVarsDataDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_vars_data_declaration(self, value, context)
@@ -402,14 +584,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_lists_data_declaration(
         &self,
-        value: (
-            &DataDeclarationScope,
-            &ListsKeyword,
-            &LeftBrace,
-            &CommaSeparated<SingleDataDeclaration>,
-            &RightBrace,
-            &SourceSpan,
-        ),
+        value: BorrowedListsDataDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_lists_data_declaration(self, value, context)
@@ -425,15 +600,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_single_variable_declaration(
         &self,
-        value: (
-            Option<&VarKeyword>,
-            &DataDeclarationScope,
-            Option<&CanonicalIdentifier>,
-            &SingleIdentifier,
-            &NormalAssignmentOperator,
-            &Expression,
-            &SourceSpan,
-        ),
+        value: BorrowedSingleVariableDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_single_variable_declaration(self, value, context)
@@ -441,13 +608,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_single_empty_variable_declaration(
         &self,
-        value: (
-            Option<&VarKeyword>,
-            &DataDeclarationScope,
-            Option<&CanonicalIdentifier>,
-            &SingleIdentifier,
-            &SourceSpan,
-        ),
+        value: BorrowedSingleEmptyVariableDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_single_empty_variable_declaration(self, value, context)
@@ -455,17 +616,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_single_list_declaration(
         &self,
-        value: (
-            Option<&ListKeyword>,
-            &DataDeclarationScope,
-            Option<&CanonicalIdentifier>,
-            &SingleIdentifier,
-            &NormalAssignmentOperator,
-            &LeftBracket,
-            &CommaSeparated<ListEntry>,
-            &RightBracket,
-            &SourceSpan,
-        ),
+        value: BorrowedSingleListDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_single_list_declaration(self, value, context)
@@ -473,13 +624,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_single_empty_list_declaration(
         &self,
-        value: (
-            Option<&ListKeyword>,
-            &DataDeclarationScope,
-            Option<&CanonicalIdentifier>,
-            &SingleIdentifier,
-            &SourceSpan,
-        ),
+        value: BorrowedSingleEmptyListDeclaration,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_single_empty_list_declaration(self, value, context)
@@ -491,7 +636,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_formatted_string(
         &self,
-        value: (&[FormattedStringContent], &SourceSpan),
+        value: BorrowedExpressionFormattedString,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_formatted_string(self, value, context)
@@ -499,7 +644,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_binary_operation(
         &self,
-        value: (&Expression, &BinOp, &Expression, &SourceSpan),
+        value: BorrowedExpressionBinaryOperation,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_binary_operation(self, value, context)
@@ -507,7 +652,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_unary_operation(
         &self,
-        value: (&UnOp, &Expression, &SourceSpan),
+        value: BorrowedExpressionUnaryOperation,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_unary_operation(self, value, context)
@@ -519,13 +664,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_call(
         &self,
-        value: (
-            &Identifier,
-            &LeftParens,
-            &CommaSeparated<Expression>,
-            &RightParens,
-            &SourceSpan,
-        ),
+        value: BorrowedExpressionCall,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_call(self, value, context)
@@ -533,13 +672,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_get_item(
         &self,
-        value: (
-            &Identifier,
-            &LeftBracket,
-            &Expression,
-            &RightBracket,
-            &SourceSpan,
-        ),
+        value: BorrowedExpressionGetItem,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_get_item(self, value, context)
@@ -547,13 +680,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_get_letter(
         &self,
-        value: (
-            &Expression,
-            &LetterAccessLeftBracket,
-            &Expression,
-            &RightBracket,
-            &SourceSpan,
-        ),
+        value: BorrowedExpressionGetLetter,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_get_letter(self, value, context)
@@ -561,7 +688,7 @@ pub trait GrazeVisitor<C, E> {
 
     fn visit_expression_parentheses(
         &self,
-        value: (&LeftParens, &Expression, &RightParens, &SourceSpan),
+        value: BorrowedExpressionParentheses,
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_expression_parentheses(self, value, context)
@@ -574,14 +701,6 @@ pub trait GrazeVisitor<C, E> {
     ) -> Result<(), E> {
         default_visit_formatted_string_content(self, value, context)
     }
-
-    // fn visit_(
-    //     &self,
-    //     value: &Literal,
-    //     context: &mut C,
-    // ) -> Result<(), E> {
-    //     Ok(())
-    // }
 }
 
 pub fn default_visit_graze_program<V, C, E>(
@@ -708,14 +827,7 @@ where
 
 pub fn default_visit_top_level_statement_sprite<V, C, E>(
     visitor: &V,
-    value: (
-        &SpriteKeyword,
-        Option<&CanonicalIdentifier>,
-        &SingleIdentifier,
-        &SpriteCodeBlock,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedTopLevelStatementSprite,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -741,13 +853,7 @@ where
 
 pub fn default_visit_top_level_statement_broadcast_declaration<V, C, E>(
     _visitor: &V,
-    _value: (
-        &BroadcastKeyword,
-        Option<&CanonicalIdentifier>,
-        &SingleIdentifier,
-        &Semicolon,
-        &SourceSpan,
-    ),
+    _value: BorrowedTopLevelStatementBroadcastDeclaration,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -758,7 +864,7 @@ where
 
 pub fn default_visit_use_statement<V, C, E>(
     _visitor: &V,
-    _value: (&UseKeyword, &UseStatementContent, &Semicolon, &SourceSpan),
+    _value: BorrowedUseStatement,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -1106,7 +1212,7 @@ where
 
 pub fn default_visit_stage_statement_data_declaration<V, C, E>(
     visitor: &V,
-    value: (&LetKeyword, &DataDeclaration, &Semicolon, &SourceSpan),
+    value: BorrowedStageStatementDataDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1118,7 +1224,7 @@ where
 
 pub fn default_visit_stage_statement_backdrop_declaration<V, C, E>(
     _visitor: &V,
-    _value: (&BackdropKeyword, &AssetDeclaration, &Semicolon, &SourceSpan),
+    _value: BorrowedStageStatementBackdropDeclaration,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -1129,7 +1235,7 @@ where
 
 pub fn default_visit_sound_declaration<V, C, E>(
     _visitor: &V,
-    _value: (&SoundKeyword, &AssetDeclaration, &Semicolon, &SourceSpan),
+    _value: BorrowedSoundDeclaration,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -1140,7 +1246,7 @@ where
 
 pub fn default_visit_no_input_hat_statement<V, C, E>(
     visitor: &V,
-    value: (&Identifier, &CodeBlock, Option<&Semicolon>, &SourceSpan),
+    value: BorrowedNoInputHatStatement,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1152,13 +1258,7 @@ where
 
 pub fn default_visit_single_input_hat_statement<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &Expression,
-        &CodeBlock,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedSingleInputHatStatement,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1171,15 +1271,7 @@ where
 
 pub fn default_visit_multi_input_hat_statement<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &LeftParens,
-        &CommaSeparated<Expression>,
-        &RightParens,
-        &CodeBlock,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedMultiInputHatStatement,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1194,23 +1286,7 @@ where
 
 pub fn default_visit_custom_block_definition<V, C, E>(
     visitor: &V,
-    value: (
-        Option<&WarpSpecifier>,
-        &ProcKeyword,
-        Option<&CanonicalIdentifier>,
-        &SingleIdentifier,
-        &LeftParens,
-        &[(
-            Option<CustomBlockParamKind>,
-            Option<CanonicalIdentifier>,
-            SingleIdentifier,
-            Option<Comma>,
-        )],
-        &RightParens,
-        &CodeBlock,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedCustomBlockDefinition,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1222,7 +1298,7 @@ where
 
 pub fn default_visit_isolated_block<V, C, E>(
     visitor: &V,
-    value: (&CodeBlock, Option<&Semicolon>, &SourceSpan),
+    value: BorrowedIsolatedBlock,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1234,13 +1310,7 @@ where
 
 pub fn default_visit_isolated_expression<V, C, E>(
     visitor: &V,
-    value: (
-        &LeftParens,
-        &Expression,
-        &RightParens,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedIsolatedExpression,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1252,7 +1322,7 @@ where
 
 pub fn default_visit_sprite_statement_data_declaration<V, C, E>(
     visitor: &V,
-    value: (&LetKeyword, &DataDeclaration, &Semicolon, &SourceSpan),
+    value: BorrowedSpriteStatementDataDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1264,7 +1334,7 @@ where
 
 pub fn default_visit_sprite_statement_costume_declaration<V, C, E>(
     _visitor: &V,
-    _value: (&CostumeKeyword, &AssetDeclaration, &Semicolon, &SourceSpan),
+    _value: BorrowedSpriteStatementCostumeDeclaration,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -1275,13 +1345,7 @@ where
 
 pub fn default_visit_config_statement<V, C, E>(
     _visitor: &V,
-    _value: (
-        &ConfigKeyword,
-        &LeftBrace,
-        &CommaSeparated<FlatDictionaryEntry>,
-        &RightBrace,
-        &SourceSpan,
-    ),
+    _value: BorrowedConfigStatement,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -1470,7 +1534,7 @@ where
 
 pub fn default_visit_statement_data_declaration<V, C, E>(
     visitor: &V,
-    value: (&LetKeyword, &DataDeclaration, &Semicolon, &SourceSpan),
+    value: BorrowedStatementDataDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1482,13 +1546,7 @@ where
 
 pub fn default_visit_statement_assignment<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &NormalAssignmentOperator,
-        &Expression,
-        &Semicolon,
-        &SourceSpan,
-    ),
+    value: BorrowedStatementAssignment,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1500,15 +1558,7 @@ where
 
 pub fn default_visit_statement_list_assignment<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &NormalAssignmentOperator,
-        &LeftBracket,
-        &CommaSeparated<ListEntry>,
-        &RightBracket,
-        &Semicolon,
-        &SourceSpan,
-    ),
+    value: BorrowedStatementListAssignment,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1520,16 +1570,7 @@ where
 
 pub fn default_visit_statement_set_item<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &LeftBracket,
-        &Expression,
-        &RightBracket,
-        &NormalAssignmentOperator,
-        &Expression,
-        &Semicolon,
-        &SourceSpan,
-    ),
+    value: BorrowedStatementSetItem,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1542,14 +1583,7 @@ where
 
 pub fn default_visit_statement_call<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &LeftParens,
-        &CommaSeparated<Expression>,
-        &RightParens,
-        &Semicolon,
-        &SourceSpan,
-    ),
+    value: BorrowedStatementCall,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1563,13 +1597,7 @@ where
 
 pub fn default_visit_statement_single_input_control<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &Expression,
-        &CodeBlock,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedStatementSingleInputControl,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1582,15 +1610,7 @@ where
 
 pub fn default_visit_statement_multi_input_control<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &LeftParens,
-        &CommaSeparated<Expression>,
-        &RightParens,
-        &CodeBlock,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedStatementMultiInputControl,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1605,7 +1625,7 @@ where
 
 pub fn default_visit_statement_forever<V, C, E>(
     visitor: &V,
-    value: (&Identifier, &CodeBlock, Option<&Semicolon>, &SourceSpan),
+    value: BorrowedStatementForever,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1617,13 +1637,7 @@ where
 
 pub fn default_visit_statement_if_else<V, C, E>(
     visitor: &V,
-    value: (
-        &(SyntacticIf, Expression, CodeBlock),
-        &[(SyntacticElse, SyntacticIf, Expression, CodeBlock)],
-        Option<&(SyntacticElse, CodeBlock)>,
-        Option<&Semicolon>,
-        &SourceSpan,
-    ),
+    value: BorrowedStatementIfElse,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1810,13 +1824,7 @@ where
 
 pub fn default_visit_mixed_data_declaration<V, C, E>(
     visitor: &V,
-    value: (
-        &DataDeclarationScope,
-        &LeftParens,
-        &CommaSeparated<SingleDataDeclaration>,
-        &RightParens,
-        &SourceSpan,
-    ),
+    value: BorrowedMixedDataDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1830,14 +1838,7 @@ where
 
 pub fn default_visit_vars_data_declaration<V, C, E>(
     visitor: &V,
-    value: (
-        &DataDeclarationScope,
-        &VarsKeyword,
-        &LeftBrace,
-        &CommaSeparated<SingleDataDeclaration>,
-        &RightBrace,
-        &SourceSpan,
-    ),
+    value: BorrowedVarsDataDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1851,14 +1852,7 @@ where
 
 pub fn default_visit_lists_data_declaration<V, C, E>(
     visitor: &V,
-    value: (
-        &DataDeclarationScope,
-        &ListsKeyword,
-        &LeftBrace,
-        &CommaSeparated<SingleDataDeclaration>,
-        &RightBrace,
-        &SourceSpan,
-    ),
+    value: BorrowedListsDataDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1969,15 +1963,7 @@ where
 
 pub fn default_visit_single_variable_declaration<V, C, E>(
     visitor: &V,
-    value: (
-        Option<&VarKeyword>,
-        &DataDeclarationScope,
-        Option<&CanonicalIdentifier>,
-        &SingleIdentifier,
-        &NormalAssignmentOperator,
-        &Expression,
-        &SourceSpan,
-    ),
+    value: BorrowedSingleVariableDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -1989,13 +1975,7 @@ where
 
 pub fn default_visit_single_empty_variable_declaration<V, C, E>(
     _visitor: &V,
-    _value: (
-        Option<&VarKeyword>,
-        &DataDeclarationScope,
-        Option<&CanonicalIdentifier>,
-        &SingleIdentifier,
-        &SourceSpan,
-    ),
+    _value: BorrowedSingleEmptyVariableDeclaration,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -2006,17 +1986,7 @@ where
 
 pub fn default_visit_single_list_declaration<V, C, E>(
     visitor: &V,
-    value: (
-        Option<&ListKeyword>,
-        &DataDeclarationScope,
-        Option<&CanonicalIdentifier>,
-        &SingleIdentifier,
-        &NormalAssignmentOperator,
-        &LeftBracket,
-        &CommaSeparated<ListEntry>,
-        &RightBracket,
-        &SourceSpan,
-    ),
+    value: BorrowedSingleListDeclaration,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2028,13 +1998,7 @@ where
 
 pub fn default_visit_single_empty_list_declaration<V, C, E>(
     _visitor: &V,
-    _value: (
-        Option<&ListKeyword>,
-        &DataDeclarationScope,
-        Option<&CanonicalIdentifier>,
-        &SingleIdentifier,
-        &SourceSpan,
-    ),
+    _value: BorrowedSingleEmptyListDeclaration,
     _context: &mut C,
 ) -> Result<(), E>
 where
@@ -2056,7 +2020,7 @@ where
 
 pub fn default_visit_expression_formatted_string<V, C, E>(
     visitor: &V,
-    value: (&[FormattedStringContent], &SourceSpan),
+    value: BorrowedExpressionFormattedString,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2070,7 +2034,7 @@ where
 
 pub fn default_visit_expression_binary_operation<V, C, E>(
     visitor: &V,
-    value: (&Expression, &BinOp, &Expression, &SourceSpan),
+    value: BorrowedExpressionBinaryOperation,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2083,7 +2047,7 @@ where
 
 pub fn default_visit_expression_unary_operation<V, C, E>(
     visitor: &V,
-    value: (&UnOp, &Expression, &SourceSpan),
+    value: BorrowedExpressionUnaryOperation,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2106,13 +2070,7 @@ where
 
 pub fn default_visit_expression_call<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &LeftParens,
-        &CommaSeparated<Expression>,
-        &RightParens,
-        &SourceSpan,
-    ),
+    value: BorrowedExpressionCall,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2126,13 +2084,7 @@ where
 
 pub fn default_visit_expression_get_item<V, C, E>(
     visitor: &V,
-    value: (
-        &Identifier,
-        &LeftBracket,
-        &Expression,
-        &RightBracket,
-        &SourceSpan,
-    ),
+    value: BorrowedExpressionGetItem,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2144,13 +2096,7 @@ where
 
 pub fn default_visit_expression_get_letter<V, C, E>(
     visitor: &V,
-    value: (
-        &Expression,
-        &LetterAccessLeftBracket,
-        &Expression,
-        &RightBracket,
-        &SourceSpan,
-    ),
+    value: BorrowedExpressionGetLetter,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2163,7 +2109,7 @@ where
 
 pub fn default_visit_expression_parentheses<V, C, E>(
     visitor: &V,
-    value: (&LeftParens, &Expression, &RightParens, &SourceSpan),
+    value: BorrowedExpressionParentheses,
     context: &mut C,
 ) -> Result<(), E>
 where
@@ -2191,6 +2137,6 @@ where
 }
 
 // TODO: Simplify types with type defintions
-//  - [ ] Visitor
+//  - [x] Visitor
 //  - [ ] `parse_custom_block`
 // Issue: #78

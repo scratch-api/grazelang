@@ -52,6 +52,15 @@ use crate::{
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
     visitor::{
+        BorrowedConfigStatement, BorrowedCustomBlockDefinition, BorrowedExpressionBinaryOperation,
+        BorrowedExpressionCall, BorrowedExpressionFormattedString, BorrowedExpressionGetItem,
+        BorrowedExpressionGetLetter, BorrowedExpressionUnaryOperation, BorrowedIsolatedBlock,
+        BorrowedIsolatedExpression, BorrowedMultiInputHatStatement, BorrowedNoInputHatStatement,
+        BorrowedSingleInputHatStatement, BorrowedStatementAssignment, BorrowedStatementCall,
+        BorrowedStatementDataDeclaration, BorrowedStatementForever, BorrowedStatementIfElse,
+        BorrowedStatementListAssignment, BorrowedStatementMultiInputControl,
+        BorrowedStatementSetItem, BorrowedStatementSingleInputControl,
+        BorrowedTopLevelStatementSprite, BorrowedTopLevelStatementStage, BorrowedUseStatement,
         GrazeVisitor, default_visit_code_block, default_visit_config_statement,
         default_visit_custom_block_definition, default_visit_expression_binary_operation,
         default_visit_expression_call, default_visit_expression_formatted_string,
@@ -2019,12 +2028,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_expression_binary_operation(
         &self,
-        value: (
-            &crate::parser::cst::Expression,
-            &crate::parser::cst::BinOp,
-            &crate::parser::cst::Expression,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedExpressionBinaryOperation,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_reporter(context, |context, parent, this_id| {
@@ -2108,13 +2112,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_expression_call(
         &self,
-        value: (
-            &crate::parser::cst::Identifier,
-            &crate::parser::cst::LeftParens,
-            &crate::parser::cst::CommaSeparated<crate::parser::cst::Expression>,
-            &crate::parser::cst::RightParens,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedExpressionCall,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_reporter(context, |context, parent, this_id| {
@@ -2171,10 +2169,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_expression_formatted_string(
         &self,
-        value: (
-            &[crate::parser::cst::FormattedStringContent],
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedExpressionFormattedString,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         enum FormattedStringTree {
@@ -2366,13 +2361,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_expression_get_item(
         &self,
-        value: (
-            &crate::parser::cst::Identifier,
-            &crate::parser::cst::LeftBracket,
-            &crate::parser::cst::Expression,
-            &crate::parser::cst::RightBracket,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedExpressionGetItem,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_reporter(context, |context, parent, this_id| {
@@ -2421,13 +2410,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_expression_get_letter(
         &self,
-        value: (
-            &Expression,
-            &crate::parser::cst::LetterAccessLeftBracket,
-            &Expression,
-            &crate::parser::cst::RightBracket,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedExpressionGetLetter,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_reporter(context, |context, parent, this_id| {
@@ -2468,11 +2451,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_expression_unary_operation(
         &self,
-        value: (
-            &crate::parser::cst::UnOp,
-            &crate::parser::cst::Expression,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedExpressionUnaryOperation,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_reporter(context, |context, parent, this_id| {
@@ -2545,13 +2524,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_assignment(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::NormalAssignmentOperator,
-            &Expression,
-            &crate::parser::cst::Semicolon,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementAssignment,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
@@ -2587,15 +2560,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_multi_input_control(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::LeftParens,
-            &crate::parser::cst::CommaSeparated<Expression>,
-            &crate::parser::cst::RightParens,
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementMultiInputControl,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
@@ -2627,13 +2592,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_single_input_control(
         &self,
-        value: (
-            &Identifier,
-            &Expression,
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementSingleInputControl,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
@@ -2656,14 +2615,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_call(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::LeftParens,
-            &crate::parser::cst::CommaSeparated<Expression>,
-            &crate::parser::cst::RightParens,
-            &crate::parser::cst::Semicolon,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementCall,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
@@ -2716,12 +2668,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_forever(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementForever,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
@@ -2743,16 +2690,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_set_item(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::LeftBracket,
-            &Expression,
-            &crate::parser::cst::RightBracket,
-            &crate::parser::cst::NormalAssignmentOperator,
-            &Expression,
-            &crate::parser::cst::Semicolon,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementSetItem,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         wrap_in_statement(context, |context, parent, this_id| {
@@ -2807,15 +2745,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_list_assignment(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::NormalAssignmentOperator,
-            &crate::parser::cst::LeftBracket,
-            &crate::parser::cst::CommaSeparated<crate::parser::cst::ListEntry>,
-            &crate::parser::cst::RightBracket,
-            &crate::parser::cst::Semicolon,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementListAssignment,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         let symbol_id = get_symbol_id(context, value.0)?;
@@ -2926,12 +2856,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_data_declaration(
         &self,
-        value: (
-            &crate::parser::cst::LetKeyword,
-            &crate::parser::cst::DataDeclaration,
-            &crate::parser::cst::Semicolon,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementDataDeclaration,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -3311,25 +3236,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_statement_if_else(
         &self,
-        value: (
-            &(
-                crate::parser::cst::SyntacticIf,
-                Expression,
-                crate::parser::cst::CodeBlock,
-            ),
-            &[(
-                crate::parser::cst::SyntacticElse,
-                crate::parser::cst::SyntacticIf,
-                Expression,
-                crate::parser::cst::CodeBlock,
-            )],
-            Option<&(
-                crate::parser::cst::SyntacticElse,
-                crate::parser::cst::CodeBlock,
-            )>,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedStatementIfElse,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         pub fn make_if_else_recursively(
@@ -3499,12 +3406,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_no_input_hat_statement(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedNoInputHatStatement,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
@@ -3556,13 +3458,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_single_input_hat_statement(
         &self,
-        value: (
-            &Identifier,
-            &Expression,
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedSingleInputHatStatement,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
@@ -3635,15 +3531,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_multi_input_hat_statement(
         &self,
-        value: (
-            &Identifier,
-            &crate::parser::cst::LeftParens,
-            &crate::parser::cst::CommaSeparated<Expression>,
-            &crate::parser::cst::RightParens,
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedMultiInputHatStatement,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
@@ -3709,23 +3597,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_custom_block_definition(
         &self,
-        value: (
-            Option<&crate::parser::cst::WarpSpecifier>,
-            &crate::parser::cst::ProcKeyword,
-            Option<&crate::parser::cst::CanonicalIdentifier>,
-            &SingleIdentifier,
-            &crate::parser::cst::LeftParens,
-            &[(
-                Option<crate::parser::cst::CustomBlockParamKind>,
-                Option<crate::parser::cst::CanonicalIdentifier>,
-                SingleIdentifier,
-                Option<crate::parser::cst::Comma>,
-            )],
-            &crate::parser::cst::RightParens,
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedCustomBlockDefinition,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
@@ -3942,11 +3814,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_isolated_block(
         &self,
-        value: (
-            &crate::parser::cst::CodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedIsolatedBlock,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
@@ -3959,13 +3827,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_isolated_expression(
         &self,
-        value: (
-            &crate::parser::cst::LeftParens,
-            &Expression,
-            &crate::parser::cst::RightParens,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedIsolatedExpression,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         context.current_previous_block = None;
@@ -4020,12 +3882,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_use_statement(
         &self,
-        value: (
-            &cst::UseKeyword,
-            &cst::UseStatementContent,
-            &cst::Semicolon,
-            &SourceSpan,
-        ),
+        value: BorrowedUseStatement,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         fn add_symbols(
@@ -4111,12 +3968,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_top_level_statement_stage(
         &self,
-        value: (
-            &crate::parser::cst::StageKeyword,
-            &crate::parser::cst::StageCodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedTopLevelStatementStage,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         let mut stage = context.uninitialized_stage.take().ok_or(
@@ -4199,14 +4051,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_top_level_statement_sprite(
         &self,
-        value: (
-            &crate::parser::cst::SpriteKeyword,
-            Option<&crate::parser::cst::CanonicalIdentifier>,
-            &SingleIdentifier,
-            &crate::parser::cst::SpriteCodeBlock,
-            Option<&crate::parser::cst::Semicolon>,
-            &crate::lexer::SourceSpan,
-        ),
+        value: BorrowedTopLevelStatementSprite,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         let target_name = value
@@ -4301,13 +4146,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
 
     fn visit_config_statement(
         &self,
-        value: (
-            &cst::ConfigKeyword,
-            &cst::LeftBrace,
-            &cst::CommaSeparated<cst::FlatDictionaryEntry>,
-            &cst::RightBrace,
-            &SourceSpan,
-        ),
+        value: BorrowedConfigStatement,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         fn extract_f64_entry(
