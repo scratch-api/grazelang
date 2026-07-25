@@ -10,11 +10,11 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_types::{
-    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BindInfo, CLONABLES_CATEGORY_ID,
-    COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam, CallBlockParamKind,
-    CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, HasShadow,
-    LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID,
-    SimpleCallableKnownBlockSignature,
+    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID, BindInfo,
+    CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
+    CallBlockParamKind, CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID,
+    DIRECTIONS_CATEGORY_ID, HasShadow, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID,
+    SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{
         IsShadow, Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
         Sb3InputValue, Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool,
@@ -731,6 +731,12 @@ impl GrazeSb3GeneratorContext {
                 stage_target_attachments.push(target_attachment);
                 let symbol = symbol_table.new_symbol(symbol);
                 symbol_table.insert_child(broadcasts_symbol, key.clone(), symbol);
+                extend_categories_for_field_value(
+                    [BROADCASTS_CATEGORY_ID].into_iter(),
+                    key.clone(),
+                    &mut field_category_entries,
+                    &mut field_entry_categories,
+                );
             }
         }
         let variables_symbol =
