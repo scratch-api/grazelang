@@ -1634,6 +1634,12 @@ pub fn add_known_block_to_params(
                         GrazeMessage::Warning(
                             GrazeWarning::Specific(
                                 match value {
+                                    KnownBlock::PrimitiveBlock {
+                                        value:
+                                            Sb3PrimitiveBlock::Variable { .. }
+                                            | Sb3PrimitiveBlock::List { .. }
+                                            | Sb3PrimitiveBlock::Broadcast { .. },
+                                    } => SpecificGrazeWarning::FieldValueIncorrect,
                                     KnownBlock::PrimitiveBlock { .. } => {
                                         SpecificGrazeWarning::LiteralFieldValueIncorrect
                                     }
@@ -3396,7 +3402,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
         default_visit_code_block(self, value, context)?;
-        if value.statements.is_empty() {
+        let code_block_is_sub_stack =
+            context.current_previous_block.is_none() && context.current_parent.is_some();
+        if value.statements.is_empty() && code_block_is_sub_stack {
             context.push_param(Param::BlockStack(None));
         }
         Ok(())
