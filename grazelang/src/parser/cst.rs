@@ -2040,23 +2040,27 @@ pub struct BorrowedIdentifierIterator<'a> {
 impl<'a> Iterator for BorrowedIdentifierIterator<'a> {
     type Item = &'a SingleIdentifier;
     fn next(&mut self) -> Option<Self::Item> {
-        match self.state {
+        match &mut self.state {
             BorrowedIdentifierIteratorState::Root => {
                 self.state = BorrowedIdentifierIteratorState::Path(0);
                 Some(&self.identifier.root)
             }
             BorrowedIdentifierIteratorState::Path(idx) => {
-                if idx >= self.identifier.path.len() {
+                if *idx >= self.identifier.path.len() {
                     self.state = BorrowedIdentifierIteratorState::Fields(0);
                     return self.next();
                 }
-                Some(&self.identifier.path[idx].1)
+                let value = &self.identifier.path[*idx].1;
+                *idx += 1;
+                Some(value)
             }
             BorrowedIdentifierIteratorState::Fields(idx) => {
-                if idx >= self.identifier.fields.len() {
+                if *idx >= self.identifier.fields.len() {
                     return None;
                 }
-                Some(&self.identifier.fields[idx].1)
+                let value = &self.identifier.fields[*idx].1;
+                *idx += 1;
+                Some(value)
             }
         }
     }
