@@ -848,19 +848,19 @@ impl GrazeSb3GeneratorContext {
         })
     }
 
-    fn new_block(&mut self) {
+    pub fn new_block(&mut self) {
         self.current_block_id = self.block_counter.get_new_id();
     }
 
-    fn get_current_block_id(&mut self) -> IdString {
+    pub fn get_current_block_id(&mut self) -> IdString {
         self.current_block_id.clone()
     }
 
-    fn push_param(&mut self, block_arg: Param) {
+    pub fn push_param(&mut self, block_arg: Param) {
         self.arg_stack.push(block_arg);
     }
 
-    fn pop_param(&mut self) -> Option<Param> {
+    pub fn pop_param(&mut self) -> Option<Param> {
         self.arg_stack.pop()
     }
 
@@ -4033,6 +4033,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         for (sound, _) in sounds {
             stage.sounds.push(sound);
         }
+        let mut block_counter = IdCounter::new();
+        let next_block_id = block_counter.get_new_id();
+        context.block_counter = block_counter;
+        context.current_block_id = next_block_id;
         context.current_sb3_target = Some(stage);
         context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
         context.current_target_configured = false;
@@ -4128,6 +4132,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             } else {
                 0
             };
+        let mut block_counter = IdCounter::new();
+        let next_block_id = block_counter.get_new_id();
+        context.block_counter = block_counter;
+        context.current_block_id = next_block_id;
         context.current_sb3_target = Some(new_sprite);
         context.current_target_symbol_name = Some(value.2.value.clone());
         context.current_target_configured = false;
