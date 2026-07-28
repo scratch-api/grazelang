@@ -186,6 +186,7 @@ pub struct SimpleCallableKnownBlockSignature(
 pub struct MethodSignature {
     pub opcode: IString,
     pub unbound_params: Vec<CallBlockParam>,
+    pub is_singleton: bool,
 }
 
 impl ToTokens for SimpleCallableKnownBlockSignature {
@@ -455,6 +456,7 @@ impl ToTokens for KnownBlock {
             } => {
                 let opcode = signature.opcode.as_str();
                 let unbound_params = &signature.unbound_params;
+                let is_singleton = signature.is_singleton;
                 let (keys, values): (Vec<_>, Vec<_>) =
                     bound_params.iter().map(|(k, v)| (k, v)).unzip();
                 tokens.append_all(quote! {
@@ -462,6 +464,7 @@ impl ToTokens for KnownBlock {
                         signature: ::std::sync::Arc::new(::grazelang_types::MethodSignature {
                             opcode: ::arcstr::literal!(#opcode),
                             unbound_params: ::std::vec![#( #unbound_params ),*],
+                            is_singleton: #is_singleton,
                         }),
                         bound_params: ::std::rc::Rc::<[_]>::from([#( (#keys, #values) ),*]),
                     }

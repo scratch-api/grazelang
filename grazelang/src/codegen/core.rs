@@ -944,6 +944,7 @@ pub mod symbol_data_derivation {
                                 },
                                 name: literal!("ITEM"),
                             }],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -956,6 +957,7 @@ pub mod symbol_data_derivation {
                                 },
                                 name: literal!("INDEX"),
                             }],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -963,6 +965,7 @@ pub mod symbol_data_derivation {
                         Arc::new(MethodSignature {
                             opcode: literal!("data_deletealloflist"),
                             unbound_params: vec![],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -983,6 +986,7 @@ pub mod symbol_data_derivation {
                                     name: literal!("ITEM"),
                                 },
                             ],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -1003,6 +1007,7 @@ pub mod symbol_data_derivation {
                                     name: literal!("ITEM"),
                                 },
                             ],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -1015,6 +1020,7 @@ pub mod symbol_data_derivation {
                                 },
                                 name: literal!("INDEX"),
                             }],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -1027,6 +1033,7 @@ pub mod symbol_data_derivation {
                                 },
                                 name: literal!("ITEM"),
                             }],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -1034,6 +1041,7 @@ pub mod symbol_data_derivation {
                         Arc::new(MethodSignature {
                             opcode: literal!("data_lengthoflist"),
                             unbound_params: vec![],
+                            is_singleton: true,
                         }),
                     ),
                     (
@@ -1046,6 +1054,7 @@ pub mod symbol_data_derivation {
                                 },
                                 name: literal!("ITEM"),
                             }],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -1053,6 +1062,7 @@ pub mod symbol_data_derivation {
                         Arc::new(MethodSignature {
                             opcode: literal!("data_showlist"),
                             unbound_params: vec![],
+                            is_singleton: false,
                         }),
                     ),
                     (
@@ -1060,6 +1070,7 @@ pub mod symbol_data_derivation {
                         Arc::new(MethodSignature {
                             opcode: literal!("data_hidelist"),
                             unbound_params: vec![],
+                            is_singleton: false,
                         }),
                     ),
                 ])
@@ -2876,10 +2887,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             Global,
             Local,
         }
-        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-        pub enum SingleAssignment {
-            List(Scope, IString, Vec<Sb3Primitive>),
-            Var(Scope, IString, Sb3Primitive),
+        #[derive(Debug, Clone, PartialEq)]
+        pub enum SingleAssignment<'a> {
+            List(Scope, IString, Vec<Result<&'a Expression, Sb3Primitive>>),
+            Var(Scope, IString, Result<&'a Expression, Sb3Primitive>),
         }
         let assignments: Vec<SingleAssignment> = match value.1 {
             crate::parser::cst::DataDeclaration::Mixed(parent_scope, _, items, _, _)
@@ -2914,16 +2925,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             } else {
                                 Scope::Local
                             };
-                            SingleAssignment::Var(
-                                scope,
-                                var,
-                                expression.calculate_value().map_err(|source| {
-                                    GrazeSb3GeneratorError::InvalidConstantExpression {
-                                        expression: Box::new(expression.clone()),
-                                        source,
-                                    }
-                                })?.into(),
-                            )
+                            SingleAssignment::Var(scope, var, Ok(expression))
                         }
                         crate::parser::cst::SingleDataDeclaration::EmptyVariable(
                             _,
@@ -2949,7 +2951,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             } else {
                                 Scope::Local
                             };
-                            SingleAssignment::Var(scope, var, "".into())
+                            SingleAssignment::Var(scope, var, Err("".into()))
                         }
                         crate::parser::cst::SingleDataDeclaration::List(
                             _,
@@ -2984,18 +2986,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 for value in items {
                                     match value {
                                         ListEntry::Expression(expression) => {
-                                            values.push(expression.calculate_value().map_err(
-                                                |source| {
-                                                    GrazeSb3GeneratorError::InvalidConstantExpression {
-                                                        expression: Box::new(expression.clone()),
-                                                        source,
-                                                    }
-                                                },
-                                            )?.into());
+                                            values.push(Ok(expression));
                                         }
                                         ListEntry::Unwrap(literal, _) => {
                                             for c in literal.get_string_value().chars() {
-                                                values.push(c.to_string().into());
+                                                values.push(Err(c.to_string().into()));
                                             }
                                         }
                                     }
@@ -3053,16 +3048,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         } else {
                             Scope::Local
                         };
-                        SingleAssignment::Var(
-                            scope,
-                            var,
-                            expression.calculate_value().map_err(|source| {
-                                GrazeSb3GeneratorError::InvalidConstantExpression {
-                                    expression: Box::new(expression.clone()),
-                                    source,
-                                }
-                            })?.into(),
-                        )
+                        SingleAssignment::Var(scope, var, Ok(expression))
                     }
                     crate::parser::cst::SingleDataDeclaration::EmptyVariable(
                         _,
@@ -3080,7 +3066,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         } else {
                             Scope::Local
                         };
-                        SingleAssignment::Var(scope, var, "".into())
+                        SingleAssignment::Var(scope, var, Err("".into()))
                     }
                     crate::parser::cst::SingleDataDeclaration::List(
                         _,
@@ -3107,18 +3093,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             for value in items {
                                 match value {
                                     ListEntry::Expression(expression) => {
-                                        values.push(expression.calculate_value().map_err(
-                                            |source| {
-                                                GrazeSb3GeneratorError::InvalidConstantExpression {
-                                                    expression: Box::new(expression.clone()),
-                                                    source,
-                                                }
-                                            },
-                                        )?.into());
+                                        values.push(Ok(expression));
                                     }
                                     ListEntry::Unwrap(literal, _) => {
                                         for c in literal.get_string_value().chars() {
-                                            values.push(c.to_string().into());
+                                            values.push(Err(c.to_string().into()));
                                         }
                                     }
                                 }
@@ -3186,9 +3165,24 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     });
                     for item in sb3_primitives {
                         wrap_in_statement(context, |context, parent, this_id| {
-                            let value = Sb3InputValue::Shadow(Sb3InputRepr::PrimitiveBlock(
-                                Sb3PrimitiveBlock::String(item),
-                            ));
+                            let value = match item {
+                                Ok(item) => {
+                                    self.visit_expression(item, context)?;
+                                    let value = context.pop_param().unwrap();
+                                    create_input_value(
+                                        param_to_input_repr_no_menu(
+                                            value,
+                                            *item.get_source_span(),
+                                            context,
+                                        )?,
+                                        Some(Sb3PrimitiveBlock::String("".into())),
+                                    )
+                                    .unwrap()
+                                }
+                                Err(item) => Sb3InputValue::Shadow(Sb3InputRepr::PrimitiveBlock(
+                                    Sb3PrimitiveBlock::String(item),
+                                )),
+                            };
                             add_block(
                                 context,
                                 &this_id,
@@ -3205,7 +3199,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         })?;
                     }
                 }
-                SingleAssignment::Var(scope, var, sb3_primitive) => {
+                SingleAssignment::Var(scope, var, expression) => {
                     wrap_in_statement(context, |context, parent, this_id| {
                         let parent_symbol_id = if scope == Scope::Global {
                             context.data_symbol_context.global_vars
@@ -3223,16 +3217,30 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         let mut fields = HashMap::new();
                         let mut inputs = HashMap::new();
                         add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
-                        add_known_block_to_params(
-                            context,
-                            param,
-                            &KnownBlock::PrimitiveBlock {
-                                value: Sb3PrimitiveBlock::String(sb3_primitive),
-                            },
-                            Default::default(),
-                            &mut inputs,
-                            &mut fields,
-                        )?;
+                        match expression {
+                            Ok(item) => {
+                                self.visit_expression(item, context)?;
+                                let value = context.pop_param().unwrap();
+                                add_param_to_params(
+                                    context,
+                                    param,
+                                    value,
+                                    *item.get_source_span(),
+                                    &mut inputs,
+                                    &mut fields,
+                                )?;
+                            }
+                            Err(item) => add_known_block_to_params(
+                                context,
+                                param,
+                                &KnownBlock::PrimitiveBlock {
+                                    value: Sb3PrimitiveBlock::String(item),
+                                },
+                                Default::default(),
+                                &mut inputs,
+                                &mut fields,
+                            )?,
+                        }
                         add_block(
                             context,
                             &this_id,
@@ -3413,6 +3421,22 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         if value.statements.is_empty() && code_block_is_sub_stack {
             context.push_param(Param::BlockStack(None));
         }
+        Ok(())
+    }
+
+    fn visit_stage_statement_data_declaration(
+        &self,
+        _value: crate::visitor::BorrowedStageStatementDataDeclaration,
+        _context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        Ok(())
+    }
+
+    fn visit_sprite_statement_data_declaration(
+        &self,
+        _value: crate::visitor::BorrowedStageStatementDataDeclaration,
+        _context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
         Ok(())
     }
 

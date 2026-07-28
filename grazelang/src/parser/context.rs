@@ -199,6 +199,12 @@ impl ResolveKnownBlock for KnownBlock {
             }
             KnownBlock::BlockRef { id } => KnownBlockInput::BlockRef(id.clone()),
             KnownBlock::PrimitiveBlock { value } => KnownBlockInput::PrimitiveInput(value.clone()),
+            KnownBlock::BoundMethod {
+                signature,
+                bound_params,
+            } if signature.is_singleton && signature.unbound_params.is_empty() => {
+                KnownBlockInput::SimpleBlock(&signature.opcode, bound_params)
+            }
             KnownBlock::Callable(..)
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. }
