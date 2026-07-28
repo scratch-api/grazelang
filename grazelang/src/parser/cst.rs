@@ -180,6 +180,22 @@ impl GetPos for ConfigKeyword {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MonitorKeyword(pub SourceSpan);
+
+impl FromSourceSpan for MonitorKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
+impl GetPos for MonitorKeyword {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AsKeyword(pub SourceSpan);
 
 impl FromSourceSpan for AsKeyword {
@@ -479,6 +495,14 @@ pub enum StageStatement {
         RightBrace,
         SourceSpan,
     ),
+    MonitorDeclaration(
+        MonitorKeyword,
+        MonitorValue,
+        LeftBrace,
+        CommaSeparated<FlatDictionaryEntry>,
+        RightBrace,
+        SourceSpan,
+    ),
     UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
@@ -505,19 +529,20 @@ pub type CustomBlockDefinition = (
 impl GetPos for StageStatement {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            StageStatement::DataDeclaration(_, _, _, p) => p,
-            StageStatement::BackdropDeclaration(_, _, _, p) => p,
-            StageStatement::SoundDeclaration(_, _, _, p) => p,
-            StageStatement::NoInputHatStatement(_, _, _, p) => p,
-            StageStatement::SingleInputHatStatement(_, _, _, _, p) => p,
-            StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
-            StageStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
-            StageStatement::IsolatedBlock(_, _, p) => p,
-            StageStatement::IsolatedExpression(_, _, _, _, p) => p,
-            StageStatement::ConfigStatement(_, _, _, _, p) => p,
-            StageStatement::UseStatement(_, _, _, p) => p,
+            StageStatement::DataDeclaration(_, _, _, p)
+            | StageStatement::BackdropDeclaration(_, _, _, p)
+            | StageStatement::SoundDeclaration(_, _, _, p)
+            | StageStatement::NoInputHatStatement(_, _, _, p)
+            | StageStatement::SingleInputHatStatement(_, _, _, _, p)
+            | StageStatement::MultiInputHatStatement(_, _, _, _, _, _, p)
+            | StageStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p)
+            | StageStatement::IsolatedBlock(_, _, p)
+            | StageStatement::IsolatedExpression(_, _, _, _, p)
+            | StageStatement::ConfigStatement(_, _, _, _, p)
+            | StageStatement::MonitorDeclaration(_, _, _, _, _, p)
+            | StageStatement::UseStatement(_, _, _, p)
+            | StageStatement::Invalid(p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
-            StageStatement::Invalid(p) => p,
         }
     }
 }
@@ -591,6 +616,14 @@ pub enum SpriteStatement {
         RightBrace,
         SourceSpan,
     ),
+    MonitorDeclaration(
+        MonitorKeyword,
+        MonitorValue,
+        LeftBrace,
+        CommaSeparated<FlatDictionaryEntry>,
+        RightBrace,
+        SourceSpan,
+    ),
     UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
@@ -599,19 +632,20 @@ pub enum SpriteStatement {
 impl GetPos for SpriteStatement {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            SpriteStatement::DataDeclaration(_, _, _, p) => p,
-            SpriteStatement::CostumeDeclaration(_, _, _, p) => p,
-            SpriteStatement::SoundDeclaration(_, _, _, p) => p,
-            SpriteStatement::NoInputHatStatement(_, _, _, p) => p,
-            SpriteStatement::SingleInputHatStatement(_, _, _, _, p) => p,
-            SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p) => p,
-            SpriteStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p) => p,
-            SpriteStatement::IsolatedBlock(_, _, p) => p,
-            SpriteStatement::IsolatedExpression(_, _, _, _, p) => p,
-            SpriteStatement::ConfigStatement(_, _, _, _, p) => p,
-            SpriteStatement::UseStatement(_, _, _, p) => p,
+            SpriteStatement::DataDeclaration(_, _, _, p)
+            | SpriteStatement::CostumeDeclaration(_, _, _, p)
+            | SpriteStatement::SoundDeclaration(_, _, _, p)
+            | SpriteStatement::NoInputHatStatement(_, _, _, p)
+            | SpriteStatement::SingleInputHatStatement(_, _, _, _, p)
+            | SpriteStatement::MultiInputHatStatement(_, _, _, _, _, _, p)
+            | SpriteStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p)
+            | SpriteStatement::IsolatedBlock(_, _, p)
+            | SpriteStatement::IsolatedExpression(_, _, _, _, p)
+            | SpriteStatement::ConfigStatement(_, _, _, _, p)
+            | SpriteStatement::MonitorDeclaration(_, _, _, _, _, p)
+            | SpriteStatement::UseStatement(_, _, _, p)
+            | SpriteStatement::Invalid(p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
-            SpriteStatement::Invalid(p) => p,
         }
     }
 }
@@ -964,6 +998,18 @@ impl FlatDictionaryEntry {
             FlatDictionaryEntry::Invalid(_) => None,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MonitorValue {
+    Identifier(Identifier),
+    Call(
+        Identifier,
+        LeftParens,
+        CommaSeparated<Identifier>,
+        RightParens,
+        SourceSpan,
+    ),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -2722,5 +2768,9 @@ pub trait ConfigStatementFromContent {
     ) -> Self;
 }
 
-// TODO: implement monitors
+// TODO: Implement monitors
+//  - [x] CST Nodes
+//  - [x] Visitor integration
+//  - [ ] Parser integration
+//  - [ ] Codegen integration
 // Issue: #75

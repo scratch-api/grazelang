@@ -26,6 +26,8 @@ pub enum Token {
     StageKeyword,
     #[token("config")]
     ConfigKeyword,
+    #[token("monitor")]
+    MonitorKeyword,
     #[token("proc")]
     ProcKeyword,
     #[token("warp")]
@@ -166,6 +168,7 @@ impl std::fmt::Debug for Token {
             Token::SpriteKeyword => write!(f, "\"sprite\""),
             Token::StageKeyword => write!(f, "\"stage\""),
             Token::ConfigKeyword => write!(f, "\"config\""),
+            Token::MonitorKeyword => write!(f, "\"monitor\""),
             Token::ProcKeyword => write!(f, "\"proc\""),
             Token::WarpKeyword => write!(f, "\"warp\""),
             Token::NowarpKeyword => write!(f, "\"nowarp\""),

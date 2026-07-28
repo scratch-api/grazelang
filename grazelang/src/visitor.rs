@@ -1,16 +1,7 @@
 use crate::{
     lexer::SourceSpan,
     parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
-        Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind,
-        DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry,
-        FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens,
-        LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
-        NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon,
-        SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword,
-        SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse,
-        SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword,
-        VarsKeyword, WarpSpecifier,
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
     },
 };
 
@@ -135,6 +126,15 @@ pub type BorrowedSpriteStatementCostumeDeclaration<'a> = (
 
 pub type BorrowedConfigStatement<'a> = (
     &'a ConfigKeyword,
+    &'a LeftBrace,
+    &'a CommaSeparated<FlatDictionaryEntry>,
+    &'a RightBrace,
+    &'a SourceSpan,
+);
+
+pub type BorrowedMonitorDeclaration<'a> = (
+    &'a MonitorKeyword,
+    &'a MonitorValue,
     &'a LeftBrace,
     &'a CommaSeparated<FlatDictionaryEntry>,
     &'a RightBrace,
@@ -472,6 +472,14 @@ pub trait GrazeVisitor<C, E> {
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_config_statement(self, value, context)
+    }
+
+    fn visit_monitor_declaration(
+        &self,
+        value: BorrowedMonitorDeclaration,
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_monitor_declaration(self, value, context)
     }
 
     fn visit_code_block(&self, value: &CodeBlock, context: &mut C) -> Result<(), E> {
@@ -1028,6 +1036,26 @@ where
                 context,
             )?;
         }
+        StageStatement::MonitorDeclaration(
+            monitor_keyword,
+            monitor_value,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        ) => {
+            visitor.visit_monitor_declaration(
+                (
+                    monitor_keyword,
+                    monitor_value,
+                    left_brace,
+                    items,
+                    right_brace,
+                    source_span,
+                ),
+                context,
+            )?;
+        }
         StageStatement::UseStatement(
             use_keyword,
             use_statement_content,
@@ -1191,6 +1219,26 @@ where
                 context,
             )?;
         }
+        SpriteStatement::MonitorDeclaration(
+            monitor_keyword,
+            monitor_value,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        ) => {
+            visitor.visit_monitor_declaration(
+                (
+                    monitor_keyword,
+                    monitor_value,
+                    left_brace,
+                    items,
+                    right_brace,
+                    source_span,
+                ),
+                context,
+            )?;
+        }
         SpriteStatement::UseStatement(
             use_keyword,
             use_statement_content,
@@ -1346,6 +1394,17 @@ where
 pub fn default_visit_config_statement<V, C, E>(
     _visitor: &V,
     _value: BorrowedConfigStatement,
+    _context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    Ok(())
+}
+
+pub fn default_visit_monitor_declaration<V, C, E>(
+    _visitor: &V,
+    _value: BorrowedMonitorDeclaration,
     _context: &mut C,
 ) -> Result<(), E>
 where
