@@ -4715,7 +4715,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             monitor.id = id.get_string_value().to_string();
         }
         if let Some((_, mode)) = data.remove("mode") {
-            monitor.mode = serde_json::from_str(mode.get_string_value()).unwrap_or_default();
+            monitor.mode = serde_json::from_str(&mode.get_json_string()).unwrap_or_default();
+            if monitor.mode == Sb3MonitorMode::List {
+                if matches!(monitor.value, Sb3MonitorValue::Primitive(_)) {
+                    monitor.value = Sb3MonitorValue::List(Default::default());
+                }
+            } else if !matches!(monitor.value, Sb3MonitorValue::Primitive(_)) {
+                monitor.value = Sb3MonitorValue::Primitive("".into());
+            }
         }
         if let Some((_, opcode)) = data.remove("opcode") {
             monitor.opcode = opcode.get_string_value().to_string();

@@ -570,13 +570,13 @@ impl ConfigStatementFromContent for StageStatement {
 
 impl MonitorDeclarationFromContent for StageStatement {
     fn monitor_statement_from_content(
-            monitor_keyword: MonitorKeyword,
-            monitor_value: MonitorValue,
-            left_brace: LeftBrace,
-            items: CommaSeparated<FlatDictionaryEntry>,
-            right_brace: RightBrace,
-            source_span: SourceSpan,
-        ) -> Self {
+        monitor_keyword: MonitorKeyword,
+        monitor_value: MonitorValue,
+        left_brace: LeftBrace,
+        items: CommaSeparated<FlatDictionaryEntry>,
+        right_brace: RightBrace,
+        source_span: SourceSpan,
+    ) -> Self {
         Self::MonitorDeclaration(
             monitor_keyword,
             monitor_value,
@@ -693,13 +693,13 @@ impl ConfigStatementFromContent for SpriteStatement {
 
 impl MonitorDeclarationFromContent for SpriteStatement {
     fn monitor_statement_from_content(
-            monitor_keyword: MonitorKeyword,
-            monitor_value: MonitorValue,
-            left_brace: LeftBrace,
-            items: CommaSeparated<FlatDictionaryEntry>,
-            right_brace: RightBrace,
-            source_span: SourceSpan,
-        ) -> Self {
+        monitor_keyword: MonitorKeyword,
+        monitor_value: MonitorValue,
+        left_brace: LeftBrace,
+        items: CommaSeparated<FlatDictionaryEntry>,
+        right_brace: RightBrace,
+        source_span: SourceSpan,
+    ) -> Self {
         Self::MonitorDeclaration(
             monitor_keyword,
             monitor_value,
@@ -1866,8 +1866,18 @@ impl Literal {
             Literal::EmptyExpression(_, _, _) => EMPTY_ISTRING_REF,
         }
     }
+
     pub fn cast_to_string(&self) -> IString {
         self.get_string_value().clone()
+    }
+
+    pub fn get_json_string(&self) -> Cow<'_, str> {
+        Cow::Borrowed(match self {
+            Literal::String(value, _) => return Cow::Owned(serde_json::to_string(value).unwrap()),
+            Literal::DecimalInt(value, _) => value,
+            Literal::DecimalFloat(value, _) => value,
+            _ => return Cow::Owned(serde_json::to_string(&Sb3PrimitiveOrBool::from(self)).unwrap()),
+        })
     }
 }
 
