@@ -1618,9 +1618,10 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Sb3MonitorMode {
+    #[default]
     Default,
     Large,
     Slider,
