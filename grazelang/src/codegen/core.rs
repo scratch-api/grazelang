@@ -4718,8 +4718,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 //  - [ ] List
                 //  - [ ] Dictionary
                 //  - [ ] null
+                // Issue: #82
                 
                 // TODO: Use advanced dictionary values for monitor declaration
+                // Issue: #81
                 Sb3MonitorValue::Primitive(old_value) => {
                     *old_value = Sb3Primitive::from(Sb3PrimitiveOrBool::from(&value));
                 },
@@ -4756,6 +4758,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         // TODO: Warn if value has a weird shape for its data type (e.g. "a" for bool, "xyz" for f64)
         //  - [ ] Booleans
         //  - [ ] Numbers
+        // Issue: #80
         context.sb3.monitors.push(monitor);
         for (key, (source_span, _)) in data {
             emit_error!(

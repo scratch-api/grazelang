@@ -582,5 +582,29 @@
         "lines": "L165-L165",
         "commit": "d492817036e8594978c2233f9623d435f7341f85",
         "title": "Soften keywords"
+    },
+    "80": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "- [ ] Booleans\n- [ ] Numbers",
+        "status": "open",
+        "lines": "L4756-L4758",
+        "commit": "eca9bd1adae9d42b3cac83bbfdb7b3cce940a6ee",
+        "title": "Warn if value has a weird shape for its data type (e.g. \"a\" for bool, \"xyz\" for f64)"
+    },
+    "81": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L4722-L4722",
+        "commit": "eca9bd1adae9d42b3cac83bbfdb7b3cce940a6ee",
+        "title": "Use advanced dictionary values for monitor declaration"
+    },
+    "82": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "- [ ] List\n- [ ] Dictionary\n- [ ] null",
+        "status": "open",
+        "lines": "L4717-L4720",
+        "commit": "eca9bd1adae9d42b3cac83bbfdb7b3cce940a6ee",
+        "title": "Implement advanced dictionary values"
     }
 }
