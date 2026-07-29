@@ -163,6 +163,7 @@ pub enum Token {
 }
 
 // TODO: Soften keywords
+// Issue: #79
 
 impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

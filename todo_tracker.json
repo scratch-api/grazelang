@@ -574,5 +574,13 @@
         "lines": "L2139-L2142",
         "commit": "a6ec2372233445a3fd95617a11c827b2797326c3",
         "title": "Simplify types with type defintions"
+    },
+    "79": {
+        "filepath": "grazelang/src/lexer.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L165-L165",
+        "commit": "d492817036e8594978c2233f9623d435f7341f85",
+        "title": "Soften keywords"
     }
 }
