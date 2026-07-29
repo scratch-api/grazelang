@@ -19,6 +19,7 @@ sprite `Sprite1` sprite_1 {
         x_position: 10,
         y_position: -15,
     }
+    monitor list_ {}
     costume `costume1` test_costume("empty.svg");
     let global test;
     let global list `list` list_ = [.."1000000"];

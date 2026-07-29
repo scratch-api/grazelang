@@ -24,14 +24,15 @@ pub const TRUE_ISTRING_REF: &IString = &arcstr::literal!("true");
 pub trait GetPos {
     fn get_source_span(&self) -> &SourceSpan;
 
-    fn range_to<T>(&self, other: &T) -> SourceSpan
+    #[inline]
+    fn span_to<T>(&self, other: &T) -> SourceSpan
     where
         T: GetPos,
     {
-        self.range_to_end(other.get_source_span().0.1)
+        self.span_to_end(other.get_source_span().0.1)
     }
 
-    fn range_to_end(&self, end: (usize, usize)) -> SourceSpan {
+    fn span_to_end(&self, end: (usize, usize)) -> SourceSpan {
         let own_position = self.get_source_span();
         ((own_position.0.0, end), own_position.1)
     }
@@ -567,6 +568,26 @@ impl ConfigStatementFromContent for StageStatement {
     }
 }
 
+impl MonitorDeclarationFromContent for StageStatement {
+    fn monitor_statement_from_content(
+            monitor_keyword: MonitorKeyword,
+            monitor_value: MonitorValue,
+            left_brace: LeftBrace,
+            items: CommaSeparated<FlatDictionaryEntry>,
+            right_brace: RightBrace,
+            source_span: SourceSpan,
+        ) -> Self {
+        Self::MonitorDeclaration(
+            monitor_keyword,
+            monitor_value,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SpriteStatement {
     DataDeclaration(LetKeyword, DataDeclaration, Semicolon, SourceSpan),
@@ -667,6 +688,26 @@ impl ConfigStatementFromContent for SpriteStatement {
         source_span: SourceSpan,
     ) -> Self {
         Self::ConfigStatement(config_keyword, left_brace, items, right_brace, source_span)
+    }
+}
+
+impl MonitorDeclarationFromContent for SpriteStatement {
+    fn monitor_statement_from_content(
+            monitor_keyword: MonitorKeyword,
+            monitor_value: MonitorValue,
+            left_brace: LeftBrace,
+            items: CommaSeparated<FlatDictionaryEntry>,
+            right_brace: RightBrace,
+            source_span: SourceSpan,
+        ) -> Self {
+        Self::MonitorDeclaration(
+            monitor_keyword,
+            monitor_value,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        )
     }
 }
 
@@ -2768,9 +2809,20 @@ pub trait ConfigStatementFromContent {
     ) -> Self;
 }
 
+pub trait MonitorDeclarationFromContent {
+    fn monitor_statement_from_content(
+        monitor_keyword: MonitorKeyword,
+        monitor_value: MonitorValue,
+        left_brace: LeftBrace,
+        items: CommaSeparated<FlatDictionaryEntry>,
+        right_brace: RightBrace,
+        source_span: SourceSpan,
+    ) -> Self;
+}
+
 // TODO: Implement monitors
 //  - [x] CST Nodes
 //  - [x] Visitor integration
-//  - [ ] Parser integration
+//  - [x] Parser integration
 //  - [ ] Codegen integration
 // Issue: #75

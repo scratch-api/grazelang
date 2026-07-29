@@ -614,7 +614,7 @@ macro_rules! parse_flat_dictionary {
             left_brace,
             items,
             right_brace,
-            left_brace.range_to(&right_brace),
+            left_brace.span_to(&right_brace),
         )
     }};
 }
@@ -1012,9 +1012,10 @@ pub mod statement {
             ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue,
             DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF, FlatDictionaryEntry,
             LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
-            NormalAssignmentOperator, RightBrace, RightBracket, RightParens,
-            Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
-            SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier,
+            MonitorDeclarationFromContent, MonitorKeyword, MonitorValue, NormalAssignmentOperator,
+            RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration,
+            SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf,
+            VarKeyword, VarsKeyword, WarpSpecifier,
         },
     };
 
@@ -2376,13 +2377,54 @@ pub mod statement {
     where
         T: ConfigStatementFromContent + InvalidVariantFromSourceSpan,
     {
-        let token_stream = &mut *token_stream;
-        let context = &mut *context;
-        let config_keyword = expect_token!(token_stream,Token::ConfigKeyword => from_stream_pos::<ConfigKeyword>(token_stream),"Expected \"config\".","\"config\"");
-        let (left_brace, items, right_brace, source_span) =
-            parse_flat_dictionary!(token_stream, context);
+        let config_keyword = expect_token!(token_stream, Token::ConfigKeyword => from_stream_pos::<ConfigKeyword>(token_stream), "Expected \"config\".", "\"config\"");
+        let (left_brace, items, right_brace, _) = parse_flat_dictionary!(token_stream, context);
+        let source_span = config_keyword.span_to(&right_brace);
         Ok(T::config_statement_from_content(
             config_keyword,
+            left_brace,
+            items,
+            right_brace,
+            source_span,
+        ))
+    }
+
+    pub fn parse_monitor_declaration<T>(
+        token_stream: ParseIn,
+        context: &mut ParseContext,
+    ) -> ParseOut<T>
+    where
+        T: MonitorDeclarationFromContent + InvalidVariantFromSourceSpan,
+    {
+        let monitor_keyword = expect_token!(
+            token_stream,
+            Token::MonitorKeyword => from_stream_pos::<MonitorKeyword>(token_stream),
+            "Expected \"monitor\".",
+            "\"monitor\""
+        );
+        let identifier = parse_full_identifier(token_stream, context)?;
+        let monitor_value = if matches!(peek_token!(token_stream), Token::LeftParens) {
+            skip_token!(token_stream);
+            let left_parens = from_stream_pos::<LeftParens>(token_stream);
+            let items = parse_comma_separated!(
+                token_stream,
+                context,
+                (token_stream, context) => parse_full_identifier(token_stream, context)?,
+                Token::RightParens,
+                "')'"
+            );
+            skip_token!(token_stream);
+            let right_parens = from_stream_pos::<RightParens>(token_stream);
+            let source_span = identifier.span_to(&right_parens);
+            MonitorValue::Call(identifier, left_parens, items, right_parens, source_span)
+        } else {
+            MonitorValue::Identifier(identifier)
+        };
+        let (left_brace, items, right_brace, _) = parse_flat_dictionary!(token_stream, context);
+        let source_span = monitor_keyword.span_to(&right_brace);
+        Ok(T::monitor_statement_from_content(
+            monitor_keyword,
+            monitor_value,
             left_brace,
             items,
             right_brace,
@@ -2430,7 +2472,7 @@ pub mod statement {
             left_parens,
             path,
             right_parens,
-            left_parens.range_to(&right_parens),
+            left_parens.span_to(&right_parens),
         ))
     }
 
@@ -3219,7 +3261,7 @@ pub mod statement {
                 find_comma_separated_entry_end_and_create_invalid::<cst::UseStatementContent>(token_stream, start)
             );
             return Ok(cst::UseStatementContent::SingleUse {
-                source_span: ident.range_to(&new_name),
+                source_span: ident.span_to(&new_name),
                 identifier: ident,
                 rename: Some((as_keyword, new_name)),
             })
@@ -3676,6 +3718,14 @@ pub fn parse_sprite_statement(
                 find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
             ))
         }
+        Token::MonitorKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            Ok(try_or_emit_message!(
+                statement::parse_monitor_declaration(token_stream, context),
+                context,
+                find_statement_end_and_create_invalid::<SpriteStatement>(token_stream, start_pos)
+            ))
+        }
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
@@ -3990,6 +4040,14 @@ pub fn parse_stage_statement(
             let start_pos = peek_token_start(token_stream);
             Ok(try_or_emit_message!(
                 statement::parse_config_statement(token_stream, context),
+                context,
+                find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
+            ))
+        }
+        Token::MonitorKeyword => {
+            let start_pos = peek_token_start(token_stream);
+            Ok(try_or_emit_message!(
+                statement::parse_monitor_declaration(token_stream, context),
                 context,
                 find_statement_end_and_create_invalid::<StageStatement>(token_stream, start_pos)
             ))
@@ -4684,7 +4742,7 @@ pub fn parse_expression(token_stream: ParseIn, context: &mut ParseContext) -> Pa
                 "Expected ']'.",
                 "']'"
             );
-            let source_span = string_expression.range_to_end(get_token_end(token_stream));
+            let source_span = string_expression.span_to_end(get_token_end(token_stream));
             expressions.push_back(Expression::GetLetter(
                 Box::new(string_expression),
                 left_bracket,
