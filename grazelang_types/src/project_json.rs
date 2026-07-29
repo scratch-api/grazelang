@@ -1465,13 +1465,13 @@ pub struct Sb3Monitor {
     pub id: String,
     pub mode: Sb3MonitorMode,
     pub opcode: String,
-    pub params: HashMap<String, Value>,
+    pub params: HashMap<String, Sb3Primitive>,
     pub sprite_name: Option<String>,
     pub value: Sb3MonitorValue,
     pub width: f64,
     pub height: f64,
-    pub x: f64,
-    pub y: f64,
+    pub x: Option<f64>,
+    pub y: Option<f64>,
     pub visible: bool,
 
     // Non lists

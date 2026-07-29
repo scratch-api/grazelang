@@ -509,6 +509,7 @@ impl SymbolTable {
             known_block,
             namespace,
             parent,
+            sprite_name: None,
         });
         self.insert_symbol_as_child(parent, child_name, symbol);
         symbol
@@ -578,141 +579,9 @@ pub struct Symbol {
     pub known_block: Option<Rc<KnownBlock>>,
     pub namespace: HashMap<IString, SymbolId>,
     pub parent: SymbolId,
+    /// Only used for monitors so only needs to be present for symbols that can be monitored
+    pub sprite_name: Option<IString>,
 }
-
-// #[derive(Debug, Clone)]
-// pub enum Symbol {
-//     Namespace(
-//         HashMap<IString, Rc<RefCell<Symbol>>>,
-//         Weak<RefCell<Symbol>>,
-//     ),
-//     KnownBlock(
-//         Box<KnownBlock>,
-//         HashMap<IString, Rc<RefCell<Symbol>>>,
-//         Weak<RefCell<Symbol>>,
-//     ),
-//     Alias(Weak<RefCell<Symbol>>, Weak<RefCell<Symbol>>),
-// }
-
-// impl Symbol {
-//     pub fn new_namespace() -> Self {
-//         Self::Namespace(HashMap::new(), Weak::new())
-//     }
-
-//     pub fn get_block(&self) -> Option<&KnownBlock> {
-//         match self {
-//             Symbol::KnownBlock(known_block, ..) => Some(known_block),
-//             Symbol::Namespace(..) | Symbol::Alias(..) => None,
-//         }
-//     }
-
-//     pub fn unalias(this: &Rc<RefCell<Self>>) -> Option<Rc<RefCell<Self>>> {
-//         match &*this.borrow() {
-//             Symbol::Namespace(..) | Symbol::KnownBlock(..) => Some(this.clone()),
-//             Symbol::Alias(weak, _) => weak.upgrade().and_then(|this| Symbol::unalias(&this)),
-//         }
-//     }
-
-//     pub fn get_child(&self, child_name: &IString) -> Option<Rc<RefCell<Symbol>>> {
-//         match self {
-//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
-//                 hash_map.get(child_name).cloned()
-//             }
-//             Symbol::Alias(alias, ..) => alias
-//                 .upgrade()
-//                 .and_then(|value| value.borrow().get_child(child_name)),
-//         }
-//     }
-
-//     /// Clones the children and allocates them in a dedicated Vec
-//     pub fn get_children_cloned(&self) -> Vec<Rc<RefCell<Symbol>>> {
-//         match self {
-//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
-//                 hash_map.values().cloned().collect()
-//             }
-//             Symbol::Alias(alias, ..) => alias
-//                 .upgrade()
-//                 .map(|value| value.borrow().get_children_cloned())
-//                 .unwrap_or_default(),
-//         }
-//     }
-
-//     /// Clones the children and keys and allocates them in a dedicated Vec
-//     pub fn get_entries_cloned(&self) -> Vec<(IString, Rc<RefCell<Symbol>>)> {
-//         match self {
-//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => hash_map
-//                 .iter()
-//                 .map(|(key, value)| (key.clone(), value.clone()))
-//                 .collect(),
-//             Symbol::Alias(alias, ..) => alias
-//                 .upgrade()
-//                 .map(|value| value.borrow().get_entries_cloned())
-//                 .unwrap_or_default(),
-//         }
-//     }
-
-//     pub fn get_parent(&self) -> &Weak<RefCell<Symbol>> {
-//         match self {
-//             Symbol::Namespace(_, parent_ref)
-//             | Symbol::KnownBlock(_, _, parent_ref)
-//             | Symbol::Alias(_, parent_ref) => parent_ref,
-//         }
-//     }
-
-//     pub fn replace_parent(&mut self, parent: Weak<RefCell<Symbol>>) -> Weak<RefCell<Symbol>> {
-//         match self {
-//             Symbol::Namespace(_, parent_ref)
-//             | Symbol::KnownBlock(_, _, parent_ref)
-//             | Symbol::Alias(_, parent_ref) => std::mem::replace(parent_ref, parent),
-//         }
-//     }
-
-//     pub fn insert_child(
-//         this: &Rc<RefCell<Self>>,
-//         child_name: IString,
-//         child: Rc<RefCell<Symbol>>,
-//     ) -> Option<Rc<RefCell<Symbol>>> {
-//         child.borrow_mut().replace_parent(Rc::downgrade(this));
-//         match &mut *this.borrow_mut() {
-//             Symbol::Namespace(hash_map, ..) => hash_map.insert(child_name, child),
-//             Symbol::KnownBlock(_, hash_map, ..) => hash_map.insert(child_name, child),
-//             Symbol::Alias(alias, ..) => alias
-//                 .upgrade()
-//                 .and_then(|value| Self::insert_child(&value, child_name, child)),
-//         }
-//     }
-
-//     pub fn remove_child(
-//         this: &Rc<RefCell<Self>>,
-//         child_name: &IString,
-//     ) -> Option<Rc<RefCell<Symbol>>> {
-//         match &mut *this.borrow_mut() {
-//             Symbol::Namespace(hash_map, ..) => hash_map.remove(child_name),
-//             Symbol::KnownBlock(_, hash_map, ..) => hash_map.remove(child_name),
-//             Symbol::Alias(alias, ..) => alias
-//                 .upgrade()
-//                 .and_then(|value| Self::remove_child(&value, child_name)),
-//         }
-//     }
-
-//     pub fn clear_children(this: &Rc<RefCell<Self>>) {
-//         let alias = match &mut *this.borrow_mut() {
-//             Symbol::Namespace(hash_map, ..) | Symbol::KnownBlock(_, hash_map, ..) => {
-//                 hash_map.clear();
-//                 return;
-//             }
-//             Symbol::Alias(alias, ..) => alias.upgrade(),
-//         };
-//         if let Some(alias) = alias {
-//             Self::clear_children(&alias);
-//         }
-//     }
-
-//     // Whether this symbol is an alias
-//     pub fn is_alias(&self) -> bool {
-//         matches!(self, Symbol::Alias(..))
-//     }
-// }
 
 #[derive(Debug, Clone)]
 pub struct BroadcastDescriptor {
@@ -738,6 +607,7 @@ impl BroadcastDescriptor {
                 })),
                 namespace: HashMap::new(),
                 parent: Default::default(),
+                sprite_name: None,
             },
             TargetAttachment::Broadcast { name, id },
         )

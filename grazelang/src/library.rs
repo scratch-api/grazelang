@@ -87,12 +87,14 @@ pub fn convert_generated_library(
                     known_block: Some(Rc::new(*known_block)),
                     namespace: HashMap::new(),
                     parent: Default::default(),
+                    sprite_name: None,
                 }))
             }
             None => ConvertedSymbol::Symbol(symbol_table.new_symbol(Symbol {
                 known_block: None,
                 namespace: HashMap::new(),
                 parent: Default::default(),
+                sprite_name: None,
             })),
         };
         if let ConvertedSymbol::Symbol(my_symbol) = &my_symbol {
@@ -213,13 +215,18 @@ pub const PROPERTY_ISTRING: &IString = &literal!("PROPERTY");
 /// Creates symbols like `sprites.<sprite_name>.x` that are to be accessed as `sensing_of` blocks for a sprite
 pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, Symbol)> {
     #[inline]
-    fn symbol_of(name: IString, known_block: KnownBlock) -> (IString, Symbol) {
+    fn symbol_of(
+        name: IString,
+        known_block: KnownBlock,
+        target_name: &IString,
+    ) -> (IString, Symbol) {
         (
             name,
             Symbol {
                 known_block: Some(Rc::new(known_block)),
                 namespace: HashMap::new(),
                 parent: Default::default(),
+                sprite_name: Some(target_name.clone()),
             },
         )
     }
@@ -242,6 +249,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                 )),
                 bind_info: Some(sensing_bind_info(target_name, "x position")),
             },
+            target_name,
         ),
         symbol_of(
             literal!("y_position"),
@@ -261,6 +269,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                 )),
                 bind_info: Some(sensing_bind_info(target_name, "y position")),
             },
+            target_name,
         ),
         symbol_of(
             literal!("direction"),
@@ -280,6 +289,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                 )),
                 bind_info: Some(sensing_bind_info(target_name, "direction")),
             },
+            target_name,
         ),
         symbol_of(
             literal!("costume_number"),
@@ -317,6 +327,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                 )),
                 bind_info: Some(sensing_bind_info(target_name, "costume #")),
             },
+            target_name,
         ),
         symbol_of(
             literal!("costume_name"),
@@ -354,6 +365,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                 )),
                 bind_info: Some(sensing_bind_info(target_name, "costume name")),
             },
+            target_name,
         ),
         symbol_of(
             literal!("size"),
@@ -373,6 +385,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                 )),
                 bind_info: Some(sensing_bind_info(target_name, "size")),
             },
+            target_name,
         ),
         symbol_of(
             literal!("volume"),
@@ -392,6 +405,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                 )),
                 bind_info: Some(sensing_bind_info(target_name, "volume")),
             },
+            target_name,
         ),
     ]
 }
@@ -406,6 +420,7 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
                 known_block: Some(Rc::new(known_block)),
                 namespace: HashMap::new(),
                 parent: Default::default(),
+                sprite_name: None,
             },
         )
     }

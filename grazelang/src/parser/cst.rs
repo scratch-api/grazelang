@@ -2825,4 +2825,6 @@ pub trait MonitorDeclarationFromContent {
 //  - [x] Visitor integration
 //  - [x] Parser integration
 //  - [ ] Codegen integration
+//    - [x] Simple monitor
+//    - [ ] Monitor config
 // Issue: #75

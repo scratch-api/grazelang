@@ -17,8 +17,8 @@ use grazelang_types::{
     SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{
         IsShadow, Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
-        Sb3InputValue, Sb3NormalBlock, Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool,
-        Sb3Root, Sb3Target, TargetAttachment,
+        Sb3InputValue, Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3NormalBlock, Sb3Primitive,
+        Sb3PrimitiveBlock, Sb3PrimitiveOrBool, Sb3Root, Sb3Target, TargetAttachment,
     },
 };
 use rand::SeedableRng;
@@ -29,6 +29,7 @@ use thiserror::Error;
 use super::ids::IdCounter;
 
 use crate::{
+    codegen::ids::generate_random_id_as_string,
     eval::{
         call::random_range,
         cast::{JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
@@ -55,25 +56,26 @@ use crate::{
         BorrowedConfigStatement, BorrowedCustomBlockDefinition, BorrowedExpressionBinaryOperation,
         BorrowedExpressionCall, BorrowedExpressionFormattedString, BorrowedExpressionGetItem,
         BorrowedExpressionGetLetter, BorrowedExpressionUnaryOperation, BorrowedIsolatedBlock,
-        BorrowedIsolatedExpression, BorrowedMultiInputHatStatement, BorrowedNoInputHatStatement,
-        BorrowedSingleInputHatStatement, BorrowedStatementAssignment, BorrowedStatementCall,
-        BorrowedStatementDataDeclaration, BorrowedStatementForever, BorrowedStatementIfElse,
-        BorrowedStatementListAssignment, BorrowedStatementMultiInputControl,
-        BorrowedStatementSetItem, BorrowedStatementSingleInputControl,
-        BorrowedTopLevelStatementSprite, BorrowedTopLevelStatementStage, BorrowedUseStatement,
-        GrazeVisitor, default_visit_code_block, default_visit_config_statement,
+        BorrowedIsolatedExpression, BorrowedMonitorDeclaration, BorrowedMultiInputHatStatement,
+        BorrowedNoInputHatStatement, BorrowedSingleInputHatStatement, BorrowedStatementAssignment,
+        BorrowedStatementCall, BorrowedStatementDataDeclaration, BorrowedStatementForever,
+        BorrowedStatementIfElse, BorrowedStatementListAssignment,
+        BorrowedStatementMultiInputControl, BorrowedStatementSetItem,
+        BorrowedStatementSingleInputControl, BorrowedTopLevelStatementSprite,
+        BorrowedTopLevelStatementStage, BorrowedUseStatement, GrazeVisitor,
+        default_visit_code_block, default_visit_config_statement,
         default_visit_custom_block_definition, default_visit_expression_binary_operation,
         default_visit_expression_call, default_visit_expression_formatted_string,
         default_visit_expression_get_item, default_visit_expression_get_letter,
         default_visit_expression_identifier, default_visit_expression_literal,
         default_visit_expression_unary_operation, default_visit_formatted_string_content,
         default_visit_isolated_block, default_visit_isolated_expression,
-        default_visit_multi_input_hat_statement, default_visit_no_input_hat_statement,
-        default_visit_single_input_hat_statement, default_visit_statement_assignment,
-        default_visit_statement_call, default_visit_statement_forever,
-        default_visit_statement_multi_input_control, default_visit_statement_set_item,
-        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
-        default_visit_top_level_statement_stage,
+        default_visit_monitor_declaration, default_visit_multi_input_hat_statement,
+        default_visit_no_input_hat_statement, default_visit_single_input_hat_statement,
+        default_visit_statement_assignment, default_visit_statement_call,
+        default_visit_statement_forever, default_visit_statement_multi_input_control,
+        default_visit_statement_set_item, default_visit_statement_single_input_control,
+        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
     },
 };
 
@@ -159,6 +161,10 @@ pub enum GrazeSb3GeneratorError {
         key: IString,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "monitor_value_not_block")]
+    #[assoc(get_secondary_message = "must resolve to a standalone block")]
+    #[error("monitor value must resolve to a standalone block")]
+    MonitorValueNotBlock { source_span: SourceSpan },
     #[assoc(internal_lint_id = "")]
     #[assoc(get_secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
@@ -224,6 +230,9 @@ impl GrazeSb3GeneratorError {
             } => {
                 format!("dictionary entry with key \"{key}\" defined multiple times")
             }
+            GrazeSb3GeneratorError::MonitorValueNotBlock { source_span: _ } => {
+                return Cow::Borrowed("expected a standalone block for a monitor value");
+            }
             GrazeSb3GeneratorError::InvalidConstantExpression {
                 expression: _,
                 source,
@@ -274,7 +283,8 @@ impl GetPos for GrazeSb3GeneratorError {
             | GrazeSb3GeneratorError::UnknownFlatDictionaryEntry {
                 key: _,
                 source_span,
-            } => source_span,
+            }
+            | GrazeSb3GeneratorError::MonitorValueNotBlock { source_span } => source_span,
             GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword } => {
                 stage_keyword.get_source_span()
             }
@@ -343,6 +353,7 @@ pub struct GrazeSb3GeneratorContext {
     pub field_category_entries: HashMap<u32, HashSet<IString>>,
     pub field_entry_categories: HashMap<IString, HashSet<u32>>,
     pub block_counter: IdCounter,
+    pub rng: Xoshiro256StarStar,
     pub arg_stack: Vec<Param>,
     pub scope_stack: Vec<PreviousSymbolStates>,
     pub current_block_id: IdString,
@@ -383,6 +394,7 @@ pub struct GrazeSb3GeneratorDataSymbolsContext {
     pub global_lists: SymbolId,
     pub local_vars: SymbolId,
     pub local_lists: SymbolId,
+    pub stage: SymbolId,
 }
 
 impl FormattedStringContext {
@@ -392,6 +404,7 @@ impl FormattedStringContext {
 }
 
 pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
+    symbol.sprite_name.replace(parent_target.clone());
     if let Some(known_block) = &mut symbol.known_block {
         match Rc::get_mut(known_block).unwrap() {
             KnownBlock::Variable {
@@ -568,6 +581,7 @@ impl GrazeSb3GeneratorContext {
             known_block: None,
             namespace: HashMap::with_capacity(standard_library_namespace_count + 4),
             parent: Default::default(),
+            sprite_name: None,
         });
 
         let targets_symbol = symbol_table.new_child_symbol(
@@ -774,6 +788,7 @@ impl GrazeSb3GeneratorContext {
                                 .map(|value| Rc::new(value.as_ref().clone())),
                             namespace: symbol.namespace.clone(),
                             parent: symbol.parent,
+                            sprite_name: None,
                         };
                         add_bind_info(&mut symbol_for_stage, STAGE_FIELD_VALUE_ISTRING);
                         if let Some(attachment) = attachment {
@@ -826,10 +841,12 @@ impl GrazeSb3GeneratorContext {
                 global_lists: lists_symbol,
                 local_vars: variables_symbol,
                 local_lists: lists_symbol,
+                stage: stage_symbol,
             },
             field_category_entries,
             field_entry_categories,
             block_counter,
+            rng,
             arg_stack: Vec::new(),
             scope_stack: vec![HashMap::new()],
             current_block_id: next_block_id,
@@ -1239,6 +1256,7 @@ pub mod symbol_data_derivation {
             })),
             namespace: HashMap::new(),
             parent: Default::default(),
+            sprite_name: None,
         };
         let attachment =
             create_attachment(asset_id, canonical_name, md5ext.clone(), ext.to_string());
@@ -1310,6 +1328,7 @@ pub mod symbol_data_derivation {
                 known_block: Some(Rc::new(custom_block.clone())),
                 namespace: HashMap::new(),
                 parent: Default::default(),
+                sprite_name: None,
             },
             Some(
                 grazelang_types::project_json::TargetAttachment::CustomBlock(
@@ -1355,6 +1374,7 @@ pub mod symbol_data_derivation {
                 ))),
                 namespace: HashMap::new(),
                 parent: Default::default(),
+                sprite_name: None,
             },
             Some(grazelang_types::project_json::TargetAttachment::Var(
                 id.to_string(),
@@ -1393,6 +1413,7 @@ pub mod symbol_data_derivation {
                 })),
                 namespace: HashMap::new(),
                 parent: Default::default(),
+                sprite_name: None,
             },
             Some(grazelang_types::project_json::TargetAttachment::List(
                 id.to_string(),
@@ -2044,6 +2065,36 @@ macro_rules! emit_error {
         }
         emit_message(context, err.into(), GrazeMessageSetting::Errors);
     }};
+}
+
+pub fn get_data_from_flat_dictionary<M>(
+    context: &mut GrazeSb3GeneratorContext,
+    dictionary: &cst::CommaSeparated<cst::FlatDictionaryEntry>,
+    mut map_key: M,
+) -> Result<HashMap<IString, (SourceSpan, Literal)>, GrazeSb3GeneratorError>
+where
+    M: FnMut(IString) -> IString,
+{
+    let mut data = HashMap::with_capacity(dictionary.len());
+    for entry in dictionary {
+        let (ident, _, value, _) = entry
+            .to_valid()
+            .expect("You must pass a valid AST to the visitor.");
+        let key = map_key(ident.value.clone());
+        if data
+            .insert(key, (*ident.get_source_span(), value.clone()))
+            .is_some()
+        {
+            emit_error!(
+                GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+                    key: ident.value.clone(),
+                    source_span: *ident.get_source_span(),
+                },
+                context
+            );
+        }
+    }
+    Ok(data)
 }
 
 impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3Generator {
@@ -3818,6 +3869,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         })),
                         namespace: HashMap::new(),
                         parent: Default::default(),
+                        sprite_name: None,
                     },
                 )
             })
@@ -3828,6 +3880,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 known_block: None,
                 namespace: HashMap::with_capacity(arguments.len()),
                 parent: Default::default(),
+                sprite_name: None,
             });
             for (key, arg) in arguments {
                 let arg = context.symbol_table.new_symbol(arg);
@@ -4238,32 +4291,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .current_sb3_target
             .as_ref()
             .is_some_and(|value| value.is_stage);
-        let mut data = HashMap::with_capacity(value.2.len());
-        for entry in value.2 {
-            let (ident, _, value, _) = entry
-                .to_valid()
-                .expect("You must pass a valid AST to the visitor.");
-            let mut key = ident.value.clone();
+        let mut data = get_data_from_flat_dictionary(context, value.2, |key| {
             if let Some(new_key) = match key.as_str() {
                 "costume" if is_stage => Some(literal!("backdrop")),
                 "show" | "shown" if !is_stage => Some(literal!("visible")),
+                "x" if !is_stage => Some(literal!("x_position")),
+                "y" if !is_stage => Some(literal!("y_position")),
                 _ => None,
             } {
-                key = new_key;
+                new_key
+            } else {
+                key
             }
-            if data
-                .insert(key, (*ident.get_source_span(), value.clone()))
-                .is_some()
-            {
-                emit_error!(
-                    GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
-                        key: ident.value.clone(),
-                        source_span: *ident.get_source_span(),
-                    },
-                    context
-                );
-            }
-        }
+        })?;
         if is_stage {
             let backdrop = data.remove("backdrop").map(|(_, value)| value);
             let target = context.current_sb3_target.as_mut().unwrap();
@@ -4384,5 +4424,285 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         context.current_target_configured = true;
         default_visit_config_statement(self, value, context)
+    }
+
+    fn visit_monitor_declaration(
+        &self,
+        value: BorrowedMonitorDeclaration,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        // let mut data = get_data_from_flat_dictionary(context, value.3, |key| {
+        //     if let Some(new_key) = match key.as_str() {
+        //         "show" | "shown" => Some(literal!("visible")),
+        //         "x" => Some(literal!("x_position")),
+        //         "y" => Some(literal!("y_position")),
+        //         _ => None,
+        //     } {
+        //         new_key
+        //     } else {
+        //         key
+        //     }
+        // })?;
+
+        fn determine_monitor_kind(
+            opcode: &str,
+            fields: &HashMap<String, Sb3FieldValue>,
+            sprite_name: Option<String>,
+        ) -> MonitorKind {
+            match (opcode, fields.iter().next()) {
+                (
+                    "data_variable",
+                    Some((
+                        field_key,
+                        Sb3FieldValue::WithId {
+                            value: Sb3Primitive::String(value),
+                            id,
+                        },
+                    )),
+                ) if fields.len() == 1 && field_key.as_str() == "VARIABLE" => {
+                    MonitorKind::Variable {
+                        id: id.clone(),
+                        sprite_name,
+                    }
+                }
+                (
+                    "data_listcontents",
+                    Some((
+                        field_key,
+                        Sb3FieldValue::WithId {
+                            value: Sb3Primitive::String(value),
+                            id,
+                        },
+                    )),
+                ) if fields.len() == 1 && field_key.as_str() == "LIST" => MonitorKind::List {
+                    id: id.clone(),
+                    sprite_name,
+                },
+                _ => MonitorKind::Generic { sprite_name },
+            }
+        }
+
+        enum MonitorKind {
+            Variable {
+                id: String,
+                sprite_name: Option<String>,
+            },
+            List {
+                id: String,
+                sprite_name: Option<String>,
+            },
+            Generic {
+                sprite_name: Option<String>,
+            },
+        }
+
+        let (opcode, fields, kind) = match value.1 {
+            cst::MonitorValue::Identifier(identifier) => {
+                let symbol_id = get_symbol_id(context, identifier)?;
+                let symbol = &context.symbol_table[symbol_id];
+                let known_block = get_known_block(symbol, identifier)?.clone();
+                let sprite_name = symbol.sprite_name.as_ref().map(ToString::to_string);
+                let input = known_block.resolve_for_input(*identifier.get_source_span(), context);
+                match input {
+                    grazelang_types::KnownBlockInput::PrimitiveInput(
+                        Sb3PrimitiveBlock::Variable {
+                            name,
+                            id,
+                            x: _,
+                            y: _,
+                        },
+                    ) => (
+                        "data_variable".to_string(),
+                        HashMap::from([(
+                            "VARIABLE".to_string(),
+                            Sb3FieldValue::Normal(Sb3Primitive::String(name.as_str().into())),
+                        )]),
+                        MonitorKind::Variable { id, sprite_name },
+                    ),
+                    grazelang_types::KnownBlockInput::PrimitiveInput(Sb3PrimitiveBlock::List {
+                        name,
+                        id,
+                        x: _,
+                        y: _,
+                    }) => (
+                        "data_listcontents".to_string(),
+                        HashMap::from([(
+                            "LIST".to_string(),
+                            Sb3FieldValue::Normal(Sb3Primitive::String(name.as_str().into())),
+                        )]),
+                        MonitorKind::List { id, sprite_name },
+                    ),
+                    grazelang_types::KnownBlockInput::SimpleBlock(opcode, items) => {
+                        let mut fields = HashMap::new();
+                        let mut inputs = HashMap::new();
+                        add_params(context, items.iter(), &mut inputs, &mut fields)?;
+                        if !inputs.is_empty() {
+                            emit_message(
+                                context,
+                                GrazeMessage::Warning(
+                                    GrazeWarning::Specific(
+                                        SpecificGrazeWarning::MonitorValueHasInputs,
+                                        *identifier.get_source_span(),
+                                    ),
+                                    None,
+                                ),
+                                GrazeMessageSetting::Warnings,
+                            );
+                        }
+                        let kind = determine_monitor_kind(opcode, &fields, sprite_name);
+                        (opcode.to_string(), fields, kind)
+                    }
+                    _ => {
+                        return Err(GrazeSb3GeneratorError::MonitorValueNotBlock {
+                            source_span: *identifier.get_source_span(),
+                        });
+                    }
+                }
+            }
+            cst::MonitorValue::Call(identifier, _, items, _, source_span) => {
+                let symbol_id = get_symbol_id(context, identifier)?;
+                let symbol = &context.symbol_table[symbol_id];
+                let known_block = get_known_block(symbol, identifier)?.clone();
+                let mut sprite_name = symbol.sprite_name.as_ref().map(ToString::to_string);
+                let CallableKnownBlockSignature(opcode, params, known_params, _mutation) =
+                    known_block.resolve_for_call_block(context).ok_or_else(|| {
+                        GrazeSb3GeneratorError::IdentifierNotCallable {
+                            identifier: identifier.clone(),
+                        }
+                    })?;
+                let mut fields = HashMap::new();
+                let mut inputs = HashMap::new();
+                add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+                if params.len() != items.len() {
+                    return Err(GrazeSb3GeneratorError::IncorrectParamCount {
+                        unexpected: items.len(),
+                        expected: params.len(),
+                        source_span: value.0.span_to(value.3),
+                    });
+                }
+                for (param, value) in zip(params.iter(), items.iter()) {
+                    let symbol_id = get_symbol_id(context, value)?;
+                    let symbol = &context.symbol_table[symbol_id];
+                    let known_block = get_known_block(symbol, value)?.clone();
+                    if let Some(value) = symbol.sprite_name.as_ref() {
+                        sprite_name.get_or_insert_with(|| value.to_string());
+                    }
+                    add_known_block_to_params(
+                        context,
+                        param,
+                        &known_block,
+                        *value.get_source_span(),
+                        &mut inputs,
+                        &mut fields,
+                    )?;
+                }
+                if !inputs.is_empty() {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                SpecificGrazeWarning::MonitorValueHasInputs,
+                                *source_span,
+                            ),
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                let kind = determine_monitor_kind(opcode, &fields, sprite_name);
+                (opcode.to_string(), fields, kind)
+            }
+        };
+        let monitor = match kind {
+            MonitorKind::Variable { id, sprite_name } => Sb3Monitor {
+                id,
+                mode: Sb3MonitorMode::Default,
+                opcode: "data_variable".to_string(),
+                params: fields
+                    .into_iter()
+                    .map(|(key, value)| {
+                        (
+                            key,
+                            match value {
+                                Sb3FieldValue::Normal(value) => value,
+                                Sb3FieldValue::WithId { value, id: _ } => value,
+                            },
+                        )
+                    })
+                    .collect(),
+                sprite_name,
+                value: Sb3MonitorValue::Primitive(Sb3Primitive::String("".into())),
+                width: 0.0,
+                height: 0.0,
+                x: None,
+                y: None,
+                visible: true,
+                slider_min: Some(0.0),
+                slider_max: Some(0.0),
+                is_discrete: Some(true),
+            },
+            MonitorKind::List { id, sprite_name } => Sb3Monitor {
+                id,
+                mode: Sb3MonitorMode::List,
+                opcode: "data_listcontents".to_string(),
+                params: fields
+                    .into_iter()
+                    .map(|(key, value)| {
+                        (
+                            key,
+                            match value {
+                                Sb3FieldValue::Normal(value) => value,
+                                Sb3FieldValue::WithId { value, id: _ } => value,
+                            },
+                        )
+                    })
+                    .collect(),
+                sprite_name,
+                value: Sb3MonitorValue::List(Vec::new()),
+                width: 0.0,
+                height: 0.0,
+                x: None,
+                y: None,
+                visible: true,
+                slider_min: None,
+                slider_max: None,
+                is_discrete: None,
+            },
+            MonitorKind::Generic { sprite_name } => Sb3Monitor {
+                id: generate_random_id_as_string(&mut context.rng),
+                mode: Sb3MonitorMode::Default,
+                opcode,
+                params: fields
+                    .into_iter()
+                    .map(|(key, value)| {
+                        (
+                            key,
+                            match value {
+                                Sb3FieldValue::Normal(value) => value,
+                                Sb3FieldValue::WithId { value, id: _ } => value,
+                            },
+                        )
+                    })
+                    .collect(),
+                sprite_name,
+                value: Sb3MonitorValue::Primitive(Sb3Primitive::String("".into())),
+                width: 0.0,
+                height: 0.0,
+                x: None,
+                y: None,
+                visible: true,
+                slider_min: Some(0.0),
+                slider_max: Some(0.0),
+                is_discrete: Some(true),
+            },
+        };
+        context.sb3.monitors.push(monitor);
+        // for (key, (source_span, _)) in data {
+        //     emit_error!(
+        //         GrazeSb3GeneratorError::UnknownFlatDictionaryEntry { key, source_span },
+        //         context
+        //     );
+        // }
+        default_visit_monitor_declaration(self, value, context)
     }
 }

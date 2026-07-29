@@ -341,6 +341,12 @@ pub enum SpecificGrazeWarning {
     #[assoc(get_secondary_message = "must be \"on\", \"off\" and \"on-flipped\"")]
     #[assoc(internal_lint_id = "invalid_video_state_value")]
     InvalidVideoStateValue,
+    #[assoc(get_primary_message = "monitor value supplies inputs")]
+    #[assoc(
+        get_secondary_message = "corresponding block would have inputs, but only fields can be supplied in monitors"
+    )]
+    #[assoc(internal_lint_id = "monitor_value_has_inputs")]
+    MonitorValueHasInputs,
 }
 
 impl GetLintId for SpecificGrazeWarning {
