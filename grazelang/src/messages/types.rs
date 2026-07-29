@@ -347,6 +347,12 @@ pub enum SpecificGrazeWarning {
     )]
     #[assoc(internal_lint_id = "monitor_value_has_inputs")]
     MonitorValueHasInputs,
+    #[assoc(get_primary_message = "specified monitor position partially")]
+    #[assoc(
+        get_secondary_message = "partially specified monitor position has the same effect as unspecified monitor position"
+    )]
+    #[assoc(internal_lint_id = "specified_monitor_position_partially")]
+    SpecifiedMonitorPositionPartially,
 }
 
 impl GetLintId for SpecificGrazeWarning {

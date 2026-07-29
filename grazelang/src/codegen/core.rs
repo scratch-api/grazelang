@@ -4322,14 +4322,18 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             if let Some(volume) = extract_f64_entry_from_flat_dictionary_data(&mut data, "volume") {
                 target.volume = volume;
             }
-            if let Some(layer_order) = extract_f64_entry_from_flat_dictionary_data(&mut data, "layer_order") {
+            if let Some(layer_order) =
+                extract_f64_entry_from_flat_dictionary_data(&mut data, "layer_order")
+            {
                 target.layer_order = layer_order as usize;
             }
             if let Some((_, text_to_speech_language)) = data.remove("text_to_speech_language") {
                 target.text_to_speech_language =
                     Some(text_to_speech_language.get_string_value().to_string());
             }
-            if let Some(video_transparency) = extract_f64_entry_from_flat_dictionary_data(&mut data, "video_transparency") {
+            if let Some(video_transparency) =
+                extract_f64_entry_from_flat_dictionary_data(&mut data, "video_transparency")
+            {
                 target.video_transparency = Some(video_transparency);
             }
             if let Some((_, video_state)) = data.remove("video_state") {
@@ -4366,19 +4370,27 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
             {
                 let target = context.current_sb3_target.as_mut().unwrap();
-                if let Some(x_position) = extract_f64_entry_from_flat_dictionary_data(&mut data, "x_position") {
+                if let Some(x_position) =
+                    extract_f64_entry_from_flat_dictionary_data(&mut data, "x_position")
+                {
                     target.x = Some(x_position);
                 }
-                if let Some(y_position) = extract_f64_entry_from_flat_dictionary_data(&mut data, "y_position") {
+                if let Some(y_position) =
+                    extract_f64_entry_from_flat_dictionary_data(&mut data, "y_position")
+                {
                     target.y = Some(y_position);
                 }
-                if let Some(direction) = extract_f64_entry_from_flat_dictionary_data(&mut data, "direction") {
+                if let Some(direction) =
+                    extract_f64_entry_from_flat_dictionary_data(&mut data, "direction")
+                {
                     target.direction = Some(direction);
                 }
                 if let Some(size) = extract_f64_entry_from_flat_dictionary_data(&mut data, "size") {
                     target.size = Some(size);
                 }
-                if let Some(volume) = extract_f64_entry_from_flat_dictionary_data(&mut data, "volume") {
+                if let Some(volume) =
+                    extract_f64_entry_from_flat_dictionary_data(&mut data, "volume")
+                {
                     target.volume = volume;
                 }
                 if let Some(draggable) = data.remove("draggable").map(|(_, value)| {
@@ -4391,7 +4403,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }) {
                     target.visible = Some(visible);
                 }
-                if let Some(layer_order) = extract_f64_entry_from_flat_dictionary_data(&mut data, "layer_order") {
+                if let Some(layer_order) =
+                    extract_f64_entry_from_flat_dictionary_data(&mut data, "layer_order")
+                {
                     target.layer_order = layer_order as usize;
                 }
             }
@@ -4713,18 +4727,18 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             match &mut monitor.value {
                 Sb3MonitorValue::List(items) => {
                     *items = serde_json::from_str(value.get_string_value()).unwrap_or_default();
-                },
+                }
                 // TODO: Implement advanced dictionary values
                 //  - [ ] List
                 //  - [ ] Dictionary
                 //  - [ ] null
                 // Issue: #82
-                
+
                 // TODO: Use advanced dictionary values for monitor declaration
                 // Issue: #81
                 Sb3MonitorValue::Primitive(old_value) => {
                     *old_value = Sb3Primitive::from(Sb3PrimitiveOrBool::from(&value));
-                },
+                }
             }
         }
         if let Some(width) = extract_f64_entry_from_flat_dictionary_data(&mut data, "width") {
@@ -4733,26 +4747,49 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         if let Some(height) = extract_f64_entry_from_flat_dictionary_data(&mut data, "height") {
             monitor.height = height;
         }
-        if let Some(x_position) = extract_f64_entry_from_flat_dictionary_data(&mut data, "x_position") {
+        if let Some(x_position) =
+            extract_f64_entry_from_flat_dictionary_data(&mut data, "x_position")
+        {
             monitor.x = Some(x_position);
         }
-        if let Some(y_position) = extract_f64_entry_from_flat_dictionary_data(&mut data, "y_position") {
+        if let Some(y_position) =
+            extract_f64_entry_from_flat_dictionary_data(&mut data, "y_position")
+        {
             monitor.y = Some(y_position);
         }
-        if let Some(visible) = data.remove("visible").map(|(_, value)| {
-            JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
-        }) {
+        if let (Some(_), None) | (None, Some(_)) = (monitor.x, monitor.y) {
+            emit_message(
+                context,
+                GrazeMessage::Warning(
+                    GrazeWarning::Specific(
+                        SpecificGrazeWarning::SpecifiedMonitorPositionPartially,
+                        *value.5,
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
+        if let Some(visible) = data
+            .remove("visible")
+            .map(|(_, value)| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
+        {
             monitor.visible = visible;
         }
-        if let Some(slider_min) = extract_f64_entry_from_flat_dictionary_data(&mut data, "slider_min") {
+        if let Some(slider_min) =
+            extract_f64_entry_from_flat_dictionary_data(&mut data, "slider_min")
+        {
             monitor.slider_min = Some(slider_min);
         }
-        if let Some(slider_max) = extract_f64_entry_from_flat_dictionary_data(&mut data, "slider_max") {
+        if let Some(slider_max) =
+            extract_f64_entry_from_flat_dictionary_data(&mut data, "slider_max")
+        {
             monitor.slider_max = Some(slider_max);
         }
-        if let Some(is_discrete) = data.remove("is_discrete").map(|(_, value)| {
-            JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
-        }) {
+        if let Some(is_discrete) = data
+            .remove("is_discrete")
+            .map(|(_, value)| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
+        {
             monitor.is_discrete = Some(is_discrete);
         }
         // TODO: Warn if value has a weird shape for its data type (e.g. "a" for bool, "xyz" for f64)
