@@ -585,10 +585,10 @@
     },
     "80": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": "- [ ] Booleans\n- [ ] Numbers",
+        "text": "- [ ] Booleans\n- [x] Numbers",
         "status": "open",
-        "lines": "L4756-L4758",
-        "commit": "eca9bd1adae9d42b3cac83bbfdb7b3cce940a6ee",
+        "lines": "L4973-L4976",
+        "commit": "241a195a68c46d04d95c76e70d82ce681dbca59a",
         "title": "Warn if value has a weird shape for its data type (e.g. \"a\" for bool, \"xyz\" for f64)"
     },
     "81": {
