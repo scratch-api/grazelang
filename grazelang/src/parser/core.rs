@@ -14,8 +14,9 @@ use crate::{
     parser::{
         context::{self, BroadcastDescriptor},
         cst::{
-            CommaSeparated, FromSourceSpan, GetPos, GrazeProgram, InvalidVariantFromSourceSpan,
-            SingleIdentifier, SpriteCodeBlock, StageCodeBlock, TopLevelStatement,
+            CommaSeparated, DictionaryValue, FromSourceSpan, GetPos, GrazeProgram,
+            InvalidVariantFromSourceSpan, SingleIdentifier, SpriteCodeBlock, StageCodeBlock,
+            TopLevelStatement,
         },
     },
     settings::GrazeMessageSetting,
@@ -476,7 +477,7 @@ macro_rules! parse_dictionary {
             let tail_value = loop {
                 if matches!(
                     peek_token!(token_stream),
-                    Token::RightBrace(LexedRightBrace::Normal)
+                    Token::RightBrace(lexer::LexedRightBrace::Normal)
                 ) {
                     break None;
                 }
@@ -529,25 +530,7 @@ macro_rules! parse_dictionary {
                                     continue;
                                 }
                             ),
-                            try_or_emit_message!(
-                                parse_literal(token_stream, context),
-                                context,
-                                {
-                                    find_comma_separated_entry_end(token_stream)?;
-                                    let value = DictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
-                                    let comma = match peek_token!(token_stream) {
-                                        Token::Comma => {
-                                            skip_token!(token_stream);
-                                            cst::Comma(get_token_source_span(token_stream))
-                                        }
-                                        _ => {
-                                            break Some(Box::new(value))
-                                        }
-                                    };
-                                    values.push((value, comma));
-                                    continue;
-                                }
-                            ),
+                            parse_dictionary_value(token_stream, context)?,
                             token_stream.span_from_previous_to_current(start_pos)
                         )
                     }
@@ -559,7 +542,7 @@ macro_rules! parse_dictionary {
                         skip_token!(token_stream);
                         cst::Comma(get_token_source_span(token_stream))
                     }
-                    Token::RightBrace(LexedRightBrace::Normal) => {
+                    Token::RightBrace(lexer::LexedRightBrace::Normal) => {
                         break Some(Box::new(value))
                     }
                     _ => {
@@ -617,6 +600,68 @@ macro_rules! parse_dictionary {
             left_brace.span_to(&right_brace),
         )
     }};
+}
+
+pub fn parse_dictionary_value(
+    token_stream: ParseIn,
+    context: &mut ParseContext,
+) -> ParseOut<DictionaryValue> {
+    use cst::{Colon, DictionaryEntry, LeftBrace, LeftBracket, RightBrace, RightBracket};
+    use lexer::LexedRightBrace;
+    use statement::find_comma_separated_entry_end;
+    let start_pos = peek_token_start(token_stream);
+    match peek_token!(token_stream) {
+        Token::LeftBrace => {
+            let (left_brace, items, right_brace, source_span) =
+                parse_dictionary!(token_stream, context);
+            Ok(DictionaryValue::Dictionary(
+                left_brace,
+                items,
+                right_brace,
+                source_span,
+            ))
+        }
+        Token::LeftBracket => {
+            skip_token!(token_stream);
+            let left_bracket = from_stream_pos::<LeftBracket>(token_stream);
+            let items = parse_comma_separated!(
+                token_stream,
+                context,
+                (token_stream, context) => token_stream.substitude_unexpected_token_message(
+                    |token_stream| parse_dictionary_value(token_stream, context),
+                    literal!("Expected ']', '{', '[' or a literal."),
+                    literal!("']', '{', '[' or a literal"),
+                )?,
+                Token::RightBracket,
+                "']'"
+            );
+            let right_bracket = expect_token!(
+                token_stream,
+                Token::RightBracket => from_stream_pos::<RightBracket>(token_stream),
+                "Expected ']'.",
+                "']'"
+            );
+            let source_span = left_bracket.span_to(&right_bracket);
+            Ok(DictionaryValue::List(
+                left_bracket,
+                items,
+                right_bracket,
+                source_span,
+            ))
+        }
+        _ => Ok(DictionaryValue::Primitive(try_or_emit_message!(
+            token_stream.substitude_unexpected_token_message(
+                |token_stream| statement::parse_literal(token_stream, context),
+                literal!("Expected '{', '[' or a literal."),
+                literal!("'{', '[' or a literal"),
+            ),
+            context,
+            find_comma_separated_entry_end_and_create_invalid::<DictionaryValue>(
+                token_stream,
+                start_pos
+            )
+        ))),
+    }
 }
 
 pub fn emit_message(
@@ -1010,8 +1055,8 @@ pub mod statement {
         parser::cst::{
             AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword,
             ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF, DictionaryEntry,
-            LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
+            DataDeclaration, DataDeclarationScope, DictionaryEntry, EMPTY_ISTRING_REF, LeftBrace,
+            LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
             MonitorDeclarationFromContent, MonitorKeyword, MonitorValue, NormalAssignmentOperator,
             RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration,
             SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf,
@@ -2489,11 +2534,23 @@ pub mod statement {
         asset_type: AssetDeclarationType,
     ) -> ParseOut<AssetDeclaration> {
         fn extract_f64_entry(
-            data: &mut HashMap<IString, (SourceSpan, cst::Literal)>,
+            errors: &mut Vec<ParseError>,
+            data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
             key: &str,
-        ) -> Option<f64> {
-            data.remove(key)
-                .map(|(_, value)| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number())
+        ) -> Result<Option<f64>, ParseError> {
+            Ok(match data.remove(key) {
+                Some((_, value)) => match value.to_literal() {
+                    Ok(value) => Some({
+                        let value = value;
+                        JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number()
+                    }),
+                    Err(err) => {
+                        errors.push(err.into());
+                        None
+                    }
+                },
+                _ => None,
+            })
         }
         match peek_token!(token_stream) {
             Token::LeftParens => {
@@ -2566,15 +2623,24 @@ pub mod statement {
                                         });
                                     }
                                 }
-                                (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
-                                    errors.push(ParseError::MissingDictionaryEntry {
-                                        key: literal!("path"),
-                                        #[cfg(feature = "include_context_in_parse_errors")]
-                                        context: literal!(static_current_context!()),
-                                        source_span: *value.get_source_span()
-                                    });
-                                    cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
-                                }).cast_to_string(), data)
+                                (match data.remove("path") {
+                                    Some((_, value)) => {
+                                        if let Ok(value) = value.to_literal().map_err(|err| errors.push(err.into())) {
+                                            value.cast_to_string()
+                                        } else {
+                                            EMPTY_ISTRING_REF.clone()
+                                        }
+                                    }
+                                    None => {
+                                        errors.push(ParseError::MissingDictionaryEntry {
+                                            key: literal!("path"),
+                                            #[cfg(feature = "include_context_in_parse_errors")]
+                                            context: literal!(static_current_context!()),
+                                            source_span: *value.get_source_span()
+                                        });
+                                        EMPTY_ISTRING_REF.clone()
+                                    }
+                                }, data)
                             },
                         };
                         let symbol_idx = symbols.len();
@@ -2586,8 +2652,8 @@ pub mod statement {
                                         name: name.clone(),
                                         canonical_name,
                                         source: path,
-                                        rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
-                                        rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
+                                        rotation_center_x: extract_f64_entry(&mut errors, &mut data, "rotation_center_x")?,
+                                        rotation_center_y: extract_f64_entry(&mut errors, &mut data, "rotation_center_y")?,
                                         symbol_idx,
                                         source_span: token_stream.span_from_previous_to_current(start_pos)
                                     }
@@ -2597,8 +2663,8 @@ pub mod statement {
                                         name: name.clone(),
                                         canonical_name,
                                         source: path,
-                                        rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
-                                        rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
+                                        rotation_center_x: extract_f64_entry(&mut errors, &mut data, "rotation_center_x")?,
+                                        rotation_center_y: extract_f64_entry(&mut errors, &mut data, "rotation_center_y")?,
                                         symbol_idx,
                                         source_span: token_stream.span_from_previous_to_current(start_pos)
                                     }
@@ -2716,15 +2782,24 @@ pub mod statement {
                                     });
                                 }
                             }
-                            (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
-                                errors.push(ParseError::MissingDictionaryEntry {
-                                    key: literal!("path"),
-                                    #[cfg(feature = "include_context_in_parse_errors")]
-                                    context: literal!(static_current_context!()),
-                                    source_span: *value.get_source_span()
-                                });
-                                cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
-                            }).cast_to_string(), data)
+                            (match data.remove("path") {
+                                Some((_, value)) => {
+                                    if let Ok(value) = value.to_literal().map_err(|err| errors.push(err.into())) {
+                                        value.cast_to_string()
+                                    } else {
+                                        EMPTY_ISTRING_REF.clone()
+                                    }
+                                }
+                                None => {
+                                    errors.push(ParseError::MissingDictionaryEntry {
+                                        key: literal!("path"),
+                                        #[cfg(feature = "include_context_in_parse_errors")]
+                                        context: literal!(static_current_context!()),
+                                        source_span: *value.get_source_span()
+                                    });
+                                    EMPTY_ISTRING_REF.clone()
+                                }
+                            }, data)
                         },
                     };
                     let symbol_idx = symbols.len();
@@ -2736,8 +2811,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
-                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
+                                    rotation_center_x: extract_f64_entry(&mut errors, &mut data, "rotation_center_x")?,
+                                    rotation_center_y: extract_f64_entry(&mut errors, &mut data, "rotation_center_y")?,
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos)
                                 }
@@ -2747,8 +2822,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
-                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
+                                    rotation_center_x: extract_f64_entry(&mut errors, &mut data, "rotation_center_x")?,
+                                    rotation_center_y: extract_f64_entry(&mut errors, &mut data, "rotation_center_y")?,
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos)
                                 }
@@ -2846,15 +2921,24 @@ pub mod statement {
                                     });
                                 }
                             }
-                            (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
-                                errors.push(ParseError::MissingDictionaryEntry {
-                                    key: literal!("path"),
-                                    #[cfg(feature = "include_context_in_parse_errors")]
-                                    context: literal!(static_current_context!()),
-                                    source_span: *value.get_source_span()
-                                });
-                                cst::Literal::String(EMPTY_ISTRING_REF.clone(), Default::default())
-                            }).cast_to_string(), data)
+                            (match data.remove("path") {
+                                Some((_, value)) => {
+                                    if let Ok(value) = value.to_literal().map_err(|err| errors.push(err.into())) {
+                                        value.cast_to_string()
+                                    } else {
+                                        EMPTY_ISTRING_REF.clone()
+                                    }
+                                }
+                                None => {
+                                    errors.push(ParseError::MissingDictionaryEntry {
+                                        key: literal!("path"),
+                                        #[cfg(feature = "include_context_in_parse_errors")]
+                                        context: literal!(static_current_context!()),
+                                        source_span: *value.get_source_span()
+                                    });
+                                    EMPTY_ISTRING_REF.clone()
+                                }
+                            }, data)
                         },
                     };
                     let symbol_idx = symbols.len();
@@ -2866,8 +2950,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
-                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
+                                    rotation_center_x: extract_f64_entry(&mut errors, &mut data, "rotation_center_x")?,
+                                    rotation_center_y: extract_f64_entry(&mut errors, &mut data, "rotation_center_y")?,
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos),
                                 }
@@ -2877,8 +2961,8 @@ pub mod statement {
                                     name: name.clone(),
                                     canonical_name,
                                     source: path,
-                                    rotation_center_x: extract_f64_entry(&mut data, "rotation_center_x"),
-                                    rotation_center_y: extract_f64_entry(&mut data, "rotation_center_y"),
+                                    rotation_center_x: extract_f64_entry(&mut errors, &mut data, "rotation_center_x")?,
+                                    rotation_center_y: extract_f64_entry(&mut errors, &mut data, "rotation_center_y")?,
                                     symbol_idx,
                                     source_span: token_stream.span_from_previous_to_current(start_pos),
                                 }
@@ -3286,11 +3370,13 @@ pub mod statement {
                 }
             }
             Token::Semicolon => layers == 0,
-            Token::LeftBrace => {
+            Token::LeftBrace | Token::LeftParens | Token::LeftBracket => {
                 layers += 1;
                 false
             }
-            Token::RightBrace(lexer::LexedRightBrace::Normal) => {
+            Token::RightBrace(lexer::LexedRightBrace::Normal)
+            | Token::RightParens
+            | Token::RightBracket => {
                 if layers > 0 {
                     layers -= 1;
                     false

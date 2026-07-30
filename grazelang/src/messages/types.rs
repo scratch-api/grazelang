@@ -353,6 +353,18 @@ pub enum SpecificGrazeWarning {
     )]
     #[assoc(internal_lint_id = "specified_monitor_position_partially")]
     SpecifiedMonitorPositionPartially,
+    #[assoc(get_primary_message = "primitive value used for list monitor")]
+    #[assoc(
+        get_secondary_message = "expected list value"
+    )]
+    #[assoc(internal_lint_id = "primitive_value_for_list_monitor")]
+    PrimitiveValueForListMonitor,
+    #[assoc(get_primary_message = "list value used for primitive monitor")]
+    #[assoc(
+        get_secondary_message = "expected primitive value"
+    )]
+    #[assoc(internal_lint_id = "list_value_for_primitive_monitor")]
+    ListValueForPrimitiveMonitor,
 }
 
 impl GetLintId for SpecificGrazeWarning {

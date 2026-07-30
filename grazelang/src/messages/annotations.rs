@@ -195,7 +195,7 @@ impl GrazeSb3GeneratorError {
                 source.get_secondary_message(),
                 *source.get_source_span(),
             ),
-            GrazeSb3GeneratorError::DictionaryTypeError { source: error } => (
+            GrazeSb3GeneratorError::DictionaryTypeError { error } => (
                 error.get_lint_id(),
                 error.get_secondary_message(),
                 *error.get_source_span(),

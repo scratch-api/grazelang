@@ -1011,7 +1011,7 @@ impl GetPos for NormalAssignmentOperator {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[expect(clippy::large_enum_variant)]
 pub enum DictionaryEntry {
-    Valid(SingleIdentifier, Colon, Literal, SourceSpan),
+    Valid(SingleIdentifier, Colon, DictionaryValue, SourceSpan),
     Invalid(SourceSpan),
 }
 
@@ -1031,14 +1031,187 @@ impl InvalidVariantFromSourceSpan for DictionaryEntry {
 }
 
 impl DictionaryEntry {
-    pub fn to_valid(&self) -> Option<(&SingleIdentifier, &Colon, &Literal, &SourceSpan)> {
+    pub fn to_valid(&self) -> Option<(&SingleIdentifier, &Colon, &DictionaryValue, &SourceSpan)> {
         match self {
-            DictionaryEntry::Valid(single_identifier, colon, literal, p) => {
-                Some((single_identifier, colon, literal, p))
+            DictionaryEntry::Valid(single_identifier, colon, value, p) => {
+                Some((single_identifier, colon, value, p))
             }
             DictionaryEntry::Invalid(_) => None,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DictionaryValue {
+    Primitive(Literal),
+    Dictionary(
+        LeftBrace,
+        CommaSeparated<DictionaryEntry>,
+        RightBrace,
+        SourceSpan,
+    ),
+    List(
+        LeftBracket,
+        CommaSeparated<DictionaryValue>,
+        RightBracket,
+        SourceSpan,
+    ),
+    Invalid(SourceSpan),
+}
+
+impl GetPos for DictionaryValue {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            DictionaryValue::Primitive(literal) => literal.get_source_span(),
+            DictionaryValue::Dictionary(_, _, _, p)
+            | DictionaryValue::List(_, _, _, p)
+            | DictionaryValue::Invalid(p) => p,
+        }
+    }
+}
+
+impl InvalidVariantFromSourceSpan for DictionaryValue {
+    fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
+        Self::Invalid(source_span)
+    }
+}
+
+impl DictionaryValue {
+    pub fn as_literal(&self) -> Result<&Literal, DictionaryTypeError> {
+        match self {
+            DictionaryValue::Primitive(literal) => Ok(literal),
+            DictionaryValue::List(..) => Err(DictionaryTypeError::ListAsPrimitive {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Dictionary(..) => Err(DictionaryTypeError::DictAsPrimitive {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => Err(DictionaryTypeError::InvalidValue {
+                source_span: *source_span,
+            }),
+        }
+    }
+
+    pub fn to_literal(self) -> Result<Literal, DictionaryTypeError> {
+        match self {
+            DictionaryValue::Primitive(literal) => Ok(literal),
+            DictionaryValue::List(..) => Err(DictionaryTypeError::ListAsPrimitive {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Dictionary(..) => Err(DictionaryTypeError::DictAsPrimitive {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => {
+                Err(DictionaryTypeError::InvalidValue { source_span })
+            }
+        }
+    }
+
+    pub fn as_list(&self) -> Result<&CommaSeparated<DictionaryValue>, DictionaryTypeError> {
+        match self {
+            DictionaryValue::List(_, items, _, _) => Ok(items),
+            DictionaryValue::Primitive(..) => Err(DictionaryTypeError::PrimitiveAsList {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Dictionary(..) => Err(DictionaryTypeError::DictAsList {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => Err(DictionaryTypeError::InvalidValue {
+                source_span: *source_span,
+            }),
+        }
+    }
+
+    pub fn to_list(self) -> Result<CommaSeparated<DictionaryValue>, DictionaryTypeError> {
+        match self {
+            DictionaryValue::List(_, items, _, _) => Ok(items),
+            DictionaryValue::Primitive(..) => Err(DictionaryTypeError::PrimitiveAsList {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Dictionary(..) => Err(DictionaryTypeError::DictAsList {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => {
+                Err(DictionaryTypeError::InvalidValue { source_span })
+            }
+        }
+    }
+
+    pub fn as_dict(&self) -> Result<&CommaSeparated<DictionaryEntry>, DictionaryTypeError> {
+        match self {
+            DictionaryValue::Dictionary(_, items, _, _) => Ok(items),
+            DictionaryValue::Primitive(..) => Err(DictionaryTypeError::PrimitiveAsDict {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::List(..) => Err(DictionaryTypeError::ListAsDict {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => Err(DictionaryTypeError::InvalidValue {
+                source_span: *source_span,
+            }),
+        }
+    }
+
+    pub fn to_dict(self) -> Result<CommaSeparated<DictionaryEntry>, DictionaryTypeError> {
+        match self {
+            DictionaryValue::Dictionary(_, items, _, _) => Ok(items),
+            DictionaryValue::Primitive(..) => Err(DictionaryTypeError::PrimitiveAsDict {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::List(..) => Err(DictionaryTypeError::ListAsDict {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => {
+                Err(DictionaryTypeError::InvalidValue { source_span })
+            }
+        }
+    }
+
+    pub fn as_literal_or_list(
+        &self,
+    ) -> Result<BorrowedDictionaryValueLiteralOrList<'_>, DictionaryTypeError> {
+        match self {
+            DictionaryValue::Primitive(literal) => {
+                Ok(BorrowedDictionaryValueLiteralOrList::Literal(literal))
+            }
+            DictionaryValue::List(_, items, _, _) => {
+                Ok(BorrowedDictionaryValueLiteralOrList::List(items))
+            }
+            DictionaryValue::Dictionary(..) => Err(DictionaryTypeError::CannotBeDict {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => Err(DictionaryTypeError::InvalidValue {
+                source_span: *source_span,
+            }),
+        }
+    }
+
+    pub fn to_literal_or_list(self) -> Result<DictionaryValueLiteralOrList, DictionaryTypeError> {
+        match self {
+            DictionaryValue::Primitive(literal) => {
+                Ok(DictionaryValueLiteralOrList::Literal(literal))
+            }
+            DictionaryValue::List(_, items, _, _) => Ok(DictionaryValueLiteralOrList::List(items)),
+            DictionaryValue::Dictionary(..) => Err(DictionaryTypeError::CannotBeDict {
+                source_span: *self.get_source_span(),
+            }),
+            DictionaryValue::Invalid(source_span) => {
+                Err(DictionaryTypeError::InvalidValue { source_span })
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum DictionaryValueLiteralOrList {
+    Literal(Literal),
+    List(CommaSeparated<DictionaryValue>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BorrowedDictionaryValueLiteralOrList<'a> {
+    Literal(&'a Literal),
+    List(&'a CommaSeparated<DictionaryValue>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -2418,9 +2591,9 @@ pub enum ParseError {
     #[assoc(internal_lint_id = "")]
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "")]
-    #[error("there was a type error in the flat dictionary")]
+    #[error(transparent)]
     DictionaryTypeError {
-        #[source]
+        #[from]
         source: DictionaryTypeError,
     },
     #[assoc(internal_lint_id = "")]
@@ -2884,6 +3057,11 @@ pub enum DictionaryTypeError {
     #[assoc(get_secondary_message = "should be a list or primitive value")]
     #[error("used a dictionary where a list or primitive value was required")]
     CannotBeDict { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "invalid_dictionary_value")]
+    #[assoc(get_primary_message = "used an invalid dictionary value")]
+    #[assoc(get_secondary_message = "this value is invalid")]
+    #[error("used an invalid dictionary value")]
+    InvalidValue { source_span: SourceSpan },
 }
 
 impl GetPos for DictionaryTypeError {
@@ -2895,7 +3073,8 @@ impl GetPos for DictionaryTypeError {
             | DictionaryTypeError::PrimitiveAsDict { source_span }
             | DictionaryTypeError::DictAsList { source_span }
             | DictionaryTypeError::PrimitiveAsList { source_span }
-            | DictionaryTypeError::CannotBeDict { source_span } => source_span,
+            | DictionaryTypeError::CannotBeDict { source_span }
+            | DictionaryTypeError::InvalidValue { source_span } => source_span,
         }
     }
 }
