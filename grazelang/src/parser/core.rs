@@ -3532,7 +3532,7 @@ pub fn parse_sprite_statement(
     context: &mut ParseContext,
 ) -> ParseOut<SpriteStatement> {
     match peek_token!(token_stream) {
-        Token::CostumeKeyword => {
+        Token::Identifier(value) if value.as_str() == "costume" => {
             skip_token!(token_stream);
             let costume_keyword = from_stream_pos::<cst::CostumeKeyword>(token_stream);
             let start_pos = get_token_start(token_stream);
@@ -3561,7 +3561,7 @@ pub fn parse_sprite_statement(
                 token_stream.span_from_previous_to_current(start_pos),
             ))
         }
-        Token::SoundKeyword => {
+        Token::Identifier(value) if value.as_str() == "sound" => {
             skip_token!(token_stream);
             let sound_keyword = from_stream_pos::<cst::SoundKeyword>(token_stream);
             let start_pos = get_token_start(token_stream);
@@ -3865,7 +3865,7 @@ pub fn parse_stage_statement(
     context: &mut ParseContext,
 ) -> ParseOut<StageStatement> {
     match peek_token!(token_stream) {
-        Token::CostumeKeyword | Token::BackdropKeyword => {
+        Token::Identifier(value) if matches!(value.as_str(), "costume" | "backdrop") => {
             skip_token!(token_stream);
             let backdrop_keyword = from_stream_pos::<cst::BackdropKeyword>(token_stream);
             let start_pos = get_token_start(token_stream);
@@ -3894,7 +3894,7 @@ pub fn parse_stage_statement(
                 token_stream.span_from_previous_to_current(start_pos),
             ))
         }
-        Token::SoundKeyword => {
+        Token::Identifier(value) if value.as_str() == "sound" => {
             skip_token!(token_stream);
             let sound_keyword = from_stream_pos::<cst::SoundKeyword>(token_stream);
             let start_pos = get_token_start(token_stream);
@@ -4289,7 +4289,7 @@ pub fn parse_top_level_statement(
             context.parsed_targets.push_back(target);
             return_val
         }
-        Token::BroadcastKeyword => {
+        Token::Identifier(value) if value.as_str() == "broadcast" => {
             let broadcast_keyword = from_stream_pos::<cst::BroadcastKeyword>(token_stream);
             let start_pos = get_token_start(token_stream);
             let canonical_identifier = consume_and_use_if!(

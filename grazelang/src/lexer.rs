@@ -54,14 +54,6 @@ pub enum Token {
     ListKeyword,
     #[token("lists")]
     ListsKeyword,
-    #[token("costume")]
-    CostumeKeyword,
-    #[token("backdrop")]
-    BackdropKeyword,
-    #[token("sound")]
-    SoundKeyword,
-    #[token("broadcast")]
-    BroadcastKeyword,
     #[token("{")]
     LeftBrace,
     #[token("}", handle_right_brace)]
@@ -163,6 +155,10 @@ pub enum Token {
 }
 
 // TODO: Soften keywords
+//  - [x] `costume`
+//  - [x] `backdrop`
+//  - [x] `sound`
+//  - [x] `broadcast`
 // Issue: #79
 
 impl std::fmt::Debug for Token {
@@ -185,10 +181,6 @@ impl std::fmt::Debug for Token {
             Token::VarsKeyword => write!(f, "\"vars\""),
             Token::ListKeyword => write!(f, "\"list\""),
             Token::ListsKeyword => write!(f, "\"lists\""),
-            Token::CostumeKeyword => write!(f, "\"costume\""),
-            Token::BackdropKeyword => write!(f, "\"backdrop\""),
-            Token::SoundKeyword => write!(f, "\"sound\""),
-            Token::BroadcastKeyword => write!(f, "\"broadcast\""),
             Token::ContainsKeyword => write!(f, "\"contains\""),
             Token::LeftBrace => write!(f, "'{{'"),
             Token::RightBrace(_) => write!(f, "'}}'"),
