@@ -545,10 +545,10 @@
     },
     "75": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [x] CST Nodes\n- [x] Visitor integration\n- [x] Parser integration\n- [ ] Codegen integration\n  - [x] Simple monitor\n  - [ ] Monitor config",
+        "text": "- [x] CST Nodes\n- [x] Visitor integration\n- [x] Parser integration\n- [x] Codegen integration\n  - [x] Simple monitor\n  - [x] Monitor config",
         "status": "open",
-        "lines": "L2823-L2830",
-        "commit": "a88cc7b23351a234d79243b58a39e918f7c98ce6",
+        "lines": "L3095-L3102",
+        "commit": "092d22ce4ce91c7d839d2d2e158aca86d4c8c34b",
         "title": "Implement monitors"
     },
     "76": {
