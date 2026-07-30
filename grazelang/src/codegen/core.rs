@@ -47,8 +47,9 @@ use crate::{
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FormattedStringContent, GetPos,
-            Identifier, ListEntry, Literal, SingleIdentifier, UnOpDescriptor,
+            DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FlatDictionaryTypeError,
+            FormattedStringContent, GetPos, Identifier, ListEntry, Literal, SingleIdentifier,
+            UnOpDescriptor,
         },
     },
     settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
@@ -167,6 +168,13 @@ pub enum GrazeSb3GeneratorError {
     MonitorValueNotBlock { source_span: SourceSpan },
     #[assoc(internal_lint_id = "")]
     #[assoc(get_secondary_message = "")]
+    #[error("there was a type error in the flat dictionary")]
+    FlatDictionaryTypeError {
+        #[source]
+        source: FlatDictionaryTypeError,
+    },
+    #[assoc(internal_lint_id = "")]
+    #[assoc(get_secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
     InvalidConstantExpression {
         expression: Box<Expression>,
@@ -233,6 +241,9 @@ impl GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::MonitorValueNotBlock { source_span: _ } => {
                 return Cow::Borrowed("expected a standalone block for a monitor value");
             }
+            GrazeSb3GeneratorError::FlatDictionaryTypeError { source: error } => {
+                return Cow::Borrowed(error.get_primary_message());
+            }
             GrazeSb3GeneratorError::InvalidConstantExpression {
                 expression: _,
                 source,
@@ -288,10 +299,11 @@ impl GetPos for GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword } => {
                 stage_keyword.get_source_span()
             }
+            GrazeSb3GeneratorError::FlatDictionaryTypeError { source: error } => error.get_source_span(),
             GrazeSb3GeneratorError::InvalidConstantExpression {
-                expression,
-                source: _,
-            } => expression.get_source_span(),
+                expression: _,
+                source,
+            } => source.get_source_span(),
         }
     }
 }
@@ -2152,8 +2164,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             None,
                         ),
                     );
-                    Ok(this_id)
-                })?;
+                    this_id
+                });
                 add_block(
                     context,
                     &this_id,
@@ -2927,8 +2939,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                     None,
                                 ),
                             );
-                            Ok(())
-                        })?;
+                        });
                     }
                 }
             }
@@ -2956,136 +2967,126 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             | crate::parser::cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
             | crate::parser::cst::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
                 .iter()
-                .map(|value| {
-                    Ok(match value {
-                        crate::parser::cst::SingleDataDeclaration::Variable(
-                            _,
-                            my_scope,
-                            _,
-                            identifier,
-                            _,
-                            expression,
-                            _,
-                        ) => {
-                            let var = identifier.value.clone();
-                            let scope = if matches!(
-                                (parent_scope, my_scope),
-                                (
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_),
-                                    DataDeclarationScope::Unset
-                                ) | (
-                                    _,
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_)
-                                )
-                            ) {
-                                Scope::Global
-                            } else {
-                                Scope::Local
-                            };
-                            SingleAssignment::Var(scope, var, Ok(expression))
-                        }
-                        crate::parser::cst::SingleDataDeclaration::EmptyVariable(
-                            _,
-                            my_scope,
-                            _,
-                            identifier,
-                            _,
-                        ) => {
-                            let var = identifier.value.clone();
-                            let scope = if matches!(
-                                (parent_scope, my_scope),
-                                (
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_),
-                                    DataDeclarationScope::Unset
-                                ) | (
-                                    _,
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_)
-                                )
-                            ) {
-                                Scope::Global
-                            } else {
-                                Scope::Local
-                            };
-                            SingleAssignment::Var(scope, var, Err("".into()))
-                        }
-                        crate::parser::cst::SingleDataDeclaration::List(
-                            _,
-                            my_scope,
-                            _,
-                            identifier,
-                            _,
-                            _,
-                            items,
-                            _,
-                            _,
-                        ) => {
-                            let list = identifier.value.clone();
-                            let scope = if matches!(
-                                (parent_scope, my_scope),
-                                (
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_),
-                                    DataDeclarationScope::Unset
-                                ) | (
-                                    _,
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_)
-                                )
-                            ) {
-                                Scope::Global
-                            } else {
-                                Scope::Local
-                            };
-                            SingleAssignment::List(scope, list, {
-                                let mut values = Vec::with_capacity(items.len());
-                                for value in items {
-                                    match value {
-                                        ListEntry::Expression(expression) => {
-                                            values.push(Ok(expression));
-                                        }
-                                        ListEntry::Unwrap(literal, _) => {
-                                            for c in literal.get_string_value().chars() {
-                                                values.push(Err(c.to_string().into()));
-                                            }
+                .map(|value| match value {
+                    crate::parser::cst::SingleDataDeclaration::Variable(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                        expression,
+                        _,
+                    ) => {
+                        let var = identifier.value.clone();
+                        let scope = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            Scope::Global
+                        } else {
+                            Scope::Local
+                        };
+                        SingleAssignment::Var(scope, var, Ok(expression))
+                    }
+                    crate::parser::cst::SingleDataDeclaration::EmptyVariable(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                    ) => {
+                        let var = identifier.value.clone();
+                        let scope = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            Scope::Global
+                        } else {
+                            Scope::Local
+                        };
+                        SingleAssignment::Var(scope, var, Err("".into()))
+                    }
+                    crate::parser::cst::SingleDataDeclaration::List(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                        _,
+                        items,
+                        _,
+                        _,
+                    ) => {
+                        let list = identifier.value.clone();
+                        let scope = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            Scope::Global
+                        } else {
+                            Scope::Local
+                        };
+                        SingleAssignment::List(scope, list, {
+                            let mut values = Vec::with_capacity(items.len());
+                            for value in items {
+                                match value {
+                                    ListEntry::Expression(expression) => {
+                                        values.push(Ok(expression));
+                                    }
+                                    ListEntry::Unwrap(literal, _) => {
+                                        for c in literal.get_string_value().chars() {
+                                            values.push(Err(c.to_string().into()));
                                         }
                                     }
                                 }
-                                values
-                            })
-                        }
-                        crate::parser::cst::SingleDataDeclaration::EmptyList(
-                            _,
-                            my_scope,
-                            _,
-                            identifier,
-                            _,
-                        ) => {
-                            let list = identifier.value.clone();
-                            let scope = if matches!(
-                                (parent_scope, my_scope),
-                                (
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_),
-                                    DataDeclarationScope::Unset
-                                ) | (
-                                    _,
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_)
-                                )
-                            ) {
-                                Scope::Global
-                            } else {
-                                Scope::Local
-                            };
-                            SingleAssignment::List(scope, list, Vec::new())
-                        }
-                    })
+                            }
+                            values
+                        })
+                    }
+                    crate::parser::cst::SingleDataDeclaration::EmptyList(
+                        _,
+                        my_scope,
+                        _,
+                        identifier,
+                        _,
+                    ) => {
+                        let list = identifier.value.clone();
+                        let scope = if matches!(
+                            (parent_scope, my_scope),
+                            (
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
+                                DataDeclarationScope::Unset
+                            ) | (
+                                _,
+                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                            )
+                        ) {
+                            Scope::Global
+                        } else {
+                            Scope::Local
+                        };
+                        SingleAssignment::List(scope, list, Vec::new())
+                    }
                 })
-                .collect::<Result<_, _>>()?,
+                .collect(),
             crate::parser::cst::DataDeclaration::Single(single_data_declaration) => {
                 let single_data_declaration = single_data_declaration.as_ref();
                 let single_assignment = match single_data_declaration {

@@ -1876,7 +1876,9 @@ impl Literal {
             Literal::String(value, _) => return Cow::Owned(serde_json::to_string(value).unwrap()),
             Literal::DecimalInt(value, _) => value,
             Literal::DecimalFloat(value, _) => value,
-            _ => return Cow::Owned(serde_json::to_string(&Sb3PrimitiveOrBool::from(self)).unwrap()),
+            _ => {
+                return Cow::Owned(serde_json::to_string(&Sb3PrimitiveOrBool::from(self)).unwrap());
+            }
         })
     }
 }
@@ -2416,6 +2418,14 @@ pub enum ParseError {
     #[assoc(internal_lint_id = "")]
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "")]
+    #[error("there was a type error in the flat dictionary")]
+    FlatDictionaryTypeError {
+        #[source]
+        source: FlatDictionaryTypeError,
+    },
+    #[assoc(internal_lint_id = "")]
+    #[assoc(internal_primary_message = "")]
+    #[assoc(get_secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
     InvalidConstantExpression {
         expression: Box<Expression>,
@@ -2661,6 +2671,9 @@ impl ParseError {
                     "dictionary entry with key \"{key}\" defined multiple times"
                 ));
             }
+            Self::FlatDictionaryTypeError { source } => {
+                return Cow::Borrowed(source.get_primary_message());
+            }
             Self::InvalidConstantExpression {
                 expression: _,
                 source,
@@ -2741,6 +2754,7 @@ impl GetPos for ParseError {
                     context: _,
                 source_span,
             } => source_span,
+            ParseError::FlatDictionaryTypeError { source } => source.get_source_span(),
             ParseError::InvalidConstantExpression {
                 expression,
                 source: _,
@@ -2828,6 +2842,68 @@ pub trait MonitorDeclarationFromContent {
         right_brace: RightBrace,
         source_span: SourceSpan,
     ) -> Self;
+}
+
+#[derive(Debug, Clone, PartialEq, Error, Serialize, Deserialize, enum_assoc::Assoc)]
+#[func(const fn internal_lint_id(&self) -> &'static str)]
+#[func(pub const fn get_primary_message(&self) -> &'static str)]
+#[func(pub const fn get_secondary_message(&self) -> &'static str)]
+pub enum FlatDictionaryTypeError {
+    #[assoc(internal_lint_id = "list_as_primitive")]
+    #[assoc(get_primary_message = "cannot interpret a list as a primitive value")]
+    #[assoc(get_secondary_message = "should be a primitive value")]
+    #[error("cannot interpret a list as a primitive value")]
+    ListAsPrimitive { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "dict_as_primitive")]
+    #[assoc(get_primary_message = "cannot interpret a dictionary as a primitive value")]
+    #[assoc(get_secondary_message = "should be a primitive value")]
+    #[error("cannot interpret a dictionary as a primitive value")]
+    DictAsPrimitive { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "list_as_dictionary")]
+    #[assoc(get_primary_message = "cannot interpret a list as a dictionary")]
+    #[assoc(get_secondary_message = "should be a dictionary")]
+    #[error("cannot interpret a list as a dictionary")]
+    ListAsDict { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "primitive_as_dictionary")]
+    #[assoc(get_primary_message = "cannot interpret a primitive value as a dictionary")]
+    #[assoc(get_secondary_message = "should be a dictionary")]
+    #[error("cannot interpret a primitive value as a dictionary")]
+    PrimitiveAsDict { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "dict_as_list")]
+    #[assoc(get_primary_message = "cannot interpret a dictionary as a list")]
+    #[assoc(get_secondary_message = "should be a list")]
+    #[error("cannot interpret a dictionary as a list")]
+    DictAsList { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "primitive_as_list")]
+    #[assoc(get_primary_message = "cannot interpret a primitive value as a list")]
+    #[assoc(get_secondary_message = "should be a list")]
+    #[error("cannot interpret a primitive value as a list")]
+    PrimitiveAsList { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "cannot_be_dict")]
+    #[assoc(get_primary_message = "used a dictionary where a list or primitive value was required")]
+    #[assoc(get_secondary_message = "should be a list or primitive value")]
+    #[error("used a dictionary where a list or primitive value was required")]
+    CannotBeDict { source_span: SourceSpan },
+}
+
+impl GetPos for FlatDictionaryTypeError {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            FlatDictionaryTypeError::ListAsPrimitive { source_span }
+            | FlatDictionaryTypeError::DictAsPrimitive { source_span }
+            | FlatDictionaryTypeError::ListAsDict { source_span }
+            | FlatDictionaryTypeError::PrimitiveAsDict { source_span }
+            | FlatDictionaryTypeError::DictAsList { source_span }
+            | FlatDictionaryTypeError::PrimitiveAsList { source_span }
+            | FlatDictionaryTypeError::CannotBeDict { source_span } => source_span,
+        }
+    }
+}
+
+impl GetLintId for FlatDictionaryTypeError {
+    fn get_lint_id(&self) -> &'static str {
+        self.internal_lint_id()
+    }
 }
 
 // TODO: Implement monitors

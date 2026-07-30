@@ -141,24 +141,26 @@ impl ParseError {
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
-        let (lint_id, secondary_message, source_span) =
-            if let ParseError::InvalidConstantExpression {
+        let (lint_id, secondary_message, source_span) = match self {
+            ParseError::InvalidConstantExpression {
                 expression: _,
                 source,
-            } = self
-            {
-                (
-                    source.get_lint_id(),
-                    source.get_secondary_message(),
-                    *source.get_source_span(),
-                )
-            } else {
-                (
-                    self.get_lint_id(),
-                    self.get_secondary_message(),
-                    *self.get_source_span(),
-                )
-            };
+            } => (
+                source.get_lint_id(),
+                source.get_secondary_message(),
+                *source.get_source_span(),
+            ),
+            ParseError::FlatDictionaryTypeError { source } => (
+                source.get_lint_id(),
+                source.get_secondary_message(),
+                *source.get_source_span(),
+            ),
+            _ => (
+                self.get_lint_id(),
+                self.get_secondary_message(),
+                *self.get_source_span(),
+            ),
+        };
         let SourceDescriptor {
             content,
             path,
@@ -184,24 +186,26 @@ impl GrazeSb3GeneratorError {
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
-        let (lint_id, secondary_message, source_span) =
-            if let GrazeSb3GeneratorError::InvalidConstantExpression {
+        let (lint_id, secondary_message, source_span) = match self {
+            GrazeSb3GeneratorError::InvalidConstantExpression {
                 expression: _,
                 source,
-            } = self
-            {
-                (
-                    source.get_lint_id(),
-                    source.get_secondary_message(),
-                    *source.get_source_span(),
-                )
-            } else {
-                (
-                    self.get_lint_id(),
-                    self.get_secondary_message(),
-                    *self.get_source_span(),
-                )
-            };
+            } => (
+                source.get_lint_id(),
+                source.get_secondary_message(),
+                *source.get_source_span(),
+            ),
+            GrazeSb3GeneratorError::FlatDictionaryTypeError { source: error } => (
+                error.get_lint_id(),
+                error.get_secondary_message(),
+                *error.get_source_span(),
+            ),
+            _ => (
+                self.get_lint_id(),
+                self.get_secondary_message(),
+                *self.get_source_span(),
+            ),
+        };
         let SourceDescriptor {
             content,
             path,

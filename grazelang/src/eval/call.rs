@@ -27,7 +27,6 @@ use crate::{
     parser::cst::{EMPTY_ISTRING_REF, Expression, Literal},
 };
 
-#[non_exhaustive]
 #[repr(u32)]
 #[derive(
     Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive,
@@ -469,7 +468,6 @@ impl ConstantExprFunction {
     }
 }
 
-#[non_exhaustive]
 #[repr(u32)]
 #[derive(
     Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TryFromPrimitive, IntoPrimitive,
