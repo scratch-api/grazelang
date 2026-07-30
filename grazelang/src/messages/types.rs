@@ -338,7 +338,7 @@ pub enum SpecificGrazeWarning {
     #[assoc(internal_lint_id = "invalid_rotation_style_value")]
     InvalidRotationStyleValue,
     #[assoc(get_primary_message = "invalid value for video state")]
-    #[assoc(get_secondary_message = "must be \"on\", \"off\" and \"on-flipped\"")]
+    #[assoc(get_secondary_message = "must be \"on\", \"off\" or \"on-flipped\"")]
     #[assoc(internal_lint_id = "invalid_video_state_value")]
     InvalidVideoStateValue,
     #[assoc(get_primary_message = "monitor value supplies inputs")]
@@ -371,6 +371,24 @@ pub enum SpecificGrazeWarning {
     )]
     #[assoc(internal_lint_id = "unexpected_value_for_number")]
     UnexpectedValueForNumber,
+    #[assoc(get_primary_message = "value used for a boolean does not look like a boolean")]
+    #[assoc(
+        get_secondary_message = "should be a boolean"
+    )]
+    #[assoc(internal_lint_id = "unexpected_value_for_boolean")]
+    UnexpectedValueForBoolean,
+    #[assoc(get_primary_message = "costume number outside valid range")]
+    #[assoc(
+        get_secondary_message = "needs to be an integer greater than zero and less than or equal to the number of costumes"
+    )]
+    #[assoc(internal_lint_id = "invalid_costume_number")]
+    InvalidCostumeNumber,
+    #[assoc(get_primary_message = "invalid monitor mode")]
+    #[assoc(
+        get_secondary_message = "must be \"default\", \"large\", \"slider\" or \"list\""
+    )]
+    #[assoc(internal_lint_id = "invalid_monitor_mode")]
+    InvalidMonitorMode,
 }
 
 impl GetLintId for SpecificGrazeWarning {

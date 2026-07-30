@@ -32,7 +32,7 @@ use crate::{
     codegen::ids::generate_random_id_as_string,
     eval::{
         call::random_range,
-        cast::{JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
+        cast::{JsPrimitive, ScratchVmToNumber, f64_is_valid_i128},
     },
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
@@ -79,6 +79,7 @@ use crate::{
         default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
     },
 };
+use helpers::*;
 
 #[derive(Debug, Clone, PartialEq, Error, enum_assoc::Assoc)]
 #[func(const fn internal_lint_id(&self) -> &'static str)]
@@ -2076,36 +2077,6 @@ macro_rules! emit_error {
     }};
 }
 
-pub fn get_data_from_dictionary<M>(
-    context: &mut GrazeSb3GeneratorContext,
-    dictionary: &cst::CommaSeparated<cst::DictionaryEntry>,
-    mut map_key: M,
-) -> Result<HashMap<IString, (SourceSpan, cst::DictionaryValue)>, GrazeSb3GeneratorError>
-where
-    M: FnMut(IString) -> IString,
-{
-    let mut data = HashMap::with_capacity(dictionary.len());
-    for entry in dictionary {
-        let (ident, _, value, _) = entry
-            .to_valid()
-            .expect("You must pass a valid AST to the visitor.");
-        let key = map_key(ident.value.clone());
-        if data
-            .insert(key, (*ident.get_source_span(), value.clone()))
-            .is_some()
-        {
-            emit_error!(
-                GrazeSb3GeneratorError::RepeatedDictionaryEntry {
-                    key: ident.value.clone(),
-                    source_span: *ident.get_source_span(),
-                },
-                context
-            );
-        }
-    }
-    Ok(data)
-}
-
 macro_rules! extract_data_from_dictionary_value {
     ($context:expr, $entry:expr, $pattern:pat => $value:expr, $pattern_2:pat => $value_2:expr) => {
         match $entry {
@@ -2127,23 +2098,126 @@ macro_rules! extract_data_from_dictionary_value {
     };
 }
 
-pub fn extract_f64_entry_from_dictionary_data(
-    context: &mut GrazeSb3GeneratorContext,
-    data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
-    key: &str,
-) -> Result<Option<f64>, GrazeSb3GeneratorError> {
-    Ok(extract_data_from_dictionary_value!(
+pub mod helpers {
+    use std::collections::HashMap;
+
+    use super::{GrazeSb3GeneratorContext, emit_message};
+    use crate::{
+        codegen::core::GrazeSb3GeneratorError,
+        eval::cast::{JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
+        lexer::SourceSpan,
+        messages::types::{GrazeMessage, GrazeWarning, SpecificGrazeWarning},
+        parser::cst::{self, GetPos},
+        settings::GrazeMessageSetting,
+    };
+    use arcstr::ArcStr as IString;
+    use grazelang_types::project_json::Sb3PrimitiveOrBool;
+
+    pub fn get_data_from_dictionary<M>(
+        context: &mut GrazeSb3GeneratorContext,
+        dictionary: &cst::CommaSeparated<cst::DictionaryEntry>,
+        mut map_key: M,
+    ) -> Result<HashMap<IString, (SourceSpan, cst::DictionaryValue)>, GrazeSb3GeneratorError>
+    where
+        M: FnMut(IString) -> IString,
+    {
+        let mut data = HashMap::with_capacity(dictionary.len());
+        for entry in dictionary {
+            let (ident, _, value, _) = entry
+                .to_valid()
+                .expect("You must pass a valid AST to the visitor.");
+            let key = map_key(ident.value.clone());
+            if data
+                .insert(key, (*ident.get_source_span(), value.clone()))
+                .is_some()
+            {
+                emit_error!(
+                    GrazeSb3GeneratorError::RepeatedDictionaryEntry {
+                        key: ident.value.clone(),
+                        source_span: *ident.get_source_span(),
+                    },
+                    context
+                );
+            }
+        }
+        Ok(data)
+    }
+
+    pub fn extract_f64_entry_from_dictionary_data(
+        context: &mut GrazeSb3GeneratorContext,
+        data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
+        key: &str,
+    ) -> Result<Option<f64>, GrazeSb3GeneratorError> {
+        Ok(extract_data_from_dictionary_value!(
+            context,
+            data.remove(key),
+            Some((_, value)) => value.to_literal(),
+            literal => {
+                let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
+                if is_nan {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                SpecificGrazeWarning::UnexpectedValueForNumber,
+                                *literal.get_source_span(),
+                            ),
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                value
+            }
+        ))
+    }
+
+    pub fn extract_optional_f64_entry_from_dictionary_data(
+        context: &mut GrazeSb3GeneratorContext,
+        data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
+        key: &str,
+    ) -> Result<Option<Option<f64>>, GrazeSb3GeneratorError> {
+        Ok(extract_data_from_dictionary_value!(
+            context,
+            data.remove(key),
+            Some((_, value)) => value.to_literal(),
+            literal => literal.get_non_empty().map(|literal| {
+                let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
+                if is_nan {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                SpecificGrazeWarning::UnexpectedValueForNumber,
+                                *literal.get_source_span(),
+                            ),
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                value
+            })
+        ))
+    }
+
+    pub fn extract_bool_entry_from_dictionary_data(
+        context: &mut GrazeSb3GeneratorContext,
+        data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
+        key: &str,
+    ) -> Result<Option<bool>, GrazeSb3GeneratorError> {
+        Ok(extract_data_from_dictionary_value!(
         context,
         data.remove(key),
         Some((_, value)) => value.to_literal(),
         literal => {
-            let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
-            if is_nan {
+            let (value, is_nab) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_boolean_and_is_nab();
+            if is_nab {
                 emit_message(
                     context,
                     GrazeMessage::Warning(
                         GrazeWarning::Specific(
-                            SpecificGrazeWarning::UnexpectedValueForNumber,
+                            SpecificGrazeWarning::UnexpectedValueForBoolean,
                             *literal.get_source_span(),
                         ),
                         None,
@@ -2152,37 +2226,37 @@ pub fn extract_f64_entry_from_dictionary_data(
                 );
             }
             value
-        }
-    ))
-}
+        }))
+    }
 
-pub fn extract_optional_f64_entry_from_dictionary_data(
-    context: &mut GrazeSb3GeneratorContext,
-    data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
-    key: &str,
-) -> Result<Option<Option<f64>>, GrazeSb3GeneratorError> {
-    Ok(extract_data_from_dictionary_value!(
-        context,
-        data.remove(key),
-        Some((_, value)) => value.to_literal(),
-        literal => literal.get_non_empty().map(|literal| {
-            let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
-            if is_nan {
-                emit_message(
-                    context,
-                    GrazeMessage::Warning(
-                        GrazeWarning::Specific(
-                            SpecificGrazeWarning::UnexpectedValueForNumber,
-                            *literal.get_source_span(),
+    pub fn extract_optional_bool_entry_from_dictionary_data(
+        context: &mut GrazeSb3GeneratorContext,
+        data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
+        key: &str,
+    ) -> Result<Option<Option<bool>>, GrazeSb3GeneratorError> {
+        Ok(extract_data_from_dictionary_value!(
+            context,
+            data.remove(key),
+            Some((_, value)) => value.to_literal(),
+            literal => literal.get_non_empty().map(|literal| {
+                let (value, is_nab) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_boolean_and_is_nab();
+                if is_nab {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                SpecificGrazeWarning::UnexpectedValueForBoolean,
+                                *literal.get_source_span(),
+                            ),
+                            None,
                         ),
-                        None,
-                    ),
-                    GrazeMessageSetting::Warnings,
-                );
-            }
-            value
-        })
-    ))
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                value
+            })
+        ))
+    }
 }
 
 impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3Generator {
@@ -4340,8 +4414,38 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 .map(|value| value.0 + 1)
                 .or_else(|| predicate_for_random(name).then(|| random_range(0..costumes.len())))
         }
-        fn parse_costume_number_from_name(costumes: &[Sb3Costume], backdrop: &Literal) -> usize {
-            let num = JsPrimitive::from(Sb3PrimitiveOrBool::from(backdrop)).to_number();
+        fn parse_costume_number_from_name(
+            context: &mut GrazeSb3GeneratorContext,
+            costumes: &[Sb3Costume],
+            backdrop: &Literal,
+        ) -> usize {
+            let (num, is_nan) =
+                JsPrimitive::from(Sb3PrimitiveOrBool::from(backdrop)).to_number_and_is_nan();
+            if is_nan {
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            SpecificGrazeWarning::UnexpectedValueForNumber,
+                            *backdrop.get_source_span(),
+                        ),
+                        None,
+                    ),
+                    GrazeMessageSetting::Warnings,
+                );
+            } else if !f64_is_valid_i128(num) || num < 1.0 || num > costumes.len() as f64 {
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            SpecificGrazeWarning::InvalidCostumeNumber,
+                            *backdrop.get_source_span(),
+                        ),
+                        None,
+                    ),
+                    GrazeMessageSetting::Warnings,
+                );
+            }
             if num.is_infinite() {
                 return 0;
             }
@@ -4389,8 +4493,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } else {
                     None
                 };
-                target.current_costume = costume_number
-                    .unwrap_or_else(|| parse_costume_number_from_name(&target.costumes, &backdrop));
+                target.current_costume = costume_number.unwrap_or_else(|| {
+                    parse_costume_number_from_name(context, &target.costumes, &backdrop)
+                });
             }
             if let Some(volume) =
                 extract_f64_entry_from_dictionary_data(context, &mut data, "volume")?
@@ -4458,8 +4563,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 } else {
                     None
                 };
-                target.current_costume = costume_number
-                    .unwrap_or_else(|| parse_costume_number_from_name(&target.costumes, &costume));
+                target.current_costume = costume_number.unwrap_or_else(|| {
+                    parse_costume_number_from_name(context, &target.costumes, &costume)
+                });
             }
             if let Some(x_position) =
                 extract_optional_f64_entry_from_dictionary_data(context, &mut data, "x_position")?
@@ -4486,20 +4592,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             {
                 target.volume = volume;
             }
-            if let Some(draggable) = extract_data_from_dictionary_value!(
-                context,
-                data.remove("draggable"),
-                Some((_, value)) => value.to_literal(),
-                value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
-            ) {
+            if let Some(draggable) =
+                extract_optional_bool_entry_from_dictionary_data(context, &mut data, "draggable")?
+            {
                 target.draggable = draggable;
             }
-            if let Some(visible) = extract_data_from_dictionary_value!(
-                context,
-                data.remove("visible"),
-                Some((_, value)) => value.to_literal(),
-                value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
-            ) {
+            if let Some(visible) =
+                extract_optional_bool_entry_from_dictionary_data(context, &mut data, "visible")?
+            {
                 target.visible = visible;
             }
             if let Some(layer_order) =
@@ -4833,7 +4933,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             Some((_, value)) => value.to_literal(),
             value => value
         ) {
-            monitor.mode = serde_json::from_str(&mode.get_json_string()).unwrap_or_default();
+            monitor.mode = serde_json::from_str(&mode.get_json_string()).unwrap_or_else(|_| {
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            SpecificGrazeWarning::InvalidMonitorMode,
+                            *mode.get_source_span(),
+                        ),
+                        None,
+                    ),
+                    GrazeMessageSetting::Warnings,
+                );
+                Default::default()
+            });
             if monitor.mode == Sb3MonitorMode::List {
                 if matches!(monitor.value, Sb3MonitorValue::Primitive(_)) {
                     monitor.value = Sb3MonitorValue::List(Default::default());
@@ -4944,12 +5057,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 GrazeMessageSetting::Warnings,
             );
         }
-        if let Some(visible) = extract_data_from_dictionary_value!(
-            context,
-            data.remove("visible"),
-            Some((_, value)) => value.to_literal(),
-            value => JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
-        ) {
+        if let Some(visible) =
+            extract_bool_entry_from_dictionary_data(context, &mut data, "visible")?
+        {
             monitor.visible = visible;
         }
         if let Some(slider_min) =
@@ -4962,17 +5072,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         {
             monitor.slider_max = slider_max;
         }
-        if let Some(is_discrete) = extract_data_from_dictionary_value!(
-            context,
-            data.remove("is_discrete"),
-            Some((_, value)) => value.to_literal(),
-            value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
-        ) {
+        if let Some(is_discrete) =
+            extract_optional_bool_entry_from_dictionary_data(context, &mut data, "is_discrete")?
+        {
             monitor.is_discrete = is_discrete;
         }
         // TODO: Warn if value has a weird shape for its data type (e.g. "a" for bool, "xyz" for f64)
-        //  - [ ] Booleans
+        //  - [x] Booleans
         //  - [x] Numbers
+        //  - [x] Monitor mode
         // Issue: #80
         context.sb3.monitors.push(monitor);
         for (key, (source_span, _)) in data {

@@ -19,7 +19,11 @@ pub trait ScratchVmToNumber {
 
 pub trait ScratchVmToBoolean {
     /// Equivalent to `Cast.toBoolean` in scratch-vm
-    fn to_boolean(&self) -> bool;
+    fn to_boolean(&self) -> bool {
+        self.to_boolean_and_is_nab().0
+    }
+    // NAB = not a boolean
+    fn to_boolean_and_is_nab(&self) -> (bool, bool);
 }
 
 pub trait ScratchVmToString {
@@ -68,11 +72,15 @@ pub enum JsPrimitive {
     Bool(bool),
 }
 
-pub fn try_convert_f64_into_i128(value: f64) -> Option<i128> {
-    (value.is_finite()
+pub fn f64_is_valid_i128(value: f64) -> bool {
+    value.is_finite()
         && value.fract() == 0.0
         && value >= i128::MIN as f64
-        && value <= i128::MAX as f64)
+        && value <= i128::MAX as f64
+}
+
+pub fn try_convert_f64_into_i128(value: f64) -> Option<i128> {
+    f64_is_valid_i128(value)
         .then_some(value as i128)
 }
 
@@ -134,20 +142,25 @@ impl ScratchVmToNumber for JsPrimitive {
 }
 
 impl ScratchVmToBoolean for JsPrimitive {
-    fn to_boolean(&self) -> bool {
-        fn convert_str_to_bool(value: &str) -> bool {
+    fn to_boolean_and_is_nab(&self) -> (bool, bool) {
+        fn convert_str_to_bool(value: &str) -> (bool, bool) {
             match value {
-                "" | "0" => false,
-                value if value.eq_ignore_ascii_case("false") => false,
-                _ => true,
+                "" => (false, true),
+                "0" => (false, false),
+                "1" => (true, false),
+                value if value.eq_ignore_ascii_case("false") => (false, false),
+                value if value.eq_ignore_ascii_case("true") => (true, false),
+                _ => (true, true),
             }
         }
         match self {
             JsPrimitive::JsString(value) => convert_str_to_bool(&String::from_utf16_lossy(value)),
             JsPrimitive::String(value) => convert_str_to_bool(value),
             JsPrimitive::IString(value) => convert_str_to_bool(value),
-            JsPrimitive::Number(value) => (!value.is_nan()) && *value != 0.0,
-            JsPrimitive::Bool(value) => *value,
+            JsPrimitive::Number(0.0) => (false, false),
+            JsPrimitive::Number(1.0) => (true, false),
+            JsPrimitive::Number(value) => ((!value.is_nan()) && *value != 0.0, true),
+            JsPrimitive::Bool(value) => (*value, false),
         }
     }
 }
@@ -277,7 +290,7 @@ impl ScratchVmIsInt for JsPrimitive {
             JsPrimitive::String(value) => !value.contains('.'),
             JsPrimitive::IString(value) => !value.contains('.'),
             JsPrimitive::Number(value) => {
-                value.is_nan() || try_convert_f64_into_i128(*value).is_some()
+                value.is_nan() || f64_is_valid_i128(*value)
             }
             JsPrimitive::Bool(_) => true,
         }
