@@ -2113,6 +2113,8 @@ pub mod helpers {
     use arcstr::ArcStr as IString;
     use grazelang_types::project_json::Sb3PrimitiveOrBool;
 
+    // TODO: Move more helpers into `grazelang::codegen::core::helpers`
+
     pub fn get_data_from_dictionary<M>(
         context: &mut GrazeSb3GeneratorContext,
         dictionary: &cst::CommaSeparated<cst::DictionaryEntry>,
@@ -5077,11 +5079,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         {
             monitor.is_discrete = is_discrete;
         }
-        // TODO: Warn if value has a weird shape for its data type (e.g. "a" for bool, "xyz" for f64)
-        //  - [x] Booleans
-        //  - [x] Numbers
-        //  - [x] Monitor mode
-        // Issue: #80
         context.sb3.monitors.push(monitor);
         for (key, (source_span, _)) in data {
             emit_error!(
