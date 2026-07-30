@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 
 pub trait ScratchVmToNumber {
     /// Equivalent to `Cast.toNumber` in scratch-vm
-    fn to_number(&self) -> f64;
+    fn to_number(&self) -> f64 {
+        self.to_number_and_is_nan().0
+    }
+    fn to_number_and_is_nan(&self) -> (f64, bool);
 }
 
 pub trait ScratchVmToBoolean {
@@ -110,22 +113,22 @@ impl From<Sb3PrimitiveOrBool> for JsPrimitive {
 }
 
 impl ScratchVmToNumber for JsPrimitive {
-    fn to_number(&self) -> f64 {
-        fn convert_str_to_number(value: &str) -> f64 {
+    fn to_number_and_is_nan(&self) -> (f64, bool) {
+        fn convert_str_to_number(value: &str) -> (f64, bool) {
             let value =
                 parse_ecmascript_string_numeric_literal::parse_string_numeric_literal(value);
             if value.is_nan() {
-                return 0.0;
+                return (0.0, true);
             }
-            value
+            (value, false)
         }
         match self {
             JsPrimitive::JsString(value) => convert_str_to_number(&String::from_utf16_lossy(value)),
             JsPrimitive::String(value) => convert_str_to_number(value),
             JsPrimitive::IString(value) => convert_str_to_number(value),
-            JsPrimitive::Number(value) if value.is_nan() => 0.0,
-            JsPrimitive::Number(value) => *value,
-            JsPrimitive::Bool(value) => (*value).into(),
+            JsPrimitive::Number(value) if value.is_nan() => (0.0, true),
+            JsPrimitive::Number(value) => (*value, false),
+            JsPrimitive::Bool(value) => ((*value).into(), false),
         }
     }
 }

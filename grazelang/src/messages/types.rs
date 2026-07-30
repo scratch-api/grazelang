@@ -365,6 +365,12 @@ pub enum SpecificGrazeWarning {
     )]
     #[assoc(internal_lint_id = "list_value_for_primitive_monitor")]
     ListValueForPrimitiveMonitor,
+    #[assoc(get_primary_message = "value used for a number does not look like a number")]
+    #[assoc(
+        get_secondary_message = "should be a number"
+    )]
+    #[assoc(internal_lint_id = "unexpected_value_for_number")]
+    UnexpectedValueForNumber,
 }
 
 impl GetLintId for SpecificGrazeWarning {

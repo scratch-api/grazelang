@@ -2127,19 +2127,6 @@ macro_rules! extract_data_from_dictionary_value {
     };
 }
 
-pub fn extract_optional_f64_entry_from_dictionary_data(
-    context: &mut GrazeSb3GeneratorContext,
-    data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
-    key: &str,
-) -> Result<Option<Option<f64>>, GrazeSb3GeneratorError> {
-    Ok(extract_data_from_dictionary_value!(
-        context,
-        data.remove(key),
-        Some((_, value)) => value.to_literal(),
-        value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number())
-    ))
-}
-
 pub fn extract_f64_entry_from_dictionary_data(
     context: &mut GrazeSb3GeneratorContext,
     data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
@@ -2149,7 +2136,52 @@ pub fn extract_f64_entry_from_dictionary_data(
         context,
         data.remove(key),
         Some((_, value)) => value.to_literal(),
-        value => JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number()
+        literal => {
+            let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
+            if is_nan {
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            SpecificGrazeWarning::UnexpectedValueForNumber,
+                            *literal.get_source_span(),
+                        ),
+                        None,
+                    ),
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            value
+        }
+    ))
+}
+
+pub fn extract_optional_f64_entry_from_dictionary_data(
+    context: &mut GrazeSb3GeneratorContext,
+    data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
+    key: &str,
+) -> Result<Option<Option<f64>>, GrazeSb3GeneratorError> {
+    Ok(extract_data_from_dictionary_value!(
+        context,
+        data.remove(key),
+        Some((_, value)) => value.to_literal(),
+        literal => literal.get_non_empty().map(|literal| {
+            let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
+            if is_nan {
+                emit_message(
+                    context,
+                    GrazeMessage::Warning(
+                        GrazeWarning::Specific(
+                            SpecificGrazeWarning::UnexpectedValueForNumber,
+                            *literal.get_source_span(),
+                        ),
+                        None,
+                    ),
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            value
+        })
     ))
 }
 
@@ -4940,7 +4972,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         // TODO: Warn if value has a weird shape for its data type (e.g. "a" for bool, "xyz" for f64)
         //  - [ ] Booleans
-        //  - [ ] Numbers
+        //  - [x] Numbers
         // Issue: #80
         context.sb3.monitors.push(monitor);
         for (key, (source_span, _)) in data {
