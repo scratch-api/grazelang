@@ -2021,6 +2021,13 @@ pub enum Literal {
 }
 
 impl Literal {
+    pub fn get_non_empty(self) -> Option<Self> {
+        match self {
+            Literal::EmptyExpression(..) => None,
+            _ => Some(self)
+        }
+    } 
+
     pub fn get_string_value(&self) -> &IString {
         match self {
             Literal::String(value, _) => value,

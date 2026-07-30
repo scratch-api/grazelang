@@ -2127,6 +2127,19 @@ macro_rules! extract_data_from_dictionary_value {
     };
 }
 
+pub fn extract_optional_f64_entry_from_dictionary_data(
+    context: &mut GrazeSb3GeneratorContext,
+    data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
+    key: &str,
+) -> Result<Option<Option<f64>>, GrazeSb3GeneratorError> {
+    Ok(extract_data_from_dictionary_value!(
+        context,
+        data.remove(key),
+        Some((_, value)) => value.to_literal(),
+        value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_number())
+    ))
+}
+
 pub fn extract_f64_entry_from_dictionary_data(
     context: &mut GrazeSb3GeneratorContext,
     data: &mut HashMap<IString, (SourceSpan, cst::DictionaryValue)>,
@@ -4361,14 +4374,16 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 data.remove("text_to_speech_language"),
                 Some((_, value)) => value.to_literal(),
-                value => value.get_string_value().to_string()
+                value => value.get_non_empty().map(|value| value.get_string_value().to_string())
             ) {
-                target.text_to_speech_language = Some(text_to_speech_language);
+                target.text_to_speech_language = text_to_speech_language;
             }
-            if let Some(video_transparency) =
-                extract_f64_entry_from_dictionary_data(context, &mut data, "video_transparency")?
-            {
-                target.video_transparency = Some(video_transparency);
+            if let Some(video_transparency) = extract_optional_f64_entry_from_dictionary_data(
+                context,
+                &mut data,
+                "video_transparency",
+            )? {
+                target.video_transparency = video_transparency;
             }
             if let Some(video_state) = extract_data_from_dictionary_value!(
                 context,
@@ -4377,8 +4392,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 value => value
             ) {
                 let source_span = *video_state.get_source_span();
-                let video_state = video_state.get_string_value().to_string();
-                if !matches!(video_state.as_str(), "on" | "off" | "on-flipped") {
+                let video_state = video_state
+                    .get_non_empty()
+                    .map(|value| value.get_string_value().to_string());
+                if let Some(video_state) = &video_state
+                    && !matches!(video_state.as_str(), "on" | "off" | "on-flipped")
+                {
                     emit_message(
                         context,
                         GrazeMessage::Warning(
@@ -4391,7 +4410,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         GrazeMessageSetting::Warnings,
                     );
                 }
-                target.video_state = Some(video_state);
+                target.video_state = video_state;
             }
         } else {
             if let Some(costume) = extract_data_from_dictionary_value!(
@@ -4411,23 +4430,24 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     .unwrap_or_else(|| parse_costume_number_from_name(&target.costumes, &costume));
             }
             if let Some(x_position) =
-                extract_f64_entry_from_dictionary_data(context, &mut data, "x_position")?
+                extract_optional_f64_entry_from_dictionary_data(context, &mut data, "x_position")?
             {
-                target.x = Some(x_position);
+                target.x = x_position;
             }
             if let Some(y_position) =
-                extract_f64_entry_from_dictionary_data(context, &mut data, "y_position")?
+                extract_optional_f64_entry_from_dictionary_data(context, &mut data, "y_position")?
             {
-                target.y = Some(y_position);
+                target.y = y_position;
             }
             if let Some(direction) =
-                extract_f64_entry_from_dictionary_data(context, &mut data, "direction")?
+                extract_optional_f64_entry_from_dictionary_data(context, &mut data, "direction")?
             {
-                target.direction = Some(direction);
+                target.direction = direction;
             }
-            if let Some(size) = extract_f64_entry_from_dictionary_data(context, &mut data, "size")?
+            if let Some(size) =
+                extract_optional_f64_entry_from_dictionary_data(context, &mut data, "size")?
             {
-                target.size = Some(size);
+                target.size = size;
             }
             if let Some(volume) =
                 extract_f64_entry_from_dictionary_data(context, &mut data, "volume")?
@@ -4438,17 +4458,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 data.remove("draggable"),
                 Some((_, value)) => value.to_literal(),
-                value => JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
+                value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
             ) {
-                target.draggable = Some(draggable);
+                target.draggable = draggable;
             }
             if let Some(visible) = extract_data_from_dictionary_value!(
                 context,
                 data.remove("visible"),
                 Some((_, value)) => value.to_literal(),
-                value => JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
-            )            {
-                target.visible = Some(visible);
+                value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
+            ) {
+                target.visible = visible;
             }
             if let Some(layer_order) =
                 extract_f64_entry_from_dictionary_data(context, &mut data, "layer_order")?
@@ -4462,11 +4482,15 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 value => value
             ) {
                 let source_span = *rotation_style.get_source_span();
-                let rotation_style = rotation_style.get_string_value().to_string();
-                if !matches!(
-                    rotation_style.as_str(),
-                    "all around" | "left-right" | "don't rotate"
-                ) {
+                let rotation_style = rotation_style
+                    .get_non_empty()
+                    .map(|value| value.get_string_value().to_string());
+                if let Some(rotation_style) = &rotation_style
+                    && !matches!(
+                        rotation_style.as_str(),
+                        "all around" | "left-right" | "don't rotate"
+                    )
+                {
                     emit_message(
                         context,
                         GrazeMessage::Warning(
@@ -4479,7 +4503,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         GrazeMessageSetting::Warnings,
                     );
                 }
-                target.rotation_style = Some(rotation_style);
+                target.rotation_style = rotation_style;
             }
         }
         context.current_sb3_target.replace(target);
@@ -4798,11 +4822,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             context,
             data.remove("sprite_name"),
             Some((_, value)) => value.to_literal(),
-            value => value.get_string_value().to_string()
+            value => value.get_non_empty().map(|value| value.get_string_value().to_string())
         ) {
-            monitor.sprite_name = Some(sprite_name);
-            // TODO: Monitor config: Interpret `()` as `None`/`null` when possible
-            // Issue: #83
+            monitor.sprite_name = sprite_name;
         }
         if let Some(value) = extract_data_from_dictionary_value!(
             context,
@@ -4810,10 +4832,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             Some((_, value)) => value.to_literal_or_list(),
             value => value
         ) {
-            // TODO: Implement advanced dictionary values
-            //  - [x] List
-            //  - [x] Dictionary
-            // Issue: #82
             match value {
                 cst::DictionaryValueLiteralOrList::Literal(value) => {
                     if matches!(monitor.value, Sb3MonitorValue::List(..)) {
@@ -4829,8 +4847,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             GrazeMessageSetting::Warnings,
                         );
                     }
-                    monitor.value = Sb3MonitorValue::Primitive(Sb3Primitive::from(Sb3PrimitiveOrBool::from(&value)));
-                },
+                    monitor.value = Sb3MonitorValue::Primitive(Sb3Primitive::from(
+                        Sb3PrimitiveOrBool::from(&value),
+                    ));
+                }
                 cst::DictionaryValueLiteralOrList::List(items) => {
                     if matches!(monitor.value, Sb3MonitorValue::Primitive(..)) {
                         emit_message(
@@ -4845,15 +4865,21 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             GrazeMessageSetting::Warnings,
                         );
                     }
-                    monitor.value = Sb3MonitorValue::List(items.into_iter().map(|value| {
-                        Ok(extract_data_from_dictionary_value!(
-                            context,
-                            Some(value),
-                            Some(value) => value.to_literal(),
-                            value => Sb3Primitive::from(Sb3PrimitiveOrBool::from(&value))
-                        ).unwrap_or_else(|| "".into()))
-                    }).collect::<Result<_, _>>()?);
-                },
+                    monitor.value = Sb3MonitorValue::List(
+                        items
+                            .into_iter()
+                            .map(|value| {
+                                Ok(extract_data_from_dictionary_value!(
+                                    context,
+                                    Some(value),
+                                    Some(value) => value.to_literal(),
+                                    value => Sb3Primitive::from(Sb3PrimitiveOrBool::from(&value))
+                                )
+                                .unwrap_or_else(|| "".into()))
+                            })
+                            .collect::<Result<_, _>>()?,
+                    );
+                }
             }
         }
         if let Some(width) = extract_f64_entry_from_dictionary_data(context, &mut data, "width")? {
@@ -4864,14 +4890,14 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             monitor.height = height;
         }
         if let Some(x_position) =
-            extract_f64_entry_from_dictionary_data(context, &mut data, "x_position")?
+            extract_optional_f64_entry_from_dictionary_data(context, &mut data, "x_position")?
         {
-            monitor.x = Some(x_position);
+            monitor.x = x_position;
         }
         if let Some(y_position) =
-            extract_f64_entry_from_dictionary_data(context, &mut data, "y_position")?
+            extract_optional_f64_entry_from_dictionary_data(context, &mut data, "y_position")?
         {
-            monitor.y = Some(y_position);
+            monitor.y = y_position;
         }
         if let (Some(_), None) | (None, Some(_)) = (monitor.x, monitor.y) {
             emit_message(
@@ -4891,28 +4917,26 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             data.remove("visible"),
             Some((_, value)) => value.to_literal(),
             value => JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
-        )
-        {
+        ) {
             monitor.visible = visible;
         }
         if let Some(slider_min) =
-            extract_f64_entry_from_dictionary_data(context, &mut data, "slider_min")?
+            extract_optional_f64_entry_from_dictionary_data(context, &mut data, "slider_min")?
         {
-            monitor.slider_min = Some(slider_min);
+            monitor.slider_min = slider_min;
         }
         if let Some(slider_max) =
-            extract_f64_entry_from_dictionary_data(context, &mut data, "slider_max")?
+            extract_optional_f64_entry_from_dictionary_data(context, &mut data, "slider_max")?
         {
-            monitor.slider_max = Some(slider_max);
+            monitor.slider_max = slider_max;
         }
         if let Some(is_discrete) = extract_data_from_dictionary_value!(
             context,
             data.remove("is_discrete"),
             Some((_, value)) => value.to_literal(),
-            value => JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean()
-        )
-        {
-            monitor.is_discrete = Some(is_discrete);
+            value => value.get_non_empty().map(|value| JsPrimitive::from(Sb3PrimitiveOrBool::from(&value)).to_boolean())
+        ) {
+            monitor.is_discrete = is_discrete;
         }
         // TODO: Warn if value has a weird shape for its data type (e.g. "a" for bool, "xyz" for f64)
         //  - [ ] Booleans
