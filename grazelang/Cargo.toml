@@ -27,4 +27,3 @@ anstream = "1.0.0"
 [features]
 default = []
 include_context_in_parse_errors = []
-include_ecmascript_string_numeric_literal_cst = []
