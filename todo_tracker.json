@@ -586,7 +586,7 @@
     "80": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "- [x] Booleans\n- [x] Numbers\n- [x] Monitor mode",
-        "status": "open",
+        "status": "closed",
         "lines": "L5080-L5084",
         "commit": "f7efa7e6b45fc512a838108803c0d3e8520db801",
         "title": "Warn if value has a weird shape for its data type (e.g. \"a\" for bool, \"xyz\" for f64)"
@@ -614,5 +614,13 @@
         "lines": "L4804-L4804",
         "commit": "51b42ec92709f9e9a28d4300e23e20f3c273968a",
         "title": "Monitor config: Interpret `()` as `None`/`null` when possible"
+    },
+    "84": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L2116-L2116",
+        "commit": "5cd4f643cde6b12eefd130f546949fec94c6a6ba",
+        "title": "Move more helpers into `grazelang::codegen::core::helpers`"
     }
 }
