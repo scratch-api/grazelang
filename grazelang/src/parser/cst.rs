@@ -492,7 +492,7 @@ pub enum StageStatement {
     ConfigStatement(
         ConfigKeyword,
         LeftBrace,
-        CommaSeparated<FlatDictionaryEntry>,
+        CommaSeparated<DictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -500,7 +500,7 @@ pub enum StageStatement {
         MonitorKeyword,
         MonitorValue,
         LeftBrace,
-        CommaSeparated<FlatDictionaryEntry>,
+        CommaSeparated<DictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -560,7 +560,7 @@ impl ConfigStatementFromContent for StageStatement {
     fn config_statement_from_content(
         config_keyword: ConfigKeyword,
         left_brace: LeftBrace,
-        items: CommaSeparated<FlatDictionaryEntry>,
+        items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
         source_span: SourceSpan,
     ) -> Self {
@@ -573,7 +573,7 @@ impl MonitorDeclarationFromContent for StageStatement {
         monitor_keyword: MonitorKeyword,
         monitor_value: MonitorValue,
         left_brace: LeftBrace,
-        items: CommaSeparated<FlatDictionaryEntry>,
+        items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
         source_span: SourceSpan,
     ) -> Self {
@@ -633,7 +633,7 @@ pub enum SpriteStatement {
     ConfigStatement(
         ConfigKeyword,
         LeftBrace,
-        CommaSeparated<FlatDictionaryEntry>,
+        CommaSeparated<DictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -641,7 +641,7 @@ pub enum SpriteStatement {
         MonitorKeyword,
         MonitorValue,
         LeftBrace,
-        CommaSeparated<FlatDictionaryEntry>,
+        CommaSeparated<DictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -683,7 +683,7 @@ impl ConfigStatementFromContent for SpriteStatement {
     fn config_statement_from_content(
         config_keyword: ConfigKeyword,
         left_brace: LeftBrace,
-        items: CommaSeparated<FlatDictionaryEntry>,
+        items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
         source_span: SourceSpan,
     ) -> Self {
@@ -696,7 +696,7 @@ impl MonitorDeclarationFromContent for SpriteStatement {
         monitor_keyword: MonitorKeyword,
         monitor_value: MonitorValue,
         left_brace: LeftBrace,
-        items: CommaSeparated<FlatDictionaryEntry>,
+        items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
         source_span: SourceSpan,
     ) -> Self {
@@ -749,9 +749,9 @@ impl GetPos for SingleAssetDeclaration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleAssetDeclarationValue {
     Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
-    FlatDictionary(
+    Dictionary(
         LeftBrace,
-        CommaSeparated<FlatDictionaryEntry>,
+        CommaSeparated<DictionaryEntry>,
         RightBrace,
         SourceSpan,
     ),
@@ -761,7 +761,7 @@ impl GetPos for SingleAssetDeclarationValue {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             SingleAssetDeclarationValue::Simple(_, _, _, source_span)
-            | SingleAssetDeclarationValue::FlatDictionary(_, _, _, source_span) => source_span,
+            | SingleAssetDeclarationValue::Dictionary(_, _, _, source_span) => source_span,
         }
     }
 }
@@ -1010,33 +1010,33 @@ impl GetPos for NormalAssignmentOperator {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[expect(clippy::large_enum_variant)]
-pub enum FlatDictionaryEntry {
+pub enum DictionaryEntry {
     Valid(SingleIdentifier, Colon, Literal, SourceSpan),
     Invalid(SourceSpan),
 }
 
-impl GetPos for FlatDictionaryEntry {
+impl GetPos for DictionaryEntry {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            FlatDictionaryEntry::Valid(_, _, _, p) | FlatDictionaryEntry::Invalid(p) => p,
+            DictionaryEntry::Valid(_, _, _, p) | DictionaryEntry::Invalid(p) => p,
         }
     }
 }
 
-impl InvalidVariantFromSourceSpan for FlatDictionaryEntry {
+impl InvalidVariantFromSourceSpan for DictionaryEntry {
     fn invalid_variant_from_source_span(source_span: SourceSpan) -> Self {
         Self::Invalid(source_span)
     }
 }
 
-impl FlatDictionaryEntry {
+impl DictionaryEntry {
     pub fn to_valid(&self) -> Option<(&SingleIdentifier, &Colon, &Literal, &SourceSpan)> {
         match self {
-            FlatDictionaryEntry::Valid(single_identifier, colon, literal, p) => {
+            DictionaryEntry::Valid(single_identifier, colon, literal, p) => {
                 Some((single_identifier, colon, literal, p))
             }
-            FlatDictionaryEntry::Invalid(_) => None,
+            DictionaryEntry::Invalid(_) => None,
         }
     }
 }
@@ -2385,31 +2385,31 @@ pub enum ParseError {
         context: IString,
         source_span: SourceSpan,
     },
-    #[assoc(internal_lint_id = "missing_flat_dictionary_entry")]
+    #[assoc(internal_lint_id = "missing_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "missing dictionary entry here")]
     #[error("expected key {key:?} in flat dictionary")]
-    MissingFlatDictionaryEntry {
+    MissingDictionaryEntry {
         key: IString,
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
-    #[assoc(internal_lint_id = "unknown_flat_dictionary_entry")]
+    #[assoc(internal_lint_id = "unknown_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "unexpected dictionary entry here")]
     #[error("unexpected key {key:?} in flat dictionary")]
-    UnknownFlatDictionaryEntry {
+    UnknownDictionaryEntry {
         key: IString,
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
         source_span: SourceSpan,
     },
-    #[assoc(internal_lint_id = "repeated_flat_dictionary_entry")]
+    #[assoc(internal_lint_id = "repeated_dictionary_entry")]
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "repeated dictionary entry here")]
     #[error("repeated key {key:?} in flat dictionary")]
-    RepeatedFlatDictionaryEntry {
+    RepeatedDictionaryEntry {
         key: IString,
         #[cfg(feature = "include_context_in_parse_errors")]
         context: IString,
@@ -2419,9 +2419,9 @@ pub enum ParseError {
     #[assoc(internal_primary_message = "")]
     #[assoc(get_secondary_message = "")]
     #[error("there was a type error in the flat dictionary")]
-    FlatDictionaryTypeError {
+    DictionaryTypeError {
         #[source]
-        source: FlatDictionaryTypeError,
+        source: DictionaryTypeError,
     },
     #[assoc(internal_lint_id = "")]
     #[assoc(internal_primary_message = "")]
@@ -2556,13 +2556,13 @@ impl PartialEq for ParseError {
                 },
             ) => l_source_span == r_source_span,
             (
-                Self::MissingFlatDictionaryEntry {
+                Self::MissingDictionaryEntry {
                     key: l_key,
                     #[cfg(feature = "include_context_in_parse_errors")]
                         context: _,
                     source_span: l_source_span,
                 },
-                Self::MissingFlatDictionaryEntry {
+                Self::MissingDictionaryEntry {
                     key: r_key,
                     #[cfg(feature = "include_context_in_parse_errors")]
                         context: _,
@@ -2570,13 +2570,13 @@ impl PartialEq for ParseError {
                 },
             ) => l_key == r_key && l_source_span == r_source_span,
             (
-                Self::UnknownFlatDictionaryEntry {
+                Self::UnknownDictionaryEntry {
                     key: l_key,
                     #[cfg(feature = "include_context_in_parse_errors")]
                         context: _,
                     source_span: l_source_span,
                 },
-                Self::UnknownFlatDictionaryEntry {
+                Self::UnknownDictionaryEntry {
                     key: r_key,
                     #[cfg(feature = "include_context_in_parse_errors")]
                         context: _,
@@ -2584,13 +2584,13 @@ impl PartialEq for ParseError {
                 },
             ) => l_key == r_key && l_source_span == r_source_span,
             (
-                Self::RepeatedFlatDictionaryEntry {
+                Self::RepeatedDictionaryEntry {
                     key: l_key,
                     #[cfg(feature = "include_context_in_parse_errors")]
                         context: _,
                     source_span: l_source_span,
                 },
-                Self::RepeatedFlatDictionaryEntry {
+                Self::RepeatedDictionaryEntry {
                     key: r_key,
                     #[cfg(feature = "include_context_in_parse_errors")]
                         context: _,
@@ -2649,19 +2649,19 @@ impl ParseError {
                     context: _,
                 source_span: _,
             } => return Cow::Owned(format!("name `{symbol}` is defined multiple times")),
-            Self::MissingFlatDictionaryEntry {
+            Self::MissingDictionaryEntry {
                 key,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span: _,
             } => return Cow::Owned(format!("missing dictionary entry key: \"{key}\"")),
-            Self::UnknownFlatDictionaryEntry {
+            Self::UnknownDictionaryEntry {
                 key,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span: _,
             } => return Cow::Owned(format!("unexpected dictionary entry key: \"{key}\"")),
-            Self::RepeatedFlatDictionaryEntry {
+            Self::RepeatedDictionaryEntry {
                 key,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
@@ -2671,7 +2671,7 @@ impl ParseError {
                     "dictionary entry with key \"{key}\" defined multiple times"
                 ));
             }
-            Self::FlatDictionaryTypeError { source } => {
+            Self::DictionaryTypeError { source } => {
                 return Cow::Borrowed(source.get_primary_message());
             }
             Self::InvalidConstantExpression {
@@ -2736,25 +2736,25 @@ impl GetPos for ParseError {
                     context: _,
                 source_span,
             } => source_span,
-            ParseError::MissingFlatDictionaryEntry {
+            ParseError::MissingDictionaryEntry {
                 key: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span,
             } => source_span,
-            ParseError::UnknownFlatDictionaryEntry {
+            ParseError::UnknownDictionaryEntry {
                 key: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span,
             } => source_span,
-            ParseError::RepeatedFlatDictionaryEntry {
+            ParseError::RepeatedDictionaryEntry {
                 key: _,
                 #[cfg(feature = "include_context_in_parse_errors")]
                     context: _,
                 source_span,
             } => source_span,
-            ParseError::FlatDictionaryTypeError { source } => source.get_source_span(),
+            ParseError::DictionaryTypeError { source } => source.get_source_span(),
             ParseError::InvalidConstantExpression {
                 expression,
                 source: _,
@@ -2827,7 +2827,7 @@ pub trait ConfigStatementFromContent {
     fn config_statement_from_content(
         config_keyword: ConfigKeyword,
         left_brace: LeftBrace,
-        items: CommaSeparated<FlatDictionaryEntry>,
+        items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
         source_span: SourceSpan,
     ) -> Self;
@@ -2838,7 +2838,7 @@ pub trait MonitorDeclarationFromContent {
         monitor_keyword: MonitorKeyword,
         monitor_value: MonitorValue,
         left_brace: LeftBrace,
-        items: CommaSeparated<FlatDictionaryEntry>,
+        items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
         source_span: SourceSpan,
     ) -> Self;
@@ -2848,7 +2848,7 @@ pub trait MonitorDeclarationFromContent {
 #[func(const fn internal_lint_id(&self) -> &'static str)]
 #[func(pub const fn get_primary_message(&self) -> &'static str)]
 #[func(pub const fn get_secondary_message(&self) -> &'static str)]
-pub enum FlatDictionaryTypeError {
+pub enum DictionaryTypeError {
     #[assoc(internal_lint_id = "list_as_primitive")]
     #[assoc(get_primary_message = "cannot interpret a list as a primitive value")]
     #[assoc(get_secondary_message = "should be a primitive value")]
@@ -2886,21 +2886,21 @@ pub enum FlatDictionaryTypeError {
     CannotBeDict { source_span: SourceSpan },
 }
 
-impl GetPos for FlatDictionaryTypeError {
+impl GetPos for DictionaryTypeError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            FlatDictionaryTypeError::ListAsPrimitive { source_span }
-            | FlatDictionaryTypeError::DictAsPrimitive { source_span }
-            | FlatDictionaryTypeError::ListAsDict { source_span }
-            | FlatDictionaryTypeError::PrimitiveAsDict { source_span }
-            | FlatDictionaryTypeError::DictAsList { source_span }
-            | FlatDictionaryTypeError::PrimitiveAsList { source_span }
-            | FlatDictionaryTypeError::CannotBeDict { source_span } => source_span,
+            DictionaryTypeError::ListAsPrimitive { source_span }
+            | DictionaryTypeError::DictAsPrimitive { source_span }
+            | DictionaryTypeError::ListAsDict { source_span }
+            | DictionaryTypeError::PrimitiveAsDict { source_span }
+            | DictionaryTypeError::DictAsList { source_span }
+            | DictionaryTypeError::PrimitiveAsList { source_span }
+            | DictionaryTypeError::CannotBeDict { source_span } => source_span,
         }
     }
 }
 
-impl GetLintId for FlatDictionaryTypeError {
+impl GetLintId for DictionaryTypeError {
     fn get_lint_id(&self) -> &'static str {
         self.internal_lint_id()
     }

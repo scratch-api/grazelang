@@ -456,7 +456,7 @@ macro_rules! parse_comma_separated {
     }};
 }
 
-macro_rules! parse_flat_dictionary {
+macro_rules! parse_dictionary {
     (
         $token_stream:expr,
         $context:expr
@@ -490,7 +490,7 @@ macro_rules! parse_flat_dictionary {
                             context,
                             {
                                 find_comma_separated_entry_end(token_stream)?;
-                                let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                let value = DictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
                                 let comma = match peek_token!(token_stream) {
                                     Token::Comma => {
                                         skip_token!(token_stream);
@@ -505,7 +505,7 @@ macro_rules! parse_flat_dictionary {
                             }
                         );
                         let start_pos = identifier.get_source_span().0.0;
-                        FlatDictionaryEntry::Valid(
+                        DictionaryEntry::Valid(
                             identifier,
                             expect_token_or_message!(
                                 token_stream,
@@ -515,7 +515,7 @@ macro_rules! parse_flat_dictionary {
                                 "':'",
                                 {
                                     find_comma_separated_entry_end(token_stream)?;
-                                    let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                    let value = DictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
                                     let comma = match peek_token!(token_stream) {
                                         Token::Comma => {
                                             skip_token!(token_stream);
@@ -534,7 +534,7 @@ macro_rules! parse_flat_dictionary {
                                 context,
                                 {
                                     find_comma_separated_entry_end(token_stream)?;
-                                    let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                    let value = DictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
                                     let comma = match peek_token!(token_stream) {
                                         Token::Comma => {
                                             skip_token!(token_stream);
@@ -576,7 +576,7 @@ macro_rules! parse_flat_dictionary {
                             context,
                             {
                                 find_comma_separated_entry_end(token_stream)?;
-                                let value = FlatDictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
+                                let value = DictionaryEntry::Invalid(token_stream.span_from_previous_to_current(item_start_pos));
                                 let comma = match peek_token!(token_stream) {
                                     Token::Comma => {
                                         skip_token!(token_stream);
@@ -1010,7 +1010,7 @@ pub mod statement {
         parser::cst::{
             AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword,
             ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF, FlatDictionaryEntry,
+            DataDeclaration, DataDeclarationScope, EMPTY_ISTRING_REF, DictionaryEntry,
             LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
             MonitorDeclarationFromContent, MonitorKeyword, MonitorValue, NormalAssignmentOperator,
             RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration,
@@ -2378,7 +2378,7 @@ pub mod statement {
         T: ConfigStatementFromContent + InvalidVariantFromSourceSpan,
     {
         let config_keyword = expect_token!(token_stream, Token::ConfigKeyword => from_stream_pos::<ConfigKeyword>(token_stream), "Expected \"config\".", "\"config\"");
-        let (left_brace, items, right_brace, _) = parse_flat_dictionary!(token_stream, context);
+        let (left_brace, items, right_brace, _) = parse_dictionary!(token_stream, context);
         let source_span = config_keyword.span_to(&right_brace);
         Ok(T::config_statement_from_content(
             config_keyword,
@@ -2420,7 +2420,7 @@ pub mod statement {
         } else {
             MonitorValue::Identifier(identifier)
         };
-        let (left_brace, items, right_brace, _) = parse_flat_dictionary!(token_stream, context);
+        let (left_brace, items, right_brace, _) = parse_dictionary!(token_stream, context);
         let source_span = monitor_keyword.span_to(&right_brace);
         Ok(T::monitor_statement_from_content(
             monitor_keyword,
@@ -2432,13 +2432,13 @@ pub mod statement {
         ))
     }
 
-    pub fn parse_flat_dictionary_asset_value(
+    pub fn parse_dictionary_asset_value(
         token_stream: ParseIn,
         context: &mut ParseContext,
     ) -> ParseOut<cst::SingleAssetDeclarationValue> {
         let (left_brace, items, right_brace, source_span) =
-            parse_flat_dictionary!(token_stream, context);
-        Ok(cst::SingleAssetDeclarationValue::FlatDictionary(
+            parse_dictionary!(token_stream, context);
+        Ok(cst::SingleAssetDeclarationValue::Dictionary(
             left_brace,
             items,
             right_brace,
@@ -2516,7 +2516,7 @@ pub mod statement {
                     let value = match peek_token!(token_stream) {
                         Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
                         Token::LeftBrace => {
-                            parse_flat_dictionary_asset_value(token_stream, context)?
+                            parse_dictionary_asset_value(token_stream, context)?
                         }
                         _ => {
                             let token = next_token!(token_stream);
@@ -2549,7 +2549,7 @@ pub mod statement {
                         let canonical_name = canonical_identifier.as_ref().map(|value| value.name.clone());
                         let (path, mut data) = match &value {
                             cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
-                            cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
+                            cst::SingleAssetDeclarationValue::Dictionary(_, items, _, _) => {
                                 let mut data = HashMap::with_capacity(items.len());
                                 for entry in items {
                                     let Some((ident, _, value, _)) = entry
@@ -2558,7 +2558,7 @@ pub mod statement {
                                         continue
                                     };
                                     if data.insert(ident.value.clone(), (*ident.get_source_span(), value.clone())).is_some() {
-                                        errors.push(ParseError::RepeatedFlatDictionaryEntry {
+                                        errors.push(ParseError::RepeatedDictionaryEntry {
                                             key: ident.value.clone(),
                                             #[cfg(feature = "include_context_in_parse_errors")]
                                             context: literal!(static_current_context!()),
@@ -2567,7 +2567,7 @@ pub mod statement {
                                     }
                                 }
                                 (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
-                                    errors.push(ParseError::MissingFlatDictionaryEntry {
+                                    errors.push(ParseError::MissingDictionaryEntry {
                                         key: literal!("path"),
                                         #[cfg(feature = "include_context_in_parse_errors")]
                                         context: literal!(static_current_context!()),
@@ -2624,7 +2624,7 @@ pub mod statement {
                             });
                         }
                         for (key, (source_span, _)) in data {
-                            errors.push(ParseError::UnknownFlatDictionaryEntry {
+                            errors.push(ParseError::UnknownDictionaryEntry {
                                 key,
                                 #[cfg(feature = "include_context_in_parse_errors")]
                                 context: literal!(static_current_context!()),
@@ -2667,7 +2667,7 @@ pub mod statement {
                 let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
                 let value = match peek_token!(token_stream) {
                     Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
-                    Token::LeftBrace => parse_flat_dictionary_asset_value(token_stream, context)?,
+                    Token::LeftBrace => parse_dictionary_asset_value(token_stream, context)?,
                     _ => {
                         let token = next_token!(token_stream);
                         emit_unexpected_token!(
@@ -2699,7 +2699,7 @@ pub mod statement {
                     let canonical_name = Some(canonical_identifier.name.clone());
                     let (path, mut data) = match &value {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
-                        cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
+                        cst::SingleAssetDeclarationValue::Dictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
                             for entry in items {
                                 let Some((ident, _, value, _)) = entry
@@ -2708,7 +2708,7 @@ pub mod statement {
                                     continue
                                 };
                                 if data.insert(ident.value.clone(), (*ident.get_source_span(), value.clone())).is_some() {
-                                    errors.push(ParseError::RepeatedFlatDictionaryEntry {
+                                    errors.push(ParseError::RepeatedDictionaryEntry {
                                         key: ident.value.clone(),
                                         #[cfg(feature = "include_context_in_parse_errors")]
                                         context: literal!(static_current_context!()),
@@ -2717,7 +2717,7 @@ pub mod statement {
                                 }
                             }
                             (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
-                                errors.push(ParseError::MissingFlatDictionaryEntry {
+                                errors.push(ParseError::MissingDictionaryEntry {
                                     key: literal!("path"),
                                     #[cfg(feature = "include_context_in_parse_errors")]
                                     context: literal!(static_current_context!()),
@@ -2774,7 +2774,7 @@ pub mod statement {
                         });
                     }
                     for (key, (source_span, _)) in data {
-                        errors.push(ParseError::UnknownFlatDictionaryEntry {
+                        errors.push(ParseError::UnknownDictionaryEntry {
                             key,
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),
@@ -2797,7 +2797,7 @@ pub mod statement {
                 let start_pos = get_token_start(token_stream);
                 let value = match peek_token!(token_stream) {
                     Token::LeftParens => parse_simple_asset_value(token_stream, context)?,
-                    Token::LeftBrace => parse_flat_dictionary_asset_value(token_stream, context)?,
+                    Token::LeftBrace => parse_dictionary_asset_value(token_stream, context)?,
                     _ => {
                         let token = next_token!(token_stream);
                         emit_unexpected_token!(
@@ -2829,7 +2829,7 @@ pub mod statement {
                     let canonical_name = None;
                     let (path, mut data) = match &value {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
-                        cst::SingleAssetDeclarationValue::FlatDictionary(_, items, _, _) => {
+                        cst::SingleAssetDeclarationValue::Dictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
                             for entry in items {
                                 let Some((ident, _, value, _)) = entry
@@ -2838,7 +2838,7 @@ pub mod statement {
                                     continue
                                 };
                                 if data.insert(ident.value.clone(), (*ident.get_source_span(), value.clone())).is_some() {
-                                    errors.push(ParseError::RepeatedFlatDictionaryEntry {
+                                    errors.push(ParseError::RepeatedDictionaryEntry {
                                         key: ident.value.clone(),
                                         #[cfg(feature = "include_context_in_parse_errors")]
                                         context: literal!(static_current_context!()),
@@ -2847,7 +2847,7 @@ pub mod statement {
                                 }
                             }
                             (data.remove("path").map(|(_, value)| value).unwrap_or_else(|| {
-                                errors.push(ParseError::MissingFlatDictionaryEntry {
+                                errors.push(ParseError::MissingDictionaryEntry {
                                     key: literal!("path"),
                                     #[cfg(feature = "include_context_in_parse_errors")]
                                     context: literal!(static_current_context!()),
@@ -2904,7 +2904,7 @@ pub mod statement {
                         });
                     }
                     for (key, (source_span, _)) in data {
-                        errors.push(ParseError::UnknownFlatDictionaryEntry {
+                        errors.push(ParseError::UnknownDictionaryEntry {
                             key,
                             #[cfg(feature = "include_context_in_parse_errors")]
                             context: literal!(static_current_context!()),

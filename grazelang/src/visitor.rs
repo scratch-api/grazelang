@@ -1,7 +1,16 @@
 use crate::{
     lexer::SourceSpan,
     parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, Expression, FlatDictionaryEntry, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
+        Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind,
+        DataDeclaration, DataDeclarationScope, DictionaryEntry, Expression, FormattedStringContent,
+        GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword,
+        LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, MonitorKeyword,
+        MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
+        Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock,
+        SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement,
+        SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent,
+        VarKeyword, VarsKeyword, WarpSpecifier,
     },
 };
 
@@ -127,7 +136,7 @@ pub type BorrowedSpriteStatementCostumeDeclaration<'a> = (
 pub type BorrowedConfigStatement<'a> = (
     &'a ConfigKeyword,
     &'a LeftBrace,
-    &'a CommaSeparated<FlatDictionaryEntry>,
+    &'a CommaSeparated<DictionaryEntry>,
     &'a RightBrace,
     &'a SourceSpan,
 );
@@ -136,7 +145,7 @@ pub type BorrowedMonitorDeclaration<'a> = (
     &'a MonitorKeyword,
     &'a MonitorValue,
     &'a LeftBrace,
-    &'a CommaSeparated<FlatDictionaryEntry>,
+    &'a CommaSeparated<DictionaryEntry>,
     &'a RightBrace,
     &'a SourceSpan,
 );

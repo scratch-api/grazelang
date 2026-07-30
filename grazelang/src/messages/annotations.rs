@@ -150,7 +150,7 @@ impl ParseError {
                 source.get_secondary_message(),
                 *source.get_source_span(),
             ),
-            ParseError::FlatDictionaryTypeError { source } => (
+            ParseError::DictionaryTypeError { source } => (
                 source.get_lint_id(),
                 source.get_secondary_message(),
                 *source.get_source_span(),
@@ -195,7 +195,7 @@ impl GrazeSb3GeneratorError {
                 source.get_secondary_message(),
                 *source.get_source_span(),
             ),
-            GrazeSb3GeneratorError::FlatDictionaryTypeError { source: error } => (
+            GrazeSb3GeneratorError::DictionaryTypeError { source: error } => (
                 error.get_lint_id(),
                 error.get_secondary_message(),
                 *error.get_source_span(),

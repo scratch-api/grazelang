@@ -47,7 +47,7 @@ use crate::{
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclarationScope, EMPTY_ISTRING_REF, Expression, FlatDictionaryTypeError,
+            DataDeclarationScope, EMPTY_ISTRING_REF, Expression, DictionaryTypeError,
             FormattedStringContent, GetPos, Identifier, ListEntry, Literal, SingleIdentifier,
             UnOpDescriptor,
         },
@@ -148,17 +148,17 @@ pub enum GrazeSb3GeneratorError {
     #[assoc(get_secondary_message = "cannot be assigned to")]
     #[error("the identifier {identifier:?} is not assignable")]
     IdentifierNotAssignable { identifier: Identifier },
-    #[assoc(internal_lint_id = "unknown_flat_dictionary_entry")]
+    #[assoc(internal_lint_id = "unknown_dictionary_entry")]
     #[assoc(get_secondary_message = "unexpected dictionary entry here")]
     #[error("unexpected key {key:?} in flat dictionary")]
-    UnknownFlatDictionaryEntry {
+    UnknownDictionaryEntry {
         key: IString,
         source_span: SourceSpan,
     },
-    #[assoc(internal_lint_id = "repeated_flat_dictionary_entry")]
+    #[assoc(internal_lint_id = "repeated_dictionary_entry")]
     #[assoc(get_secondary_message = "repeated dictionary entry here")]
     #[error("repeated key {key:?} in flat dictionary")]
-    RepeatedFlatDictionaryEntry {
+    RepeatedDictionaryEntry {
         key: IString,
         source_span: SourceSpan,
     },
@@ -169,9 +169,9 @@ pub enum GrazeSb3GeneratorError {
     #[assoc(internal_lint_id = "")]
     #[assoc(get_secondary_message = "")]
     #[error("there was a type error in the flat dictionary")]
-    FlatDictionaryTypeError {
+    DictionaryTypeError {
         #[source]
-        source: FlatDictionaryTypeError,
+        source: DictionaryTypeError,
     },
     #[assoc(internal_lint_id = "")]
     #[assoc(get_secondary_message = "")]
@@ -228,11 +228,11 @@ impl GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::IdentifierNotAssignable { identifier } => {
                 format!("`{identifier}` cannot be assigned to")
             }
-            GrazeSb3GeneratorError::UnknownFlatDictionaryEntry {
+            GrazeSb3GeneratorError::UnknownDictionaryEntry {
                 key,
                 source_span: _,
             } => format!("unexpected dictionary entry key: \"{key}\""),
-            GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+            GrazeSb3GeneratorError::RepeatedDictionaryEntry {
                 key,
                 source_span: _,
             } => {
@@ -241,7 +241,7 @@ impl GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::MonitorValueNotBlock { source_span: _ } => {
                 return Cow::Borrowed("expected a standalone block for a monitor value");
             }
-            GrazeSb3GeneratorError::FlatDictionaryTypeError { source: error } => {
+            GrazeSb3GeneratorError::DictionaryTypeError { source: error } => {
                 return Cow::Borrowed(error.get_primary_message());
             }
             GrazeSb3GeneratorError::InvalidConstantExpression {
@@ -287,11 +287,11 @@ impl GetPos for GrazeSb3GeneratorError {
                 source_span,
             }
             | GrazeSb3GeneratorError::BlockStackHasNoKnownBlock { source_span }
-            | GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+            | GrazeSb3GeneratorError::RepeatedDictionaryEntry {
                 key: _,
                 source_span,
             }
-            | GrazeSb3GeneratorError::UnknownFlatDictionaryEntry {
+            | GrazeSb3GeneratorError::UnknownDictionaryEntry {
                 key: _,
                 source_span,
             }
@@ -299,7 +299,7 @@ impl GetPos for GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword } => {
                 stage_keyword.get_source_span()
             }
-            GrazeSb3GeneratorError::FlatDictionaryTypeError { source: error } => error.get_source_span(),
+            GrazeSb3GeneratorError::DictionaryTypeError { source: error } => error.get_source_span(),
             GrazeSb3GeneratorError::InvalidConstantExpression {
                 expression: _,
                 source,
@@ -2079,9 +2079,9 @@ macro_rules! emit_error {
     }};
 }
 
-pub fn get_data_from_flat_dictionary<M>(
+pub fn get_data_from_dictionary<M>(
     context: &mut GrazeSb3GeneratorContext,
-    dictionary: &cst::CommaSeparated<cst::FlatDictionaryEntry>,
+    dictionary: &cst::CommaSeparated<cst::DictionaryEntry>,
     mut map_key: M,
 ) -> Result<HashMap<IString, (SourceSpan, Literal)>, GrazeSb3GeneratorError>
 where
@@ -2098,7 +2098,7 @@ where
             .is_some()
         {
             emit_error!(
-                GrazeSb3GeneratorError::RepeatedFlatDictionaryEntry {
+                GrazeSb3GeneratorError::RepeatedDictionaryEntry {
                     key: ident.value.clone(),
                     source_span: *ident.get_source_span(),
                 },
@@ -2109,7 +2109,7 @@ where
     Ok(data)
 }
 
-pub fn extract_f64_entry_from_flat_dictionary_data(
+pub fn extract_f64_entry_from_dictionary_data(
     data: &mut HashMap<IString, (SourceSpan, cst::Literal)>,
     key: &str,
 ) -> Option<f64> {
@@ -4293,7 +4293,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .current_sb3_target
             .as_ref()
             .is_some_and(|value| value.is_stage);
-        let mut data = get_data_from_flat_dictionary(context, value.2, |key| {
+        let mut data = get_data_from_dictionary(context, value.2, |key| {
             if let Some(new_key) = match key.as_str() {
                 "costume" if is_stage => Some(literal!("backdrop")),
                 "show" | "shown" if !is_stage => Some(literal!("visible")),
@@ -4320,11 +4320,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 target.current_costume = costume_number
                     .unwrap_or_else(|| parse_costume_number_from_name(&target.costumes, &backdrop));
             }
-            if let Some(volume) = extract_f64_entry_from_flat_dictionary_data(&mut data, "volume") {
+            if let Some(volume) = extract_f64_entry_from_dictionary_data(&mut data, "volume") {
                 target.volume = volume;
             }
             if let Some(layer_order) =
-                extract_f64_entry_from_flat_dictionary_data(&mut data, "layer_order")
+                extract_f64_entry_from_dictionary_data(&mut data, "layer_order")
             {
                 target.layer_order = layer_order as usize;
             }
@@ -4333,7 +4333,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     Some(text_to_speech_language.get_string_value().to_string());
             }
             if let Some(video_transparency) =
-                extract_f64_entry_from_flat_dictionary_data(&mut data, "video_transparency")
+                extract_f64_entry_from_dictionary_data(&mut data, "video_transparency")
             {
                 target.video_transparency = Some(video_transparency);
             }
@@ -4372,25 +4372,25 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             {
                 let target = context.current_sb3_target.as_mut().unwrap();
                 if let Some(x_position) =
-                    extract_f64_entry_from_flat_dictionary_data(&mut data, "x_position")
+                    extract_f64_entry_from_dictionary_data(&mut data, "x_position")
                 {
                     target.x = Some(x_position);
                 }
                 if let Some(y_position) =
-                    extract_f64_entry_from_flat_dictionary_data(&mut data, "y_position")
+                    extract_f64_entry_from_dictionary_data(&mut data, "y_position")
                 {
                     target.y = Some(y_position);
                 }
                 if let Some(direction) =
-                    extract_f64_entry_from_flat_dictionary_data(&mut data, "direction")
+                    extract_f64_entry_from_dictionary_data(&mut data, "direction")
                 {
                     target.direction = Some(direction);
                 }
-                if let Some(size) = extract_f64_entry_from_flat_dictionary_data(&mut data, "size") {
+                if let Some(size) = extract_f64_entry_from_dictionary_data(&mut data, "size") {
                     target.size = Some(size);
                 }
                 if let Some(volume) =
-                    extract_f64_entry_from_flat_dictionary_data(&mut data, "volume")
+                    extract_f64_entry_from_dictionary_data(&mut data, "volume")
                 {
                     target.volume = volume;
                 }
@@ -4405,7 +4405,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     target.visible = Some(visible);
                 }
                 if let Some(layer_order) =
-                    extract_f64_entry_from_flat_dictionary_data(&mut data, "layer_order")
+                    extract_f64_entry_from_dictionary_data(&mut data, "layer_order")
                 {
                     target.layer_order = layer_order as usize;
                 }
@@ -4434,7 +4434,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         for (key, (source_span, _)) in data {
             emit_error!(
-                GrazeSb3GeneratorError::UnknownFlatDictionaryEntry { key, source_span },
+                GrazeSb3GeneratorError::UnknownDictionaryEntry { key, source_span },
                 context
             );
         }
@@ -4447,7 +4447,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: BorrowedMonitorDeclaration,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        let mut data = get_data_from_flat_dictionary(context, value.3, |key| {
+        let mut data = get_data_from_dictionary(context, value.3, |key| {
             if let Some(new_key) = match key.as_str() {
                 "show" | "shown" => Some(literal!("visible")),
                 "x" => Some(literal!("x_position")),
@@ -4749,19 +4749,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
             }
         }
-        if let Some(width) = extract_f64_entry_from_flat_dictionary_data(&mut data, "width") {
+        if let Some(width) = extract_f64_entry_from_dictionary_data(&mut data, "width") {
             monitor.width = width;
         }
-        if let Some(height) = extract_f64_entry_from_flat_dictionary_data(&mut data, "height") {
+        if let Some(height) = extract_f64_entry_from_dictionary_data(&mut data, "height") {
             monitor.height = height;
         }
         if let Some(x_position) =
-            extract_f64_entry_from_flat_dictionary_data(&mut data, "x_position")
+            extract_f64_entry_from_dictionary_data(&mut data, "x_position")
         {
             monitor.x = Some(x_position);
         }
         if let Some(y_position) =
-            extract_f64_entry_from_flat_dictionary_data(&mut data, "y_position")
+            extract_f64_entry_from_dictionary_data(&mut data, "y_position")
         {
             monitor.y = Some(y_position);
         }
@@ -4785,12 +4785,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             monitor.visible = visible;
         }
         if let Some(slider_min) =
-            extract_f64_entry_from_flat_dictionary_data(&mut data, "slider_min")
+            extract_f64_entry_from_dictionary_data(&mut data, "slider_min")
         {
             monitor.slider_min = Some(slider_min);
         }
         if let Some(slider_max) =
-            extract_f64_entry_from_flat_dictionary_data(&mut data, "slider_max")
+            extract_f64_entry_from_dictionary_data(&mut data, "slider_max")
         {
             monitor.slider_max = Some(slider_max);
         }
@@ -4807,7 +4807,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.sb3.monitors.push(monitor);
         for (key, (source_span, _)) in data {
             emit_error!(
-                GrazeSb3GeneratorError::UnknownFlatDictionaryEntry { key, source_span },
+                GrazeSb3GeneratorError::UnknownDictionaryEntry { key, source_span },
                 context
             );
         }
