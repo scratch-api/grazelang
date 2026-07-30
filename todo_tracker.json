@@ -577,18 +577,18 @@
     },
     "79": {
         "filepath": "grazelang/src/lexer.rs",
-        "text": "",
+        "text": "- [x] `costume`\n- [x] `backdrop`\n- [x] `sound`\n- [x] `broadcast`",
         "status": "open",
-        "lines": "L165-L165",
-        "commit": "d492817036e8594978c2233f9623d435f7341f85",
+        "lines": "L157-L162",
+        "commit": "b804dc54ae5c1bf0664617631b441efc26d37b50",
         "title": "Soften keywords"
     },
     "80": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": "- [ ] Booleans\n- [x] Numbers",
+        "text": "- [x] Booleans\n- [x] Numbers\n- [x] Monitor mode",
         "status": "open",
-        "lines": "L4973-L4976",
-        "commit": "241a195a68c46d04d95c76e70d82ce681dbca59a",
+        "lines": "L5080-L5084",
+        "commit": "f7efa7e6b45fc512a838108803c0d3e8520db801",
         "title": "Warn if value has a weird shape for its data type (e.g. \"a\" for bool, \"xyz\" for f64)"
     },
     "81": {
