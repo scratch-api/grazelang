@@ -3096,7 +3096,7 @@ impl GetLintId for DictionaryTypeError {
 //  - [x] CST Nodes
 //  - [x] Visitor integration
 //  - [x] Parser integration
-//  - [ ] Codegen integration
+//  - [x] Codegen integration
 //    - [x] Simple monitor
-//    - [ ] Monitor config
+//    - [x] Monitor config
 // Issue: #75
