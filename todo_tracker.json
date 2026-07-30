@@ -602,7 +602,7 @@
     "82": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "- [x] List\n- [x] Dictionary",
-        "status": "open",
+        "status": "closed",
         "lines": "L4812-L4815",
         "commit": "51b42ec92709f9e9a28d4300e23e20f3c273968a",
         "title": "Implement advanced dictionary values"
@@ -610,7 +610,7 @@
     "83": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L4804-L4804",
         "commit": "51b42ec92709f9e9a28d4300e23e20f3c273968a",
         "title": "Monitor config: Interpret `()` as `None`/`null` when possible"
