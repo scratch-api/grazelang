@@ -3091,12 +3091,3 @@ impl GetLintId for DictionaryTypeError {
         self.internal_lint_id()
     }
 }
-
-// TODO: Implement monitors
-//  - [x] CST Nodes
-//  - [x] Visitor integration
-//  - [x] Parser integration
-//  - [x] Codegen integration
-//    - [x] Simple monitor
-//    - [x] Monitor config
-// Issue: #75
