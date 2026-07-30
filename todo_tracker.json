@@ -594,17 +594,25 @@
     "81": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L4722-L4722",
         "commit": "eca9bd1adae9d42b3cac83bbfdb7b3cce940a6ee",
         "title": "Use advanced dictionary values for monitor declaration"
     },
     "82": {
         "filepath": "grazelang/src/codegen/core.rs",
-        "text": "- [ ] List\n- [ ] Dictionary\n- [ ] null",
+        "text": "- [x] List\n- [x] Dictionary",
         "status": "open",
-        "lines": "L4717-L4720",
-        "commit": "eca9bd1adae9d42b3cac83bbfdb7b3cce940a6ee",
+        "lines": "L4812-L4815",
+        "commit": "51b42ec92709f9e9a28d4300e23e20f3c273968a",
         "title": "Implement advanced dictionary values"
+    },
+    "83": {
+        "filepath": "grazelang/src/codegen/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L4804-L4804",
+        "commit": "51b42ec92709f9e9a28d4300e23e20f3c273968a",
+        "title": "Monitor config: Interpret `()` as `None`/`null` when possible"
     }
 }

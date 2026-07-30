@@ -4802,6 +4802,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         ) {
             monitor.sprite_name = Some(sprite_name);
             // TODO: Monitor config: Interpret `()` as `None`/`null` when possible
+            // Issue: #83
         }
         if let Some(value) = extract_data_from_dictionary_value!(
             context,
