@@ -40,10 +40,10 @@ pub fn annotate<'a, I, S, P>(iter: I, mut source_getter: S, mut printer: P)
 where
     I: Iterator<Item = &'a GrazeMessage>,
     S: FnMut(u32) -> SourceDescriptor<'a>,
-    P: for<'b> FnMut(&'b [Group<'a>]),
+    P: for<'b> FnMut(&'b [Group<'a>], &'b GrazeMessage),
 {
     let mut groups = Vec::with_capacity(4);
-    iter.for_each(move |value| printer(value.annotate(&mut source_getter, &mut groups)));
+    iter.for_each(move |value| printer(value.annotate(&mut source_getter, &mut groups), value));
 }
 
 pub fn convert_source_span(text_span: TextSpan, line_starts: &[usize]) -> std::ops::Range<usize> {

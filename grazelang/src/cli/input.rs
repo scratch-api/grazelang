@@ -34,7 +34,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Parser)]
 #[command(name = "graze")]
 #[command(version = VERSION)]
-#[command(about = "Allows you to manage graze projects, to transpile them to sb3 files and to detranspile sb3 files to ", long_about = None)]
+#[command(about = "Allows you to manage graze projects, to transpile them to sb3 files and to detranspile sb3 files to graze projects", long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -297,8 +297,9 @@ impl Cli {
         annotations::annotate(
             messages.iter(),
             |id| source_files.get(&id).unwrap().as_descriptor(),
-            |ann| {
-                anstream::println!("{}", renderer.render(ann));
+            |ann, _| {
+                let rendered = renderer.render(ann);
+                anstream::eprintln!("{rendered}");
             },
         );
         if error {
