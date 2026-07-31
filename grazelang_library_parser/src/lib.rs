@@ -335,17 +335,14 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
     let pen_properties_category_string_2 = PEN_PROPERTIES_CATEGORY_STRING.as_str();
     quote! {
         #qualifier fn dynamic_generate_library(
-            path: &::std::primitive::str,
+            path: &::std::path::Path,
             use_cache: ::std::primitive::bool,
             create_cache: ::std::primitive::bool,
         ) -> (
                 ::std::collections::HashMap<::std::string::String, #library_path::LibraryItem>,
                 ::std::collections::HashMap<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>
             ) {
-            let relative_path = path.to_string();
-            let manifest_dir =
-                ::std::env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
-            let full_path = ::std::path::Path::new(&manifest_dir).join(&relative_path);
+            let full_path = path;
             let toml_str = ::std::fs::read_to_string(&full_path)
                 .unwrap_or_else(|_| panic!("Failed to read file at {:?}", full_path));
             let (hex_hash, output_cache_path) = (
@@ -353,7 +350,12 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                     let hash = <::sha3::Sha3_256 as ::sha3::Digest>::digest(toml_str.as_bytes());
                     ::base16ct::lower::encode_string(hash.as_slice())
                 },
-                ::std::path::Path::new(&manifest_dir).join(&(relative_path + ".out_cached.dyn.json")),
+                {
+                    let mut path = full_path.with_added_extension("out_cached");
+                    path.add_extension("dyn");
+                    path.add_extension("json");
+                    path
+                },
             );
             if use_cache {
                 if output_cache_path.is_file() {
