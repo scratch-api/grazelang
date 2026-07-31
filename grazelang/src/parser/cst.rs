@@ -3091,3 +3091,9 @@ impl GetLintId for DictionaryTypeError {
         self.internal_lint_id()
     }
 }
+
+// TODO: Add `use extension` or `extension` statement
+//  - [ ] Decide on syntax
+//  - [ ] CST integration
+//  - [ ] Parser integration
+//  - [ ] Codegen integration
