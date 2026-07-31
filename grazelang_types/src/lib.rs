@@ -1,4 +1,5 @@
 pub mod project_json;
+pub mod parser;
 
 use proc_macro2::TokenStream;
 use std::{
@@ -600,4 +601,3 @@ impl ToTokens for ConstantExprLibraryItem {
         });
     }
 }
-

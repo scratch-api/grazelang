@@ -8,13 +8,13 @@ license.workspace = true
 proc-macro = true
 
 [dependencies]
-arcstr = { version = "1.2.0", features = ["serde"] }
-syn = { version = "2.0.117", features = ["full", "extra-traits"] }
-serde_json = "1.0.149"
-serde = { version = "1.0.228", features = ["derive"] }
-quote = "1.0.45"
+arcstr.workspace = true
+syn = { version = "3.0.3", features = ["full", "extra-traits"] }
+serde_json.workspace = true
+serde.workspace = true
+quote.workspace = true
 grazelang_types = { path = "../grazelang_types" }
-sha3 = "0.11.0"
-base16ct = { version = "1.0.0", features = ["alloc"] }
+sha3.workspace = true
+base16ct.workspace = true
 proc-macro2 = "1.0.106"
-toml = "1.1.4"
+toml.workspace = true

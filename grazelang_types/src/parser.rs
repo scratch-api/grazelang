@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use arcstr::ArcStr as IString;
-use grazelang_types::{
+use crate::{
     CallBlockParam, CallBlockParamKind, ConstantExprLibraryItem, ConstantExprLibraryItemValue,
     KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
@@ -687,4 +687,10 @@ pub fn process_constant_expr_toolbox_category(
 pub struct LibraryCache {
     pub hash: String,
     pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DynamicLibraryCache {
+    pub hash: String,
+    pub value: (HashMap<String, LibraryItem>, HashMap<u32, HashSet<String>>),
 }

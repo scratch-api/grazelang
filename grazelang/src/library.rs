@@ -5,7 +5,7 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
-use grazelang_library_parser::{generate_constant_expr_library, generate_library};
+use grazelang_library_parser::{generate_constant_expr_library, generate_dynamic_generate_library, generate_library};
 use grazelang_types::{
     AliasSegment, BACKDROPS_CATEGORY_ID, BindInfo, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, ConstantExprLibraryItem, KnownBlock, LibraryItem, LibraryItemValue,
@@ -64,6 +64,8 @@ where
             .ok_or(ConstExpLookupError::NotFound)
     })
 }
+
+generate_dynamic_generate_library!();
 
 pub fn convert_generated_library(
     library: HashMap<String, LibraryItem>,

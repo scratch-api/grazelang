@@ -11,17 +11,33 @@ use grazelang_types::{
     DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID,
     LibraryItem, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, PEN_PROPERTIES_CATEGORY_ID,
     PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, VARIABLES_CATEGORY_ID,
+    parser::{
+        self,
+        LibraryCache, merge_associated_item,
+        process_constant_expr_toolbox_category, process_toolbox_category,
+    }
 };
 use proc_macro::TokenStream;
 use quote::quote;
 use sha3::{Digest, Sha3_256};
 use syn::{LitStr, parse_macro_input};
 
-use crate::parser::{
-    LibraryCache, merge_associated_item, process_constant_expr_toolbox_category,
-    process_toolbox_category,
-};
-mod parser;
+const NO_CATEGORY_STRING: &IString = &literal!("");
+const VARIABLES_CATEGORY_STRING: &IString = &literal!("variables");
+const LISTS_CATEGORY_STRING: &IString = &literal!("lists");
+const BROADCASTS_CATEGORY_STRING: &IString = &literal!("broadcasts");
+const COSTUMES_CATEGORY_STRING: &IString = &literal!("costumes");
+const BACKDROPS_CATEGORY_STRING: &IString = &literal!("backdrops");
+const BACKDROP_TARGETS_CATEGORY_STRING: &IString = &literal!("backdrop_targets");
+const SOUNDS_CATEGORY_STRING: &IString = &literal!("sounds");
+const DESTINATIONS_CATEGORY_STRING: &IString = &literal!("destinations");
+const DIRECTIONS_CATEGORY_STRING: &IString = &literal!("directions");
+const CLONABLES_CATEGORY_STRING: &IString = &literal!("clonables");
+const COLLIDERS_CATEGORY_STRING: &IString = &literal!("colliders");
+const LOCATIONS_CATEGORY_STRING: &IString = &literal!("locations");
+const PROPERTIES_CATEGORY_STRING: &IString = &literal!("properties");
+const OBJECTS_CATEGORY_STRING: &IString = &literal!("objects");
+const PEN_PROPERTIES_CATEGORY_STRING: &IString = &literal!("pen_properties");
 
 macro_rules! implement_generate_library {
     ($input:ident, $use_cache:ident, $create_cache:ident) => {{
@@ -44,29 +60,29 @@ macro_rules! implement_generate_library {
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
 
-        let v: crate::parser::Library =
+        let v: parser::Library =
             toml::from_str(&toml_str).expect("Failed to parse JSON");
-        let v: Vec<crate::parser::ToolboxCategory> = v.categories;
+        let v: Vec<parser::ToolboxCategory> = v.categories;
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
         let mut menu_category_ids = HashMap::<IString, u32>::from([
-            (literal!(""), NO_CATEGORY_ID),
-            (literal!("variables"), VARIABLES_CATEGORY_ID),
-            (literal!("lists"), LISTS_CATEGORY_ID),
-            (literal!("broadcasts"), BROADCASTS_CATEGORY_ID),
-            (literal!("costumes"), COSTUMES_CATEGORY_ID),
-            (literal!("backdrops"), BACKDROPS_CATEGORY_ID),
-            (literal!("backdrop_targets"), BACKDROP_TARGETS_CATEGORY_ID),
-            (literal!("sounds"), SOUNDS_CATEGORY_ID),
-            (literal!("destinations"), DESTINATIONS_CATEGORY_ID),
-            (literal!("directions"), DIRECTIONS_CATEGORY_ID),
-            (literal!("clonables"), CLONABLES_CATEGORY_ID),
-            (literal!("colliders"), COLLIDERS_CATEGORY_ID),
-            (literal!("locations"), LOCATIONS_CATEGORY_ID),
-            (literal!("properties"), PROPERTIES_CATEGORY_ID),
-            (literal!("objects"), OBJECTS_CATEGORY_ID),
-            (literal!("pen_properties"), PEN_PROPERTIES_CATEGORY_ID),
+            (NO_CATEGORY_STRING.clone(), NO_CATEGORY_ID),
+            (VARIABLES_CATEGORY_STRING.clone(), VARIABLES_CATEGORY_ID),
+            (LISTS_CATEGORY_STRING.clone(), LISTS_CATEGORY_ID),
+            (BROADCASTS_CATEGORY_STRING.clone(), BROADCASTS_CATEGORY_ID),
+            (COSTUMES_CATEGORY_STRING.clone(), COSTUMES_CATEGORY_ID),
+            (BACKDROPS_CATEGORY_STRING.clone(), BACKDROPS_CATEGORY_ID),
+            (BACKDROP_TARGETS_CATEGORY_STRING.clone(), BACKDROP_TARGETS_CATEGORY_ID),
+            (SOUNDS_CATEGORY_STRING.clone(), SOUNDS_CATEGORY_ID),
+            (DESTINATIONS_CATEGORY_STRING.clone(), DESTINATIONS_CATEGORY_ID),
+            (DIRECTIONS_CATEGORY_STRING.clone(), DIRECTIONS_CATEGORY_ID),
+            (CLONABLES_CATEGORY_STRING.clone(), CLONABLES_CATEGORY_ID),
+            (COLLIDERS_CATEGORY_STRING.clone(), COLLIDERS_CATEGORY_ID),
+            (LOCATIONS_CATEGORY_STRING.clone(), LOCATIONS_CATEGORY_ID),
+            (PROPERTIES_CATEGORY_STRING.clone(), PROPERTIES_CATEGORY_ID),
+            (OBJECTS_CATEGORY_STRING.clone(), OBJECTS_CATEGORY_ID),
+            (PEN_PROPERTIES_CATEGORY_STRING.clone(), PEN_PROPERTIES_CATEGORY_ID),
         ]);
         let mut category_entries = HashMap::<u32, HashSet<String>>::new();
 
@@ -122,10 +138,10 @@ macro_rules! implement_generate_constant_expr_library {
             $create_cache
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
-        
-        let v: crate::parser::Library =
+
+        let v: parser::Library =
             toml::from_str(&toml_str).expect("Failed to parse JSON");
-        let v: Vec<crate::parser::ToolboxCategory> = v.categories;
+        let v: Vec<parser::ToolboxCategory> = v.categories;
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
@@ -289,4 +305,132 @@ pub fn generate_constant_expr_library_no_create_cache(input: TokenStream) -> Tok
 #[proc_macro]
 pub fn generate_constant_expr_library_no_use_cache(input: TokenStream) -> TokenStream {
     implement_generate_constant_expr_library!(input, no_use_cache, create_cache)
+}
+
+#[proc_macro]
+pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
+    let library_path = quote! { ::grazelang_types };
+    let parser_path = if input.is_empty() {
+        quote! { #library_path::parser }
+    } else {
+        return quote! { ::std::compile_error!("no arguments allowed"); }.into();
+    };
+    let no_category_string_2 = NO_CATEGORY_STRING.as_str();
+    let variables_category_string_2 = VARIABLES_CATEGORY_STRING.as_str();
+    let lists_category_string_2 = LISTS_CATEGORY_STRING.as_str();
+    let broadcasts_category_string_2 = BROADCASTS_CATEGORY_STRING.as_str();
+    let costumes_category_string_2 = COSTUMES_CATEGORY_STRING.as_str();
+    let backdrops_category_string_2 = BACKDROPS_CATEGORY_STRING.as_str();
+    let backdrop_targets_category_string_2 = BACKDROP_TARGETS_CATEGORY_STRING.as_str();
+    let sounds_category_string_2 = SOUNDS_CATEGORY_STRING.as_str();
+    let destinations_category_string_2 = DESTINATIONS_CATEGORY_STRING.as_str();
+    let directions_category_string_2 = DIRECTIONS_CATEGORY_STRING.as_str();
+    let clonables_category_string_2 = CLONABLES_CATEGORY_STRING.as_str();
+    let colliders_category_string_2 = COLLIDERS_CATEGORY_STRING.as_str();
+    let locations_category_string_2 = LOCATIONS_CATEGORY_STRING.as_str();
+    let properties_category_string_2 = PROPERTIES_CATEGORY_STRING.as_str();
+    let objects_category_string_2 = OBJECTS_CATEGORY_STRING.as_str();
+    let pen_properties_category_string_2 = PEN_PROPERTIES_CATEGORY_STRING.as_str();
+    quote! {
+        pub(crate) fn dynamic_generate_library(
+            path: &::std::primitive::str,
+            use_cache: ::std::primitive::bool,
+            create_cache: ::std::primitive::bool,
+        ) -> (
+                ::std::collections::HashMap<::std::string::String, #library_path::LibraryItem>,
+                ::std::collections::HashMap<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>
+            ) {
+            let relative_path = path.to_string();
+            let manifest_dir =
+                ::std::env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
+            let full_path = ::std::path::Path::new(&manifest_dir).join(&relative_path);
+            let toml_str = ::std::fs::read_to_string(&full_path)
+                .unwrap_or_else(|_| panic!("Failed to read file at {:?}", full_path));
+            let (hex_hash, output_cache_path) = (
+                {
+                    let hash = <::sha3::Sha3_256 as ::sha3::Digest>::digest(toml_str.as_bytes());
+                    ::base16ct::lower::encode_string(hash.as_slice())
+                },
+                ::std::path::Path::new(&manifest_dir).join(&(relative_path + ".out_cached.dyn.json")),
+            );
+            if use_cache {
+                if output_cache_path.is_file() {
+                    let output_json_str = ::std::fs::read_to_string(&output_cache_path)
+                        .unwrap_or_else(|_| panic!("Failed to read file at {:?}", output_cache_path));
+                    if let ::std::result::Result::Ok(cache) = ::serde_json::from_str::<#parser_path::DynamicLibraryCache>(&output_json_str)
+                        && cache.hash == hex_hash
+                    {
+                        return cache.value;
+                    }
+                };
+            }
+            let v: #parser_path::Library = ::toml::from_str(&toml_str).expect("Failed to parse JSON");
+            let v: ::std::vec::Vec<#parser_path::ToolboxCategory> = v.categories;
+            let mut library = ::std::collections::HashMap::with_capacity(10);
+            let mut menus = ::std::collections::HashMap::new();
+            let mut menu_category_ids = ::std::collections::HashMap::<::arcstr::ArcStr, ::std::primitive::u32>::from([
+                (::arcstr::literal!(#no_category_string_2), #library_path::NO_CATEGORY_ID),
+                (::arcstr::literal!(#variables_category_string_2), #library_path::VARIABLES_CATEGORY_ID),
+                (::arcstr::literal!(#lists_category_string_2), #library_path::LISTS_CATEGORY_ID),
+                (::arcstr::literal!(#broadcasts_category_string_2), #library_path::BROADCASTS_CATEGORY_ID),
+                (::arcstr::literal!(#costumes_category_string_2), #library_path::COSTUMES_CATEGORY_ID),
+                (::arcstr::literal!(#backdrops_category_string_2), #library_path::BACKDROPS_CATEGORY_ID),
+                (
+                    ::arcstr::literal!(#backdrop_targets_category_string_2),
+                    #library_path::BACKDROP_TARGETS_CATEGORY_ID,
+                ),
+                (::arcstr::literal!(#sounds_category_string_2), #library_path::SOUNDS_CATEGORY_ID),
+                (
+                    ::arcstr::literal!(#destinations_category_string_2),
+                    #library_path::DESTINATIONS_CATEGORY_ID,
+                ),
+                (::arcstr::literal!(#directions_category_string_2), #library_path::DIRECTIONS_CATEGORY_ID),
+                (::arcstr::literal!(#clonables_category_string_2), #library_path::CLONABLES_CATEGORY_ID),
+                (::arcstr::literal!(#colliders_category_string_2), #library_path::COLLIDERS_CATEGORY_ID),
+                (::arcstr::literal!(#locations_category_string_2), #library_path::LOCATIONS_CATEGORY_ID),
+                (::arcstr::literal!(#properties_category_string_2), #library_path::PROPERTIES_CATEGORY_ID),
+                (::arcstr::literal!(#objects_category_string_2), #library_path::OBJECTS_CATEGORY_ID),
+                (
+                    ::arcstr::literal!(#pen_properties_category_string_2),
+                    #library_path::PEN_PROPERTIES_CATEGORY_ID,
+                ),
+            ]);
+            let mut category_entries = ::std::collections::HashMap::<::std::primitive::u32, ::std::collections::HashSet<String>>::new();
+            for namespace in v {
+                let (category_name, category, associated_menus) =
+                #parser_path::process_toolbox_category(namespace, &mut category_entries, &mut menu_category_ids);
+                for (key, value) in associated_menus {
+                    match menus.entry(key) {
+                        ::std::collections::hash_map::Entry::Vacant(v) => {
+                            v.insert(value);
+                        }
+                        ::std::collections::hash_map::Entry::Occupied(mut o) => {
+                            #parser_path::merge_associated_item(o.get_mut(), value);
+                        }
+                    }
+                }
+                library.insert(category_name, category);
+            }
+            library.insert(
+                "menus".to_string(),
+                #library_path::LibraryItem {
+                    namespace: menus,
+                    value: None,
+                },
+            );
+            if create_cache {
+                let dynamic_library_cache = #parser_path::DynamicLibraryCache {
+                    hash: hex_hash,
+                    value: (library, category_entries),
+                };
+                ::std::fs::write(
+                    output_cache_path,
+                    ::serde_json::to_string(&dynamic_library_cache).unwrap(),
+                )
+                .unwrap();
+                return dynamic_library_cache.value;
+            }
+            (library, category_entries)
+        }        
+    }.into()
 }
