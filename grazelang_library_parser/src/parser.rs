@@ -14,7 +14,7 @@ pub struct Library {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ToolboxCategory {
     pub category: String,
     pub id: String,
@@ -23,7 +23,7 @@ pub struct ToolboxCategory {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct BlockEntry {
     #[serde(rename = "type")]
     pub opcode: String,
@@ -40,7 +40,7 @@ pub struct BlockEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct AssignmentDescriptor {
     pub opcode: String,
     pub value: BlockArg,
@@ -55,9 +55,9 @@ pub struct KnownParam {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum BlockArg {
-    #[serde(rename_all = "camelCase")]
+    #[serde(rename_all = "snake_case")]
     Field {
         name: String,
         field_type: String,
@@ -65,7 +65,7 @@ pub enum BlockArg {
         options: Option<Vec<MenuOption>>,
         option_category: Option<IString>,
     },
-    #[serde(rename_all = "camelCase")]
+    #[serde(rename_all = "snake_case")]
     Input {
         name: String,
         menu_field_name: Option<String>,
@@ -76,7 +76,7 @@ pub enum BlockArg {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct MenuOption {
     pub label: String,
     pub value: String,
@@ -85,7 +85,7 @@ pub struct MenuOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct ShadowData {
     #[serde(rename = "type")]
     pub shadow_type: String,
