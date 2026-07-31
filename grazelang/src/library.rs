@@ -68,6 +68,7 @@ where
 generate_dynamic_generate_library!(pub);
 
 // TODO: Load extension as dynamic library using `dynamic_generate_library`
+// Issue: #85
 
 pub fn convert_generated_library(
     library: HashMap<String, LibraryItem>,

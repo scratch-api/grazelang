@@ -622,5 +622,29 @@
         "lines": "L2116-L2116",
         "commit": "5cd4f643cde6b12eefd130f546949fec94c6a6ba",
         "title": "Move more helpers into `grazelang::codegen::core::helpers`"
+    },
+    "85": {
+        "filepath": "grazelang/src/library.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L70-L70",
+        "commit": "d139fd1ef3bb79a3045785ba6ab84781732d37a5",
+        "title": "Load extension as dynamic library using `dynamic_generate_library`"
+    },
+    "86": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "- [ ] Decide on syntax\n- [ ] CST integration\n- [ ] Parser integration\n- [ ] Codegen integration",
+        "status": "open",
+        "lines": "L3095-L3099",
+        "commit": "d139fd1ef3bb79a3045785ba6ab84781732d37a5",
+        "title": "Add `use extension` or `extension` statement"
+    },
+    "87": {
+        "filepath": "grazelang_library_parser/src/lib.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L442-L442",
+        "commit": "d139fd1ef3bb79a3045785ba6ab84781732d37a5",
+        "title": "Include optional required_extensions attribute to libraries"
     }
 }

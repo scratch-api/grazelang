@@ -3097,3 +3097,4 @@ impl GetLintId for DictionaryTypeError {
 //  - [ ] CST integration
 //  - [ ] Parser integration
 //  - [ ] Codegen integration
+// Issue: #86

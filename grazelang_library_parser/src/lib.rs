@@ -440,3 +440,4 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
 }
 
 // TODO: Include optional required_extensions attribute to libraries
+// Issue: #87
