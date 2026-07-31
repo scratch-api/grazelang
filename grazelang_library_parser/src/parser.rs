@@ -9,6 +9,11 @@ use grazelang_types::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Library {
+    pub categories: Vec<ToolboxCategory>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolboxCategory {
     pub category: String,

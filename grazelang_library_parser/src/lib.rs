@@ -32,20 +32,21 @@ macro_rules! implement_generate_library {
             std::env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
         let full_path = Path::new(&manifest_dir).join(&relative_path);
 
-        let json_str = fs::read_to_string(&full_path)
+        let toml_str = fs::read_to_string(&full_path)
             .unwrap_or_else(|_| panic!("Failed to read file at {:?}", full_path));
 
         let (hex_hash, output_cache_path) = implement_create_hash_and_cache_path!(
             manifest_dir,
             relative_path,
-            json_str,
+            toml_str,
             $use_cache,
             $create_cache
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
 
-        let v: Vec<crate::parser::ToolboxCategory> =
-            serde_json::from_str(&json_str).expect("Failed to parse JSON");
+        let v: crate::parser::Library =
+            toml::from_str(&toml_str).expect("Failed to parse JSON");
+        let v: Vec<crate::parser::ToolboxCategory> = v.categories;
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
@@ -111,18 +112,21 @@ macro_rules! implement_generate_constant_expr_library {
         let manifest_dir =
             std::env::var("CARGO_MANIFEST_DIR").expect("Failed to get CARGO_MANIFEST_DIR");
         let full_path = Path::new(&manifest_dir).join(&relative_path);
-        let json_str = fs::read_to_string(&full_path)
+        let toml_str = fs::read_to_string(&full_path)
             .unwrap_or_else(|_| panic!("Failed to read file at {:?}", full_path));
         let (hex_hash, output_cache_path) = implement_create_hash_and_cache_path_for_constant_expr!(
             manifest_dir,
             relative_path,
-            json_str,
+            toml_str,
             $use_cache,
             $create_cache
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
-        let v: Vec<crate::parser::ToolboxCategory> =
-            serde_json::from_str(&json_str).expect("Failed to parse JSON");
+        
+        let v: crate::parser::Library =
+            toml::from_str(&toml_str).expect("Failed to parse JSON");
+        let v: Vec<crate::parser::ToolboxCategory> = v.categories;
+
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
         for namespace in v {
@@ -167,50 +171,50 @@ fn expand_category_entries(
 }
 
 macro_rules! implement_create_hash_and_cache_path {
-    ($dir:expr, $rel_path:expr, $json_str:expr, yes) => {
+    ($dir:expr, $rel_path:expr, $toml_str:expr, yes) => {
         (
             {
-                let hash = Sha3_256::digest($json_str.as_bytes());
+                let hash = Sha3_256::digest($toml_str.as_bytes());
                 base16ct::lower::encode_string(hash.as_slice())
             },
             Path::new(&$dir).join(&($rel_path + ".out_cached.json")),
         )
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, no_use_cache, no_create_cache) => {
+    ($dir:expr, $rel_path:expr, $toml_str:expr, no_use_cache, no_create_cache) => {
         ((), ())
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, use_cache, no_create_cache) => {
-        implement_create_hash_and_cache_path!($dir, $rel_path, $json_str, yes)
+    ($dir:expr, $rel_path:expr, $toml_str:expr, use_cache, no_create_cache) => {
+        implement_create_hash_and_cache_path!($dir, $rel_path, $toml_str, yes)
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, no_use_cache, create_cache) => {
-        implement_create_hash_and_cache_path!($dir, $rel_path, $json_str, yes)
+    ($dir:expr, $rel_path:expr, $toml_str:expr, no_use_cache, create_cache) => {
+        implement_create_hash_and_cache_path!($dir, $rel_path, $toml_str, yes)
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, use_cache, create_cache) => {
-        implement_create_hash_and_cache_path!($dir, $rel_path, $json_str, yes)
+    ($dir:expr, $rel_path:expr, $toml_str:expr, use_cache, create_cache) => {
+        implement_create_hash_and_cache_path!($dir, $rel_path, $toml_str, yes)
     };
 }
 
 macro_rules! implement_create_hash_and_cache_path_for_constant_expr {
-    ($dir:expr, $rel_path:expr, $json_str:expr, yes) => {
+    ($dir:expr, $rel_path:expr, $toml_str:expr, yes) => {
         (
             {
-                let hash = Sha3_256::digest($json_str.as_bytes());
+                let hash = Sha3_256::digest($toml_str.as_bytes());
                 base16ct::lower::encode_string(hash.as_slice())
             },
             Path::new(&$dir).join(&($rel_path + ".constant_expr.out_cached.json")),
         )
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, no_use_cache, no_create_cache) => {
+    ($dir:expr, $rel_path:expr, $toml_str:expr, no_use_cache, no_create_cache) => {
         ((), ())
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, use_cache, no_create_cache) => {
-        implement_create_hash_and_cache_path_for_constant_expr!($dir, $rel_path, $json_str, yes)
+    ($dir:expr, $rel_path:expr, $toml_str:expr, use_cache, no_create_cache) => {
+        implement_create_hash_and_cache_path_for_constant_expr!($dir, $rel_path, $toml_str, yes)
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, no_use_cache, create_cache) => {
-        implement_create_hash_and_cache_path_for_constant_expr!($dir, $rel_path, $json_str, yes)
+    ($dir:expr, $rel_path:expr, $toml_str:expr, no_use_cache, create_cache) => {
+        implement_create_hash_and_cache_path_for_constant_expr!($dir, $rel_path, $toml_str, yes)
     };
-    ($dir:expr, $rel_path:expr, $json_str:expr, use_cache, create_cache) => {
-        implement_create_hash_and_cache_path_for_constant_expr!($dir, $rel_path, $json_str, yes)
+    ($dir:expr, $rel_path:expr, $toml_str:expr, use_cache, create_cache) => {
+        implement_create_hash_and_cache_path_for_constant_expr!($dir, $rel_path, $toml_str, yes)
     };
 }
 

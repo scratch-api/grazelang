@@ -6,8 +6,8 @@ raw_scratch_standard_library_schema.jsonc
 raw_scratch_standard_toolbox_schema_*
 raw_scratch_standard_toolbox_schema.*
 scratch_standard_library_schema.jsonc
-standard_toolbox.json.out_cached.json
-standard_toolbox.json.constant_expr.out_cached.json
+*.out_cached.json
+*.constant_expr.out_cached.json
 transform_toolbox.py
 visualizetoolbox.py
 test_*

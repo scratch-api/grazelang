@@ -17,3 +17,4 @@ grazelang_types = { path = "../grazelang_types" }
 sha3 = "0.11.0"
 base16ct = { version = "1.0.0", features = ["alloc"] }
 proc-macro2 = "1.0.106"
+toml = "1.1.4"

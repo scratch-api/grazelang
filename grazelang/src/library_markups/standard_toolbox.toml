@@ -1,0 +1,3007 @@
+[[categories]]
+    category = "%{BKY_CATEGORY_MOTION}"
+    id = "motion"
+
+    [[categories.blocks]]
+        type = "motion_movesteps"
+        altName = "move_steps"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "STEPS"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "10"
+
+    [[categories.blocks]]
+        type = "motion_turnright"
+        altName = "turn_right"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DEGREES"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "15"
+
+    [[categories.blocks]]
+        type = "motion_turnleft"
+        altName = "turn_left"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DEGREES"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "15"
+
+    [[categories.blocks]]
+        type = "motion_goto"
+        altName = "go_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TO"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "motion_goto_menu"
+                defaultValue = "_random_"
+                optionCategory = "destinations"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "random position"
+                    altName = "random_position"
+                    value = "_random_"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "mouse-pointer"
+                    altName = "mouse_pointer"
+                    value = "_mouse_"
+
+    [[categories.blocks]]
+        type = "motion_gotoxy"
+        altName = "go_to_xy"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "X"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "0"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "Y"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "0"
+
+    [[categories.blocks]]
+        type = "motion_glideto"
+        altName = "glide_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SECS"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "1"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TO"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "motion_glideto_menu"
+                defaultValue = "_random_"
+                optionCategory = "destinations"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "random position"
+                    altName = "random_position"
+                    value = "_random_"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "mouse-pointer"
+                    altName = "mouse_pointer"
+                    value = "_mouse_"
+
+    [[categories.blocks]]
+        type = "motion_glidesecstoxy"
+        altName = "glide_to_xy"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SECS"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "1"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "X"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "0"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "Y"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "0"
+
+    [[categories.blocks]]
+        type = "motion_pointindirection"
+        altName = "point_in_direction"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DIRECTION"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_angle"
+                defaultValue = "90"
+
+    [[categories.blocks]]
+        type = "motion_pointtowards"
+        altName = "point_towards"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TOWARDS"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "motion_pointtowards_menu"
+                defaultValue = "_mouse_"
+                optionCategory = "directions"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "mouse-pointer"
+                    altName = "mouse_pointer"
+                    value = "_mouse_"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "random direction"
+                    altName = "random_direction"
+                    value = "_random_"
+
+    [[categories.blocks]]
+        type = "motion_changexby"
+        altName = "change_x_by"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DX"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "10"
+
+    [[categories.blocks]]
+        type = "motion_setx"
+        altName = "set_x"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "X"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "0"
+
+    [[categories.blocks]]
+        type = "motion_changeyby"
+        altName = "change_y_by"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DY"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "10"
+
+    [[categories.blocks]]
+        type = "motion_sety"
+        altName = "set_y"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "Y"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "0"
+
+    [[categories.blocks]]
+        type = "motion_ifonedgebounce"
+        args = []
+        altName = "if_on_edge_bounce"
+
+    [[categories.blocks]]
+        type = "motion_setrotationstyle"
+        altName = "set_rotation_style"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "STYLE"
+            fieldType = "field_dropdown"
+            value = "left-right"
+            optionCategory = "rotation_styles"
+
+            [[categories.blocks.args.options]]
+                label = "left-right"
+                altName = "left_right"
+                value = "left-right"
+
+            [[categories.blocks.args.options]]
+                label = "don't rotate"
+                altName = "dont_rotate"
+                value = "don't rotate"
+
+            [[categories.blocks.args.options]]
+                label = "all around"
+                altName = "all_around"
+                value = "all around"
+
+    [[categories.blocks]]
+        type = "motion_xposition"
+        args = []
+        altName = "x_position"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [categories.blocks.assign]
+            opcode = "motion_setx"
+
+            [categories.blocks.assign.value]
+                kind = "input"
+                name = "X"
+                inputType = "value"
+
+                [categories.blocks.assign.value.shadow]
+                    type = "math_number"
+                    defaultValue = "0"
+
+        [categories.blocks.fieldValue]
+            label = "x position"
+            value = "x position"
+
+    [[categories.blocks]]
+        type = "motion_yposition"
+        args = []
+        altName = "y_position"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [categories.blocks.assign]
+            opcode = "motion_sety"
+
+            [categories.blocks.assign.value]
+                kind = "input"
+                name = "Y"
+                inputType = "value"
+
+                [categories.blocks.assign.value.shadow]
+                    type = "math_number"
+                    defaultValue = "0"
+
+        [categories.blocks.fieldValue]
+            label = "y position"
+            value = "y position"
+
+    [[categories.blocks]]
+        type = "motion_direction"
+        args = []
+        altName = "direction"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [categories.blocks.assign]
+            opcode = "motion_pointindirection"
+
+            [categories.blocks.assign.value]
+                kind = "input"
+                name = "DIRECTION"
+                inputType = "value"
+
+                [categories.blocks.assign.value.shadow]
+                    type = "math_angle"
+                    defaultValue = "90"
+
+        [categories.blocks.fieldValue]
+            label = "direction"
+            value = "direction"
+
+[[categories]]
+    category = "%{BKY_CATEGORY_LOOKS}"
+    id = "looks"
+
+    [[categories.blocks]]
+        type = "looks_sayforsecs"
+        altName = "say_for"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "MESSAGE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "Hello!"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SECS"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "2"
+
+    [[categories.blocks]]
+        type = "looks_say"
+        altName = "say"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "MESSAGE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "Hello!"
+
+    [[categories.blocks]]
+        type = "looks_thinkforsecs"
+        altName = "think_for"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "MESSAGE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "Hmm..."
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SECS"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "2"
+
+    [[categories.blocks]]
+        type = "looks_think"
+        altName = "think"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "MESSAGE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "Hmm..."
+
+    [[categories.blocks]]
+        type = "looks_switchcostumeto"
+        altName = "switch_to_costume"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "COSTUME"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "looks_costume"
+                defaultValue = ""
+                options = []
+                optionCategory = "costumes"
+
+    [[categories.blocks]]
+        type = "looks_nextcostume"
+        args = []
+        altName = "next_costume"
+
+    [[categories.blocks]]
+        type = "looks_switchbackdropto"
+        altName = "switch_to_backdrop"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "BACKDROP"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "looks_backdrops"
+                defaultValue = "next backdrop"
+                optionCategory = "backdrop_targets"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "next backdrop"
+                    altName = "next_backdrop"
+                    value = "next backdrop"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "previous backdrop"
+                    altName = "previous_backdrop"
+                    value = "previous backdrop"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "random backdrop"
+                    altName = "random_backdrop"
+                    value = "random backdrop"
+
+    [[categories.blocks]]
+        type = "looks_switchbackdroptoandwait"
+        altName = "switch_to_backdrop_and_wait"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "BACKDROP"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "looks_backdrops"
+                defaultValue = "next backdrop"
+                optionCategory = "backdrop_targets"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "next backdrop"
+                    altName = "next_backdrop"
+                    value = "next backdrop"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "previous backdrop"
+                    altName = "previous_backdrop"
+                    value = "previous backdrop"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "random backdrop"
+                    altName = "random_backdrop"
+                    value = "random backdrop"
+
+    [[categories.blocks]]
+        type = "looks_nextbackdrop"
+        args = []
+        altName = "next_backdrop"
+
+    [[categories.blocks]]
+        type = "looks_changesizeby"
+        altName = "change_size_by"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CHANGE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "10"
+
+    [[categories.blocks]]
+        type = "looks_setsizeto"
+        altName = "set_size_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SIZE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "100"
+
+    [[categories.blocks]]
+        type = "looks_changeeffectby"
+        altName = "change_graphic_effect_by"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "EFFECT"
+            fieldType = "field_dropdown"
+            value = "COLOR"
+            optionCategory = "effects"
+
+            [[categories.blocks.args.options]]
+                label = "color"
+                value = "COLOR"
+
+            [[categories.blocks.args.options]]
+                label = "fisheye"
+                value = "FISHEYE"
+
+            [[categories.blocks.args.options]]
+                label = "whirl"
+                value = "WHIRL"
+
+            [[categories.blocks.args.options]]
+                label = "pixelate"
+                value = "PIXELATE"
+
+            [[categories.blocks.args.options]]
+                label = "mosaic"
+                value = "MOSAIC"
+
+            [[categories.blocks.args.options]]
+                label = "brightness"
+                value = "BRIGHTNESS"
+
+            [[categories.blocks.args.options]]
+                label = "ghost"
+                value = "GHOST"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CHANGE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "25"
+
+    [[categories.blocks]]
+        type = "looks_seteffectto"
+        altName = "set_graphic_effect_to"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "EFFECT"
+            fieldType = "field_dropdown"
+            value = "COLOR"
+            optionCategory = "effects"
+
+            [[categories.blocks.args.options]]
+                label = "color"
+                value = "COLOR"
+
+            [[categories.blocks.args.options]]
+                label = "fisheye"
+                value = "FISHEYE"
+
+            [[categories.blocks.args.options]]
+                label = "whirl"
+                value = "WHIRL"
+
+            [[categories.blocks.args.options]]
+                label = "pixelate"
+                value = "PIXELATE"
+
+            [[categories.blocks.args.options]]
+                label = "mosaic"
+                value = "MOSAIC"
+
+            [[categories.blocks.args.options]]
+                label = "brightness"
+                value = "BRIGHTNESS"
+
+            [[categories.blocks.args.options]]
+                label = "ghost"
+                value = "GHOST"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "0"
+
+    [[categories.blocks]]
+        type = "looks_cleargraphiceffects"
+        args = []
+        altName = "clear_graphic_effects"
+
+    [[categories.blocks]]
+        type = "looks_show"
+        args = []
+        altName = "show"
+
+    [[categories.blocks]]
+        type = "looks_hide"
+        args = []
+        altName = "hide"
+
+    [[categories.blocks]]
+        type = "looks_gotofrontback"
+        altName = "go_to_layer"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "FRONT_BACK"
+            fieldType = "field_dropdown"
+            value = "front"
+            optionCategory = "front_back"
+
+            [[categories.blocks.args.options]]
+                label = "front"
+                value = "front"
+
+            [[categories.blocks.args.options]]
+                label = "back"
+                value = "back"
+
+    [[categories.blocks]]
+        type = "looks_goforwardbackwardlayers"
+        altName = "change_layer"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "FORWARD_BACKWARD"
+            fieldType = "field_dropdown"
+            value = "forward"
+            optionCategory = "forward_backward"
+
+            [[categories.blocks.args.options]]
+                label = "forward"
+                value = "forward"
+
+            [[categories.blocks.args.options]]
+                label = "backward"
+                value = "backward"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_integer"
+                defaultValue = "1"
+
+    [[categories.blocks]]
+        type = "looks_costumenumbername"
+        altName = "get_costume"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "NUMBER_NAME"
+            fieldType = "field_dropdown"
+            value = "number"
+            optionCategory = "number_name"
+
+            [[categories.blocks.args.options]]
+                label = "number"
+                value = "number"
+
+            [[categories.blocks.args.options]]
+                label = "name"
+                value = "name"
+
+    [[categories.blocks]]
+        type = "looks_backdropnumbername"
+        altName = "get_backdrop"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "NUMBER_NAME"
+            fieldType = "field_dropdown"
+            value = "number"
+            optionCategory = "number_name"
+
+            [[categories.blocks.args.options]]
+                label = "number"
+                value = "number"
+
+            [[categories.blocks.args.options]]
+                label = "name"
+                value = "name"
+
+    [[categories.blocks]]
+        type = "looks_size"
+        args = []
+        altName = "size"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [categories.blocks.assign]
+            opcode = "looks_setsizeto"
+
+            [categories.blocks.assign.value]
+                kind = "input"
+                name = "SIZE"
+                inputType = "value"
+
+                [categories.blocks.assign.value.shadow]
+                    type = "math_number"
+                    defaultValue = "100"
+
+        [categories.blocks.fieldValue]
+            label = "size"
+            value = "size"
+
+[[categories]]
+    category = "grazelang_costume_shorthands"
+    id = "grazelang_costume_shorthands"
+    altName = "costume"
+
+    [[categories.blocks]]
+        type = "looks_costumenumbername"
+        args = []
+        altName = "costume_number"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [[categories.blocks.knownParams]]
+            value = ["number"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "NUMBER_NAME"
+                fieldType = "field_dropdown"
+                value = "number"
+                options = []
+                optionCategory = "number_name"
+
+        [categories.blocks.fieldValue]
+            label = "costume #"
+            value = "costume #"
+
+    [[categories.blocks]]
+        type = "looks_costumenumbername"
+        args = []
+        altName = "costume_name"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [[categories.blocks.knownParams]]
+            value = ["name"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "NUMBER_NAME"
+                fieldType = "field_dropdown"
+                value = "number"
+                options = []
+                optionCategory = "number_name"
+
+        [categories.blocks.fieldValue]
+            label = "costume name"
+            value = "costume name"
+
+    [[categories.blocks]]
+        type = "looks_backdropnumbername"
+        args = []
+        altName = "backdrop_number"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [[categories.blocks.knownParams]]
+            value = ["number"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "NUMBER_NAME"
+                fieldType = "field_dropdown"
+                value = "number"
+                options = []
+                optionCategory = "number_name"
+
+        [categories.blocks.fieldValue]
+            label = "backdrop #"
+            value = "backdrop #"
+
+    [[categories.blocks]]
+        type = "looks_backdropnumbername"
+        args = []
+        altName = "backdrop_name"
+        isSingleton = true
+        fieldCategory = "properties"
+
+        [[categories.blocks.knownParams]]
+            value = ["name"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "NUMBER_NAME"
+                fieldType = "field_dropdown"
+                value = "number"
+                options = []
+                optionCategory = "number_name"
+
+        [categories.blocks.fieldValue]
+            label = "backdrop name"
+            value = "backdrop name"
+
+[[categories]]
+    category = "%{BKY_CATEGORY_SOUND}"
+    id = "sound"
+
+    [[categories.blocks]]
+        type = "sound_playuntildone"
+        altName = "play_sound_until_done"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SOUND_MENU"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "sound_sounds_menu"
+                defaultValue = ""
+                options = []
+                optionCategory = "sounds"
+
+    [[categories.blocks]]
+        type = "sound_play"
+        altName = "start_sound"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SOUND_MENU"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "sound_sounds_menu"
+                defaultValue = ""
+                options = []
+                optionCategory = "sounds"
+
+    [[categories.blocks]]
+        type = "sound_stopallsounds"
+        args = []
+        altName = "stop_all_sounds"
+
+    [[categories.blocks]]
+        type = "sound_changeeffectby"
+        altName = "change_sound_effect_by"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "EFFECT"
+            fieldType = "field_dropdown"
+            value = "PITCH"
+            optionCategory = "sound_effects"
+
+            [[categories.blocks.args.options]]
+                label = "pitch"
+                value = "PITCH"
+
+            [[categories.blocks.args.options]]
+                label = "pan left/right"
+                altName = "pan_left_right"
+                value = "PAN"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "10"
+
+    [[categories.blocks]]
+        type = "sound_seteffectto"
+        altName = "set_sound_effect_to"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "EFFECT"
+            fieldType = "field_dropdown"
+            value = "PITCH"
+            optionCategory = "sound_effects"
+
+            [[categories.blocks.args.options]]
+                label = "pitch"
+                value = "PITCH"
+
+            [[categories.blocks.args.options]]
+                label = "pan left/right"
+                altName = "pan_left_right"
+                value = "PAN"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "100"
+
+    [[categories.blocks]]
+        type = "sound_cleareffects"
+        args = []
+        altName = "clear_sound_effects"
+
+    [[categories.blocks]]
+        type = "sound_changevolumeby"
+        altName = "change_volume_by"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VOLUME"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "-10"
+
+    [[categories.blocks]]
+        type = "sound_setvolumeto"
+        altName = "set_volume_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VOLUME"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "100"
+
+    [[categories.blocks]]
+        type = "sound_volume"
+        args = []
+        altName = "volume"
+        fieldCategory = "properties"
+
+        [categories.blocks.fieldValue]
+            label = "volume"
+            value = "volume"
+
+        [categories.blocks.assign]
+            opcode = "sound_setvolumeto"
+
+            [categories.blocks.assign.value]
+                kind = "input"
+                name = "VOLUME"
+                inputType = "value"
+
+                [categories.blocks.assign.value.shadow]
+                    type = "math_number"
+                    defaultValue = "100"
+
+[[categories]]
+    category = "%{BKY_CATEGORY_EVENTS}"
+    id = "events"
+
+    [[categories.blocks]]
+        type = "event_whenflagclicked"
+        args = []
+        altName = "when_green_flag_clicked"
+
+    [[categories.blocks]]
+        type = "event_whenkeypressed"
+        altName = "when_key_pressed"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "KEY_OPTION"
+            fieldType = "field_dropdown"
+            value = "space"
+            optionCategory = "keys"
+
+            [[categories.blocks.args.options]]
+                label = "space"
+                value = "space"
+
+            [[categories.blocks.args.options]]
+                label = "up arrow"
+                altName = "up_arrow"
+                value = "up arrow"
+
+            [[categories.blocks.args.options]]
+                label = "down arrow"
+                altName = "down_arrow"
+                value = "down arrow"
+
+            [[categories.blocks.args.options]]
+                label = "right arrow"
+                altName = "right_arrow"
+                value = "right arrow"
+
+            [[categories.blocks.args.options]]
+                label = "left arrow"
+                altName = "left_arrow"
+                value = "left arrow"
+
+            [[categories.blocks.args.options]]
+                label = "any"
+                value = "any"
+
+            [[categories.blocks.args.options]]
+                label = "a"
+                altName = "key_a"
+                value = "a"
+
+            [[categories.blocks.args.options]]
+                label = "b"
+                altName = "key_b"
+                value = "b"
+
+            [[categories.blocks.args.options]]
+                label = "c"
+                altName = "key_c"
+                value = "c"
+
+            [[categories.blocks.args.options]]
+                label = "d"
+                altName = "key_d"
+                value = "d"
+
+            [[categories.blocks.args.options]]
+                label = "e"
+                altName = "key_e"
+                value = "e"
+
+            [[categories.blocks.args.options]]
+                label = "f"
+                altName = "key_f"
+                value = "f"
+
+            [[categories.blocks.args.options]]
+                label = "g"
+                altName = "key_g"
+                value = "g"
+
+            [[categories.blocks.args.options]]
+                label = "h"
+                altName = "key_h"
+                value = "h"
+
+            [[categories.blocks.args.options]]
+                label = "i"
+                altName = "key_i"
+                value = "i"
+
+            [[categories.blocks.args.options]]
+                label = "j"
+                altName = "key_j"
+                value = "j"
+
+            [[categories.blocks.args.options]]
+                label = "k"
+                altName = "key_k"
+                value = "k"
+
+            [[categories.blocks.args.options]]
+                label = "l"
+                altName = "key_l"
+                value = "l"
+
+            [[categories.blocks.args.options]]
+                label = "m"
+                altName = "key_m"
+                value = "m"
+
+            [[categories.blocks.args.options]]
+                label = "n"
+                altName = "key_n"
+                value = "n"
+
+            [[categories.blocks.args.options]]
+                label = "o"
+                altName = "key_o"
+                value = "o"
+
+            [[categories.blocks.args.options]]
+                label = "p"
+                altName = "key_p"
+                value = "p"
+
+            [[categories.blocks.args.options]]
+                label = "q"
+                altName = "key_q"
+                value = "q"
+
+            [[categories.blocks.args.options]]
+                label = "r"
+                altName = "key_r"
+                value = "r"
+
+            [[categories.blocks.args.options]]
+                label = "s"
+                altName = "key_s"
+                value = "s"
+
+            [[categories.blocks.args.options]]
+                label = "t"
+                altName = "key_t"
+                value = "t"
+
+            [[categories.blocks.args.options]]
+                label = "u"
+                altName = "key_u"
+                value = "u"
+
+            [[categories.blocks.args.options]]
+                label = "v"
+                altName = "key_v"
+                value = "v"
+
+            [[categories.blocks.args.options]]
+                label = "w"
+                altName = "key_w"
+                value = "w"
+
+            [[categories.blocks.args.options]]
+                label = "x"
+                altName = "key_x"
+                value = "x"
+
+            [[categories.blocks.args.options]]
+                label = "y"
+                altName = "key_y"
+                value = "y"
+
+            [[categories.blocks.args.options]]
+                label = "z"
+                altName = "key_z"
+                value = "z"
+
+            [[categories.blocks.args.options]]
+                label = "0"
+                altName = "key_0"
+                value = "0"
+
+            [[categories.blocks.args.options]]
+                label = "1"
+                altName = "key_1"
+                value = "1"
+
+            [[categories.blocks.args.options]]
+                label = "2"
+                altName = "key_2"
+                value = "2"
+
+            [[categories.blocks.args.options]]
+                label = "3"
+                altName = "key_3"
+                value = "3"
+
+            [[categories.blocks.args.options]]
+                label = "4"
+                altName = "key_4"
+                value = "4"
+
+            [[categories.blocks.args.options]]
+                label = "5"
+                altName = "key_5"
+                value = "5"
+
+            [[categories.blocks.args.options]]
+                label = "6"
+                altName = "key_6"
+                value = "6"
+
+            [[categories.blocks.args.options]]
+                label = "7"
+                altName = "key_7"
+                value = "7"
+
+            [[categories.blocks.args.options]]
+                label = "8"
+                altName = "key_8"
+                value = "8"
+
+            [[categories.blocks.args.options]]
+                label = "9"
+                altName = "key_9"
+                value = "9"
+
+    [[categories.blocks]]
+        type = "event_whenthisspriteclicked"
+        args = []
+        altName = "when_this_sprite_clicked"
+
+    [[categories.blocks]]
+        type = "event_whenbackdropswitchesto"
+        altName = "when_backdrop_switches_to"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "BACKDROP"
+            fieldType = "field_dropdown"
+            value = ""
+            options = []
+            optionCategory = "backdrops"
+
+    [[categories.blocks]]
+        type = "event_whengreaterthan"
+        altName = "when_greater_than"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "WHENGREATERTHANMENU"
+            fieldType = "field_dropdown"
+            value = "LOUDNESS"
+            optionCategory = "when_greater_than_target"
+
+            [[categories.blocks.args.options]]
+                label = "loudness"
+                value = "LOUDNESS"
+
+            [[categories.blocks.args.options]]
+                label = "timer"
+                value = "TIMER"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "10"
+
+    [[categories.blocks]]
+        type = "event_whenbroadcastreceived"
+        altName = "when_broadcast_received"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "BROADCAST_OPTION"
+            fieldType = "field_variable"
+            optionCategory = "broadcasts"
+
+    [[categories.blocks]]
+        type = "event_broadcast"
+        altName = "broadcast"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "BROADCAST_INPUT"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "event_broadcast_menu"
+                optionCategory = "broadcasts"
+
+    [[categories.blocks]]
+        type = "event_broadcastandwait"
+        altName = "broadcast_and_wait"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "BROADCAST_INPUT"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "event_broadcast_menu"
+                optionCategory = "broadcasts"
+
+[[categories]]
+    category = "%{BKY_CATEGORY_CONTROL}"
+    id = "control"
+
+    [[categories.blocks]]
+        type = "control_wait"
+        altName = "wait_seconds"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DURATION"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_positive_number"
+                defaultValue = "1"
+
+    [[categories.blocks]]
+        type = "control_repeat"
+        altName = "repeat"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TIMES"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_whole_number"
+                defaultValue = "10"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SUBSTACK"
+            inputType = "statement"
+
+    [[categories.blocks]]
+        type = "control_forever"
+        altName = "forever_loop"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SUBSTACK"
+            inputType = "statement"
+
+    [[categories.blocks]]
+        type = "control_if"
+        altName = "if"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CONDITION"
+            inputType = "value"
+            check = "Boolean"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SUBSTACK"
+            inputType = "statement"
+
+    [[categories.blocks]]
+        type = "control_if_else"
+        altName = "if_else"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CONDITION"
+            inputType = "value"
+            check = "Boolean"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SUBSTACK"
+            inputType = "statement"
+
+    [[categories.blocks]]
+        type = "control_wait_until"
+        altName = "wait_until"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CONDITION"
+            inputType = "value"
+            check = "Boolean"
+
+    [[categories.blocks]]
+        type = "control_repeat_until"
+        altName = "repeat_until"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CONDITION"
+            inputType = "value"
+            check = "Boolean"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SUBSTACK"
+            inputType = "statement"
+
+    [[categories.blocks]]
+        type = "control_while"
+        altName = "while_loop"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CONDITION"
+            inputType = "value"
+            check = "Boolean"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SUBSTACK"
+            inputType = "statement"
+
+    [[categories.blocks]]
+        type = "control_stop"
+        altName = "stop"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "STOP_OPTION"
+            fieldType = "field_dropdown"
+            value = "all"
+            optionCategory = "stop_target"
+
+            [[categories.blocks.args.options]]
+                label = "all"
+                value = "all"
+
+            [[categories.blocks.args.options]]
+                label = "this script"
+                altName = "this_script"
+                value = "this script"
+
+            [[categories.blocks.args.options]]
+                label = "other scripts in sprite"
+                altName = "other_scripts_in_sprite"
+                value = "other scripts in sprite"
+
+    [[categories.blocks]]
+        type = "control_start_as_clone"
+        args = []
+        altName = "when_start_as_clone"
+
+    [[categories.blocks]]
+        type = "control_create_clone_of"
+        altName = "create_clone_of"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "CLONE_OPTION"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "control_create_clone_of_menu"
+                defaultValue = "_myself_"
+                optionCategory = "clonables"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "myself"
+                    value = "_myself_"
+
+    [[categories.blocks]]
+        type = "control_delete_this_clone"
+        args = []
+        altName = "delete_this_clone"
+
+[[categories]]
+    category = "%{BKY_CATEGORY_SENSING}"
+    id = "sensing"
+
+    [[categories.blocks]]
+        type = "sensing_touchingobject"
+        altName = "is_touching_object"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TOUCHINGOBJECTMENU"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "sensing_touchingobjectmenu"
+                defaultValue = "_mouse_"
+                optionCategory = "colliders"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "mouse-pointer"
+                    altName = "mouse_pointer"
+                    value = "_mouse_"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "edge"
+                    value = "_edge_"
+
+    [[categories.blocks]]
+        type = "sensing_touchingcolor"
+        altName = "is_touching_color"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "COLOR"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "colour_picker"
+
+    [[categories.blocks]]
+        type = "sensing_coloristouchingcolor"
+        altName = "color_is_touching_color"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "COLOR"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "colour_picker"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "COLOR2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "colour_picker"
+
+    [[categories.blocks]]
+        type = "sensing_distanceto"
+        altName = "distance_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DISTANCETOMENU"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "sensing_distancetomenu"
+                defaultValue = "_mouse_"
+                optionCategory = "locations"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "mouse-pointer"
+                    altName = "mouse_pointer"
+                    value = "_mouse_"
+
+    [[categories.blocks]]
+        type = "sensing_askandwait"
+        altName = "ask_and_wait"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "QUESTION"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "What's your name?"
+
+    [[categories.blocks]]
+        type = "sensing_answer"
+        args = []
+        altName = "answer"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_keypressed"
+        altName = "is_key_pressed"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "KEY_OPTION"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "sensing_keyoptions"
+                defaultValue = "space"
+                optionCategory = "keys"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "space"
+                    value = "space"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "up arrow"
+                    altName = "up_arrow"
+                    value = "up arrow"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "down arrow"
+                    altName = "down_arrow"
+                    value = "down arrow"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "right arrow"
+                    altName = "right_arrow"
+                    value = "right arrow"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "left arrow"
+                    altName = "left_arrow"
+                    value = "left arrow"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "any"
+                    value = "any"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "a"
+                    altName = "key_a"
+                    value = "a"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "b"
+                    altName = "key_b"
+                    value = "b"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "c"
+                    altName = "key_c"
+                    value = "c"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "d"
+                    altName = "key_d"
+                    value = "d"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "e"
+                    altName = "key_e"
+                    value = "e"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "f"
+                    altName = "key_f"
+                    value = "f"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "g"
+                    altName = "key_g"
+                    value = "g"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "h"
+                    altName = "key_h"
+                    value = "h"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "i"
+                    altName = "key_i"
+                    value = "i"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "j"
+                    altName = "key_j"
+                    value = "j"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "k"
+                    altName = "key_k"
+                    value = "k"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "l"
+                    altName = "key_l"
+                    value = "l"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "m"
+                    altName = "key_m"
+                    value = "m"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "n"
+                    altName = "key_n"
+                    value = "n"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "o"
+                    altName = "key_o"
+                    value = "o"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "p"
+                    altName = "key_p"
+                    value = "p"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "q"
+                    altName = "key_q"
+                    value = "q"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "r"
+                    altName = "key_r"
+                    value = "r"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "s"
+                    altName = "key_s"
+                    value = "s"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "t"
+                    altName = "key_t"
+                    value = "t"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "u"
+                    altName = "key_u"
+                    value = "u"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "v"
+                    altName = "key_v"
+                    value = "v"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "w"
+                    altName = "key_w"
+                    value = "w"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "x"
+                    altName = "key_x"
+                    value = "x"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "y"
+                    altName = "key_y"
+                    value = "y"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "z"
+                    altName = "key_z"
+                    value = "z"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "0"
+                    altName = "key_0"
+                    value = "0"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "1"
+                    altName = "key_1"
+                    value = "1"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "2"
+                    altName = "key_2"
+                    value = "2"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "3"
+                    altName = "key_3"
+                    value = "3"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "4"
+                    altName = "key_4"
+                    value = "4"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "5"
+                    altName = "key_5"
+                    value = "5"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "6"
+                    altName = "key_6"
+                    value = "6"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "7"
+                    altName = "key_7"
+                    value = "7"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "8"
+                    altName = "key_8"
+                    value = "8"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "9"
+                    altName = "key_9"
+                    value = "9"
+
+    [[categories.blocks]]
+        type = "sensing_mousedown"
+        args = []
+        altName = "is_mouse_down"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_mousex"
+        args = []
+        altName = "mouse_x"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_mousey"
+        args = []
+        altName = "mouse_y"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_setdragmode"
+        altName = "set_drag_mode"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "DRAG_MODE"
+            fieldType = "field_dropdown"
+            value = "draggable"
+            optionCategory = "draggable"
+
+            [[categories.blocks.args.options]]
+                label = "draggable"
+                value = "draggable"
+
+            [[categories.blocks.args.options]]
+                label = "not draggable"
+                altName = "not_draggable"
+                value = "not draggable"
+
+    [[categories.blocks]]
+        type = "sensing_loudness"
+        args = []
+        altName = "loudness"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_timer"
+        args = []
+        altName = "timer"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_resettimer"
+        args = []
+        altName = "reset_timer"
+
+    [[categories.blocks]]
+        type = "sensing_of"
+        altName = "property_of_object"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "PROPERTY"
+            fieldType = "field_dropdown"
+            value = ""
+            options = []
+            optionCategory = "properties"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OBJECT"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "sensing_of_object_menu"
+                defaultValue = ""
+                options = []
+                optionCategory = "objects"
+
+    [[categories.blocks]]
+        type = "sensing_current"
+        altName = "current_time_unit"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "CURRENTMENU"
+            fieldType = "field_dropdown"
+            value = "YEAR"
+            optionCategory = "time_units"
+
+            [[categories.blocks.args.options]]
+                label = "year"
+                value = "YEAR"
+
+            [[categories.blocks.args.options]]
+                label = "month"
+                value = "MONTH"
+
+            [[categories.blocks.args.options]]
+                label = "date"
+                value = "DATE"
+
+            [[categories.blocks.args.options]]
+                label = "day of week"
+                altName = "day_of_week"
+                value = "DAYOFWEEK"
+
+            [[categories.blocks.args.options]]
+                label = "hour"
+                value = "HOUR"
+
+            [[categories.blocks.args.options]]
+                label = "minute"
+                value = "MINUTE"
+
+            [[categories.blocks.args.options]]
+                label = "second"
+                value = "SECOND"
+
+    [[categories.blocks]]
+        type = "sensing_dayssince2000"
+        args = []
+        altName = "days_since_2000"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_online"
+        args = []
+        altName = "is_online"
+        isSingleton = true
+
+    [[categories.blocks]]
+        type = "sensing_username"
+        args = []
+        altName = "username"
+        isSingleton = true
+
+[[categories]]
+    category = "%{BKY_CATEGORY_OPERATORS}"
+    id = "operators"
+
+    [[categories.blocks]]
+        type = "operator_add"
+        altName = "add_values"
+        constantExprFunctionId = 0
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_subtract"
+        altName = "subtract_values"
+        constantExprFunctionId = 1
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_multiply"
+        altName = "multiply_values"
+        constantExprFunctionId = 2
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_divide"
+        altName = "divide_values"
+        constantExprFunctionId = 3
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_random"
+        altName = "pick_random_number"
+        constantExprFunctionId = 4
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "FROM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "1"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TO"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "10"
+
+    [[categories.blocks]]
+        type = "operator_gt"
+        altName = "is_greater_than"
+        constantExprFunctionId = 5
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "50"
+
+    [[categories.blocks]]
+        type = "operator_lt"
+        altName = "is_less_than"
+        constantExprFunctionId = 6
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "50"
+
+    [[categories.blocks]]
+        type = "operator_equals"
+        altName = "is_equal_to"
+        constantExprFunctionId = 7
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "50"
+
+    [[categories.blocks]]
+        type = "operator_and"
+        altName = "logical_and"
+        constantExprFunctionId = 8
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND1"
+            inputType = "value"
+            check = "Boolean"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND2"
+            inputType = "value"
+            check = "Boolean"
+
+    [[categories.blocks]]
+        type = "operator_or"
+        altName = "logical_or"
+        constantExprFunctionId = 9
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND1"
+            inputType = "value"
+            check = "Boolean"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND2"
+            inputType = "value"
+            check = "Boolean"
+
+    [[categories.blocks]]
+        type = "operator_not"
+        altName = "logical_not"
+        constantExprFunctionId = 10
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "OPERAND"
+            inputType = "value"
+            check = "Boolean"
+
+    [[categories.blocks]]
+        type = "operator_join"
+        altName = "join_strings"
+        constantExprFunctionId = 11
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "STRING1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "apple "
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "STRING2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "banana"
+
+    [[categories.blocks]]
+        type = "operator_letter_of"
+        altName = "letter_of_string"
+        constantExprFunctionId = 12
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "LETTER"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_whole_number"
+                defaultValue = "1"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "STRING"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "apple"
+
+    [[categories.blocks]]
+        type = "operator_length"
+        altName = "string_length"
+        constantExprFunctionId = 13
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "STRING"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "apple"
+
+    [[categories.blocks]]
+        type = "operator_contains"
+        altName = "string_contains"
+        constantExprFunctionId = 14
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "STRING1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "apple"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "STRING2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "a"
+
+    [[categories.blocks]]
+        type = "operator_mod"
+        altName = "modulo"
+        constantExprFunctionId = 15
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM1"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM2"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_round"
+        altName = "round"
+        constantExprFunctionId = 16
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "math_operator"
+        constantExprFunctionId = 17
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "OPERATOR"
+            fieldType = "field_dropdown"
+            value = "abs"
+            optionCategory = "math_ops"
+
+            [[categories.blocks.args.options]]
+                label = "abs"
+                value = "abs"
+                altName = "op_abs"
+                constantExprValueId = 0
+
+            [[categories.blocks.args.options]]
+                label = "floor"
+                value = "floor"
+                altName = "op_floor"
+                constantExprValueId = 1
+
+            [[categories.blocks.args.options]]
+                label = "ceiling"
+                value = "ceiling"
+                altName = "op_ceil"
+                constantExprValueId = 2
+
+            [[categories.blocks.args.options]]
+                label = "sqrt"
+                value = "sqrt"
+                altName = "op_sqrt"
+                constantExprValueId = 3
+
+            [[categories.blocks.args.options]]
+                label = "sin"
+                value = "sin"
+                altName = "op_sin"
+                constantExprValueId = 4
+
+            [[categories.blocks.args.options]]
+                label = "cos"
+                value = "cos"
+                altName = "op_cos"
+                constantExprValueId = 5
+
+            [[categories.blocks.args.options]]
+                label = "tan"
+                value = "tan"
+                altName = "op_tan"
+                constantExprValueId = 6
+
+            [[categories.blocks.args.options]]
+                label = "asin"
+                value = "asin"
+                altName = "op_asin"
+                constantExprValueId = 7
+
+            [[categories.blocks.args.options]]
+                label = "acos"
+                value = "acos"
+                altName = "op_acos"
+                constantExprValueId = 8
+
+            [[categories.blocks.args.options]]
+                label = "atan"
+                value = "atan"
+                altName = "op_atan"
+                constantExprValueId = 9
+
+            [[categories.blocks.args.options]]
+                label = "ln"
+                value = "ln"
+                altName = "op_ln"
+                constantExprValueId = 10
+
+            [[categories.blocks.args.options]]
+                label = "log"
+                value = "log"
+                altName = "op_log"
+                constantExprValueId = 11
+
+            [[categories.blocks.args.options]]
+                label = "e ^"
+                altName = "op_exp"
+                value = "e ^"
+                constantExprValueId = 12
+
+            [[categories.blocks.args.options]]
+                label = "10 ^"
+                altName = "op_pow"
+                value = "10 ^"
+                constantExprValueId = 13
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+[[categories]]
+    category = "grazelang_math_op_shorthands"
+    id = "grazelang_math_op_shorthands"
+    altName = "math_ops"
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "abs"
+        constantExprFunctionId = 18
+
+        [[categories.blocks.knownParams]]
+            value = ["abs"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "abs"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "floor"
+        constantExprFunctionId = 19
+
+        [[categories.blocks.knownParams]]
+            value = ["floor"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "floor"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "ceil"
+        constantExprFunctionId = 20
+
+        [[categories.blocks.knownParams]]
+            value = ["ceiling"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "ceiling"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "sqrt"
+        constantExprFunctionId = 21
+
+        [[categories.blocks.knownParams]]
+            value = ["sqrt"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "sqrt"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "sin"
+        constantExprFunctionId = 22
+
+        [[categories.blocks.knownParams]]
+            value = ["sin"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "sin"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "cos"
+        constantExprFunctionId = 23
+
+        [[categories.blocks.knownParams]]
+            value = ["cos"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "cos"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "tan"
+        constantExprFunctionId = 24
+
+        [[categories.blocks.knownParams]]
+            value = ["tan"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "tan"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "asin"
+        constantExprFunctionId = 25
+
+        [[categories.blocks.knownParams]]
+            value = ["asin"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "asin"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "acos"
+        constantExprFunctionId = 26
+
+        [[categories.blocks.knownParams]]
+            value = ["acos"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "acos"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "op_atan"
+        constantExprFunctionId = 27
+
+        [[categories.blocks.knownParams]]
+            value = ["atan"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "atan"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "ln"
+        constantExprFunctionId = 28
+
+        [[categories.blocks.knownParams]]
+            value = ["ln"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "ln"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "log"
+        constantExprFunctionId = 29
+
+        [[categories.blocks.knownParams]]
+            value = ["log"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "log"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "exp"
+        constantExprFunctionId = 30
+
+        [[categories.blocks.knownParams]]
+            value = ["e ^"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "e ^"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+    [[categories.blocks]]
+        type = "operator_mathop"
+        altName = "pow"
+        constantExprFunctionId = 31
+
+        [[categories.blocks.knownParams]]
+            value = ["10 ^"]
+
+            [categories.blocks.knownParams.param]
+                kind = "field"
+                name = "OPERATOR"
+                fieldType = "field_dropdown"
+                value = "10 ^"
+                options = []
+                optionCategory = "math_ops"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NUM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = ""
+
+[[categories]]
+    category = "%{BKY_CATEGORY_VARIABLES}"
+    id = "data"
+
+    [[categories.blocks]]
+        type = "data_variable"
+        altName = "get_variable_value"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "VARIABLE"
+            fieldType = "field_variable_getter"
+            optionCategory = "variables"
+
+    [[categories.blocks]]
+        type = "data_setvariableto"
+        altName = "set_variable_to"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "VARIABLE"
+            fieldType = "field_variable"
+            optionCategory = "variables"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "0"
+
+    [[categories.blocks]]
+        type = "data_changevariableby"
+        altName = "change_variable_by"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "VARIABLE"
+            fieldType = "field_variable"
+            optionCategory = "variables"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                defaultValue = "1"
+
+    [[categories.blocks]]
+        type = "data_showvariable"
+        altName = "show_variable"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "VARIABLE"
+            fieldType = "field_variable"
+            optionCategory = "variables"
+
+    [[categories.blocks]]
+        type = "data_hidevariable"
+        altName = "hide_variable"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "VARIABLE"
+            fieldType = "field_variable"
+            optionCategory = "variables"
+
+    [[categories.blocks]]
+        type = "data_listcontents"
+        altName = "get_list_contents"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable_getter"
+
+    [[categories.blocks]]
+        type = "data_addtolist"
+        altName = "add_to_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "ITEM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "thing"
+
+    [[categories.blocks]]
+        type = "data_deleteoflist"
+        altName = "delete_item_of_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "INDEX"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_integer"
+                defaultValue = "1"
+
+    [[categories.blocks]]
+        type = "data_deletealloflist"
+        altName = "delete_all_of_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+    [[categories.blocks]]
+        type = "data_insertatlist"
+        altName = "insert_at_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "INDEX"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_integer"
+                defaultValue = "1"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "ITEM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "thing"
+
+    [[categories.blocks]]
+        type = "data_replaceitemoflist"
+        altName = "replace_item_of_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "INDEX"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_integer"
+                defaultValue = "1"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "ITEM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "thing"
+
+    [[categories.blocks]]
+        type = "data_itemoflist"
+        altName = "get_item_of_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "INDEX"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_integer"
+                defaultValue = "1"
+
+    [[categories.blocks]]
+        type = "data_itemnumoflist"
+        altName = "get_index_of_item_in_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "ITEM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "thing"
+
+    [[categories.blocks]]
+        type = "data_lengthoflist"
+        altName = "get_list_length"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+    [[categories.blocks]]
+        type = "data_listcontainsitem"
+        altName = "list_contains_item"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "ITEM"
+            inputType = "value"
+
+            [categories.blocks.args.shadow]
+                type = "text"
+                defaultValue = "thing"
+
+    [[categories.blocks]]
+        type = "data_showlist"
+        altName = "show_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+    [[categories.blocks]]
+        type = "data_hidelist"
+        altName = "hide_list"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "LIST"
+            fieldType = "field_variable"
+            optionCategory = "lists"
+
+[[categories]]
+    category = "%{BKY_CATEGORY_MYBLOCKS}"
+    id = "myBlocks"
+    blocks = []
+    altName = "my_blocks"
