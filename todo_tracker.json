@@ -577,10 +577,10 @@
     },
     "79": {
         "filepath": "grazelang/src/lexer.rs",
-        "text": "- [x] `costume`\n- [x] `backdrop`\n- [x] `sound`\n- [x] `broadcast`",
+        "text": "- [x] `costume`\n- [x] `backdrop`\n- [x] `sound`\n- [x] `broadcast`\n- [x] `stage`\n- [x] `vars`\n- [x] `lists`",
         "status": "open",
-        "lines": "L157-L162",
-        "commit": "b804dc54ae5c1bf0664617631b441efc26d37b50",
+        "lines": "L151-L159",
+        "commit": "f5838a56a59663783129a58db865336ea80661af",
         "title": "Soften keywords"
     },
     "80": {
