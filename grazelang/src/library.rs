@@ -65,7 +65,7 @@ where
     })
 }
 
-generate_dynamic_generate_library!();
+generate_dynamic_generate_library!(pub);
 
 pub fn convert_generated_library(
     library: HashMap<String, LibraryItem>,

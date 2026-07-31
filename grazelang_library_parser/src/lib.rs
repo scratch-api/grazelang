@@ -310,10 +310,12 @@ pub fn generate_constant_expr_library_no_use_cache(input: TokenStream) -> TokenS
 #[proc_macro]
 pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
     let library_path = quote! { ::grazelang_types };
-    let parser_path = if input.is_empty() {
-        quote! { #library_path::parser }
+    let parser_path = quote! { #library_path::parser }; 
+    let qualifier = if input.is_empty() {
+        quote!{ }
     } else {
-        return quote! { ::std::compile_error!("no arguments allowed"); }.into();
+        let qualifier = parse_macro_input!(input as syn::Visibility);
+        quote!{ #qualifier }
     };
     let no_category_string_2 = NO_CATEGORY_STRING.as_str();
     let variables_category_string_2 = VARIABLES_CATEGORY_STRING.as_str();
@@ -332,7 +334,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
     let objects_category_string_2 = OBJECTS_CATEGORY_STRING.as_str();
     let pen_properties_category_string_2 = PEN_PROPERTIES_CATEGORY_STRING.as_str();
     quote! {
-        pub(crate) fn dynamic_generate_library(
+        #qualifier fn dynamic_generate_library(
             path: &::std::primitive::str,
             use_cache: ::std::primitive::bool,
             create_cache: ::std::primitive::bool,
