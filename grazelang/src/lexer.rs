@@ -22,8 +22,6 @@ use crate::string_unescape::unescape_format_string;
 pub enum Token {
     #[token("sprite")]
     SpriteKeyword,
-    #[token("stage")]
-    StageKeyword,
     #[token("config")]
     ConfigKeyword,
     #[token("monitor")]
@@ -48,12 +46,8 @@ pub enum Token {
     LocalKeyword,
     #[token("var")]
     VarKeyword,
-    #[token("vars")]
-    VarsKeyword,
     #[token("list")]
     ListKeyword,
-    #[token("lists")]
-    ListsKeyword,
     #[token("{")]
     LeftBrace,
     #[token("}", handle_right_brace)]
@@ -159,13 +153,15 @@ pub enum Token {
 //  - [x] `backdrop`
 //  - [x] `sound`
 //  - [x] `broadcast`
+//  - [x] `stage`
+//  - [x] `vars`
+//  - [x] `lists`
 // Issue: #79
 
 impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::SpriteKeyword => write!(f, "\"sprite\""),
-            Token::StageKeyword => write!(f, "\"stage\""),
             Token::ConfigKeyword => write!(f, "\"config\""),
             Token::MonitorKeyword => write!(f, "\"monitor\""),
             Token::ProcKeyword => write!(f, "\"proc\""),
@@ -178,9 +174,7 @@ impl std::fmt::Debug for Token {
             Token::GlobalKeyword => write!(f, "\"global\""),
             Token::LocalKeyword => write!(f, "\"local\""),
             Token::VarKeyword => write!(f, "\"var\""),
-            Token::VarsKeyword => write!(f, "\"vars\""),
             Token::ListKeyword => write!(f, "\"list\""),
-            Token::ListsKeyword => write!(f, "\"lists\""),
             Token::ContainsKeyword => write!(f, "\"contains\""),
             Token::LeftBrace => write!(f, "'{{'"),
             Token::RightBrace(_) => write!(f, "'}}'"),

@@ -943,9 +943,6 @@ pub fn parse_single_identifier(
 ) -> ParseOut<IString> {
     Ok(match next_token!(token_stream) {
         Token::Identifier(value) => value,
-        Token::StageKeyword => literal!("stage"),
-        Token::VarsKeyword => literal!("vars"),
-        Token::ListsKeyword => literal!("lists"),
         token => emit_unexpected_token!(
             token_stream,
             "Expected an identifier.",
@@ -985,9 +982,6 @@ macro_rules! parse_identifier_segments_with_sep {
             $store.push({
                 let (value, source_span) = match next_token!(token_stream) {
                     Token::Identifier(value) => (value, get_token_source_span(token_stream)),
-                    Token::StageKeyword => (literal!("stage"), get_token_source_span(token_stream)),
-                    Token::VarsKeyword => (literal!("vars"), get_token_source_span(token_stream)),
-                    Token::ListsKeyword => (literal!("lists"), get_token_source_span(token_stream)),
                     Token::LeftBrace if $allow_left_brace => $left_brace_ret,
                     token => emit_unexpected_token!(
                         token_stream,
@@ -1694,7 +1688,7 @@ pub mod statement {
                 }
                 variant_from_stream_pos!(token_stream => SingleDataDeclarationType::List)
             }
-            Token::VarsKeyword => {
+            Token::Identifier(value) if value.as_str() == "vars" => {
                 skip_token!(token_stream);
                 let vars_keyword = from_stream_pos::<VarsKeyword>(token_stream);
                 if start_pos.is_none() {
@@ -1733,7 +1727,7 @@ pub mod statement {
                     token_stream.span_from_previous_to_current(let_keyword_position.0.0),
                 ));
             }
-            Token::ListsKeyword => {
+            Token::Identifier(value) if value.as_str() == "lists" => {
                 skip_token!(token_stream);
                 let lists_keyword = from_stream_pos::<ListsKeyword>(token_stream);
                 if start_pos.is_none() {
@@ -2139,10 +2133,7 @@ pub mod statement {
                     None => break None,
                 } {
                     Token::Semicolon => break None,
-                    Token::Identifier(_)
-                    | Token::StageKeyword
-                    | Token::VarsKeyword
-                    | Token::ListsKeyword => {
+                    Token::Identifier(_) => {
                         if let Token::Identifier(ident) = peek_token!(token_stream) {
                             if ident.as_str() != "else" {
                                 break None;
@@ -3472,7 +3463,7 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             context,
             find_statement_end_and_create_invalid::<Statement>(token_stream, start)
         )),
-        Token::Identifier(_) | Token::StageKeyword | Token::VarsKeyword | Token::ListsKeyword => {
+        Token::Identifier(_) => {
             let identifier = try_or_emit_message!(
                 parse_full_identifier(token_stream, context),
                 context,
@@ -4191,7 +4182,7 @@ pub fn parse_top_level_statement(
     context: &mut ParseContext,
 ) -> ParseOut<TopLevelStatement> {
     match next_token!(token_stream) {
-        Token::StageKeyword => {
+        Token::Identifier(value) if value.as_str() == "stage" => {
             let stage_keyword = from_stream_pos::<cst::StageKeyword>(token_stream);
             let start_pos = get_token_start(token_stream);
             context.next_target = Some(context.parsed_targets.swap_remove_front(0).unwrap());
@@ -4661,18 +4652,6 @@ pub mod expression {
                 token_stream.span_from_previous_to_current(token_position.0.0),
             )),
             Token::Identifier(value) => {
-                parse_expression_after_identifier(token_stream, context, value, token_position)
-            }
-            Token::StageKeyword => {
-                let value = literal!("stage");
-                parse_expression_after_identifier(token_stream, context, value, token_position)
-            }
-            Token::VarsKeyword => {
-                let value = literal!("vars");
-                parse_expression_after_identifier(token_stream, context, value, token_position)
-            }
-            Token::ListsKeyword => {
-                let value = literal!("lists");
                 parse_expression_after_identifier(token_stream, context, value, token_position)
             }
             Token::LeftParens => {
