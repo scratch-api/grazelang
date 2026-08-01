@@ -2218,7 +2218,7 @@ pub mod statement {
         if peek_token!(token_stream) == &Token::LeftBrace {
             let expression = match expressions.len() {
                 0 => {
-                    let source_span = (left_parens.0.0, right_parens.0.1);
+                    let source_span = left_parens.span_to(&right_parens);
                     Expression::Literal(cst::Literal::EmptyExpression(
                         left_parens,
                         right_parens,
@@ -2237,7 +2237,7 @@ pub mod statement {
                             token_stream.span_from_previous_to_current(start_pos),
                         ));
                     };
-                    let source_span = (left_parens.0.0, right_parens.0.1);
+                    let source_span = left_parens.span_to(&right_parens);
                     Expression::Parentheses(left_parens, expression, right_parens, source_span)
                 }
                 _ => {
@@ -3667,7 +3667,7 @@ pub fn parse_sprite_statement(
                         )
                     );
                     if expressions.is_empty() {
-                        let source_span = (left_parens.0.0, right_parens.0.1);
+                        let source_span = left_parens.span_to(&right_parens);
                         return parse_sprite_rest_of_single_input_control(
                             token_stream,
                             context,
@@ -3681,7 +3681,7 @@ pub fn parse_sprite_statement(
                         );
                     }
                     if expressions.values.is_empty() && expressions.tail_value.is_some() {
-                        let source_span = (left_parens.0.0, right_parens.0.1);
+                        let source_span = left_parens.span_to(&right_parens);
                         return parse_sprite_rest_of_single_input_control(
                             token_stream,
                             context,
@@ -4006,7 +4006,7 @@ pub fn parse_stage_statement(
                         )
                     );
                     if expressions.is_empty() {
-                        let source_span = (left_parens.0.0, right_parens.0.1);
+                        let source_span = left_parens.span_to(&right_parens);
                         return parse_stage_rest_of_single_input_control(
                             token_stream,
                             context,
@@ -4020,7 +4020,7 @@ pub fn parse_stage_statement(
                         );
                     }
                     if expressions.values.is_empty() && expressions.tail_value.is_some() {
-                        let source_span = (left_parens.0.0, right_parens.0.1);
+                        let source_span = left_parens.span_to(&right_parens);
                         return parse_stage_rest_of_single_input_control(
                             token_stream,
                             context,
