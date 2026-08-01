@@ -398,6 +398,8 @@ impl GetLintId for SpecificGrazeWarning {
     }
 }
 
+// TODO: Warn when two lists, two variables etc. have the same canonical name
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum GrazeInfo {
     Custom {
