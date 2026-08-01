@@ -633,11 +633,11 @@
     },
     "86": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [ ] Decide on syntax\n- [ ] CST integration\n- [ ] Parser integration\n- [ ] Codegen integration",
+        "text": "- [x] Decide on syntax\n- [x] CST integration\n- [ ] Parser integration\n- [ ] Codegen integration",
         "status": "open",
-        "lines": "L3095-L3099",
-        "commit": "d139fd1ef3bb79a3045785ba6ab84781732d37a5",
-        "title": "Add `use extension` or `extension` statement"
+        "lines": "L3114-L3119",
+        "commit": "a8abf25a510212de81452a6ea45ea9d0bbafa8ac",
+        "title": "Add `use extension` statement"
     },
     "87": {
         "filepath": "grazelang_library_parser/src/lib.rs",
