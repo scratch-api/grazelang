@@ -3114,6 +3114,6 @@ impl GetLintId for DictionaryTypeError {
 // TODO: Add `use extension` statement
 //  - [x] Decide on syntax
 //  - [x] CST integration
-//  - [ ] Parser integration
+//  - [x] Parser integration
 //  - [ ] Codegen integration
 // Issue: #86

@@ -159,6 +159,7 @@ pub enum Token {
 //  - [x] `stage`
 //  - [x] `vars`
 //  - [x] `lists`
+//  - [x] `extension`
 // Issue: #79
 
 impl std::fmt::Debug for Token {

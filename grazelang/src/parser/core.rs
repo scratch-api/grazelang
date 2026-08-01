@@ -71,9 +71,9 @@ macro_rules! expect_token_or_message {
 
 /// The difference between this and `consume_if` is that we cannot use values from the match in `consume_if` due to the borrow checker.
 macro_rules! consume_and_use_if {
-    ($token_stream:expr, $pattern:pat => $body:expr) => {{
+    ($token_stream:expr, $pattern:pat $(if $guard:expr)? => $body:expr) => {{
         #[expect(unused_variables)]
-        if matches!(peek_token!($token_stream => Option), Some($pattern)) {
+        if matches!(peek_token!($token_stream => Option), Some($pattern) $(if $guard)?) {
             match next_token!($token_stream) {
                 $pattern => Some($body),
                 _ => unreachable!(),
@@ -85,9 +85,9 @@ macro_rules! consume_and_use_if {
 }
 
 macro_rules! consume_if {
-    ($token_stream:expr, $pattern:path => $body:expr) => {{
+    ($token_stream:expr, $pattern:pat $(if $guard:expr)? => $body:expr) => {{
         match peek_token!($token_stream => Option) {
-            Some($pattern) => {
+            Some($pattern) $(if $guard)? => {
                 skip_token!($token_stream);
                 Some($body)
             }
@@ -97,8 +97,8 @@ macro_rules! consume_if {
 }
 
 macro_rules! consume_then_never_if {
-    ($token_stream:expr, $pattern:pat => $body:expr) => {{
-        if matches!(peek_token!($token_stream => Option), Some($pattern)) {
+    ($token_stream:expr, $pattern:pat $(if $guard:expr)? => $body:expr) => {{
+        if matches!(peek_token!($token_stream => Option), Some($pattern) $(if $guard)?) {
             skip_token!($token_stream);
             $body;
         }
@@ -3478,7 +3478,11 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
-            let extension_keyword = None;
+            let extension_keyword = consume_if!(
+                token_stream,
+                Token::Identifier(value) if value.as_str() == "extension"
+                    => from_stream_pos::<cst::ExtensionKeyword>(token_stream)
+            );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(Statement::UseStatement(
@@ -3808,7 +3812,11 @@ pub fn parse_sprite_statement(
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
-            let extension_keyword = None;
+            let extension_keyword = consume_if!(
+                token_stream,
+                Token::Identifier(value) if value.as_str() == "extension"
+                    => from_stream_pos::<cst::ExtensionKeyword>(token_stream)
+            );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(SpriteStatement::UseStatement(
@@ -4136,7 +4144,11 @@ pub fn parse_stage_statement(
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
-            let extension_keyword = None;
+            let extension_keyword = consume_if!(
+                token_stream,
+                Token::Identifier(value) if value.as_str() == "extension"
+                    => from_stream_pos::<cst::ExtensionKeyword>(token_stream)
+            );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(StageStatement::UseStatement(
@@ -4357,7 +4369,11 @@ pub fn parse_top_level_statement(
         }
         Token::UseKeyword => {
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
-            let extension_keyword = None;
+            let extension_keyword = consume_if!(
+                token_stream,
+                Token::Identifier(value) if value.as_str() == "extension"
+                    => from_stream_pos::<cst::ExtensionKeyword>(token_stream)
+            );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(TopLevelStatement::UseStatement(
