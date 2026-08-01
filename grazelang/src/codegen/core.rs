@@ -4205,7 +4205,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
         }
         let mut path = Vec::new();
-        add_symbols(context, &mut path, value.1)?;
+        add_symbols(context, &mut path, value.2)?;
         Ok(())
     }
 

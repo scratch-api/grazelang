@@ -3478,10 +3478,12 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
+            let extension_keyword = None;
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(Statement::UseStatement(
                 use_keyword,
+                extension_keyword,
                 content,
                 expect_token_or_message!(
                     token_stream,
@@ -3806,10 +3808,12 @@ pub fn parse_sprite_statement(
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
+            let extension_keyword = None;
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(SpriteStatement::UseStatement(
                 use_keyword,
+                extension_keyword,
                 content,
                 expect_token_or_message!(
                     token_stream,
@@ -4132,10 +4136,12 @@ pub fn parse_stage_statement(
         Token::UseKeyword => {
             skip_token!(token_stream);
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
+            let extension_keyword = None;
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(StageStatement::UseStatement(
                 use_keyword,
+                extension_keyword,
                 content,
                 expect_token_or_message!(
                     token_stream,
@@ -4351,10 +4357,12 @@ pub fn parse_top_level_statement(
         }
         Token::UseKeyword => {
             let use_keyword = from_stream_pos::<cst::UseKeyword>(token_stream);
+            let extension_keyword = None;
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
             Ok(TopLevelStatement::UseStatement(
                 use_keyword,
+                extension_keyword,
                 content,
                 expect_token_or_message!(
                     token_stream,

@@ -3,14 +3,14 @@ use crate::{
     parser::cst::{
         AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
         Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind,
-        DataDeclaration, DataDeclarationScope, DictionaryEntry, Expression, FormattedStringContent,
-        GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword,
-        LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, MonitorKeyword,
-        MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens,
-        Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock,
-        SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement,
-        SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent,
-        VarKeyword, VarsKeyword, WarpSpecifier,
+        DataDeclaration, DataDeclarationScope, DictionaryEntry, Expression, ExtensionKeyword,
+        FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens,
+        LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
+        MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace,
+        RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier,
+        SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock,
+        StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement,
+        UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier,
     },
 };
 
@@ -40,6 +40,7 @@ pub type BorrowedTopLevelStatementBroadcastDeclaration<'a> = (
 
 pub type BorrowedUseStatement<'a> = (
     &'a UseKeyword,
+    Option<&'a ExtensionKeyword>,
     &'a UseStatementContent,
     &'a Semicolon,
     &'a SourceSpan,
@@ -792,12 +793,19 @@ where
         }
         TopLevelStatement::UseStatement(
             use_keyword,
+            extension_keyword,
             use_statement_content,
             semicolon,
             source_span,
         ) => {
             visitor.visit_use_statement(
-                (use_keyword, use_statement_content, semicolon, source_span),
+                (
+                    use_keyword,
+                    extension_keyword.as_ref(),
+                    use_statement_content,
+                    semicolon,
+                    source_span,
+                ),
                 context,
             )?;
         }
@@ -1067,12 +1075,19 @@ where
         }
         StageStatement::UseStatement(
             use_keyword,
+            extension_keyword,
             use_statement_content,
             semicolon,
             source_span,
         ) => {
             visitor.visit_use_statement(
-                (use_keyword, use_statement_content, semicolon, source_span),
+                (
+                    use_keyword,
+                    extension_keyword.as_ref(),
+                    use_statement_content,
+                    semicolon,
+                    source_span,
+                ),
                 context,
             )?;
         }
@@ -1250,12 +1265,19 @@ where
         }
         SpriteStatement::UseStatement(
             use_keyword,
+            extension_keyword,
             use_statement_content,
             semicolon,
             source_span,
         ) => {
             visitor.visit_use_statement(
-                (use_keyword, use_statement_content, semicolon, source_span),
+                (
+                    use_keyword,
+                    extension_keyword.as_ref(),
+                    use_statement_content,
+                    semicolon,
+                    source_span,
+                ),
                 context,
             )?;
         }
@@ -1586,9 +1608,21 @@ where
                 context,
             )?;
         }
-        Statement::UseStatement(use_keyword, use_statement_content, semicolon, source_span) => {
+        Statement::UseStatement(
+            use_keyword,
+            extension_keyword,
+            use_statement_content,
+            semicolon,
+            source_span,
+        ) => {
             visitor.visit_use_statement(
-                (use_keyword, use_statement_content, semicolon, source_span),
+                (
+                    use_keyword,
+                    extension_keyword.as_ref(),
+                    use_statement_content,
+                    semicolon,
+                    source_span,
+                ),
                 context,
             )?;
         }

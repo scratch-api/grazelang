@@ -59,7 +59,7 @@ pub enum TopLevelStatement {
         Semicolon,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -70,7 +70,7 @@ impl GetPos for TopLevelStatement {
             TopLevelStatement::Stage(_, _, _, p) => p,
             TopLevelStatement::Sprite(_, _, _, _, _, p) => p,
             TopLevelStatement::BroadcastDeclaration(_, _, _, _, p) => p,
-            TopLevelStatement::UseStatement(_, _, _, p) => p,
+            TopLevelStatement::UseStatement(_, _, _, _, p) => p,
             TopLevelStatement::EmptyStatement(p) => &p.0,
             TopLevelStatement::Invalid(p) => p,
         }
@@ -158,6 +158,22 @@ impl FromSourceSpan for UseKeyword {
 }
 
 impl GetPos for UseKeyword {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExtensionKeyword(pub SourceSpan);
+
+impl FromSourceSpan for ExtensionKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
+impl GetPos for ExtensionKeyword {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
         &self.0
@@ -504,7 +520,7 @@ pub enum StageStatement {
         RightBrace,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -541,7 +557,7 @@ impl GetPos for StageStatement {
             | StageStatement::IsolatedExpression(_, _, _, _, p)
             | StageStatement::ConfigStatement(_, _, _, _, p)
             | StageStatement::MonitorDeclaration(_, _, _, _, _, p)
-            | StageStatement::UseStatement(_, _, _, p)
+            | StageStatement::UseStatement(_, _, _, _, p)
             | StageStatement::Invalid(p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
         }
@@ -645,7 +661,7 @@ pub enum SpriteStatement {
         RightBrace,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -664,7 +680,7 @@ impl GetPos for SpriteStatement {
             | SpriteStatement::IsolatedExpression(_, _, _, _, p)
             | SpriteStatement::ConfigStatement(_, _, _, _, p)
             | SpriteStatement::MonitorDeclaration(_, _, _, _, _, p)
-            | SpriteStatement::UseStatement(_, _, _, p)
+            | SpriteStatement::UseStatement(_, _, _, _, p)
             | SpriteStatement::Invalid(p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
         }
@@ -827,7 +843,7 @@ pub enum Statement {
         Option<Semicolon>,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -844,7 +860,7 @@ impl GetPos for Statement {
             Statement::MultiInputControl(_, _, _, _, _, _, p) => p,
             Statement::Forever(_, _, _, p) => p,
             Statement::IfElse(_, _, _, _, p) => p,
-            Statement::UseStatement(_, _, _, p) => p,
+            Statement::UseStatement(_, _, _, _, p) => p,
             Statement::EmptyStatement(p) => &p.0,
             Statement::Invalid(p) => p,
         }
@@ -3095,9 +3111,9 @@ impl GetLintId for DictionaryTypeError {
     }
 }
 
-// TODO: Add `use extension` or `extension` statement
-//  - [ ] Decide on syntax
-//  - [ ] CST integration
+// TODO: Add `use extension` statement
+//  - [x] Decide on syntax
+//  - [x] CST integration
 //  - [ ] Parser integration
 //  - [ ] Codegen integration
 // Issue: #86
