@@ -642,7 +642,7 @@
     "87": {
         "filepath": "grazelang_library_parser/src/lib.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L442-L442",
         "commit": "d139fd1ef3bb79a3045785ba6ab84781732d37a5",
         "title": "Include optional required_extensions attribute to libraries"
