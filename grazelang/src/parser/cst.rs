@@ -2473,6 +2473,8 @@ impl GetPos for CanonicalIdentifier {
     }
 }
 
+// TODO: Validate more names
+
 #[derive(Debug, Clone, Error, enum_assoc::Assoc)]
 #[func(const fn internal_lint_id(&self) -> &'static str)]
 #[func(const fn internal_primary_message(&self) -> &'static str)]
