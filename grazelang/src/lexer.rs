@@ -149,6 +149,7 @@ pub enum Token {
 }
 
 // TODO: Add `+=` etc
+// Issue: #88
 
 // TODO: Soften keywords
 //  - [x] `costume`
