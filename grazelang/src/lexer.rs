@@ -148,6 +148,8 @@ pub enum Token {
     LeftFormattedString(IString),
 }
 
+// TODO: Add `+=` etc
+
 // TODO: Soften keywords
 //  - [x] `costume`
 //  - [x] `backdrop`
