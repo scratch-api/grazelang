@@ -577,10 +577,10 @@
     },
     "79": {
         "filepath": "grazelang/src/lexer.rs",
-        "text": "- [x] `costume`\n- [x] `backdrop`\n- [x] `sound`\n- [x] `broadcast`\n- [x] `stage`\n- [x] `vars`\n- [x] `lists`",
+        "text": "- [x] `costume`\n- [x] `backdrop`\n- [x] `sound`\n- [x] `broadcast`\n- [x] `stage`\n- [x] `vars`\n- [x] `lists`\n- [x] `extension`",
         "status": "open",
-        "lines": "L151-L159",
-        "commit": "f5838a56a59663783129a58db865336ea80661af",
+        "lines": "L154-L163",
+        "commit": "4fb5a7bb822ff5c26bf8f94e826eae014660c90e",
         "title": "Soften keywords"
     },
     "80": {
@@ -633,10 +633,10 @@
     },
     "86": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [x] Decide on syntax\n- [x] CST integration\n- [ ] Parser integration\n- [ ] Codegen integration",
+        "text": "- [x] Decide on syntax\n- [x] CST integration\n- [x] Parser integration\n- [ ] Codegen integration",
         "status": "open",
         "lines": "L3114-L3119",
-        "commit": "a8abf25a510212de81452a6ea45ea9d0bbafa8ac",
+        "commit": "4fb5a7bb822ff5c26bf8f94e826eae014660c90e",
         "title": "Add `use extension` statement"
     },
     "87": {
