@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub struct Library {
     pub categories: Vec<ToolboxCategory>,
+    #[serde(default)]
+    pub required_extensions: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -692,8 +694,14 @@ pub struct LibraryCache {
     pub value: String,
 }
 
+pub type DynamicLibraryCacheValue = (
+    HashMap<String, LibraryItem>,
+    HashMap<u32, HashSet<String>>,
+    Vec<String>,
+);
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DynamicLibraryCache {
     pub hash: String,
-    pub value: (HashMap<String, LibraryItem>, HashMap<u32, HashSet<String>>),
+    pub value: DynamicLibraryCacheValue,
 }

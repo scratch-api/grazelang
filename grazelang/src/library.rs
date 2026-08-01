@@ -19,7 +19,8 @@ use crate::{
 };
 
 pub fn get_generated_library() -> (HashMap<String, LibraryItem>, HashMap<u32, HashSet<IString>>) {
-    generate_library!("src/library_markups/standard_toolbox.toml")
+    let (a, b, _): (_, _, [&'static str; _]) = generate_library!("src/library_markups/standard_toolbox.toml");
+    (a, b)
 }
 
 pub static CONSTANT_EXPR_LIBRARY: LazyLock<ConstantExprLibraryItem> = LazyLock::new(|| {

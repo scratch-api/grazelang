@@ -60,9 +60,9 @@ macro_rules! implement_generate_library {
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
 
-        let v: library_parser::Library =
+        let source_library: library_parser::Library =
             toml::from_str(&toml_str).expect("Failed to parse JSON");
-        let v: Vec<library_parser::ToolboxCategory> = v.categories;
+        let v: Vec<library_parser::ToolboxCategory> = source_library.categories;
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
@@ -111,8 +111,10 @@ macro_rules! implement_generate_library {
 
         let category_entry_stream = expand_category_entries(category_entries);
 
+        let extensions = source_library.required_extensions.iter();
+
         let expanded = quote! {
-            (::std::collections::HashMap::from([#( (#library_keys.to_string(), #library_values) ),*]), #category_entry_stream)
+            (::std::collections::HashMap::from([#( (#library_keys.to_string(), #library_values) ),*]), #category_entry_stream, [#( #extensions ),*])
         };
 
         implement_create_cache!(output_cache_path, hex_hash, expanded, $create_cache);
@@ -139,9 +141,9 @@ macro_rules! implement_generate_constant_expr_library {
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
 
-        let v: library_parser::Library =
+        let source_library: library_parser::Library =
             toml::from_str(&toml_str).expect("Failed to parse JSON");
-        let v: Vec<library_parser::ToolboxCategory> = v.categories;
+        let v: Vec<library_parser::ToolboxCategory> = source_library.categories;
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
@@ -340,7 +342,8 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
             create_cache: ::std::primitive::bool,
         ) -> (
                 ::std::collections::HashMap<::std::string::String, #library_path::LibraryItem>,
-                ::std::collections::HashMap<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>
+                ::std::collections::HashMap<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>,
+                ::std::vec::Vec<::std::string::String>,
             ) {
             let full_path = path;
             let toml_str = ::std::fs::read_to_string(&full_path)
@@ -366,8 +369,8 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                     return cache.value;
                 }
             }
-            let v: #parser_path::Library = ::toml::from_str(&toml_str).expect("Failed to parse JSON");
-            let v: ::std::vec::Vec<#parser_path::ToolboxCategory> = v.categories;
+            let source_library: #parser_path::Library = ::toml::from_str(&toml_str).expect("Failed to parse JSON");
+            let v: ::std::vec::Vec<#parser_path::ToolboxCategory> = source_library.categories;
             let mut library = ::std::collections::HashMap::with_capacity(10);
             let mut menus = ::std::collections::HashMap::new();
             let mut menu_category_ids = ::std::collections::HashMap::<::arcstr::ArcStr, ::std::primitive::u32>::from([
@@ -423,7 +426,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
             if create_cache {
                 let dynamic_library_cache = #parser_path::DynamicLibraryCache {
                     hash: hex_hash,
-                    value: (library, category_entries),
+                    value: (library, category_entries, source_library.required_extensions),
                 };
                 ::std::fs::write(
                     output_cache_path,
@@ -432,10 +435,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                 .unwrap();
                 return dynamic_library_cache.value;
             }
-            (library, category_entries)
+            (library, category_entries, source_library.required_extensions)
         }        
     }.into()
 }
-
-// TODO: Include optional required_extensions attribute to libraries
-// Issue: #87
