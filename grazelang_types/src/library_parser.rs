@@ -1,14 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
-use arcstr::ArcStr as IString;
 use crate::{
     CallBlockParam, CallBlockParamKind, ConstantExprLibraryItem, ConstantExprLibraryItemValue,
     KnownBlock, LibraryItem, LibraryItemValue, NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveBlock},
 };
+use arcstr::ArcStr as IString;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Library {
     pub categories: Vec<ToolboxCategory>,
 }
@@ -320,10 +321,12 @@ impl BlockEntry {
                             field: field_value.map(|value| {
                                 let field_value = value.value.clone();
                                 category_entries
-                                    .entry(get_menu_category_id(menu_category_ids, field_category.as_ref()))
+                                    .entry(get_menu_category_id(
+                                        menu_category_ids,
+                                        field_category.as_ref(),
+                                    ))
                                     .or_default()
-                                    .insert(field_value.clone())
-                                ;
+                                    .insert(field_value.clone());
                                 Sb3FieldValue::Normal(field_value.into())
                             }),
                             assign: assign.map(

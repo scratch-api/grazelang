@@ -1,5 +1,5 @@
 pub mod project_json;
-pub mod parser;
+pub mod library_parser;
 
 use proc_macro2::TokenStream;
 use std::{

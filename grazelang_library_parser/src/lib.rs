@@ -11,7 +11,7 @@ use grazelang_types::{
     DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID,
     LibraryItem, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, PEN_PROPERTIES_CATEGORY_ID,
     PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, VARIABLES_CATEGORY_ID,
-    parser::{
+    library_parser::{
         self,
         LibraryCache, merge_associated_item,
         process_constant_expr_toolbox_category, process_toolbox_category,
@@ -60,9 +60,9 @@ macro_rules! implement_generate_library {
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
 
-        let v: parser::Library =
+        let v: library_parser::Library =
             toml::from_str(&toml_str).expect("Failed to parse JSON");
-        let v: Vec<parser::ToolboxCategory> = v.categories;
+        let v: Vec<library_parser::ToolboxCategory> = v.categories;
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
@@ -139,9 +139,9 @@ macro_rules! implement_generate_constant_expr_library {
         );
         implement_use_cache!(output_cache_path, hex_hash, $use_cache);
 
-        let v: parser::Library =
+        let v: library_parser::Library =
             toml::from_str(&toml_str).expect("Failed to parse JSON");
-        let v: Vec<parser::ToolboxCategory> = v.categories;
+        let v: Vec<library_parser::ToolboxCategory> = v.categories;
 
         let mut library = HashMap::with_capacity(10);
         let mut menus = HashMap::new();
@@ -310,7 +310,7 @@ pub fn generate_constant_expr_library_no_use_cache(input: TokenStream) -> TokenS
 #[proc_macro]
 pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
     let library_path = quote! { ::grazelang_types };
-    let parser_path = quote! { #library_path::parser }; 
+    let parser_path = quote! { #library_path::library_parser }; 
     let qualifier = if input.is_empty() {
         quote!{ }
     } else {
@@ -357,16 +357,14 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                     path
                 },
             );
-            if use_cache {
-                if output_cache_path.is_file() {
-                    let output_json_str = ::std::fs::read_to_string(&output_cache_path)
-                        .unwrap_or_else(|_| panic!("Failed to read file at {:?}", output_cache_path));
-                    if let ::std::result::Result::Ok(cache) = ::serde_json::from_str::<#parser_path::DynamicLibraryCache>(&output_json_str)
-                        && cache.hash == hex_hash
-                    {
-                        return cache.value;
-                    }
-                };
+            if use_cache && output_cache_path.is_file() {
+                let output_json_str = ::std::fs::read_to_string(&output_cache_path)
+                    .unwrap_or_else(|_| panic!("Failed to read file at {:?}", output_cache_path));
+                if let ::std::result::Result::Ok(cache) = ::serde_json::from_str::<#parser_path::DynamicLibraryCache>(&output_json_str)
+                    && cache.hash == hex_hash
+                {
+                    return cache.value;
+                }
             }
             let v: #parser_path::Library = ::toml::from_str(&toml_str).expect("Failed to parse JSON");
             let v: ::std::vec::Vec<#parser_path::ToolboxCategory> = v.categories;
