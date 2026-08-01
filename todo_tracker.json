@@ -662,5 +662,13 @@
         "lines": "L2476-L2476",
         "commit": "3f06a129fb217f73ec82dd390b6537bc11e4e974",
         "title": "Validate more names"
+    },
+    "90": {
+        "filepath": "grazelang/src/messages/types.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L401-L401",
+        "commit": "e57b997ffe420da04a0ea2b275c63acf7956f7f4",
+        "title": "Warn when two lists, two variables etc. have the same canonical name"
     }
 }
