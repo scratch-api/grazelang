@@ -654,5 +654,13 @@
         "lines": "L151-L151",
         "commit": "44a79048dcde31254184829d68e8aeb9a03e8e72",
         "title": "Add `+=` etc"
+    },
+    "89": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L2476-L2476",
+        "commit": "3f06a129fb217f73ec82dd390b6537bc11e4e974",
+        "title": "Validate more names"
     }
 }
