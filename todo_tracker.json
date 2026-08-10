@@ -626,7 +626,7 @@
     "85": {
         "filepath": "grazelang/src/library.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L70-L70",
         "commit": "d139fd1ef3bb79a3045785ba6ab84781732d37a5",
         "title": "Load extension as dynamic library using `dynamic_generate_library`"
