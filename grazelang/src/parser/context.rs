@@ -695,6 +695,7 @@ pub struct ParseContext {
     // If stage is in this, it should be the first element
     pub parsed_targets: VecDeque<Target>,
     pub broadcasts: HashMap<IString, BroadcastDescriptor>,
+    pub extensions: HashSet<(IString, SourceSpan)>,
     pub next_target: Option<Target>,
     pub global_symbols: HashMap<IString, TargetSymbolDescriptor>,
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
@@ -714,6 +715,7 @@ impl ParseContext {
                 symbols: HashMap::new(),
             }]),
             broadcasts: HashMap::new(),
+            extensions: HashSet::new(),
             global_symbols: HashMap::new(),
             next_target: None,
             random_seed,

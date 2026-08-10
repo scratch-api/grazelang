@@ -6,8 +6,12 @@ use serde::{Deserialize, Serialize};
 pub struct GrazeSettings {
     pub message_setting: GrazeMessageSetting,
     pub use_shadows: UseShadows,
-    /// Path for the resources of the project or None if the resources are in the current directory
+    /// Path for the resources of the project or None if the resources are located in the current directory
     pub resources_path: Option<PathBuf>,
+    /// Path for external extensions for the project or None if the extensions are located in the current directory
+    pub extensions_path: Option<PathBuf>,
+    pub use_cached_extensions: bool,
+    pub create_cached_extensions: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, clap::ValueEnum)]

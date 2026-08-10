@@ -340,14 +340,14 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
             path: &::std::path::Path,
             use_cache: ::std::primitive::bool,
             create_cache: ::std::primitive::bool,
-        ) -> (
+        ) -> Option<(
                 ::std::collections::HashMap<::std::string::String, #library_path::LibraryItem>,
                 ::std::collections::HashMap<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>,
                 ::std::vec::Vec<::std::string::String>,
-            ) {
+            )> {
             let full_path = path;
             let toml_str = ::std::fs::read_to_string(&full_path)
-                .unwrap_or_else(|_| panic!("Failed to read file at {:?}", full_path));
+                .ok()?;
             let (hex_hash, output_cache_path) = (
                 {
                     let hash = <::sha3::Sha3_256 as ::sha3::Digest>::digest(toml_str.as_bytes());
@@ -362,11 +362,11 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
             );
             if use_cache && output_cache_path.is_file() {
                 let output_json_str = ::std::fs::read_to_string(&output_cache_path)
-                    .unwrap_or_else(|_| panic!("Failed to read file at {:?}", output_cache_path));
+                    .ok()?;
                 if let ::std::result::Result::Ok(cache) = ::serde_json::from_str::<#parser_path::DynamicLibraryCache>(&output_json_str)
                     && cache.hash == hex_hash
                 {
-                    return cache.value;
+                    return Some(cache.value);
                 }
             }
             let source_library: #parser_path::Library = ::toml::from_str(&toml_str).expect("Failed to parse JSON");
@@ -400,7 +400,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                     #library_path::PEN_PROPERTIES_CATEGORY_ID,
                 ),
             ]);
-            let mut category_entries = ::std::collections::HashMap::<::std::primitive::u32, ::std::collections::HashSet<String>>::new();
+            let mut category_entries = ::std::collections::HashMap::<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>::new();
             for namespace in v {
                 let (category_name, category, associated_menus) =
                 #parser_path::process_toolbox_category(namespace, &mut category_entries, &mut menu_category_ids);
@@ -430,12 +430,12 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                 };
                 ::std::fs::write(
                     output_cache_path,
-                    ::serde_json::to_string(&dynamic_library_cache).unwrap(),
+                    ::serde_json::to_string(&dynamic_library_cache).ok()?,
                 )
-                .unwrap();
-                return dynamic_library_cache.value;
+                .ok()?;
+                return Some(dynamic_library_cache.value);
             }
-            (library, category_entries, source_library.required_extensions)
+            Some((library, category_entries, source_library.required_extensions))
         }        
     }.into()
 }

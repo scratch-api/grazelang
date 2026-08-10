@@ -52,12 +52,21 @@ pub enum Commands {
         #[arg(long)]
         log_time: bool,
         /// Path for the sb3 file
-        #[arg(value_enum, short, long)]
+        #[arg(short, long)]
         target: Option<PathBuf>,
         // 'r' is reserved for a requirements file
         /// Path for the resources of the project (default: project directory)
-        #[arg(value_enum, short = 'R', long)]
+        #[arg(short = 'R', long)]
         resources: Option<PathBuf>,
+        /// Path for external extensions for the project (default: extensions directory in project directory)
+        #[arg(short = 'e', long)]
+        extensions: Option<PathBuf>,
+        /// Should the transpiler try to use cached versions of external extensions
+        #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
+        use_cached_extensions: bool,
+        /// Should the transpiler create cached versions of external extensions
+        #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
+        create_cached_extensions: bool,
         /// Path of the file or project directory
         #[arg(default_value = ".")]
         path: PathBuf,
@@ -267,13 +276,19 @@ impl Cli {
                 logging,
                 target,
                 resources,
+                extensions,
+                use_cached_extensions,
+                create_cached_extensions,
                 path,
                 log_time,
             } => Self::build(
                 shadows,
                 logging,
-                target.as_ref().map(PathBuf::as_path),
-                resources.as_ref().map(PathBuf::as_path),
+                target.as_deref(),
+                resources.as_deref(),
+                extensions.as_deref(),
+                *use_cached_extensions,
+                *create_cached_extensions,
                 path,
                 *log_time,
             ),
@@ -309,11 +324,15 @@ impl Cli {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn build(
         shadows: &UseShadows,
         logging: &GrazeMessageSetting,
         target: Option<&Path>,
         resources: Option<&Path>,
+        extensions: Option<&Path>,
+        use_cached_extensions: bool,
+        create_cached_extensions: bool,
         path: &Path,
         log_time: bool,
     ) {
@@ -330,6 +349,16 @@ impl Cli {
                         path.to_path_buf()
                     }
                 })),
+                extensions_path: Some(extensions.map(Path::to_path_buf).unwrap_or_else(|| {
+                    if path_is_file {
+                        path.parent().unwrap_or(Path::new("/"))
+                    } else {
+                        path
+                    }
+                    .join("extensions")
+                })),
+                use_cached_extensions,
+                create_cached_extensions,
             },
             Default::default(),
         );

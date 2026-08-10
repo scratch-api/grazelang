@@ -5,7 +5,9 @@ use std::{
 };
 
 use arcstr::{ArcStr as IString, literal};
-use grazelang_library_parser::{generate_constant_expr_library, generate_dynamic_generate_library, generate_library};
+use grazelang_library_parser::{
+    generate_constant_expr_library, generate_dynamic_generate_library, generate_library,
+};
 use grazelang_types::{
     AliasSegment, BACKDROPS_CATEGORY_ID, BindInfo, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, ConstantExprLibraryItem, KnownBlock, LibraryItem, LibraryItemValue,
@@ -19,8 +21,26 @@ use crate::{
 };
 
 pub fn get_generated_library() -> (HashMap<String, LibraryItem>, HashMap<u32, HashSet<IString>>) {
-    let (a, b, _): (_, _, [&'static str; _]) = generate_library!("src/library_markups/standard_toolbox.toml");
+    let (a, b, _): (_, _, [&'static str; _]) =
+        generate_library!("src/library_markups/standard_toolbox.toml");
     (a, b)
+}
+
+pub type ExtensionData = (
+    HashMap<String, LibraryItem>,
+    HashMap<u32, HashSet<IString>>,
+    Vec<&'static str>,
+);
+
+pub fn get_extension(extension: &str) -> Option<ExtensionData> {
+    match extension {
+        // "pen" => {
+        //     let (a, b, c): (_, _, [&'static str; _]) =
+        //         generate_library!("src/library_markups/extensions/pen.toml");
+        //     Some((a, b, Vec::from(c)))
+        // }
+        _ => None,
+    }
 }
 
 pub static CONSTANT_EXPR_LIBRARY: LazyLock<ConstantExprLibraryItem> = LazyLock::new(|| {
@@ -142,15 +162,13 @@ pub fn convert_generated_library(
 
 /// Output is not guaranteed to be correct
 pub fn get_standard_library_namespace_count() -> usize {
-    11
+    12
 }
 
-pub fn add_standard_library_namespaces(
+pub fn populate_field_category_entries(
     context: &mut GrazeSb3GeneratorContext,
-    root_symbol: SymbolId,
+    category_entries: HashMap<u32, HashSet<IString>>,
 ) {
-    let (raw_library, category_entries) = get_generated_library();
-    convert_generated_library(raw_library, &mut context.symbol_table, root_symbol);
     for (key, values) in category_entries {
         match context.field_category_entries.entry(key) {
             std::collections::hash_map::Entry::Vacant(v) => {
@@ -171,6 +189,48 @@ pub fn add_standard_library_namespaces(
             }
         }
     }
+}
+
+pub fn add_builtin_extension(
+    context: &mut GrazeSb3GeneratorContext,
+    root_symbol: SymbolId,
+    extension: &str,
+) -> Option<()> {
+    let (raw_library, category_entries, extensions) = get_extension(extension)?;
+    convert_generated_library(raw_library, &mut context.symbol_table, root_symbol);
+    populate_field_category_entries(context, category_entries);
+    context
+        .sb3
+        .extensions
+        .extend(extensions.iter().map(|value| value.to_string()));
+    Some(())
+}
+
+pub fn add_external_extension(
+    context: &mut GrazeSb3GeneratorContext,
+    root_symbol: SymbolId,
+    extension: &std::path::Path,
+    use_cache: bool,
+    create_cache: bool
+) -> Option<()> {
+    let (raw_library, category_entries, extensions) = dynamic_generate_library(extension, use_cache, create_cache)?;
+    let category_entries = category_entries.iter().map(|value| (*value.0, value.1.iter().map(Into::into).collect())).collect();
+    convert_generated_library(raw_library, &mut context.symbol_table, root_symbol);
+    populate_field_category_entries(context, category_entries);
+    context
+        .sb3
+        .extensions
+        .extend(extensions.iter().map(|value| value.to_string()));
+    Some(())
+}
+
+pub fn add_standard_library_namespaces(
+    context: &mut GrazeSb3GeneratorContext,
+    root_symbol: SymbolId,
+) {
+    let (raw_library, category_entries) = get_generated_library();
+    convert_generated_library(raw_library, &mut context.symbol_table, root_symbol);
+    populate_field_category_entries(context, category_entries);
 }
 
 #[inline]

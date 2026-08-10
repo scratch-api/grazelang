@@ -3485,6 +3485,25 @@ pub fn parse_statement(token_stream: ParseIn, context: &mut ParseContext) -> Par
             );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
+            if extension_keyword.is_some()
+                && let Some((root, source_span)) = match &content {
+                    cst::UseStatementContent::SingleUse {
+                        identifier: root,
+                        rename: _,
+                        source_span: _,
+                    }
+                    | cst::UseStatementContent::MultiUse {
+                        root,
+                        left_brace: _,
+                        content: _,
+                        right_brace: _,
+                        source_span: _,
+                    } => Some((root.root.value.clone(), *root.get_source_span())),
+                    cst::UseStatementContent::Invalid(_) => None,
+                }
+            {
+                context.extensions.insert((root, source_span));
+            }
             Ok(Statement::UseStatement(
                 use_keyword,
                 extension_keyword,
@@ -3819,6 +3838,25 @@ pub fn parse_sprite_statement(
             );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
+            if extension_keyword.is_some()
+                && let Some((root, source_span)) = match &content {
+                    cst::UseStatementContent::SingleUse {
+                        identifier: root,
+                        rename: _,
+                        source_span: _,
+                    }
+                    | cst::UseStatementContent::MultiUse {
+                        root,
+                        left_brace: _,
+                        content: _,
+                        right_brace: _,
+                        source_span: _,
+                    } => Some((root.root.value.clone(), *root.get_source_span())),
+                    cst::UseStatementContent::Invalid(_) => None,
+                }
+            {
+                context.extensions.insert((root, source_span));
+            }
             Ok(SpriteStatement::UseStatement(
                 use_keyword,
                 extension_keyword,
@@ -4151,6 +4189,25 @@ pub fn parse_stage_statement(
             );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
+            if extension_keyword.is_some()
+                && let Some((root, source_span)) = match &content {
+                    cst::UseStatementContent::SingleUse {
+                        identifier: root,
+                        rename: _,
+                        source_span: _,
+                    }
+                    | cst::UseStatementContent::MultiUse {
+                        root,
+                        left_brace: _,
+                        content: _,
+                        right_brace: _,
+                        source_span: _,
+                    } => Some((root.root.value.clone(), *root.get_source_span())),
+                    cst::UseStatementContent::Invalid(_) => None,
+                }
+            {
+                context.extensions.insert((root, source_span));
+            }
             Ok(StageStatement::UseStatement(
                 use_keyword,
                 extension_keyword,
@@ -4376,6 +4433,25 @@ pub fn parse_top_level_statement(
             );
             let start_pos = get_token_start(token_stream);
             let content = statement::parse_use_statement_content(token_stream, context)?;
+            if extension_keyword.is_some()
+                && let Some((root, source_span)) = match &content {
+                    cst::UseStatementContent::SingleUse {
+                        identifier: root,
+                        rename: _,
+                        source_span: _,
+                    }
+                    | cst::UseStatementContent::MultiUse {
+                        root,
+                        left_brace: _,
+                        content: _,
+                        right_brace: _,
+                        source_span: _,
+                    } => Some((root.root.value.clone(), *root.get_source_span())),
+                    cst::UseStatementContent::Invalid(_) => None,
+                }
+            {
+                context.extensions.insert((root, source_span));
+            }
             Ok(TopLevelStatement::UseStatement(
                 use_keyword,
                 extension_keyword,

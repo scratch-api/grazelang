@@ -329,6 +329,15 @@ pub enum GrazeSb3GeneratorCreationError {
         path: PathBuf,
         source_span: SourceSpan,
     },
+    #[assoc(internal_lint_id = "unknown_extension_error")]
+    #[assoc(
+        get_primary_message = "tried to use an extension that was neither builtin nor provided in an extension directory"
+    )]
+    #[assoc(get_secondary_message = "unknown extensions")]
+    #[error(
+        "tried to use an extension that was neither builtin nor provided in an extension directory"
+    )]
+    UnknownExtension { source_span: SourceSpan },
 }
 
 impl GetLintId for GrazeSb3GeneratorCreationError {
@@ -346,7 +355,8 @@ impl GetPos for GrazeSb3GeneratorCreationError {
             | GrazeSb3GeneratorCreationError::PathTriesToEscapeResourceDirectory {
                 path: _,
                 source_span,
-            } => source_span,
+            }
+            | GrazeSb3GeneratorCreationError::UnknownExtension { source_span } => source_span,
         }
     }
 }
@@ -842,7 +852,7 @@ impl GrazeSb3GeneratorContext {
         }
         let mut block_counter = IdCounter::new();
         let next_block_id = block_counter.get_new_id();
-        Ok(Self {
+        let mut this = Self {
             sb3: Sb3Root::default(),
             targets,
             symbol_table,
@@ -872,7 +882,37 @@ impl GrazeSb3GeneratorContext {
             settings: std::mem::take(&mut parse_context.settings),
             messages: Vec::new(),
             successful: true,
-        })
+        };
+        for (extension, source_span) in &parse_context.extensions {
+            if library::add_builtin_extension(&mut this, root_symbol, extension)
+                .or_else(|| {
+                    let path = this
+                        .settings
+                        .extensions_path
+                        .as_deref()
+                        .unwrap_or(Path::new(CURRENT_DIRECTORY_STR))
+                        .join(extension.as_str());
+                    let use_cache = this.settings.use_cached_extensions;
+                    let create_cache = this.settings.create_cached_extensions;
+                    library::add_external_extension(
+                        &mut this,
+                        root_symbol,
+                        &path,
+                        use_cache,
+                        create_cache,
+                    )
+                })
+                .is_none()
+            {
+                return Err((
+                    GrazeSb3GeneratorCreationError::UnknownExtension {
+                        source_span: *source_span,
+                    },
+                    parse_context.messages,
+                ));
+            }
+        }
+        Ok(this)
     }
 
     pub fn new_block(&mut self) {
