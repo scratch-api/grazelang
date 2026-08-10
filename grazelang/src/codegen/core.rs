@@ -4256,6 +4256,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         costumes.sort_by_key(|value| value.1);
         sounds.sort_by_key(|value| value.1);
+        if costumes.is_empty() {
+            emit_message(
+                context,
+                GrazeMessage::Warning(
+                    GrazeWarning::Specific(
+                        SpecificGrazeWarning::TargetWithoutCostume,
+                        *value.3,
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
         stage.costumes.reserve(costumes.len());
         stage.sounds.reserve(sounds.len());
         for (costume, _) in costumes {
@@ -4349,6 +4362,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         }
         costumes.sort_by_key(|value| value.1);
         sounds.sort_by_key(|value| value.1);
+        if costumes.is_empty() {
+            emit_message(
+                context,
+                GrazeMessage::Warning(
+                    GrazeWarning::Specific(
+                        SpecificGrazeWarning::TargetWithoutCostume,
+                        *value.5,
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
         new_sprite.costumes.reserve(costumes.len());
         new_sprite.sounds.reserve(sounds.len());
         for (costume, _) in costumes {

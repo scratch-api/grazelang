@@ -389,6 +389,12 @@ pub enum SpecificGrazeWarning {
     )]
     #[assoc(internal_lint_id = "invalid_monitor_mode")]
     InvalidMonitorMode,
+    #[assoc(get_primary_message = "the stage and all sprites must have at least one costume or backdrop")]
+    #[assoc(
+        get_secondary_message = "missing a costume or backdrop"
+    )]
+    #[assoc(internal_lint_id = "target_without_costume")]
+    TargetWithoutCostume,
 }
 
 impl GetLintId for SpecificGrazeWarning {
