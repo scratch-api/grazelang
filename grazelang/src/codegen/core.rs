@@ -1305,10 +1305,14 @@ pub mod symbol_data_derivation {
             call_params.push(CallBlockParam {
                 kind: grazelang_types::CallBlockParamKind::Input {
                     default: match arg.kind {
-                        CustomBlockParamKindValue::Number => grazelang_types::project_json::Sb3PrimitiveBlock::Number("".into()),
-                        CustomBlockParamKindValue::String => grazelang_types::project_json::Sb3PrimitiveBlock::String("".into()),
+                        CustomBlockParamKindValue::Number => Some(
+                            grazelang_types::project_json::Sb3PrimitiveBlock::Number("".into()),
+                        ),
+                        CustomBlockParamKindValue::String => Some(
+                            grazelang_types::project_json::Sb3PrimitiveBlock::String("".into()),
+                        ),
                         CustomBlockParamKindValue::Boolean => None,
-                    }
+                    },
                 },
                 name: arg_id.clone(),
             });
@@ -4250,10 +4254,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message(
                 context,
                 GrazeMessage::Warning(
-                    GrazeWarning::Specific(
-                        SpecificGrazeWarning::TargetWithoutCostume,
-                        *value.3,
-                    ),
+                    GrazeWarning::Specific(SpecificGrazeWarning::TargetWithoutCostume, *value.3),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
@@ -4356,10 +4357,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message(
                 context,
                 GrazeMessage::Warning(
-                    GrazeWarning::Specific(
-                        SpecificGrazeWarning::TargetWithoutCostume,
-                        *value.5,
-                    ),
+                    GrazeWarning::Specific(SpecificGrazeWarning::TargetWithoutCostume, *value.5),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
