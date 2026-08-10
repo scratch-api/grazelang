@@ -1288,7 +1288,6 @@ pub mod symbol_data_derivation {
             let mut proccode =
                 String::with_capacity(descriptor.name.len() + 3 * descriptor.args.len());
             proccode.push_str(descriptor.name.as_str());
-
             for arg in &descriptor.args {
                 proccode.push_str(" %");
                 proccode.push(match &arg.kind {
@@ -1299,40 +1298,35 @@ pub mod symbol_data_derivation {
             }
             proccode.into()
         });
-
         let mut call_params = Vec::with_capacity(descriptor.args.len());
         let mut params = Vec::with_capacity(descriptor.args.len());
-
         for arg in &descriptor.args {
-            let is_bool = arg.kind == CustomBlockParamKindValue::Boolean;
             let arg_id = generate_random_id_string(rng);
-
             call_params.push(CallBlockParam {
                 kind: grazelang_types::CallBlockParamKind::Input {
-                    default: (!is_bool).then(|| {
-                        grazelang_types::project_json::Sb3PrimitiveBlock::String("".into())
-                    }),
+                    default: match arg.kind {
+                        CustomBlockParamKindValue::Number => grazelang_types::project_json::Sb3PrimitiveBlock::Number("".into()),
+                        CustomBlockParamKindValue::String => grazelang_types::project_json::Sb3PrimitiveBlock::String("".into()),
+                        CustomBlockParamKindValue::Boolean => None,
+                    }
                 },
                 name: arg_id.clone(),
             });
-
             params.push((
                 arg_id,
-                if is_bool {
+                if arg.kind == CustomBlockParamKindValue::Boolean {
                     HasShadow::No
                 } else {
                     HasShadow::Yes
                 },
             ));
         }
-
         let custom_block = KnownBlock::CustomBlock {
             proccode,
             call_params,
             params,
             is_warp: descriptor.is_warp,
         };
-
         (
             Symbol {
                 known_block: Some(Rc::new(custom_block.clone())),
@@ -1368,13 +1362,11 @@ pub mod symbol_data_derivation {
             descriptor.canonical_name.as_ref().map(|v| v.to_string()),
             namespace_input_name,
         );
-
         let initial_value = if descriptor.value_is_initial_value {
             descriptor.value.clone()
         } else {
             "".into()
         };
-
         (
             Symbol {
                 known_block: Some(Rc::new(KnownBlock::new_variable(
@@ -1408,13 +1400,11 @@ pub mod symbol_data_derivation {
             descriptor.canonical_name.as_ref().map(|v| v.to_string()),
             descriptor.name.clone(),
         );
-
         let initial_value = if descriptor.value_is_initial_value {
             descriptor.value.clone()
         } else {
             Vec::new()
         };
-
         (
             Symbol {
                 known_block: Some(Rc::new(KnownBlock::List {
