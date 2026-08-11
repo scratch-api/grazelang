@@ -634,7 +634,7 @@
     "86": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "- [x] Decide on syntax\n- [x] CST integration\n- [x] Parser integration\n- [x] Codegen integration",
-        "status": "open",
+        "status": "closed",
         "lines": "L3157-L3162",
         "commit": "6c10803612050fc729c0e6592947d5ebe77aa851",
         "title": "Add `use extension` statement"
