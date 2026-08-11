@@ -1,0 +1,148 @@
+[[categories]]
+    category = "pen"
+    id = "pen"
+
+    [[categories.blocks]]
+        type = "pen_clear"
+        alt_name = "clear"
+        args = []
+
+    [[categories.blocks]]
+        type = "pen_stamp"
+        alt_name = "stamp"
+        args = []
+
+    [[categories.blocks]]
+        type = "pen_penDown"
+        alt_name = "pen_down"
+        args = []
+
+    [[categories.blocks]]
+        type = "pen_penUp"
+        alt_name = "pen_up"
+        args = []
+
+    [[categories.blocks]]
+        type = "pen_setPenColorToColor"
+        alt_name = "set_pen_color_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "COLOR"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "colour_picker"
+                default_value = "#0afe19"
+
+    [[categories.blocks]]
+        type = "pen_changePenColorParamBy"
+        alt_name = "change_pen_param_by"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "COLOR_PARAM"
+            input_type = "value"
+            menu_field_name = "colorParam"
+
+            [categories.blocks.args.shadow]
+                type = "pen_menu_colorParam"
+                default_value = "color"
+                option_category = "color_params"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "color"
+                    value = "color"
+                    alt_name = "pen_color"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "saturation"
+                    value = "saturation"
+                    alt_name = "pen_saturation"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "brightness"
+                    value = "brightness"
+                    alt_name = "pen_brightness"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "transparency"
+                    value = "transparency"
+                    alt_name = "pen_transparency"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "10"
+
+    [[categories.blocks]]
+        type = "pen_setPenColorParamTo"
+        alt_name = "set_pen_param_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "COLOR_PARAM"
+            input_type = "value"
+            menu_field_name = "colorParam"
+
+            [categories.blocks.args.shadow]
+                type = "pen_menu_colorParam"
+                default_value = "color"
+                option_category = "color_params"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "color"
+                    value = "color"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "saturation"
+                    value = "saturation"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "brightness"
+                    value = "brightness"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "transparency"
+                    value = "transparency"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "VALUE"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "50"
+
+    [[categories.blocks]]
+        type = "pen_changePenSizeBy"
+        alt_name = "change_pen_size_by"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SIZE"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "1"
+
+    [[categories.blocks]]
+        type = "pen_setPenSizeTo"
+        alt_name = "set_pen_size_to"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "SIZE"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "1"
+
+required_extensions = ["pen"]

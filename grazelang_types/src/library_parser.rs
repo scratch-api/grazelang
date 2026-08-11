@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, hash::{DefaultHasher, Hash}};
 
 use crate::{
     CallBlockParam, CallBlockParamKind, ConstantExprLibraryItem, ConstantExprLibraryItemValue,
@@ -157,7 +157,10 @@ pub fn get_menu_category_id(
         if let Some(&id) = menu_category_ids.get(category) {
             id
         } else {
-            let id = menu_category_ids.len() as u32;
+            use std::hash::Hasher;
+            let mut hasher = DefaultHasher::new();
+            category.hash(&mut hasher);
+            let id = hasher.finish() as u32;
             menu_category_ids.insert(category.clone(), id);
             id
         }

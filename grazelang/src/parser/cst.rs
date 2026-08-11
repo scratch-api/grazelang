@@ -59,7 +59,13 @@ pub enum TopLevelStatement {
         Semicolon,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(
+        UseKeyword,
+        Option<ExtensionKeyword>,
+        UseStatementContent,
+        Semicolon,
+        SourceSpan,
+    ),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -520,7 +526,13 @@ pub enum StageStatement {
         RightBrace,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(
+        UseKeyword,
+        Option<ExtensionKeyword>,
+        UseStatementContent,
+        Semicolon,
+        SourceSpan,
+    ),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -661,7 +673,13 @@ pub enum SpriteStatement {
         RightBrace,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(
+        UseKeyword,
+        Option<ExtensionKeyword>,
+        UseStatementContent,
+        Semicolon,
+        SourceSpan,
+    ),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -765,6 +783,7 @@ impl GetPos for SingleAssetDeclaration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleAssetDeclarationValue {
     Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
+    // TODO: Use `Expression` for SingleAssetDeclarationValue::Simple::1
     Dictionary(
         LeftBrace,
         CommaSeparated<DictionaryEntry>,
@@ -843,7 +862,13 @@ pub enum Statement {
         Option<Semicolon>,
         SourceSpan,
     ),
-    UseStatement(UseKeyword, Option<ExtensionKeyword>, UseStatementContent, Semicolon, SourceSpan),
+    UseStatement(
+        UseKeyword,
+        Option<ExtensionKeyword>,
+        UseStatementContent,
+        Semicolon,
+        SourceSpan,
+    ),
     EmptyStatement(Semicolon),
     Invalid(SourceSpan),
 }
@@ -1334,6 +1359,16 @@ pub enum SingleDataDeclaration {
         RightBracket,
         SourceSpan,
     ),
+    // FileList(
+    //     Option<ListKeyword>,
+    //     DataDeclarationScope,
+    //     Option<CanonicalIdentifier>,
+    //     SingleIdentifier,
+    //     NormalAssignmentOperator,
+    //     FileKeyword,
+    //     Expression,
+    //     SourceSpan,
+    // )
     EmptyList(
         Option<ListKeyword>,
         DataDeclarationScope,
@@ -1342,6 +1377,12 @@ pub enum SingleDataDeclaration {
         SourceSpan,
     ),
 }
+
+// TODO: Allow loading list content from a resource file
+// Syntax:
+// ```rust
+// let list list_name = file "path/to/list";
+// ```
 
 impl GetPos for SingleDataDeclaration {
     fn get_source_span(&self) -> &SourceSpan {
@@ -2040,9 +2081,9 @@ impl Literal {
     pub fn get_non_empty(self) -> Option<Self> {
         match self {
             Literal::EmptyExpression(..) => None,
-            _ => Some(self)
+            _ => Some(self),
         }
-    } 
+    }
 
     pub fn get_string_value(&self) -> &IString {
         match self {

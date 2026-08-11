@@ -34,11 +34,11 @@ pub type ExtensionData = (
 
 pub fn get_extension(extension: &str) -> Option<ExtensionData> {
     match extension {
-        // "pen" => {
-        //     let (a, b, c): (_, _, [&'static str; _]) =
-        //         generate_library!("src/library_markups/extensions/pen.toml");
-        //     Some((a, b, Vec::from(c)))
-        // }
+        "pen" => {
+            let (a, b, c): (_, _, [&'static str; _]) =
+                generate_library!("src/library_markups/extensions/pen.toml");
+            Some((a, b, Vec::from(c)))
+        }
         _ => None,
     }
 }
@@ -135,11 +135,36 @@ pub fn convert_generated_library(
         }
         my_symbol
     }
+    pub fn convert_category(
+        namespace: LibraryItem,
+        symbol_table: &mut SymbolTable,
+        aliases: &mut Vec<(SymbolId, IString, Vec<AliasSegment>)>,
+        current_symbol: Option<SymbolId>,
+    ) -> Option<ConvertedSymbol> {
+        if let Some(my_symbol) = current_symbol {
+            for (child_name, child) in namespace.namespace {
+                let child = recursively_convert(child, symbol_table, aliases);
+                match child {
+                    ConvertedSymbol::Symbol(child) => {
+                        symbol_table.insert_child(my_symbol, child_name.into(), child);
+                    }
+                    ConvertedSymbol::Alias(alias_segments) => {
+                        aliases.push((my_symbol, child_name.into(), alias_segments));
+                    }
+                }
+            }
+            return None;
+        }
+        Some(recursively_convert(namespace, symbol_table, aliases))
+    }
     let mut aliases = Vec::new();
     library.into_iter().for_each(|(name, namespace)| {
-        if let ConvertedSymbol::Symbol(symbol) =
-            recursively_convert(namespace, symbol_table, &mut aliases)
-        {
+        if let Some(ConvertedSymbol::Symbol(symbol)) = convert_category(
+            namespace,
+            symbol_table,
+            &mut aliases,
+            symbol_table.get_child(root_symbol, name.as_str()),
+        ) {
             symbol_table.insert_child(root_symbol, name.as_str().into(), symbol);
         }
     });
@@ -208,10 +233,14 @@ pub fn add_external_extension(
     root_symbol: SymbolId,
     extension: &std::path::Path,
     use_cache: bool,
-    create_cache: bool
+    create_cache: bool,
 ) -> Option<()> {
-    let (raw_library, category_entries, extensions) = dynamic_generate_library(extension, use_cache, create_cache)?;
-    let category_entries = category_entries.iter().map(|value| (*value.0, value.1.iter().map(Into::into).collect())).collect();
+    let (raw_library, category_entries, extensions) =
+        dynamic_generate_library(extension, use_cache, create_cache)?;
+    let category_entries = category_entries
+        .iter()
+        .map(|value| (*value.0, value.1.iter().map(Into::into).collect()))
+        .collect();
     convert_generated_library(raw_library, &mut context.symbol_table, root_symbol);
     populate_field_category_entries(context, category_entries);
     context

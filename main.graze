@@ -1,3 +1,4 @@
+use extension pen;
 
 stage {
     backdrop `backdrop1` test_costume("empty.svg");
@@ -53,6 +54,8 @@ sprite `Sprite1` sprite_1 {
     }
     {
         say("sin(45) = ${sin(45)}; math_operator(op_sin, 45) = ${math_operator(op_sin, 45)}");
+        pen_up();
+        set_pen_param_to(pen_color, 5);
     }
     ("0b${list_}" + 10)
     (test)
