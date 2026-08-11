@@ -886,12 +886,13 @@ impl GrazeSb3GeneratorContext {
         for (extension, source_span) in &parse_context.extensions {
             if library::add_builtin_extension(&mut this, root_symbol, extension)
                 .or_else(|| {
-                    let path = this
+                    let mut path = this
                         .settings
                         .extensions_path
                         .as_deref()
                         .unwrap_or(Path::new(CURRENT_DIRECTORY_STR))
                         .join(extension.as_str());
+                    path.add_extension("toml");
                     let use_cache = this.settings.use_cached_extensions;
                     let create_cache = this.settings.create_cached_extensions;
                     library::add_external_extension(
@@ -1774,6 +1775,18 @@ pub fn add_known_block_to_params(
                                     GrazeMessageSetting::Warnings,
                                 );
                             }
+                            (
+                                Sb3InputRepr::Reference(
+                                    introduce_input_menu(
+                                        opcode,
+                                        field_name,
+                                        Sb3FieldValue::Normal(cow_str.to_string().into()),
+                                        context,
+                                    )
+                                    .to_string(),
+                                ),
+                                IsShadow::Yes,
+                            )
                         }
                         Sb3PrimitiveBlock::Broadcast { .. } => {
                             if !BROADCAST_CATEGORIES.contains(category) {
@@ -1789,10 +1802,10 @@ pub fn add_known_block_to_params(
                                     GrazeMessageSetting::Warnings,
                                 );
                             }
+                            (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow)
                         }
-                        _ => (),
+                        _ => (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow),
                     }
-                    (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow)
                 }
                 grazelang_types::KnownBlockInput::BlockRef(id) => {
                     (Sb3InputRepr::Reference(id.to_string()), IsShadow::No)
