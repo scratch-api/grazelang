@@ -3165,3 +3165,4 @@ impl GetLintId for DictionaryTypeError {
 //  - [x] Pen
 //  - [ ] Music
 //  - [ ] Et cetera
+// Issue: #93

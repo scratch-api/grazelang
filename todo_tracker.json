@@ -633,10 +633,10 @@
     },
     "86": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "- [x] Decide on syntax\n- [x] CST integration\n- [x] Parser integration\n- [ ] Codegen integration",
+        "text": "- [x] Decide on syntax\n- [x] CST integration\n- [x] Parser integration\n- [x] Codegen integration",
         "status": "open",
-        "lines": "L3114-L3119",
-        "commit": "4fb5a7bb822ff5c26bf8f94e826eae014660c90e",
+        "lines": "L3157-L3162",
+        "commit": "6c10803612050fc729c0e6592947d5ebe77aa851",
         "title": "Add `use extension` statement"
     },
     "87": {
@@ -686,5 +686,13 @@
         "lines": "L786-L786",
         "commit": "66fc1691e35e7c2c59ed42a786db5ea94fd9ee0d",
         "title": "Use `Expression` for SingleAssetDeclarationValue::Simple::1"
+    },
+    "93": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "- [x] Pen\n- [ ] Music\n- [ ] Et cetera",
+        "status": "open",
+        "lines": "L3164-L3167",
+        "commit": "6c10803612050fc729c0e6592947d5ebe77aa851",
+        "title": "Add extensions"
     }
 }
