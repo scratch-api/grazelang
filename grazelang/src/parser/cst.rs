@@ -3154,13 +3154,6 @@ impl GetLintId for DictionaryTypeError {
     }
 }
 
-// TODO: Add `use extension` statement
-//  - [x] Decide on syntax
-//  - [x] CST integration
-//  - [x] Parser integration
-//  - [x] Codegen integration
-// Issue: #86
-
 // TODO: Add extensions
 //  - [x] Pen
 //  - [ ] Music
