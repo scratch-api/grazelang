@@ -72,9 +72,6 @@ pub enum JsPrimitive {
     Bool(bool),
 }
 
-// TODO: Trait IsValidI128
-// Issue: #94
-
 pub trait IsValidI128 {
     fn is_valid_i128(&self) -> bool;
 }
