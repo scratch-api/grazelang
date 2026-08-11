@@ -784,6 +784,7 @@ impl GetPos for SingleAssetDeclaration {
 pub enum SingleAssetDeclarationValue {
     Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
     // TODO: Use `Expression` for SingleAssetDeclarationValue::Simple::1
+    // Issue: #92
     Dictionary(
         LeftBrace,
         CommaSeparated<DictionaryEntry>,
@@ -1383,6 +1384,7 @@ pub enum SingleDataDeclaration {
 // ```rust
 // let list list_name = file "path/to/list";
 // ```
+// Issue: #91
 
 impl GetPos for SingleDataDeclaration {
     fn get_source_span(&self) -> &SourceSpan {
