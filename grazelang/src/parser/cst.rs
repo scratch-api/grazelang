@@ -3156,6 +3156,6 @@ impl GetLintId for DictionaryTypeError {
 
 // TODO: Add extensions
 //  - [x] Pen
-//  - [ ] Music
+//  - [x] Music
 //  - [ ] Et cetera
 // Issue: #93

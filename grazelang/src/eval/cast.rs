@@ -6,7 +6,7 @@ use std::{
 };
 
 use arcstr::ArcStr as IString;
-use grazelang_types::project_json::Sb3PrimitiveOrBool;
+use grazelang_types::project_json::{Sb3FieldValue, Sb3Primitive, Sb3PrimitiveOrBool};
 use serde::{Deserialize, Serialize};
 
 pub trait ScratchVmToNumber {
@@ -72,16 +72,43 @@ pub enum JsPrimitive {
     Bool(bool),
 }
 
-pub fn f64_is_valid_i128(value: f64) -> bool {
-    value.is_finite()
-        && value.fract() == 0.0
-        && value >= i128::MIN as f64
-        && value <= i128::MAX as f64
+// TODO: Trait IsValidI128
+
+pub trait IsValidI128 {
+    fn is_valid_i128(&self) -> bool;
+}
+
+impl IsValidI128 for Sb3Primitive {
+    fn is_valid_i128(&self) -> bool {
+        match self {
+            Sb3Primitive::String(value) => value.parse::<i128>().is_ok(),
+            Sb3Primitive::Int128(_) => true,
+            Sb3Primitive::Int(_) => true,
+            Sb3Primitive::Float(value) => value.is_valid_i128(),
+        }
+    }
+}
+
+impl IsValidI128 for Sb3FieldValue {
+    fn is_valid_i128(&self) -> bool {
+        match self {
+            Sb3FieldValue::Normal(sb3_primitive) => sb3_primitive.is_valid_i128(),
+            Sb3FieldValue::WithId { .. } => false,
+        }
+    }
+}
+
+impl IsValidI128 for f64 {
+    fn is_valid_i128(&self) -> bool {
+        self.is_finite()
+        && self.fract() == 0.0
+        && *self >= i128::MIN as f64
+        && *self <= i128::MAX as f64
+    }
 }
 
 pub fn try_convert_f64_into_i128(value: f64) -> Option<i128> {
-    f64_is_valid_i128(value)
-        .then_some(value as i128)
+    value.is_valid_i128().then_some(value as i128)
 }
 
 impl From<JsPrimitive> for Sb3PrimitiveOrBool {
@@ -289,9 +316,7 @@ impl ScratchVmIsInt for JsPrimitive {
             JsPrimitive::JsString(value) => !value.contains(&(b'.' as u16)),
             JsPrimitive::String(value) => !value.contains('.'),
             JsPrimitive::IString(value) => !value.contains('.'),
-            JsPrimitive::Number(value) => {
-                value.is_nan() || f64_is_valid_i128(*value)
-            }
+            JsPrimitive::Number(value) => value.is_nan() || value.is_valid_i128(),
             JsPrimitive::Bool(_) => true,
         }
     }

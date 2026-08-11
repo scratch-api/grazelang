@@ -39,6 +39,11 @@ pub fn get_extension(extension: &str) -> Option<ExtensionData> {
                 generate_library!("src/library_markups/extensions/pen.toml");
             Some((a, b, Vec::from(c)))
         }
+        "music" => {
+            let (a, b, c): (_, _, [&'static str; _]) =
+                generate_library!("src/library_markups/extensions/music.toml");
+            Some((a, b, Vec::from(c)))
+        }
         _ => None,
     }
 }

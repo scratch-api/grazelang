@@ -1,0 +1,317 @@
+[[categories]]
+    category = "music"
+    id = "music"
+
+    [[categories.blocks]]
+        type = "music_playDrumForBeats"
+        alt_name = "play_drum_for_beats"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "DRUM"
+            input_type = "value"
+            menu_field_name = "DRUM"
+
+            [categories.blocks.args.shadow]
+                type = "music_menu_DRUM"
+                default_value = "1"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(1) Snare Drum"
+                    value = "1"
+                    alt_name = "snare_drum"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(2) Bass Drum"
+                    value = "2"
+                    alt_name = "bass_drum"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(3) Side Stick"
+                    value = "3"
+                    alt_name = "side_stick"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(4) Crash Cymbal"
+                    value = "4"
+                    alt_name = "crash_cymbal"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(5) Open Hi-Hat"
+                    value = "5"
+                    alt_name = "open_hi_hat"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(6) Closed Hi-Hat"
+                    value = "6"
+                    alt_name = "closed_hi_hat"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(7) Tambourine"
+                    value = "7"
+                    alt_name = "tambourine"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(8) Hand Clap"
+                    value = "8"
+                    alt_name = "hand_clap"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(9) Claves"
+                    value = "9"
+                    alt_name = "claves"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(10) Wood Block"
+                    value = "10"
+                    alt_name = "wood_block"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(11) Cowbell"
+                    value = "11"
+                    alt_name = "cowbell"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(12) Triangle"
+                    value = "12"
+                    alt_name = "triangle"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(13) Bongo"
+                    value = "13"
+                    alt_name = "bongo"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(14) Conga"
+                    value = "14"
+                    alt_name = "conga"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(15) Cabasa"
+                    value = "15"
+                    alt_name = "cabasa"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(16) Guiro"
+                    value = "16"
+                    alt_name = "guiro"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(17) Vibraslap"
+                    value = "17"
+                    alt_name = "vibraslap"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(18) Cuica"
+                    value = "18"
+                    alt_name = "cuica"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "BEATS"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "0.25"
+
+    [[categories.blocks]]
+        type = "music_restForBeats"
+        alt_name = "rest_for_beats"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "BEATS"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "0.25"
+
+    [[categories.blocks]]
+        type = "music_playNoteForBeats"
+        alt_name = "play_note_for_beats"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "NOTE"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "note"
+                default_value = "60"
+                option_category = "integers"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "BEATS"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "0.25"
+
+    [[categories.blocks]]
+        type = "music_setInstrument"
+        alt_name = "set_instrument"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "INSTRUMENT"
+            input_type = "value"
+            menu_field_name = "INSTRUMENT"
+
+            [categories.blocks.args.shadow]
+                type = "music_menu_INSTRUMENT"
+                default_value = "1"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(1) Piano"
+                    value = "1"
+                    alt_name = "piano"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(2) Electric Piano"
+                    value = "2"
+                    alt_name = "electric_piano"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(3) Organ"
+                    value = "3"
+                    alt_name = "organ"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(4) Guitar"
+                    value = "4"
+                    alt_name = "guitar"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(5) Electric Guitar"
+                    value = "5"
+                    alt_name = "electric_guitar"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(6) Bass"
+                    value = "6"
+                    alt_name = "bass"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(7) Pizzicato"
+                    value = "7"
+                    alt_name = "pizzicato"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(8) Cello"
+                    value = "8"
+                    alt_name = "cello"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(9) Trombone"
+                    value = "9"
+                    alt_name = "trombone"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(10) Clarinet"
+                    value = "10"
+                    alt_name = "clarinet"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(11) Saxophone"
+                    value = "11"
+                    alt_name = "saxophone"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(12) Flute"
+                    value = "12"
+                    alt_name = "flute"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(13) Wooden Flute"
+                    value = "13"
+                    alt_name = "wooden_flute"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(14) Bassoon"
+                    value = "14"
+                    alt_name = "bassoon"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(15) Choir"
+                    value = "15"
+                    alt_name = "choir"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(16) Vibraphone"
+                    value = "16"
+                    alt_name = "vibraphone"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(17) Music Box"
+                    value = "17"
+                    alt_name = "music_box"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(18) Steel Drum"
+                    value = "18"
+                    alt_name = "steel_drum"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(19) Marimba"
+                    value = "19"
+                    alt_name = "marimba"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(20) Synth Lead"
+                    value = "20"
+                    alt_name = "synth_lead"
+
+                [[categories.blocks.args.shadow.options]]
+                    label = "(21) Synth Pad"
+                    value = "21"
+                    alt_name = "synth_pad"
+
+    [[categories.blocks]]
+        type = "music_setTempo"
+        alt_name = "set_tempo"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TEMPO"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "60"
+
+    [[categories.blocks]]
+        type = "music_changeTempo"
+        alt_name = "change_tempo"
+
+        [[categories.blocks.args]]
+            kind = "input"
+            name = "TEMPO"
+            input_type = "value"
+
+            [categories.blocks.args.shadow]
+                type = "math_number"
+                default_value = "20"
+
+    [[categories.blocks]]
+        type = "music_getTempo"
+        alt_name = "tempo"
+        args = []
+        is_singleton = true
+
+        [categories.blocks.assign]
+            opcode = "music_setTempo"
+
+            [categories.blocks.assign.value]
+                kind = "input"
+                name = "TEMPO"
+                input_type = "value"
+
+                [categories.blocks.assign.value.shadow]
+                    type = "math_number"
+                    default_value = "60"
+
+required_extensions = ["music"]

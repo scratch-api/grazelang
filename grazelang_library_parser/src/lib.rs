@@ -11,6 +11,7 @@ use grazelang_types::{
     DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID,
     LibraryItem, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, PEN_PROPERTIES_CATEGORY_ID,
     PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, VARIABLES_CATEGORY_ID,
+    INTEGERS_CATEGORY_ID,
     library_parser::{
         self,
         LibraryCache, merge_associated_item,
@@ -38,6 +39,7 @@ const LOCATIONS_CATEGORY_STRING: &IString = &literal!("locations");
 const PROPERTIES_CATEGORY_STRING: &IString = &literal!("properties");
 const OBJECTS_CATEGORY_STRING: &IString = &literal!("objects");
 const PEN_PROPERTIES_CATEGORY_STRING: &IString = &literal!("pen_properties");
+const INTEGERS_CATEGORY_STRING: &IString = &literal!("integers");
 
 macro_rules! implement_generate_library {
     ($input:ident, $use_cache:ident, $create_cache:ident) => {{
@@ -83,9 +85,9 @@ macro_rules! implement_generate_library {
             (PROPERTIES_CATEGORY_STRING.clone(), PROPERTIES_CATEGORY_ID),
             (OBJECTS_CATEGORY_STRING.clone(), OBJECTS_CATEGORY_ID),
             (PEN_PROPERTIES_CATEGORY_STRING.clone(), PEN_PROPERTIES_CATEGORY_ID),
+            (INTEGERS_CATEGORY_STRING.clone(), INTEGERS_CATEGORY_ID),
         ]);
         let mut category_entries = HashMap::<u32, HashSet<String>>::new();
-
         for namespace in v {
             let (category_name, category, associated_menus) = process_toolbox_category(namespace, &mut category_entries, &mut menu_category_ids);
             for (key, value) in associated_menus {
@@ -100,25 +102,18 @@ macro_rules! implement_generate_library {
             }
             library.insert(category_name, category);
         }
-
         library.insert("menus".to_string(), LibraryItem {
             namespace: menus,
             value: None,
         });
-
         let library_keys = library.keys();
         let library_values = library.values();
-
         let category_entry_stream = expand_category_entries(category_entries);
-
         let extensions = source_library.required_extensions.iter();
-
         let expanded = quote! {
             (::std::collections::HashMap::from([#( (#library_keys.to_string(), #library_values) ),*]), #category_entry_stream, [#( #extensions ),*])
         };
-
         implement_create_cache!(output_cache_path, hex_hash, expanded, $create_cache);
-
         TokenStream::from(expanded)
     }};
 }
@@ -335,6 +330,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
     let properties_category_string_2 = PROPERTIES_CATEGORY_STRING.as_str();
     let objects_category_string_2 = OBJECTS_CATEGORY_STRING.as_str();
     let pen_properties_category_string_2 = PEN_PROPERTIES_CATEGORY_STRING.as_str();
+    let integers_category_string_2 = INTEGERS_CATEGORY_STRING.as_str();
     quote! {
         #qualifier fn dynamic_generate_library(
             path: &::std::path::Path,
@@ -399,6 +395,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                     ::arcstr::literal!(#pen_properties_category_string_2),
                     #library_path::PEN_PROPERTIES_CATEGORY_ID,
                 ),
+                (::arcstr::literal!(#integers_category_string_2), #library_path::INTEGERS_CATEGORY_ID),
             ]);
             let mut category_entries = ::std::collections::HashMap::<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>::new();
             for namespace in v {

@@ -13,8 +13,8 @@ use grazelang_types::{
     BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID, BindInfo,
     CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID,
-    DIRECTIONS_CATEGORY_ID, HasShadow, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID,
-    SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
+    DIRECTIONS_CATEGORY_ID, HasShadow, INTEGERS_CATEGORY_ID, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID,
+    OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{
         IsShadow, Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
         Sb3InputValue, Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3NormalBlock, Sb3Primitive,
@@ -32,7 +32,9 @@ use crate::{
     codegen::ids::generate_random_id_as_string,
     eval::{
         call::random_range,
-        cast::{JsPrimitive, ScratchVmToNumber, f64_is_valid_i128},
+        cast::{
+            JsPrimitive, ScratchVmToNumber, IsValidI128,
+        },
     },
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
@@ -1711,7 +1713,10 @@ pub fn add_known_block_to_params(
             fields.insert(param_name, {
                 let (field_value, categories) =
                     value.resolve_for_field(known_block_source_span, context);
-                if !categories.contains(category) {
+                if !(categories.contains(category)
+                    || (*category == INTEGERS_CATEGORY_ID
+                        && field_value.is_valid_i128()))
+                {
                     emit_message(
                         context,
                         GrazeMessage::Warning(
@@ -1762,7 +1767,10 @@ pub fn add_known_block_to_params(
                                 .field_entry_categories
                                 .get(&*cow_str)
                                 .unwrap_or_else(|| &*NO_CATEGORIES);
-                            if !categories.contains(category) {
+                            if !(categories.contains(category)
+                                || (*category == INTEGERS_CATEGORY_ID
+                                    && sb3_primitive.is_valid_i128()))
+                            {
                                 emit_message(
                                     context,
                                     GrazeMessage::Warning(
@@ -4503,7 +4511,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     ),
                     GrazeMessageSetting::Warnings,
                 );
-            } else if !f64_is_valid_i128(num) || num < 1.0 || num > costumes.len() as f64 {
+            } else if !num.is_valid_i128() || num < 1.0 || num > costumes.len() as f64 {
                 emit_message(
                     context,
                     GrazeMessage::Warning(

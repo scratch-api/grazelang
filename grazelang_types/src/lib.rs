@@ -30,6 +30,7 @@ pub const LOCATIONS_CATEGORY_ID: u32 = 12; // sprites or mouse pointer
 pub const PROPERTIES_CATEGORY_ID: u32 = 13;
 pub const OBJECTS_CATEGORY_ID: u32 = 14; // sprites or the stage
 pub const PEN_PROPERTIES_CATEGORY_ID: u32 = 15;
+pub const INTEGERS_CATEGORY_ID: u32 = 16;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindInfo {
