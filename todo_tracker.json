@@ -666,7 +666,7 @@
     "90": {
         "filepath": "grazelang/src/messages/types.rs",
         "text": "- [x] Name conflict for two global lists or variables\n- [x] Name conflict for two local lists or variables of the same sprite\n- [x] Name conflict for a global and a local list\n- [x] Name conflict for a global and a local variable\n- [x] Name conflict for two sprites\n- [x] Name conflict for two backdrops, costumes or sounds",
-        "status": "open",
+        "status": "closed",
         "lines": "L409-L416",
         "commit": "b4e3ef40fb359398c5bd4dd637b3b8ff3ac5b842",
         "title": "Warn when two lists, two variables etc. have the same canonical name"
