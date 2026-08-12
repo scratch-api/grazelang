@@ -40,9 +40,10 @@ impl Namespace {
     }
     /** Panics when reusing a name. */
     pub fn assign_name_for(&mut self, original_name: OriginalName, name: ActualName) -> ActualName {
-        if self.used_names.contains_key(&name) {
-            panic!("Name \"{}\" is not unique in this namespace.", name);
-        }
+        // Disabled to prevent panics. There is also a warning for this scenario.
+        // if self.used_names.contains_key(&name) {
+        //     panic!("Name \"{}\" is not unique in this namespace.", name);
+        // }
         self.used_names.insert(name.clone(), original_name);
         name
     }

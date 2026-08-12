@@ -391,6 +391,12 @@ pub enum SpecificGrazeWarning {
     #[assoc(get_secondary_message = "property belongs to another target")]
     #[assoc(internal_lint_id = "assign_property_of_other_target")]
     AssignPropertyOfOtherTarget,
+    #[assoc(
+        get_primary_message = "used conflicting canonical names"
+    )]
+    #[assoc(get_secondary_message = "repeated canonical name here")]
+    #[assoc(internal_lint_id = "repeated_canonical_name")]
+    RepeatedCanonicalName,
 }
 
 impl GetLintId for SpecificGrazeWarning {
@@ -401,6 +407,12 @@ impl GetLintId for SpecificGrazeWarning {
 }
 
 // TODO: Warn when two lists, two variables etc. have the same canonical name
+//  - [x] Name conflict for two global lists or variables
+//  - [x] Name conflict for two local lists or variables of the same sprite
+//  - [x] Name conflict for a global and a local list
+//  - [x] Name conflict for a global and a local variable
+//  - [ ] Name conflict for two sprites
+//  - [ ] Name conflict for two backdrops, costumes or sounds
 // Issue: #90
 
 #[derive(Debug, Clone, PartialEq)]
