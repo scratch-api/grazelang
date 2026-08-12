@@ -657,10 +657,10 @@
     },
     "89": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "",
+        "text": "- [ ] `_stage_`, `_myself_`, `_random_`, `_mouse_` for sprite names\n- [ ] `next costume`, `previous costume` for costumes\n- [ ] `next backdrop`, `previous backdrop`, `random backdrop` for backdrops",
         "status": "open",
-        "lines": "L2476-L2476",
-        "commit": "3f06a129fb217f73ec82dd390b6537bc11e4e974",
+        "lines": "L2535-L2539",
+        "commit": "4019287cffef79dcf179a89fac0caffe10a730d8",
         "title": "Validate more names"
     },
     "90": {
