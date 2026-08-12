@@ -1,77 +1,35 @@
-
 stage {
-    // Implicitly global var
-    let var1 = 1;
-    // Explicitly global var
-    let global var2 = 1;
-    // Cloud var
-    let cloud var3 = 1;
+    // You can declare backdrops either with the `backdrop` keyword or the `costume` keyword
+    backdrop backdrop_1("empty.svg");
+
+    let score = 0;
+    let list scores = [10, 20, 30];
 }
 
-sprite sawd {
-    // Data
+// The canonical name of this sprite is `Game` and the internal name is `game`
+// An explicit canonical name is optional, the internal name is the fallback
+sprite `Game` game {
+    // Costumes can only be declared with the `costume` keyword
+    costume costume_1("empty.svg");
 
-    // Variables:
-    // Global var
-    let global var4 = 1;
-    // Implicitly local var
-    let var5 = 1;
-    // Explicitly local var
-    let local var6 = 1;
-    // Cloud var
-    let cloud var7 = 1;
-    // Named var
-    let `variable 8` var8 = 1;
-    // Multiple vars
-    let (var9 = 1, var10 = 1);
-    // Many vars
-    let vars {
-        var11 = 1,
-        var12 = 1
-    };
-    // Explicit var
-    let var var11 = 1;
+    when_green_flag_clicked {
+        // Declaring a variable as a normal statement causes the variable to be assigned to every time the declaration is reached
+        let local lives = 3;
+        score = 0;
+        scores.push(42);
+        scores[1] = 99;
+        repeat 3 {
+            say("tick");
+            wait(0.5);
+        }
+        if lives > 0 {
+            // You can use ${} to create formatted strings
+            say("lives = ${lives}");
+        }
+    }
 
-    // Lists:
-    // Global list
-    let global list list3 = [1, 2, 3];
-    // Implicitly local list
-    let list list4 = [1, 2, 3];
-    // Explicitly local valistr
-    let local list list5 = [1, 2, 3];
-    // Named list
-    let list `list 6` list6 = [1, 2, 3];
-    // List including characters from a string
-    let list list7 = ["", "", .."abcdefghijklmnopqrstuvwxyz", .."ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
-    // Multiple lists
-    let (list list8 = [1, 2, 3], list list9 = [1, 2, 3]);
-    // Many lists
-    let lists {
-        list10 = [1, 2, 3],
-        list11 = [1, 2, 3]
-    };
-
-    // Mixed:
-    // Mixed definitions
-    let (
-        var14 = 1,
-        global var15 = 1,
-        var var16 = 1,
-        global list list12 = [1, 2, 3]
-    );
-
-
-    // Assets
-
-    // Costumes:
-    // Costume
-    costume c1("path/to/c1");
-    // Multiple costumes
-    costume (c2("path/to/c2"), c3("path/to/c3"));
-
-    // Sounds:
-    // Sound
-    sound s1("path/to/s1");
-    // Multiple sounds
-    sound (s2("path/to/s2"), s3("path/to/s3"));
+    // This is an isolated code block that will not have a hat block
+    {
+        scores.clear();
+    }
 }

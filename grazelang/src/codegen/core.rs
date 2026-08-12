@@ -428,6 +428,8 @@ pub struct GrazeSb3GeneratorDataSymbolsContext {
 pub struct GrazeSb3GeneratorLintContext {
     pub sprite_names: HashSet<IString>,
     pub data_names: HashMap<IString, DataNameUsage>,
+    pub costume_names: HashSet<IString>,
+    pub sound_names: HashSet<IString>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -2333,12 +2335,11 @@ pub mod helpers {
         context: &mut GrazeSb3GeneratorContext,
         canonical_identifier: Option<&cst::CanonicalIdentifier>,
         identifier: &cst::SingleIdentifier,
-        source_span: SourceSpan,
         data_name_usage: DataNameUsage,
     ) {
-        let name = canonical_identifier
-            .map(|value| &value.name)
-            .unwrap_or(&identifier.value);
+        let (name, source_span) = canonical_identifier
+            .map(|value| (&value.name, *value.get_source_span()))
+            .unwrap_or_else(|| (&identifier.value, *identifier.get_source_span()));
         if let Some(value) = context.lint_context.data_names.get_mut(name) {
             if data_name_usage.current_target_idx != value.current_target_idx {
                 value.variable = false;
@@ -2373,6 +2374,66 @@ pub mod helpers {
                 .data_names
                 .insert(name.clone(), data_name_usage);
         }
+    }
+
+    pub fn visit_asset_declaration_for_sb3_generator(
+        context: &mut GrazeSb3GeneratorContext,
+        asset_declaration: &cst::AssetDeclaration,
+        is_sound: bool,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        match asset_declaration {
+            cst::AssetDeclaration::Multiple(_, comma_separated, _, _) => {
+                for single_asset_declaration in comma_separated {
+                    visit_single_asset_declaration_for_sb3_generator(
+                        context,
+                        single_asset_declaration,
+                        is_sound,
+                    )?;
+                }
+                Ok(())
+            }
+            cst::AssetDeclaration::Single(single_asset_declaration) => {
+                visit_single_asset_declaration_for_sb3_generator(
+                    context,
+                    single_asset_declaration,
+                    is_sound,
+                )
+            }
+        }
+    }
+
+    pub fn visit_single_asset_declaration_for_sb3_generator(
+        context: &mut GrazeSb3GeneratorContext,
+        single_asset_declaration: &cst::SingleAssetDeclaration,
+        is_sound: bool,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        let cst::SingleAssetDeclaration(canonical_identifier, identifier, _, _) =
+            single_asset_declaration;
+        let (name, source_span) = canonical_identifier
+            .as_ref()
+            .map(|value| (&value.name, *value.get_source_span()))
+            .unwrap_or_else(|| (&identifier.value, *identifier.get_source_span()));
+        let names = if is_sound {
+            &mut context.lint_context.sound_names
+        } else {
+            &mut context.lint_context.costume_names
+        };
+        if names.contains(name) {
+            emit_message(
+                context,
+                GrazeMessage::Warning(
+                    GrazeWarning::Specific(
+                        SpecificGrazeWarning::RepeatedCanonicalName,
+                        source_span,
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        } else {
+            names.insert(name.clone());
+        }
+        Ok(())
     }
 }
 
@@ -3238,7 +3299,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                         expression,
-                        source_span,
+                        _,
                     ) => {
                         let var = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3284,7 +3345,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::Var(scope, var, Ok(expression))
@@ -3294,7 +3354,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let var = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3340,7 +3400,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::Var(scope, var, Err("".into()))
@@ -3354,7 +3413,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         items,
                         _,
-                        source_span,
+                        _,
                     ) => {
                         let list = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3400,7 +3459,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::List(scope, list, {
@@ -3425,7 +3483,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let list = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3471,7 +3529,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::List(scope, list, Vec::new())
@@ -3488,7 +3545,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                         expression,
-                        source_span,
+                        _,
                     ) => {
                         let var = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3528,7 +3585,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::Var(scope, var, Ok(expression))
@@ -3538,7 +3594,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let var = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3578,7 +3634,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::Var(scope, var, Err("".into()))
@@ -3592,7 +3647,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         items,
                         _,
-                        source_span,
+                        _,
                     ) => {
                         let list = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3632,7 +3687,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::List(scope, list, {
@@ -3657,7 +3711,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let list = identifier.value.clone();
                         let (scope, data_name_usage) = if matches!(
@@ -3697,7 +3751,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                         SingleAssignment::List(scope, list, Vec::new())
@@ -4005,6 +4058,30 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         Ok(())
     }
 
+    fn visit_sprite_statement_costume_declaration(
+        &self,
+        value: crate::visitor::BorrowedSpriteStatementCostumeDeclaration,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        visit_asset_declaration_for_sb3_generator(context, value.1, false)
+    }
+
+    fn visit_stage_statement_backdrop_declaration(
+        &self,
+        value: crate::visitor::BorrowedStageStatementBackdropDeclaration,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        visit_asset_declaration_for_sb3_generator(context, value.1, false)
+    }
+
+    fn visit_sound_declaration(
+        &self,
+        value: crate::visitor::BorrowedSoundDeclaration,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        visit_asset_declaration_for_sb3_generator(context, value.1, true)
+    }
+
     fn visit_data_declaration(
         &self,
         value: &cst::DataDeclaration,
@@ -4014,7 +4091,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .current_sb3_target
             .as_ref()
             .is_some_and(|value| value.is_stage);
-
         match value {
             crate::parser::cst::DataDeclaration::Mixed(parent_scope, _, items, _, _)
             | crate::parser::cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
@@ -4028,7 +4104,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                         _,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4051,7 +4127,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4060,7 +4135,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4083,7 +4158,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4096,7 +4170,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                         _,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4119,7 +4193,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4128,7 +4201,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4151,7 +4224,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4167,7 +4239,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         identifier,
                         _,
                         _,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4182,7 +4254,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4191,7 +4262,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4206,7 +4277,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4219,7 +4289,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                         _,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4234,7 +4304,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4243,7 +4312,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         my_scope,
                         canonical_identifier,
                         identifier,
-                        source_span,
+                        _,
                     ) => {
                         let data_name_usage = DataNameUsage {
                             global: matches!(
@@ -4258,7 +4327,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             canonical_identifier.as_ref(),
                             identifier,
-                            *source_span,
                             data_name_usage,
                         );
                     }
@@ -4905,6 +4973,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_sb3_target = Some(stage);
         context.current_target_symbol_name = Some(STAGE_ISTRING.clone());
         context.current_target_configured = false;
+        context.lint_context.costume_names.clear();
+        context.lint_context.sound_names.clear();
         wrap_in_scope(context, |context| {
             let namespace = &context.symbol_table[sprite_symbol_id].namespace;
             let mut insert_symbols = Vec::with_capacity(namespace.len());
@@ -4937,11 +5007,28 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: BorrowedTopLevelStatementSprite,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        let target_name = value
+        let (target_name, target_name_source_span) = value
             .1
-            .as_ref()
-            .map(|value| value.name.clone())
-            .unwrap_or_else(|| value.2.value.clone());
+            .map(|value| (value.name.clone(), *value.get_source_span()))
+            .unwrap_or_else(|| (value.2.value.clone(), *value.2.get_source_span()));
+        if context.lint_context.sprite_names.contains(&target_name) {
+            emit_message(
+                context,
+                GrazeMessage::Warning(
+                    GrazeWarning::Specific(
+                        SpecificGrazeWarning::RepeatedCanonicalName,
+                        target_name_source_span,
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        } else {
+            context
+                .lint_context
+                .sprite_names
+                .insert(target_name.clone());
+        }
         let assets = context
             .target_attachments
             .remove(&value.2.value)
@@ -5014,6 +5101,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         context.current_sb3_target = Some(new_sprite);
         context.current_target_symbol_name = Some(value.2.value.clone());
         context.current_target_configured = false;
+        context.lint_context.costume_names.clear();
+        context.lint_context.sound_names.clear();
         wrap_in_scope(context, |context| {
             let namespace = &context.symbol_table[sprite_symbol_id].namespace;
             let mut insert_symbols = Vec::with_capacity(namespace.len());

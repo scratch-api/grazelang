@@ -411,8 +411,8 @@ impl GetLintId for SpecificGrazeWarning {
 //  - [x] Name conflict for two local lists or variables of the same sprite
 //  - [x] Name conflict for a global and a local list
 //  - [x] Name conflict for a global and a local variable
-//  - [ ] Name conflict for two sprites
-//  - [ ] Name conflict for two backdrops, costumes or sounds
+//  - [x] Name conflict for two sprites
+//  - [x] Name conflict for two backdrops, costumes or sounds
 // Issue: #90
 
 #[derive(Debug, Clone, PartialEq)]
