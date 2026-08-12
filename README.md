@@ -8,7 +8,7 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 - [x] Local syntax errors
 - [x] SB3 generation
 - [x] Command Line interface
-- [ ] Extensions
+- [x] Extensions
 - [ ] Comments
 - [ ] SB3 detranspiler
 - [ ] Syntax highlighting
