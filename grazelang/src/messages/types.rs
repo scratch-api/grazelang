@@ -406,15 +406,6 @@ impl GetLintId for SpecificGrazeWarning {
     }
 }
 
-// TODO: Warn when two lists, two variables etc. have the same canonical name
-//  - [x] Name conflict for two global lists or variables
-//  - [x] Name conflict for two local lists or variables of the same sprite
-//  - [x] Name conflict for a global and a local list
-//  - [x] Name conflict for a global and a local variable
-//  - [x] Name conflict for two sprites
-//  - [x] Name conflict for two backdrops, costumes or sounds
-// Issue: #90
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum GrazeInfo {
     Custom {
