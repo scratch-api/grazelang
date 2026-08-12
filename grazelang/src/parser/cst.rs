@@ -2533,6 +2533,9 @@ impl GetPos for CanonicalIdentifier {
 }
 
 // TODO: Validate more names
+//  - [ ] `_stage_`, `_myself_`, `_random_`, `_mouse_` for sprite names
+//  - [ ] `next costume`, `previous costume` for costumes
+//  - [ ] `next backdrop`, `previous backdrop`, `random backdrop` for backdrops
 // Issue: #89
 
 #[derive(Debug, Clone, Error, enum_assoc::Assoc)]
