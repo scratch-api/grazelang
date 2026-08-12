@@ -354,27 +354,19 @@ pub enum SpecificGrazeWarning {
     #[assoc(internal_lint_id = "specified_monitor_position_partially")]
     SpecifiedMonitorPositionPartially,
     #[assoc(get_primary_message = "primitive value used for list monitor")]
-    #[assoc(
-        get_secondary_message = "expected list value"
-    )]
+    #[assoc(get_secondary_message = "expected list value")]
     #[assoc(internal_lint_id = "primitive_value_for_list_monitor")]
     PrimitiveValueForListMonitor,
     #[assoc(get_primary_message = "list value used for primitive monitor")]
-    #[assoc(
-        get_secondary_message = "expected primitive value"
-    )]
+    #[assoc(get_secondary_message = "expected primitive value")]
     #[assoc(internal_lint_id = "list_value_for_primitive_monitor")]
     ListValueForPrimitiveMonitor,
     #[assoc(get_primary_message = "value used for a number does not look like a number")]
-    #[assoc(
-        get_secondary_message = "should be a number"
-    )]
+    #[assoc(get_secondary_message = "should be a number")]
     #[assoc(internal_lint_id = "unexpected_value_for_number")]
     UnexpectedValueForNumber,
     #[assoc(get_primary_message = "value used for a boolean does not look like a boolean")]
-    #[assoc(
-        get_secondary_message = "should be a boolean"
-    )]
+    #[assoc(get_secondary_message = "should be a boolean")]
     #[assoc(internal_lint_id = "unexpected_value_for_boolean")]
     UnexpectedValueForBoolean,
     #[assoc(get_primary_message = "costume number outside valid range")]
@@ -384,17 +376,21 @@ pub enum SpecificGrazeWarning {
     #[assoc(internal_lint_id = "invalid_costume_number")]
     InvalidCostumeNumber,
     #[assoc(get_primary_message = "invalid monitor mode")]
-    #[assoc(
-        get_secondary_message = "must be \"default\", \"large\", \"slider\" or \"list\""
-    )]
+    #[assoc(get_secondary_message = "must be \"default\", \"large\", \"slider\" or \"list\"")]
     #[assoc(internal_lint_id = "invalid_monitor_mode")]
     InvalidMonitorMode,
-    #[assoc(get_primary_message = "the stage and all sprites must have at least one costume or backdrop")]
     #[assoc(
-        get_secondary_message = "missing a costume or backdrop"
+        get_primary_message = "the stage and all sprites must have at least one costume or backdrop"
     )]
+    #[assoc(get_secondary_message = "missing a costume or backdrop")]
     #[assoc(internal_lint_id = "target_without_costume")]
     TargetWithoutCostume,
+    #[assoc(
+        get_primary_message = "tried to assign to property of another target, can only assign to own version of it"
+    )]
+    #[assoc(get_secondary_message = "property belongs to another target")]
+    #[assoc(internal_lint_id = "assign_property_of_other_target")]
+    AssignPropertyOfOtherTarget,
 }
 
 impl GetLintId for SpecificGrazeWarning {

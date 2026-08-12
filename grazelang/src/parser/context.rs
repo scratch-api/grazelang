@@ -153,6 +153,7 @@ pub trait ResolveKnownBlock {
 
     fn resolve_for_assignment<'a>(
         &'a self,
+        source_span: SourceSpan,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> Option<&'a SimpleCallableKnownBlockSignature>;
 }
@@ -224,8 +225,19 @@ impl ResolveKnownBlock for KnownBlock {
                 params,
                 field: _,
                 assign: _,
-                bind_info: _,
-            } => KnownBlockInput::SimpleBlock(opcode, params),
+                bind_info,
+            } => {
+                if let Some(bind_info) = bind_info
+                    && let Some(target) = context.current_sb3_target.as_ref()
+                    && bind_info.parent_target.as_str() != target.get_field_value()
+                {
+                    return KnownBlockInput::SimpleBlock(
+                        static_ref_of_const!(literal!("sensing_of"), IString),
+                        &bind_info.property_of_params,
+                    );
+                }
+                KnownBlockInput::SimpleBlock(opcode, params)
+            },
             KnownBlock::Empty => KnownBlockInput::Empty,
         }
     }
@@ -443,7 +455,8 @@ impl ResolveKnownBlock for KnownBlock {
 
     fn resolve_for_assignment<'a>(
         &'a self,
-        _context: &mut codegen::core::GrazeSb3GeneratorContext,
+        source_span: SourceSpan,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> Option<&'a SimpleCallableKnownBlockSignature> {
         match self {
             KnownBlock::Variable {
@@ -457,8 +470,26 @@ impl ResolveKnownBlock for KnownBlock {
                 params: _,
                 field: _,
                 assign,
-                bind_info: _,
-            } => assign.as_ref(),
+                bind_info,
+            } => {
+                if let Some(bind_info) = bind_info
+                    && let Some(target) = context.current_sb3_target.as_ref()
+                    && bind_info.parent_target.as_str() != target.get_field_value()
+                {
+                    emit_message(
+                        context,
+                        GrazeMessage::Warning(
+                            GrazeWarning::Specific(
+                                SpecificGrazeWarning::AssignPropertyOfOtherTarget,
+                                source_span,
+                            ),
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                assign.as_ref()
+            },
             KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }
