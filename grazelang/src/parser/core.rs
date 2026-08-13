@@ -1490,47 +1490,80 @@ pub mod statement {
                         _ => ()
                     }
                     let previous_symbol = symbols.insert(name.clone(), if(matches!(dec_type, SingleDataDeclarationType::List(_)) || (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)) {
-                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
-                            name: name.clone(), canonical_name: canonical_identifier.as_ref().map(|value|value.name.clone()), value_is_initial_value: values_are_initial_values, value: match &value {
+                        let value = if values_are_initial_values {
+                            match &value {
                                 DeclarationValue::List(_, _, value, _) => {
                                     let mut expressions = Vec::with_capacity(value.len());
                                     for entry in value {
                                         match entry {
-                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().map_err(|source| {
-                                                ParseError::InvalidConstantExpression {
-                                                    expression: Box::new(expression.clone()),
-                                                    source
-                                                }
-                                            })?),
-                                            ListEntry::Unwrap(literal, _) => literal.get_string_value().as_str().chars().for_each(|c| expressions.push(grazelang_types::project_json::Sb3PrimitiveOrBool::String(c.to_string()))),
+                                            ListEntry::Expression(expression) => {
+                                                expressions.push(expression.calculate_value().map_err(|source| {
+                                                    ParseError::InvalidConstantExpression {
+                                                        expression: Box::new(expression.clone()),
+                                                        source,
+                                                    }
+                                                })?);
+                                            }
+                                            ListEntry::Unwrap(literal, _) => literal
+                                                .get_string_value()
+                                                .as_str()
+                                                .chars()
+                                                .for_each(|c| {
+                                                    expressions.push(
+                                                        grazelang_types::project_json::Sb3PrimitiveOrBool::String(
+                                                            c.to_string(),
+                                                        ),
+                                                    )
+                                                }),
                                         }
                                     }
                                     expressions
-                                },
+                                }
                                 DeclarationValue::None => Vec::new(),
-                                DeclarationValue::Var(..) => unreachable!()
+                                DeclarationValue::Var(..) => unreachable!(),
                             }
+                        } else {
+                            Vec::new()
+                        };
+                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier
+                                .as_ref()
+                                .map(|value| value.name.clone()),
+                            value_is_initial_value: values_are_initial_values,
+                            value,
                         })
                     } else {
-                        context::TargetSymbolDescriptor::Var(context::VarDescriptor {
-                            name: name.clone(),
-                            canonical_name: canonical_identifier.as_ref().map(|value|value.name.clone()),
-                            value_is_initial_value: values_are_initial_values,
-                            value: match &value {
-                                DeclarationValue::None => grazelang_types::project_json::Sb3PrimitiveOrBool::String("".to_string()),
+                        let value = if values_are_initial_values {
+                            match &value {
+                                DeclarationValue::None => {
+                                    grazelang_types::project_json::Sb3PrimitiveOrBool::String(String::new())
+                                }
                                 DeclarationValue::Var(_, value) => {
                                     value.calculate_value().map_err(|source| {
                                         ParseError::InvalidConstantExpression {
-                                            expression: Box::new(value.clone()), source
+                                            expression: Box::new(value.clone()),
+                                            source,
                                         }
                                     })?
-                                },
-                                DeclarationValue::List(..) => unreachable!()
-                            },
+                                }
+                                DeclarationValue::List(..) => unreachable!(),
+                            }
+                        } else {
+                            grazelang_types::project_json::Sb3PrimitiveOrBool::String(String::new())
+                        };
+                        context::TargetSymbolDescriptor::Var(context::VarDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier
+                                .as_ref()
+                                .map(|value| value.name.clone()),
+                            value_is_initial_value: values_are_initial_values,
+                            value,
                             is_cloud: matches!(
                                 (default_scope, &scope),
-                                (DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset) | (_, DataDeclarationScope::Cloud(_))
-                            )
+                                (DataDeclarationScope::Cloud(_), DataDeclarationScope::Unset)
+                                    | (_, DataDeclarationScope::Cloud(_))
+                            ),
                         })
                     });
                     if let Some(previous_symbol) = previous_symbol {
@@ -1943,52 +1976,79 @@ pub mod statement {
                 let previous_symbol = symbols.insert(
                     name.clone(),
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
-                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
-                            name: name.clone(),
-                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                            value_is_initial_value: values_are_initial_values,
-                            value: match &value {
+                        let value = if values_are_initial_values {
+                            match &value {
                                 DeclarationValue::List(_, _, value, _) => {
                                     let mut expressions = Vec::with_capacity(value.len());
                                     for entry in value {
                                         match entry {
-                                            ListEntry::Expression(expression) => expressions.push(expression.calculate_value().map_err(|source| {
-                                                ParseError::InvalidConstantExpression {
-                                                    expression: Box::new(expression.clone()),source
-                                                }
-                                            })?),
+                                            ListEntry::Expression(expression) => {
+                                                expressions.push(expression.calculate_value().map_err(|source| {
+                                                    ParseError::InvalidConstantExpression {
+                                                        expression: Box::new(expression.clone()),
+                                                        source,
+                                                    }
+                                                })?);
+                                            }
                                             ListEntry::Unwrap(literal, _) => literal
                                                 .get_string_value()
                                                 .as_str()
                                                 .chars()
-                                                .for_each(|c| expressions.push(
-                                                    grazelang_types::project_json::Sb3PrimitiveOrBool::String(c.to_string())
-                                                )),
+                                                .for_each(|c| {
+                                                    expressions.push(
+                                                        grazelang_types::project_json::Sb3PrimitiveOrBool::String(
+                                                            c.to_string(),
+                                                        ),
+                                                    )
+                                                }),
                                         }
                                     }
                                     expressions
-                                },
+                                }
                                 DeclarationValue::None => Vec::new(),
-                                DeclarationValue::Var(..) => unreachable!()
+                                DeclarationValue::Var(..) => unreachable!(),
                             }
+                        } else {
+                            Vec::new()
+                        };
+                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier
+                                .as_ref()
+                                .map(|value| value.name.clone()),
+                            value_is_initial_value: values_are_initial_values,
+                            value,
                         })
                     } else {
-                        context::TargetSymbolDescriptor::Var(context::VarDescriptor {
-                            name: name.clone(),
-                            canonical_name: canonical_identifier.as_ref().map(|value| value.name.clone()),
-                            value_is_initial_value: values_are_initial_values,
-                            value: match &value {
-                                DeclarationValue::None => grazelang_types::project_json::Sb3PrimitiveOrBool::String("".to_string()),
+                        let value = if values_are_initial_values {
+                            match &value {
+                                DeclarationValue::None => {
+                                    grazelang_types::project_json::Sb3PrimitiveOrBool::String(String::new())
+                                }
                                 DeclarationValue::Var(_, value) => {
                                     value.calculate_value().map_err(|source| {
                                         ParseError::InvalidConstantExpression {
-                                            expression: Box::new(value.clone()),source
+                                            expression: Box::new(value.clone()),
+                                            source,
                                         }
                                     })?
-                                },
-                                DeclarationValue::List(..) => unreachable!()
-                            },
-                            is_cloud: matches!(scope, DataDeclarationScope::Cloud(_))
+                                }
+                                DeclarationValue::List(..) => unreachable!(),
+                            }
+                        } else {
+                            grazelang_types::project_json::Sb3PrimitiveOrBool::String(String::new())
+                        };
+                        context::TargetSymbolDescriptor::Var(context::VarDescriptor {
+                            name: name.clone(),
+                            canonical_name: canonical_identifier
+                                .as_ref()
+                                .map(|value| value.name.clone()),
+                            value_is_initial_value: values_are_initial_values,
+                            value,
+                            is_cloud: matches!(
+                                &scope,
+                                DataDeclarationScope::Cloud(_)
+                            ),
                         })
                     }
                 );
