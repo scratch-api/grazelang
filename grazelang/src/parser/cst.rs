@@ -980,6 +980,22 @@ impl GetPos for ListKeyword {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct FileKeyword(pub SourceSpan);
+
+impl FromSourceSpan for FileKeyword {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
+impl GetPos for FileKeyword {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleDataDeclarationType {
     Unset,
@@ -1360,16 +1376,16 @@ pub enum SingleDataDeclaration {
         RightBracket,
         SourceSpan,
     ),
-    // FileList(
-    //     Option<ListKeyword>,
-    //     DataDeclarationScope,
-    //     Option<CanonicalIdentifier>,
-    //     SingleIdentifier,
-    //     NormalAssignmentOperator,
-    //     FileKeyword,
-    //     Expression,
-    //     SourceSpan,
-    // )
+    FileList(
+        Option<ListKeyword>,
+        DataDeclarationScope,
+        Option<CanonicalIdentifier>,
+        SingleIdentifier,
+        NormalAssignmentOperator,
+        FileKeyword,
+        Expression,
+        SourceSpan,
+    ),
     EmptyList(
         Option<ListKeyword>,
         DataDeclarationScope,
@@ -1384,15 +1400,20 @@ pub enum SingleDataDeclaration {
 // ```rust
 // let list list_name = file "path/to/list";
 // ```
+//  - [x] CST Integration
+//  - [x] Visitor Integration
+//  - [x] Parser Integration
+//  - [ ] Codegen Integration
 // Issue: #91
 
 impl GetPos for SingleDataDeclaration {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            SingleDataDeclaration::Variable(_, _, _, _, _, _, p) => p,
-            SingleDataDeclaration::EmptyVariable(_, _, _, _, p) => p,
-            SingleDataDeclaration::List(_, _, _, _, _, _, _, _, p) => p,
-            SingleDataDeclaration::EmptyList(_, _, _, _, p) => p,
+            SingleDataDeclaration::Variable(_, _, _, _, _, _, p)
+            | SingleDataDeclaration::EmptyVariable(_, _, _, _, p)
+            | SingleDataDeclaration::List(_, _, _, _, _, _, _, _, p)
+            | SingleDataDeclaration::FileList(_, _, _, _, _, _, _, p)
+            | SingleDataDeclaration::EmptyList(_, _, _, _, p) => p,
         }
     }
 }

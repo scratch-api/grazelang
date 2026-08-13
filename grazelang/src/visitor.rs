@@ -1,16 +1,7 @@
 use crate::{
     lexer::SourceSpan,
     parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
-        Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind,
-        DataDeclaration, DataDeclarationScope, DictionaryEntry, Expression, ExtensionKeyword,
-        FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens,
-        LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
-        MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace,
-        RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier,
-        SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock,
-        StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement,
-        UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier,
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, DictionaryEntry, Expression, ExtensionKeyword, FileKeyword, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
     },
 };
 
@@ -282,6 +273,17 @@ pub type BorrowedSingleListDeclaration<'a> = (
     &'a LeftBracket,
     &'a CommaSeparated<ListEntry>,
     &'a RightBracket,
+    &'a SourceSpan,
+);
+
+pub type BorrowedSingleFileListDeclaration<'a> = (
+    Option<&'a ListKeyword>,
+    &'a DataDeclarationScope,
+    Option<&'a CanonicalIdentifier>,
+    &'a SingleIdentifier,
+    &'a NormalAssignmentOperator,
+    &'a FileKeyword,
+    &'a Expression,
     &'a SourceSpan,
 );
 
@@ -638,6 +640,14 @@ pub trait GrazeVisitor<C, E> {
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_single_list_declaration(self, value, context)
+    }
+
+    fn visit_single_file_list_declaration(
+        &self,
+        value: BorrowedSingleFileListDeclaration,
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_single_file_list_declaration(self, value, context)
     }
 
     fn visit_single_empty_list_declaration(
@@ -2041,6 +2051,27 @@ where
                 context,
             )?;
         }
+        SingleDataDeclaration::FileList(
+            list_keyword,
+            data_declaration_scope,
+            canonical_identifier,
+            single_identifier,
+            normal_assignment_operator,
+            file_keyword,
+            expression,
+            source_span,
+        ) => {
+            visitor.visit_single_file_list_declaration((
+                list_keyword.as_ref(),
+                data_declaration_scope,
+                canonical_identifier.as_ref(),
+                single_identifier,
+                normal_assignment_operator,
+                file_keyword,
+                expression,
+                source_span,
+            ), context)?;
+        }
         SingleDataDeclaration::EmptyList(
             list_keyword,
             data_declaration_scope,
@@ -2095,6 +2126,17 @@ where
     V: GrazeVisitor<C, E> + ?Sized,
 {
     visitor.visit_list_content(value.6, context)?;
+    Ok(())
+}
+
+pub fn default_visit_single_file_list_declaration<V, C, E>(
+    _visitor: &V,
+    _value: BorrowedSingleFileListDeclaration,
+    _context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
     Ok(())
 }
 

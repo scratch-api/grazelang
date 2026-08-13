@@ -88,6 +88,15 @@ pub struct ListDescriptor {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FileListDescriptor {
+    pub name: IString,
+    pub canonical_name: Option<IString>,
+    pub source: String,
+    /// lists declared as a normal statement are assigned to every time the statement is reached and their initial value is empty
+    pub value_is_initial_value: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockParamDescriptor {
     pub name: IString,
     pub canonical_name: Option<IString>,
@@ -649,6 +658,7 @@ impl BroadcastDescriptor {
 pub enum TargetSymbolDescriptor {
     Var(VarDescriptor),
     List(ListDescriptor),
+    FileList(FileListDescriptor),
     CustomBlockDescriptor(CustomBlockDescriptor),
     Costume(CostumeDescriptor),
     Backdrop(BackdropDescriptor),

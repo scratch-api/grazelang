@@ -1235,6 +1235,7 @@ pub mod statement {
             cst::CommaSeparated<cst::ListEntry>,
             RightBracket,
         ),
+        FileList(NormalAssignmentOperator, cst::FileKeyword, Expression),
         Var(NormalAssignmentOperator, Expression),
     }
 
@@ -1398,6 +1399,35 @@ pub mod statement {
                             list_content,
                             right_bracket,
                         )
+                    } else if matches!(peek_token!(token_stream), Token::Identifier(value) if value.as_str() == "file")
+                    {
+                        match (&default_type, &dec_type) {
+                            (
+                                DefaultDataDeclarationType::Var,
+                                SingleDataDeclarationType::List(_),
+                            ) => (),
+                            (DefaultDataDeclarationType::Var, _)
+                            | (
+                                DefaultDataDeclarationType::List,
+                                SingleDataDeclarationType::Var(_),
+                            ) => {
+                                let token = next_token!(token_stream);
+                                emit_unexpected_token!(
+                                    token_stream,
+                                    "Expected an expression.",
+                                    "an expression",
+                                    token
+                                );
+                            }
+                            _ => (),
+                        }
+                        skip_token!(token_stream);
+                        let file_keyword = from_stream_pos::<cst::FileKeyword>(token_stream);
+                        DeclarationValue::FileList(
+                            assignment_operator,
+                            file_keyword,
+                            parse_expression(token_stream, context)?,
+                        )
                     } else {
                         match (&default_type, &dec_type) {
                             (
@@ -1410,7 +1440,12 @@ pub mod statement {
                                 SingleDataDeclarationType::List(_),
                             ) => {
                                 let token = next_token!(token_stream);
-                                emit_unexpected_token!(token_stream, "Expected '['.", "'['", token);
+                                emit_unexpected_token!(
+                                    token_stream,
+                                    "Expected '[' or \"file\".",
+                                    "'[' or \"file\"",
+                                    token
+                                );
                             }
                             _ => (),
                         }
@@ -1433,7 +1468,6 @@ pub mod statement {
                     )
                 }
             };
-
             if let (
                 DataDeclarationScope::Local(source_span),
                 DataDeclarationScope::Unset,
@@ -1489,50 +1523,69 @@ pub mod statement {
                         }),
                         _ => ()
                     }
-                    let previous_symbol = symbols.insert(name.clone(), if(matches!(dec_type, SingleDataDeclarationType::List(_)) || (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List)) {
-                        let value = if values_are_initial_values {
-                            match &value {
-                                DeclarationValue::List(_, _, value, _) => {
-                                    let mut expressions = Vec::with_capacity(value.len());
-                                    for entry in value {
-                                        match entry {
-                                            ListEntry::Expression(expression) => {
-                                                expressions.push(expression.calculate_value().map_err(|source| {
-                                                    ParseError::InvalidConstantExpression {
-                                                        expression: Box::new(expression.clone()),
-                                                        source,
-                                                    }
-                                                })?);
-                                            }
-                                            ListEntry::Unwrap(literal, _) => literal
-                                                .get_string_value()
-                                                .as_str()
-                                                .chars()
-                                                .for_each(|c| {
-                                                    expressions.push(
-                                                        grazelang_types::project_json::Sb3PrimitiveOrBool::String(
-                                                            c.to_string(),
-                                                        ),
-                                                    )
-                                                }),
-                                        }
+                    let previous_symbol = symbols.insert(name.clone(), if matches!(dec_type, SingleDataDeclarationType::List(_)) || (dec_type == SingleDataDeclarationType::Unset && default_type == DefaultDataDeclarationType::List) {
+                        if let DeclarationValue::FileList(_, _, value) = &value {
+                            context::TargetSymbolDescriptor::FileList(context::FileListDescriptor {
+                                name: name.clone(),
+                                canonical_name: canonical_identifier
+                                    .as_ref()
+                                    .map(|value| value.name.clone()),
+                                value_is_initial_value: values_are_initial_values,
+                                source: value.calculate_value().map_err(|source| {
+                                    ParseError::InvalidConstantExpression {
+                                        expression: Box::new(value.clone()),
+                                        source,
                                     }
-                                    expressions
-                                }
-                                DeclarationValue::None => Vec::new(),
-                                DeclarationValue::Var(..) => unreachable!(),
-                            }
+                                }).map(|value| value.to_string()).unwrap_or_else(|err| {
+                                    errors.push(err);
+                                    String::new()
+                                }),
+                            })
                         } else {
-                            Vec::new()
-                        };
-                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
-                            name: name.clone(),
-                            canonical_name: canonical_identifier
-                                .as_ref()
-                                .map(|value| value.name.clone()),
-                            value_is_initial_value: values_are_initial_values,
-                            value,
-                        })
+                            let value = if values_are_initial_values {
+                                match &value {
+                                    DeclarationValue::List(_, _, value, _) => {
+                                        let mut expressions = Vec::with_capacity(value.len());
+                                        for entry in value {
+                                            match entry {
+                                                ListEntry::Expression(expression) => {
+                                                    expressions.push(expression.calculate_value().map_err(|source| {
+                                                        ParseError::InvalidConstantExpression {
+                                                            expression: Box::new(expression.clone()),
+                                                            source,
+                                                        }
+                                                    })?);
+                                                }
+                                                ListEntry::Unwrap(literal, _) => literal
+                                                    .get_string_value()
+                                                    .as_str()
+                                                    .chars()
+                                                    .for_each(|c| {
+                                                        expressions.push(
+                                                            grazelang_types::project_json::Sb3PrimitiveOrBool::String(
+                                                                c.to_string(),
+                                                            ),
+                                                        )
+                                                    }),
+                                            }
+                                        }
+                                        expressions
+                                    }
+                                    DeclarationValue::None => Vec::new(),
+                                    DeclarationValue::Var(..) | DeclarationValue::FileList(..) => unreachable!(),
+                                }
+                            } else {
+                                Vec::new()
+                            };
+                            context::TargetSymbolDescriptor::List(context::ListDescriptor {
+                                name: name.clone(),
+                                canonical_name: canonical_identifier
+                                    .as_ref()
+                                    .map(|value| value.name.clone()),
+                                value_is_initial_value: values_are_initial_values,
+                                value,
+                            })
+                        }
                     } else {
                         let value = if values_are_initial_values {
                             match &value {
@@ -1547,7 +1600,7 @@ pub mod statement {
                                         }
                                     })?
                                 }
-                                DeclarationValue::List(..) => unreachable!(),
+                                DeclarationValue::List(..) | DeclarationValue::FileList(..) => unreachable!(),
                             }
                         } else {
                             grazelang_types::project_json::Sb3PrimitiveOrBool::String(String::new())
@@ -1642,6 +1695,22 @@ pub mod statement {
                         left_brace,
                         items,
                         right_brace,
+                        token_stream.span_from_previous_to_current(start_pos.unwrap()),
+                    )
+                }
+                DeclarationValue::FileList(assignment_operator, file_keyword, expression) => {
+                    SingleDataDeclaration::FileList(
+                        match dec_type {
+                            SingleDataDeclarationType::Unset => None,
+                            SingleDataDeclarationType::Var(_) => None,
+                            SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
+                        },
+                        scope,
+                        canonical_identifier,
+                        identifier,
+                        assignment_operator,
+                        file_keyword,
+                        expression,
                         token_stream.span_from_previous_to_current(start_pos.unwrap()),
                     )
                 }
@@ -1908,7 +1977,6 @@ pub mod statement {
             Token::Assign => {
                 skip_token!(token_stream);
                 let assignment_operator = from_stream_pos::<NormalAssignmentOperator>(token_stream);
-
                 if let Token::LeftBracket = peek_token!(token_stream) {
                     if !matches!(dec_type, SingleDataDeclarationType::List(_)) {
                         let token = next_token!(token_stream);
@@ -1927,10 +1995,24 @@ pub mod statement {
                         list_content,
                         right_bracket,
                     )
+                } else if matches!(peek_token!(token_stream), Token::Identifier(value) if value.as_str() == "file")
+                {
+                    skip_token!(token_stream);
+                    let file_keyword = from_stream_pos::<cst::FileKeyword>(token_stream);
+                    DeclarationValue::FileList(
+                        assignment_operator,
+                        file_keyword,
+                        parse_expression(token_stream, context)?,
+                    )
                 } else {
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
                         let token = next_token!(token_stream);
-                        emit_unexpected_token!(token_stream, "Expected '['.", "'['", token);
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected '[' or \"file\".",
+                            "'[' or \"file\"",
+                            token
+                        );
                     }
                     DeclarationValue::Var(
                         assignment_operator,
@@ -1976,49 +2058,69 @@ pub mod statement {
                 let previous_symbol = symbols.insert(
                     name.clone(),
                     if matches!(dec_type, SingleDataDeclarationType::List(_)) {
-                        let value = if values_are_initial_values {
-                            match &value {
-                                DeclarationValue::List(_, _, value, _) => {
-                                    let mut expressions = Vec::with_capacity(value.len());
-                                    for entry in value {
-                                        match entry {
-                                            ListEntry::Expression(expression) => {
-                                                expressions.push(expression.calculate_value().map_err(|source| {
-                                                    ParseError::InvalidConstantExpression {
-                                                        expression: Box::new(expression.clone()),
-                                                        source,
-                                                    }
-                                                })?);
-                                            }
-                                            ListEntry::Unwrap(literal, _) => literal
-                                                .get_string_value()
-                                                .as_str()
-                                                .chars()
-                                                .for_each(|c| {
-                                                    expressions.push(
-                                                        grazelang_types::project_json::Sb3PrimitiveOrBool::String(
-                                                            c.to_string(),
-                                                        ),
-                                                    )
-                                                }),
-                                        }
+                        if let DeclarationValue::FileList(_, _, value) = &value {
+                            context::TargetSymbolDescriptor::FileList(context::FileListDescriptor {
+                                name: name.clone(),
+                                canonical_name: canonical_identifier
+                                    .as_ref()
+                                    .map(|value| value.name.clone()),
+                                value_is_initial_value: values_are_initial_values,
+                                source: value.calculate_value().map_err(|source| {
+                                    ParseError::InvalidConstantExpression {
+                                        expression: Box::new(value.clone()),
+                                        source,
                                     }
-                                    expressions
+                                }).map(|value| value.to_string()).unwrap_or_else(|err| {
+                                    errors.push(err);
+                                    String::new()
+                                }),
+                            })
+                        }
+                        else {
+                            let value = if values_are_initial_values {
+                                match &value {
+                                    DeclarationValue::List(_, _, value, _) => {
+                                        let mut expressions = Vec::with_capacity(value.len());
+                                        for entry in value {
+                                            match entry {
+                                                ListEntry::Expression(expression) => {
+                                                    expressions.push(expression.calculate_value().map_err(|source| {
+                                                        ParseError::InvalidConstantExpression {
+                                                            expression: Box::new(expression.clone()),
+                                                            source,
+                                                        }
+                                                    })?);
+                                                }
+                                                ListEntry::Unwrap(literal, _) => literal
+                                                    .get_string_value()
+                                                    .as_str()
+                                                    .chars()
+                                                    .for_each(|c| {
+                                                        expressions.push(
+                                                            grazelang_types::project_json::Sb3PrimitiveOrBool::String(
+                                                                c.to_string(),
+                                                            ),
+                                                        )
+                                                    }),
+                                            }
+                                        }
+                                        expressions
+                                    }
+                                    DeclarationValue::None => Vec::new(),
+                                    DeclarationValue::Var(..) | DeclarationValue::FileList(..) => unreachable!(),
                                 }
-                                DeclarationValue::None => Vec::new(),
-                                DeclarationValue::Var(..) => unreachable!(),
-                            }
-                        } else {
-                            Vec::new()
-                        };
-                        context::TargetSymbolDescriptor::List(context::ListDescriptor {
-                            name: name.clone(),
-                            canonical_name: canonical_identifier
-                                .as_ref()
-                                .map(|value| value.name.clone()),
-                            value_is_initial_value: values_are_initial_values,
-                            value,
-                        })
+                            } else {
+                                Vec::new()
+                            };
+                            context::TargetSymbolDescriptor::List(context::ListDescriptor {
+                                name: name.clone(),
+                                canonical_name: canonical_identifier
+                                    .as_ref()
+                                    .map(|value| value.name.clone()),
+                                value_is_initial_value: values_are_initial_values,
+                                value,
+                            })
+                        }
                     } else {
                         let value = if values_are_initial_values {
                             match &value {
@@ -2033,7 +2135,7 @@ pub mod statement {
                                         }
                                     })?
                                 }
-                                DeclarationValue::List(..) => unreachable!(),
+                                DeclarationValue::List(..) | DeclarationValue::FileList(..) => unreachable!(),
                             }
                         } else {
                             grazelang_types::project_json::Sb3PrimitiveOrBool::String(String::new())
@@ -2117,6 +2219,22 @@ pub mod statement {
                     left_brace,
                     items,
                     right_brace,
+                    token_stream.span_from_previous_to_current(start_pos.unwrap().0.0),
+                )
+            }
+            DeclarationValue::FileList(assignment_operator, file_keyword, expression) => {
+                SingleDataDeclaration::FileList(
+                    match dec_type {
+                        SingleDataDeclarationType::Unset => None,
+                        SingleDataDeclarationType::Var(_) => None,
+                        SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
+                    },
+                    scope,
+                    canonical_identifier,
+                    identifier,
+                    assignment_operator,
+                    file_keyword,
+                    expression,
                     token_stream.span_from_previous_to_current(start_pos.unwrap().0.0),
                 )
             }
