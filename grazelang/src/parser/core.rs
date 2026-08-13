@@ -1277,25 +1277,19 @@ pub mod statement {
             let dec_type = match peek_token!(token_stream) {
                 Token::VarKeyword => {
                     skip_token!(token_stream);
-                    if start_pos.is_none() {
-                        start_pos = Some(get_token_start(token_stream));
-                    }
+                    start_pos.get_or_insert_with(|| get_token_start(token_stream));
                     variant_from_stream_pos!(token_stream => SingleDataDeclarationType::Var)
                 }
                 Token::ListKeyword => {
                     skip_token!(token_stream);
-                    if start_pos.is_none() {
-                        start_pos = Some(get_token_start(token_stream));
-                    }
+                    start_pos.get_or_insert_with(|| get_token_start(token_stream));
                     variant_from_stream_pos!(token_stream => SingleDataDeclarationType::List)
                 }
                 _ => SingleDataDeclarationType::Unset,
             };
             let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => {
                 let value = value.clone();
-                if start_pos.is_none() {
-                    start_pos = Some(get_token_start(token_stream));
-                }
+                start_pos.get_or_insert_with(|| get_token_start(token_stream));
                 CanonicalIdentifier {
                     name: value,
                     source_span: get_token_source_span(token_stream),
@@ -1303,9 +1297,7 @@ pub mod statement {
             });
             let identifier = match next_token!(token_stream) {
                 Token::Identifier(value) => {
-                    if start_pos.is_none() {
-                        start_pos = Some(get_token_start(token_stream));
-                    }
+                    start_pos.get_or_insert_with(|| get_token_start(token_stream));
                     SingleIdentifier {
                         value,
                         source_span: get_token_source_span(token_stream),
@@ -1347,25 +1339,6 @@ pub mod statement {
                 },
             };
             let value = match peek_token!(token_stream) {
-                // Token::LeftBrace => {
-                //     if default_type == DefaultDataDeclarationType::Var {
-                //         match dec_type {
-                //             SingleDataDeclarationType::Unset => {
-                //                 skip_token!(token_stream);
-                //                 emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-                //             }
-                //             SingleDataDeclarationType::Var(_) => {
-                //                 skip_token!(token_stream);
-                //                 emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-                //             }
-                //             _ => (),
-                //         }
-                //     }
-                //     let (left_brace, list_content, right_brace) =
-                //         parse_list_content(token_stream, context)?;
-
-                //     DeclarationValue::List(left_brace, list_content, right_brace)
-                // }
                 Token::Assign => {
                     skip_token!(token_stream);
                     let assignment_operator =
@@ -1540,6 +1513,7 @@ pub mod statement {
                                     errors.push(err);
                                     String::new()
                                 }),
+                                source_span: token_stream.span_from_previous_to_current(start_pos.unwrap())
                             })
                         } else {
                             let value = if values_are_initial_values {
@@ -1778,24 +1752,18 @@ pub mod statement {
         let dec_type = match peek_token!(token_stream) {
             Token::VarKeyword => {
                 skip_token!(token_stream);
-                if start_pos.is_none() {
-                    start_pos = variant_from_stream_pos!(token_stream => Some);
-                }
+                start_pos.get_or_insert_with(|| get_token_source_span(token_stream));
                 variant_from_stream_pos!(token_stream => SingleDataDeclarationType::Var)
             }
             Token::ListKeyword => {
                 skip_token!(token_stream);
-                if start_pos.is_none() {
-                    start_pos = variant_from_stream_pos!(token_stream => Some);
-                }
+                start_pos.get_or_insert_with(|| get_token_source_span(token_stream));
                 variant_from_stream_pos!(token_stream => SingleDataDeclarationType::List)
             }
             Token::Identifier(value) if value.as_str() == "vars" => {
                 skip_token!(token_stream);
                 let vars_keyword = from_stream_pos::<VarsKeyword>(token_stream);
-                if start_pos.is_none() {
-                    start_pos = variant_from_stream_pos!(token_stream => Some);
-                }
+                start_pos.get_or_insert_with(|| get_token_source_span(token_stream));
                 let left_brace = expect_token!(
                     token_stream,
                     Token::LeftBrace => from_stream_pos::<LeftBrace>(token_stream),
@@ -1832,9 +1800,7 @@ pub mod statement {
             Token::Identifier(value) if value.as_str() == "lists" => {
                 skip_token!(token_stream);
                 let lists_keyword = from_stream_pos::<ListsKeyword>(token_stream);
-                if start_pos.is_none() {
-                    start_pos = variant_from_stream_pos!(token_stream => Some);
-                }
+                start_pos.get_or_insert_with(|| get_token_source_span(token_stream));
                 let left_brace = expect_token!(
                     token_stream,
                     Token::LeftBrace => from_stream_pos::<LeftBrace>(token_stream),
@@ -1871,9 +1837,7 @@ pub mod statement {
             Token::LeftParens => {
                 skip_token!(token_stream);
                 let left_parens = from_stream_pos::<LeftParens>(token_stream);
-                if start_pos.is_none() {
-                    start_pos = variant_from_stream_pos!(token_stream => Some);
-                }
+                start_pos.get_or_insert_with(|| get_token_source_span(token_stream));
                 let declarations = parse_inner_single_declarations(
                     token_stream,
                     context,
@@ -1903,9 +1867,7 @@ pub mod statement {
         };
         let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => {
             let value = value.clone();
-            if start_pos.is_none() {
-                start_pos = variant_from_stream_pos!(token_stream => Some);
-            }
+            start_pos.get_or_insert_with(|| get_token_source_span(token_stream));
             CanonicalIdentifier {
                 name: value,
                 source_span: get_token_source_span(token_stream),
@@ -1913,9 +1875,7 @@ pub mod statement {
         });
         let identifier = match next_token!(token_stream) {
             Token::Identifier(value) => {
-                if start_pos.is_none() {
-                    start_pos = variant_from_stream_pos!(token_stream => Some);
-                }
+                start_pos.get_or_insert_with(|| get_token_source_span(token_stream));
                 SingleIdentifier {
                     value,
                     source_span: get_token_source_span(token_stream),
@@ -1957,23 +1917,6 @@ pub mod statement {
             },
         };
         let value = match peek_token!(token_stream) {
-            // Token::LeftBrace => {
-            //     match dec_type {
-            //         SingleDataDeclarationType::Unset => {
-            //             skip_token!(token_stream);
-            //             emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-            //         }
-            //         SingleDataDeclarationType::Var(_) => {
-            //             skip_token!(token_stream);
-            //             emit_unexpected_token!(token_stream, "Expected '='.", "'='")
-            //         }
-            //         SingleDataDeclarationType::List(_) => (),
-            //     }
-            //     let (left_brace, list_content, right_brace) =
-            //         parse_list_content(token_stream, context)?;
-
-            //     DeclarationValue::List(left_brace, list_content, right_brace)
-            // }
             Token::Assign => {
                 skip_token!(token_stream);
                 let assignment_operator = from_stream_pos::<NormalAssignmentOperator>(token_stream);
@@ -2074,6 +2017,7 @@ pub mod statement {
                                     errors.push(err);
                                     String::new()
                                 }),
+                                source_span: token_stream.span_from_previous_to_current(start_pos.unwrap().0.0)
                             })
                         }
                         else {

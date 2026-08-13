@@ -94,6 +94,7 @@ pub struct FileListDescriptor {
     pub source: String,
     /// lists declared as a normal statement are assigned to every time the statement is reached and their initial value is empty
     pub value_is_initial_value: bool,
+    pub source_span: SourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

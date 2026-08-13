@@ -316,6 +316,11 @@ pub enum GrazeSb3GeneratorCreationError {
     #[assoc(get_secondary_message = "could not find asset")]
     #[error("could not find asset")]
     CouldNotFindAsset { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "asset_with_bad_encoding")]
+    #[assoc(get_primary_message = "could not load an asset due to a bad encoding")]
+    #[assoc(get_secondary_message = "asset has a bad encoding")]
+    #[error("asset has a bad encoding")]
+    AssetWithBadEncoding { source_span: SourceSpan },
     #[assoc(internal_lint_id = "resource_directory_does_not_exist")]
     #[assoc(get_primary_message = "resource directory does not exist")]
     #[assoc(get_secondary_message = "")]
@@ -351,6 +356,7 @@ impl GetPos for GrazeSb3GeneratorCreationError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             GrazeSb3GeneratorCreationError::CouldNotFindAsset { source_span }
+            | GrazeSb3GeneratorCreationError::AssetWithBadEncoding { source_span }
             | GrazeSb3GeneratorCreationError::ResourceDirectoryDoesNotExist { source_span }
             | GrazeSb3GeneratorCreationError::PathTriesToEscapeResourceDirectory {
                 path: _,
@@ -993,7 +999,7 @@ pub mod symbol_data_derivation {
         BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
         CallBlockParamKind, HasShadow, LISTS_CATEGORY_ID, MethodSignature, SOUNDS_CATEGORY_ID,
         project_json::{
-            Sb3Costume, Sb3FieldValue, Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock,
+            self, Sb3Costume, Sb3FieldValue, Sb3ListDeclaration, Sb3Primitive, Sb3PrimitiveBlock,
             Sb3Sound, Sb3VariableDeclaration, TargetAttachment,
         },
     };
@@ -1008,8 +1014,8 @@ pub mod symbol_data_derivation {
         names::Namespace,
         parser::{
             context::{
-                CustomBlockDescriptor, KnownBlock, ListDescriptor, Symbol, SymbolId, SymbolTable,
-                TargetSymbolDescriptor, VarDescriptor,
+                CustomBlockDescriptor, FileListDescriptor, KnownBlock, ListDescriptor, Symbol,
+                SymbolId, SymbolTable, TargetSymbolDescriptor, VarDescriptor,
             },
             cst::CustomBlockParamKindValue,
         },
@@ -1206,8 +1212,12 @@ pub mod symbol_data_derivation {
             TargetSymbolDescriptor::Var(descriptor) => {
                 Ok(handle_variable(descriptor, rng, namespace))
             }
-            TargetSymbolDescriptor::List(descriptor) => Ok(handle_list(descriptor, rng, namespace)),
-            TargetSymbolDescriptor::FileList(descriptor) => todo!(),
+            TargetSymbolDescriptor::List(descriptor) => {
+                Ok(handle_list_descriptor(descriptor, rng, namespace))
+            }
+            TargetSymbolDescriptor::FileList(descriptor) => {
+                handle_file_list_descriptor(descriptor, rng, namespace, resource_directory)
+            }
             TargetSymbolDescriptor::Costume(descriptor) => process_asset(
                 &descriptor.name,
                 descriptor.canonical_name.as_ref(),
@@ -1454,7 +1464,7 @@ pub mod symbol_data_derivation {
         )
     }
 
-    fn handle_list<T: Rng>(
+    fn handle_list_descriptor<T: Rng>(
         descriptor: &ListDescriptor,
         rng: &mut T,
         namespace: &mut Namespace,
@@ -1469,6 +1479,53 @@ pub mod symbol_data_derivation {
         } else {
             Vec::new()
         };
+        handle_list(id, canonical_name, initial_value)
+    }
+
+    fn handle_file_list_descriptor<T: Rng>(
+        descriptor: &FileListDescriptor,
+        rng: &mut T,
+        namespace: &mut Namespace,
+        resource_directory: &Path,
+    ) -> Result<TargetSymbolData, GrazeSb3GeneratorCreationError> {
+        use std::{
+            fs::File,
+            io::{BufRead, BufReader, Error as IoError},
+        };
+        let id = generate_random_id_string(rng);
+        let canonical_name = namespace.introduce_new_symbol(
+            descriptor.canonical_name.as_ref().map(|v| v.to_string()),
+            descriptor.name.clone(),
+        );
+        let initial_value = if descriptor.value_is_initial_value {
+            let source_span = descriptor.source_span;
+            let path = extend_path_safely(resource_directory, &descriptor.source, source_span)?;
+            let reader =
+                BufReader::new(File::open(path).map_err(|_| {
+                    GrazeSb3GeneratorCreationError::CouldNotFindAsset { source_span }
+                })?);
+            reader
+                .lines()
+                .try_fold::<_, _, Result<_, IoError>>(Vec::new(), |mut data, item| {
+                    data.push(project_json::Sb3PrimitiveOrBool::from(item?));
+                    Ok(data)
+                })
+                .map_err(|_| GrazeSb3GeneratorCreationError::AssetWithBadEncoding { source_span })?
+        } else {
+            Vec::new()
+        };
+        Ok(handle_list(
+            id,
+            canonical_name,
+            initial_value,
+        ))
+    }
+
+    fn handle_list(
+        id: IString,
+        canonical_name: String,
+        initial_value: Vec<project_json::Sb3PrimitiveOrBool>,
+    ) -> TargetSymbolData {
         (
             Symbol {
                 known_block: Some(Rc::new(KnownBlock::List {
@@ -4344,7 +4401,9 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         expression,
                         _,
-                    ) => todo!(),
+                    ) => {
+                        // todo!()
+                    },
                     cst::SingleDataDeclaration::EmptyList(
                         _,
                         my_scope,
@@ -4371,7 +4430,6 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
             }
         };
-
         Ok(())
     }
 
