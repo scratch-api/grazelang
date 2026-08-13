@@ -2,7 +2,6 @@ use std::ops::Range;
 use std::sync::OnceLock;
 
 use arcstr::ArcStr as IString; // Immutable string
-use arcstr::literal as literal_istring;
 use logos::{Lexer, Logos};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -130,7 +129,7 @@ pub enum Token {
     #[regex(r#"\.[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)?"#, parse_number)]
     #[regex(r#"[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*"#, parse_number)]
     #[regex(r#"Infinity"#, parse_string)]
-    #[token("NaN", |_| literal_istring!("NaN"))]
+    #[regex(r#"NaN"#, parse_string)]
     DecimalFloat(IString),
     #[regex(r#"0[xX][0-9a-fA-F](?:_?[0-9a-fA-F])*"#, parse_number)]
     HexadecimalInt(IString),
