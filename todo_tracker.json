@@ -673,10 +673,10 @@
     },
     "91": {
         "filepath": "grazelang/src/parser/cst.rs",
-        "text": "Syntax:\n```rust\nlet list list_name = file \"path/to/list\";\n```\n - [x] CST Integration\n - [x] Visitor Integration\n - [x] Parser Integration\n - [ ] Codegen Integration",
+        "text": "Syntax:\n```rust\nlet list list_name = file \"path/to/list\";\n```\n - [x] CST Integration\n - [x] Visitor Integration\n - [x] Parser Integration\n - [x] Codegen Integration",
         "status": "open",
         "lines": "L1398-L1407",
-        "commit": "ae7066323dd28bc76475b2519acdc0e339c40629",
+        "commit": "b59161d8114a9c0a0b93e88aa302c7152fc8f705",
         "title": "Allow loading list content from a resource file"
     },
     "92": {
