@@ -171,6 +171,21 @@ pub enum GrazeSb3GeneratorError {
     #[assoc(get_secondary_message = "")]
     #[error(transparent)]
     DictionaryTypeError { error: DictionaryTypeError },
+    #[assoc(internal_lint_id = "could_not_find_asset")]
+    #[assoc(get_secondary_message = "could not find asset")]
+    #[error("could not find asset")]
+    CouldNotFindAsset { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "asset_with_bad_encoding")]
+    #[assoc(get_secondary_message = "asset has a bad encoding")]
+    #[error("asset has a bad encoding")]
+    AssetWithBadEncoding { source_span: SourceSpan },
+    #[assoc(internal_lint_id = "path_tries_to_escape_resource_directory")]
+    #[assoc(get_secondary_message = "path tries to escape resource directory")]
+    #[error("path {path:?} tries to escape the resource directory")]
+    PathTriesToEscapeResourceDirectory {
+        path: PathBuf,
+        source_span: SourceSpan,
+    },
     #[assoc(internal_lint_id = "")]
     #[assoc(get_secondary_message = "")]
     #[error("the expression {expression:?} is not calculatable by graze, {source}")]
@@ -242,6 +257,16 @@ impl GrazeSb3GeneratorError {
             GrazeSb3GeneratorError::DictionaryTypeError { error } => {
                 return Cow::Borrowed(error.get_primary_message());
             }
+            GrazeSb3GeneratorError::CouldNotFindAsset { source_span: _ } => {
+                return Cow::Borrowed("could not find the file of an asset");
+            }
+            GrazeSb3GeneratorError::AssetWithBadEncoding { source_span: _ } => {
+                return Cow::Borrowed("could not load an asset due to a bad encoding");
+            }
+            GrazeSb3GeneratorError::PathTriesToEscapeResourceDirectory {
+                path: _,
+                source_span: _,
+            } => return Cow::Borrowed("asset file path tries to escape resource directory"),
             GrazeSb3GeneratorError::InvalidConstantExpression {
                 expression: _,
                 source,
@@ -293,7 +318,13 @@ impl GetPos for GrazeSb3GeneratorError {
                 key: _,
                 source_span,
             }
-            | GrazeSb3GeneratorError::MonitorValueNotBlock { source_span } => source_span,
+            | GrazeSb3GeneratorError::MonitorValueNotBlock { source_span }
+            | GrazeSb3GeneratorError::CouldNotFindAsset { source_span }
+            | GrazeSb3GeneratorError::AssetWithBadEncoding { source_span }
+            | GrazeSb3GeneratorError::PathTriesToEscapeResourceDirectory {
+                source_span,
+                path: _,
+            } => source_span,
             GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword } => {
                 stage_keyword.get_source_span()
             }
@@ -1490,7 +1521,7 @@ pub mod symbol_data_derivation {
     ) -> Result<TargetSymbolData, GrazeSb3GeneratorCreationError> {
         use std::{
             fs::File,
-            io::{BufRead, BufReader, Error as IoError},
+            io::{BufRead, BufReader},
         };
         let id = generate_random_id_string(rng);
         let canonical_name = namespace.introduce_new_symbol(
@@ -1506,19 +1537,16 @@ pub mod symbol_data_derivation {
                 })?);
             reader
                 .lines()
-                .try_fold::<_, _, Result<_, IoError>>(Vec::new(), |mut data, item| {
-                    data.push(project_json::Sb3PrimitiveOrBool::from(item?));
-                    Ok(data)
+                .map(|item| {
+                    Ok(project_json::Sb3PrimitiveOrBool::from(item.map_err(
+                        |_| GrazeSb3GeneratorCreationError::AssetWithBadEncoding { source_span },
+                    )?))
                 })
-                .map_err(|_| GrazeSb3GeneratorCreationError::AssetWithBadEncoding { source_span })?
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Vec::new()
         };
-        Ok(handle_list(
-            id,
-            canonical_name,
-            initial_value,
-        ))
+        Ok(handle_list(id, canonical_name, initial_value))
     }
 
     fn handle_list(
@@ -2227,7 +2255,10 @@ macro_rules! extract_data_from_dictionary_value {
 }
 
 pub mod helpers {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        path::{Path, PathBuf},
+    };
 
     use super::{GrazeSb3GeneratorContext, emit_message};
     use crate::{
@@ -2492,6 +2523,24 @@ pub mod helpers {
             names.insert(name.clone());
         }
         Ok(())
+    }
+
+    pub fn extend_path_safely(
+        directory: &Path,
+        rest: &str,
+        source_span: SourceSpan,
+    ) -> Result<PathBuf, GrazeSb3GeneratorError> {
+        let new_path = directory
+            .join(rest)
+            .canonicalize()
+            .map_err(|_| GrazeSb3GeneratorError::CouldNotFindAsset { source_span })?;
+        if !new_path.starts_with(directory) {
+            return Err(GrazeSb3GeneratorError::PathTriesToEscapeResourceDirectory {
+                path: new_path,
+                source_span,
+            });
+        }
+        Ok(new_path)
     }
 }
 
@@ -3349,260 +3398,356 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             | cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
             | cst::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
                 .iter()
-                .map(|value| match value {
-                    cst::SingleDataDeclaration::Variable(
-                        _,
-                        my_scope,
-                        canonical_identifier,
-                        identifier,
-                        _,
-                        expression,
-                        _,
-                    ) => {
-                        let var = identifier.value.clone();
-                        let (scope, data_name_usage) = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
-                        ) {
-                            (
-                                Scope::Global,
-                                DataNameUsage {
-                                    global: true,
-                                    variable: true,
-                                    list: false,
-                                    current_target_idx: context.sb3.targets.len(),
-                                },
-                            )
-                        } else {
-                            (
-                                Scope::Local,
-                                if is_stage {
+                .map(|value| {
+                    Ok(match value {
+                        cst::SingleDataDeclaration::Variable(
+                            _,
+                            my_scope,
+                            canonical_identifier,
+                            identifier,
+                            _,
+                            expression,
+                            _,
+                        ) => {
+                            let var = identifier.value.clone();
+                            let (scope, data_name_usage) = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                (
+                                    Scope::Global,
                                     DataNameUsage {
                                         global: true,
                                         variable: true,
                                         list: false,
                                         current_target_idx: context.sb3.targets.len(),
-                                    }
-                                } else {
-                                    DataNameUsage {
-                                        global: false,
-                                        variable: true,
-                                        list: false,
-                                        current_target_idx: context.sb3.targets.len(),
-                                    }
-                                },
-                            )
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
+                                    },
+                                )
+                            } else {
+                                (
+                                    Scope::Local,
+                                    if is_stage {
+                                        DataNameUsage {
+                                            global: true,
+                                            variable: true,
+                                            list: false,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    } else {
+                                        DataNameUsage {
+                                            global: false,
+                                            variable: true,
+                                            list: false,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    },
+                                )
+                            };
+                            check_lint_for_repeated_data_name(
+                                context,
+                                canonical_identifier.as_ref(),
+                                identifier,
+                                data_name_usage,
+                            );
+                            SingleAssignment::Var(scope, var, Ok(expression))
+                        }
+                        cst::SingleDataDeclaration::EmptyVariable(
+                            _,
+                            my_scope,
+                            canonical_identifier,
                             identifier,
-                            data_name_usage,
-                        );
-                        SingleAssignment::Var(scope, var, Ok(expression))
-                    }
-                    cst::SingleDataDeclaration::EmptyVariable(
-                        _,
-                        my_scope,
-                        canonical_identifier,
-                        identifier,
-                        _,
-                    ) => {
-                        let var = identifier.value.clone();
-                        let (scope, data_name_usage) = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
-                        ) {
-                            (
-                                Scope::Global,
-                                DataNameUsage {
-                                    global: true,
-                                    variable: true,
-                                    list: false,
-                                    current_target_idx: context.sb3.targets.len(),
-                                },
-                            )
-                        } else {
-                            (
-                                Scope::Local,
-                                if is_stage {
+                            _,
+                        ) => {
+                            let var = identifier.value.clone();
+                            let (scope, data_name_usage) = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                (
+                                    Scope::Global,
                                     DataNameUsage {
                                         global: true,
                                         variable: true,
                                         list: false,
                                         current_target_idx: context.sb3.targets.len(),
-                                    }
-                                } else {
-                                    DataNameUsage {
-                                        global: false,
-                                        variable: true,
-                                        list: false,
-                                        current_target_idx: context.sb3.targets.len(),
-                                    }
-                                },
-                            )
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
+                                    },
+                                )
+                            } else {
+                                (
+                                    Scope::Local,
+                                    if is_stage {
+                                        DataNameUsage {
+                                            global: true,
+                                            variable: true,
+                                            list: false,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    } else {
+                                        DataNameUsage {
+                                            global: false,
+                                            variable: true,
+                                            list: false,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    },
+                                )
+                            };
+                            check_lint_for_repeated_data_name(
+                                context,
+                                canonical_identifier.as_ref(),
+                                identifier,
+                                data_name_usage,
+                            );
+                            SingleAssignment::Var(scope, var, Err("".into()))
+                        }
+                        cst::SingleDataDeclaration::List(
+                            _,
+                            my_scope,
+                            canonical_identifier,
                             identifier,
-                            data_name_usage,
-                        );
-                        SingleAssignment::Var(scope, var, Err("".into()))
-                    }
-                    cst::SingleDataDeclaration::List(
-                        _,
-                        my_scope,
-                        canonical_identifier,
-                        identifier,
-                        _,
-                        _,
-                        items,
-                        _,
-                        _,
-                    ) => {
-                        let list = identifier.value.clone();
-                        let (scope, data_name_usage) = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
-                        ) {
-                            (
-                                Scope::Global,
-                                DataNameUsage {
-                                    global: true,
-                                    variable: false,
-                                    list: true,
-                                    current_target_idx: context.sb3.targets.len(),
-                                },
-                            )
-                        } else {
-                            (
-                                Scope::Local,
-                                if is_stage {
+                            _,
+                            _,
+                            items,
+                            _,
+                            _,
+                        ) => {
+                            let list = identifier.value.clone();
+                            let (scope, data_name_usage) = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                (
+                                    Scope::Global,
                                     DataNameUsage {
                                         global: true,
                                         variable: false,
                                         list: true,
                                         current_target_idx: context.sb3.targets.len(),
-                                    }
-                                } else {
-                                    DataNameUsage {
-                                        global: false,
-                                        variable: false,
-                                        list: true,
-                                        current_target_idx: context.sb3.targets.len(),
-                                    }
-                                },
-                            )
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
-                            identifier,
-                            data_name_usage,
-                        );
-                        SingleAssignment::List(scope, list, {
-                            let mut values = Vec::with_capacity(items.len());
-                            for value in items {
-                                match value {
-                                    ListEntry::Expression(expression) => {
-                                        values.push(Ok(expression));
-                                    }
-                                    ListEntry::Unwrap(literal, _) => {
-                                        for c in literal.get_string_value().chars() {
-                                            values.push(Err(c.to_string().into()));
+                                    },
+                                )
+                            } else {
+                                (
+                                    Scope::Local,
+                                    if is_stage {
+                                        DataNameUsage {
+                                            global: true,
+                                            variable: false,
+                                            list: true,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    } else {
+                                        DataNameUsage {
+                                            global: false,
+                                            variable: false,
+                                            list: true,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    },
+                                )
+                            };
+                            check_lint_for_repeated_data_name(
+                                context,
+                                canonical_identifier.as_ref(),
+                                identifier,
+                                data_name_usage,
+                            );
+                            SingleAssignment::List(scope, list, {
+                                let mut values = Vec::with_capacity(items.len());
+                                for value in items {
+                                    match value {
+                                        ListEntry::Expression(expression) => {
+                                            values.push(Ok(expression));
+                                        }
+                                        ListEntry::Unwrap(literal, _) => {
+                                            for c in literal.get_string_value().chars() {
+                                                values.push(Err(c.to_string().into()));
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            values
-                        })
-                    }
-                    cst::SingleDataDeclaration::FileList(
-                        list_keyword,
-                        data_declaration_scope,
-                        canonical_identifier,
-                        single_identifier,
-                        normal_assignment_operator,
-                        _,
-                        expression,
-                        _,
-                    ) => todo!(),
-                    cst::SingleDataDeclaration::EmptyList(
-                        _,
-                        my_scope,
-                        canonical_identifier,
-                        identifier,
-                        _,
-                    ) => {
-                        let list = identifier.value.clone();
-                        let (scope, data_name_usage) = if matches!(
-                            (parent_scope, my_scope),
-                            (
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_),
-                                DataDeclarationScope::Unset
-                            ) | (
-                                _,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            )
-                        ) {
-                            (
-                                Scope::Global,
-                                DataNameUsage {
-                                    global: true,
-                                    variable: false,
-                                    list: true,
-                                    current_target_idx: context.sb3.targets.len(),
-                                },
-                            )
-                        } else {
-                            (
-                                Scope::Local,
-                                if is_stage {
+                                values
+                            })
+                        }
+                        cst::SingleDataDeclaration::FileList(
+                            _,
+                            my_scope,
+                            canonical_identifier,
+                            identifier,
+                            _,
+                            _,
+                            expression,
+                            source_span,
+                        ) => {
+                            let list = identifier.value.clone();
+                            let (scope, data_name_usage) = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                (
+                                    Scope::Global,
                                     DataNameUsage {
                                         global: true,
                                         variable: false,
                                         list: true,
                                         current_target_idx: context.sb3.targets.len(),
+                                    },
+                                )
+                            } else {
+                                (
+                                    Scope::Local,
+                                    if is_stage {
+                                        DataNameUsage {
+                                            global: true,
+                                            variable: false,
+                                            list: true,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    } else {
+                                        DataNameUsage {
+                                            global: false,
+                                            variable: false,
+                                            list: true,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    },
+                                )
+                            };
+                            check_lint_for_repeated_data_name(
+                                context,
+                                canonical_identifier.as_ref(),
+                                identifier,
+                                data_name_usage,
+                            );
+                            let source_prim = expression.calculate_value().map_err(|source| {
+                                GrazeSb3GeneratorError::InvalidConstantExpression {
+                                    expression: Box::new(expression.clone()),
+                                    source,
+                                }
+                            })?;
+                            let source = source_prim.as_cow_str();
+                            use std::{
+                                fs::File,
+                                io::{BufRead, BufReader},
+                            };
+                            SingleAssignment::List(scope, list, {
+                                let path = extend_path_safely(
+                                    context
+                                        .settings
+                                        .resources_path
+                                        .as_deref()
+                                        .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
+                                    &source,
+                                    *source_span,
+                                )?;
+                                let reader = BufReader::new(File::open(path).map_err(|_| {
+                                    GrazeSb3GeneratorError::CouldNotFindAsset {
+                                        source_span: *source_span,
                                     }
-                                } else {
+                                })?);
+                                reader
+                                    .lines()
+                                    .map(|item| {
+                                        Ok(Err(Sb3Primitive::from(item.map_err(|_| {
+                                            GrazeSb3GeneratorError::AssetWithBadEncoding {
+                                                source_span: *source_span,
+                                            }
+                                        })?)))
+                                    })
+                                    .collect::<Result<Vec<_>, _>>()?
+                            })
+                        }
+                        cst::SingleDataDeclaration::EmptyList(
+                            _,
+                            my_scope,
+                            canonical_identifier,
+                            identifier,
+                            _,
+                        ) => {
+                            let list = identifier.value.clone();
+                            let (scope, data_name_usage) = if matches!(
+                                (parent_scope, my_scope),
+                                (
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_),
+                                    DataDeclarationScope::Unset
+                                ) | (
+                                    _,
+                                    DataDeclarationScope::Cloud(_)
+                                        | DataDeclarationScope::Global(_)
+                                )
+                            ) {
+                                (
+                                    Scope::Global,
                                     DataNameUsage {
-                                        global: false,
+                                        global: true,
                                         variable: false,
                                         list: true,
                                         current_target_idx: context.sb3.targets.len(),
-                                    }
-                                },
-                            )
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
-                            identifier,
-                            data_name_usage,
-                        );
-                        SingleAssignment::List(scope, list, Vec::new())
-                    }
+                                    },
+                                )
+                            } else {
+                                (
+                                    Scope::Local,
+                                    if is_stage {
+                                        DataNameUsage {
+                                            global: true,
+                                            variable: false,
+                                            list: true,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    } else {
+                                        DataNameUsage {
+                                            global: false,
+                                            variable: false,
+                                            list: true,
+                                            current_target_idx: context.sb3.targets.len(),
+                                        }
+                                    },
+                                )
+                            };
+                            check_lint_for_repeated_data_name(
+                                context,
+                                canonical_identifier.as_ref(),
+                                identifier,
+                                data_name_usage,
+                            );
+                            SingleAssignment::List(scope, list, Vec::new())
+                        }
+                    })
                 })
-                .collect(),
+                .collect::<Result<Vec<_>, _>>()?,
             cst::DataDeclaration::Single(single_data_declaration) => {
                 let single_data_declaration = single_data_declaration.as_ref();
                 let single_assignment = match single_data_declaration {
@@ -3775,15 +3920,93 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         })
                     }
                     cst::SingleDataDeclaration::FileList(
-                        list_keyword,
-                        data_declaration_scope,
+                        _,
+                        my_scope,
                         canonical_identifier,
-                        single_identifier,
-                        normal_assignment_operator,
+                        identifier,
+                        _,
                         _,
                         expression,
-                        _,
-                    ) => todo!(),
+                        source_span,
+                    ) => {
+                        let list = identifier.value.clone();
+                        let (scope, data_name_usage) = if matches!(
+                            my_scope,
+                            DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
+                        ) {
+                            (
+                                Scope::Global,
+                                DataNameUsage {
+                                    global: true,
+                                    variable: false,
+                                    list: true,
+                                    current_target_idx: context.sb3.targets.len(),
+                                },
+                            )
+                        } else {
+                            (
+                                Scope::Local,
+                                if is_stage {
+                                    DataNameUsage {
+                                        global: true,
+                                        variable: false,
+                                        list: true,
+                                        current_target_idx: context.sb3.targets.len(),
+                                    }
+                                } else {
+                                    DataNameUsage {
+                                        global: false,
+                                        variable: false,
+                                        list: true,
+                                        current_target_idx: context.sb3.targets.len(),
+                                    }
+                                },
+                            )
+                        };
+                        check_lint_for_repeated_data_name(
+                            context,
+                            canonical_identifier.as_ref(),
+                            identifier,
+                            data_name_usage,
+                        );
+                        let source_prim = expression.calculate_value().map_err(|source| {
+                            GrazeSb3GeneratorError::InvalidConstantExpression {
+                                expression: Box::new(expression.clone()),
+                                source,
+                            }
+                        })?;
+                        let source = source_prim.as_cow_str();
+                        use std::{
+                            fs::File,
+                            io::{BufRead, BufReader},
+                        };
+                        SingleAssignment::List(scope, list, {
+                            let path = extend_path_safely(
+                                context
+                                    .settings
+                                    .resources_path
+                                    .as_deref()
+                                    .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
+                                &source,
+                                *source_span,
+                            )?;
+                            let reader = BufReader::new(File::open(path).map_err(|_| {
+                                GrazeSb3GeneratorError::CouldNotFindAsset {
+                                    source_span: *source_span,
+                                }
+                            })?);
+                            reader
+                                .lines()
+                                .map(|item| {
+                                    Ok(Err(Sb3Primitive::from(item.map_err(|_| {
+                                        GrazeSb3GeneratorError::AssetWithBadEncoding {
+                                            source_span: *source_span,
+                                        }
+                                    })?)))
+                                })
+                                .collect::<Result<Vec<_>, _>>()?
+                        })
+                    }
                     cst::SingleDataDeclaration::EmptyList(
                         _,
                         my_scope,
@@ -4180,32 +4403,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                         _,
-                    ) => {
-                        let data_name_usage = DataNameUsage {
-                            global: matches!(
-                                (parent_scope, my_scope),
-                                (
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_),
-                                    DataDeclarationScope::Unset
-                                ) | (
-                                    _,
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_)
-                                )
-                            ) || is_stage,
-                            variable: true,
-                            list: false,
-                            current_target_idx: context.sb3.targets.len(),
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
-                            identifier,
-                            data_name_usage,
-                        );
-                    }
-                    cst::SingleDataDeclaration::EmptyVariable(
+                    )
+                    | cst::SingleDataDeclaration::EmptyVariable(
                         _,
                         my_scope,
                         canonical_identifier,
@@ -4246,42 +4445,18 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                         _,
-                    ) => {
-                        let data_name_usage = DataNameUsage {
-                            global: matches!(
-                                (parent_scope, my_scope),
-                                (
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_),
-                                    DataDeclarationScope::Unset
-                                ) | (
-                                    _,
-                                    DataDeclarationScope::Cloud(_)
-                                        | DataDeclarationScope::Global(_)
-                                )
-                            ) || is_stage,
-                            variable: false,
-                            list: true,
-                            current_target_idx: context.sb3.targets.len(),
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
-                            identifier,
-                            data_name_usage,
-                        );
-                    }
-                    cst::SingleDataDeclaration::FileList(
-                        list_keyword,
-                        data_declaration_scope,
+                    )
+                    | cst::SingleDataDeclaration::FileList(
+                        _,
+                        my_scope,
                         canonical_identifier,
-                        single_identifier,
-                        normal_assignment_operator,
+                        identifier,
                         _,
-                        expression,
                         _,
-                    ) => todo!(),
-                    cst::SingleDataDeclaration::EmptyList(
+                        _,
+                        _,
+                    )
+                    | cst::SingleDataDeclaration::EmptyList(
                         _,
                         my_scope,
                         canonical_identifier,
@@ -4325,24 +4500,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                         _,
-                    ) => {
-                        let data_name_usage = DataNameUsage {
-                            global: matches!(
-                                my_scope,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            ) || is_stage,
-                            variable: true,
-                            list: false,
-                            current_target_idx: context.sb3.targets.len(),
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
-                            identifier,
-                            data_name_usage,
-                        );
-                    }
-                    cst::SingleDataDeclaration::EmptyVariable(
+                    )
+                    | cst::SingleDataDeclaration::EmptyVariable(
                         _,
                         my_scope,
                         canonical_identifier,
@@ -4375,36 +4534,18 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                         _,
                         _,
-                    ) => {
-                        let data_name_usage = DataNameUsage {
-                            global: matches!(
-                                my_scope,
-                                DataDeclarationScope::Cloud(_) | DataDeclarationScope::Global(_)
-                            ) || is_stage,
-                            variable: false,
-                            list: true,
-                            current_target_idx: context.sb3.targets.len(),
-                        };
-                        check_lint_for_repeated_data_name(
-                            context,
-                            canonical_identifier.as_ref(),
-                            identifier,
-                            data_name_usage,
-                        );
-                    }
-                    cst::SingleDataDeclaration::FileList(
-                        list_keyword,
-                        data_declaration_scope,
+                    )
+                    | cst::SingleDataDeclaration::FileList(
+                        _,
+                        my_scope,
                         canonical_identifier,
-                        single_identifier,
-                        normal_assignment_operator,
+                        identifier,
                         _,
-                        expression,
                         _,
-                    ) => {
-                        // todo!()
-                    },
-                    cst::SingleDataDeclaration::EmptyList(
+                        _,
+                        _,
+                    )
+                    | cst::SingleDataDeclaration::EmptyList(
                         _,
                         my_scope,
                         canonical_identifier,

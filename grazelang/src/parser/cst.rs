@@ -1403,7 +1403,7 @@ pub enum SingleDataDeclaration {
 //  - [x] CST Integration
 //  - [x] Visitor Integration
 //  - [x] Parser Integration
-//  - [ ] Codegen Integration
+//  - [x] Codegen Integration
 // Issue: #91
 
 impl GetPos for SingleDataDeclaration {
