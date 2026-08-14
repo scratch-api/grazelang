@@ -1395,17 +1395,6 @@ pub enum SingleDataDeclaration {
     ),
 }
 
-// TODO: Allow loading list content from a resource file
-// Syntax:
-// ```rust
-// let list list_name = file "path/to/list";
-// ```
-//  - [x] CST Integration
-//  - [x] Visitor Integration
-//  - [x] Parser Integration
-//  - [x] Codegen Integration
-// Issue: #91
-
 impl GetPos for SingleDataDeclaration {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
