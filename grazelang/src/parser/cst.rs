@@ -783,8 +783,6 @@ impl GetPos for SingleAssetDeclaration {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleAssetDeclarationValue {
     Simple(LeftParens, (IString, SourceSpan), RightParens, SourceSpan),
-    // TODO: Use `Expression` for SingleAssetDeclarationValue::Simple::1
-    // Issue: #92
     Dictionary(
         LeftBrace,
         CommaSeparated<DictionaryEntry>,
