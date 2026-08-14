@@ -682,7 +682,7 @@
     "92": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L786-L786",
         "commit": "66fc1691e35e7c2c59ed42a786db5ea94fd9ee0d",
         "title": "Use `Expression` for SingleAssetDeclarationValue::Simple::1"
