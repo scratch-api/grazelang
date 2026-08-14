@@ -37,7 +37,8 @@ use crate::{
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::types::{
-        ConstantExprEvaluationError, GetLintId, GrazeMessage, GrazeWarning, SpecificGrazeWarning,
+        ConstantExprEvaluationError, GetLintId, GrazeMessage, GrazeWarning,
+        LONG_LIST_ASSIGNMENT_MININUM_LENGTH, SpecificGrazeWarning,
     },
     names::Namespace,
     parser::{
@@ -3298,6 +3299,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 ),
             );
         });
+        if value.3.len() >= LONG_LIST_ASSIGNMENT_MININUM_LENGTH {
+            emit_message(
+                context,
+                GrazeMessage::Warning(
+                    GrazeWarning::Specific(
+                        SpecificGrazeWarning::LongListAssignment,
+                        *value.3.get_source_span(),
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
         for item in value.3 {
             match item {
                 ListEntry::Expression(expression) => {
@@ -3385,9 +3399,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             Local,
         }
         #[derive(Debug, Clone, PartialEq)]
-        pub enum SingleAssignment<'a> {
-            List(Scope, IString, Vec<Result<&'a Expression, Sb3Primitive>>),
+        enum SingleAssignment<'a> {
             Var(Scope, IString, Result<&'a Expression, Sb3Primitive>),
+            List(
+                Scope,
+                IString,
+                (Vec<Result<&'a Expression, Sb3Primitive>>, SourceSpan),
+            ),
         }
         let is_stage = context
             .current_sb3_target
@@ -3589,7 +3607,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                         }
                                     }
                                 }
-                                values
+                                (values, *items.get_source_span())
                             })
                         }
                         cst::SingleDataDeclaration::FileList(
@@ -3598,7 +3616,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             canonical_identifier,
                             identifier,
                             _,
-                            _,
+                            file_keyword,
                             expression,
                             source_span,
                         ) => {
@@ -3676,16 +3694,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                         source_span: *source_span,
                                     }
                                 })?);
-                                reader
-                                    .lines()
-                                    .map(|item| {
-                                        Ok(Err(Sb3Primitive::from(item.map_err(|_| {
-                                            GrazeSb3GeneratorError::AssetWithBadEncoding {
-                                                source_span: *source_span,
-                                            }
-                                        })?)))
-                                    })
-                                    .collect::<Result<Vec<_>, _>>()?
+                                (
+                                    reader
+                                        .lines()
+                                        .map(|item| {
+                                            Ok(Err(Sb3Primitive::from(item.map_err(|_| {
+                                                GrazeSb3GeneratorError::AssetWithBadEncoding {
+                                                    source_span: *source_span,
+                                                }
+                                            })?)))
+                                        })
+                                        .collect::<Result<Vec<_>, _>>()?,
+                                    file_keyword.span_to(expression),
+                                )
                             })
                         }
                         cst::SingleDataDeclaration::EmptyList(
@@ -3743,7 +3764,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 identifier,
                                 data_name_usage,
                             );
-                            SingleAssignment::List(scope, list, Vec::new())
+                            SingleAssignment::List(scope, list, Default::default())
                         }
                     })
                 })
@@ -3916,7 +3937,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                     }
                                 }
                             }
-                            values
+                            (values, *items.get_source_span())
                         })
                     }
                     cst::SingleDataDeclaration::FileList(
@@ -3925,7 +3946,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         canonical_identifier,
                         identifier,
                         _,
-                        _,
+                        file_keyword,
                         expression,
                         source_span,
                     ) => {
@@ -3995,16 +4016,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                     source_span: *source_span,
                                 }
                             })?);
-                            reader
-                                .lines()
-                                .map(|item| {
-                                    Ok(Err(Sb3Primitive::from(item.map_err(|_| {
-                                        GrazeSb3GeneratorError::AssetWithBadEncoding {
-                                            source_span: *source_span,
-                                        }
-                                    })?)))
-                                })
-                                .collect::<Result<Vec<_>, _>>()?
+                            (
+                                reader
+                                    .lines()
+                                    .map(|item| {
+                                        Ok(Err(Sb3Primitive::from(item.map_err(|_| {
+                                            GrazeSb3GeneratorError::AssetWithBadEncoding {
+                                                source_span: *source_span,
+                                            }
+                                        })?)))
+                                    })
+                                    .collect::<Result<Vec<_>, _>>()?,
+                                file_keyword.span_to(expression),
+                            )
                         })
                     }
                     cst::SingleDataDeclaration::EmptyList(
@@ -4054,7 +4078,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             identifier,
                             data_name_usage,
                         );
-                        SingleAssignment::List(scope, list, Vec::new())
+                        SingleAssignment::List(scope, list, Default::default())
                     }
                 };
                 vec![single_assignment]
@@ -4062,7 +4086,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         };
         for assignment in assignments {
             match assignment {
-                SingleAssignment::List(scope, list, sb3_primitives) => {
+                SingleAssignment::List(scope, list, (values, values_source_span)) => {
                     let parent_symbol_id = if scope == Scope::Global {
                         context.data_symbol_context.global_lists
                     } else {
@@ -4096,7 +4120,20 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             ),
                         );
                     });
-                    for item in sb3_primitives {
+                    if values.len() >= LONG_LIST_ASSIGNMENT_MININUM_LENGTH {
+                        emit_message(
+                            context,
+                            GrazeMessage::Warning(
+                                GrazeWarning::Specific(
+                                    SpecificGrazeWarning::LongListAssignment,
+                                    values_source_span,
+                                ),
+                                None,
+                            ),
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                    for item in values {
                         wrap_in_statement(context, |context, parent, this_id| {
                             let value = match item {
                                 Ok(item) => {

@@ -391,13 +391,19 @@ pub enum SpecificGrazeWarning {
     #[assoc(get_secondary_message = "property belongs to another target")]
     #[assoc(internal_lint_id = "assign_property_of_other_target")]
     AssignPropertyOfOtherTarget,
-    #[assoc(
-        get_primary_message = "used conflicting canonical names"
-    )]
+    #[assoc(get_primary_message = "used conflicting canonical names")]
     #[assoc(get_secondary_message = "repeated canonical name here")]
     #[assoc(internal_lint_id = "repeated_canonical_name")]
     RepeatedCanonicalName,
+    #[assoc(
+        get_primary_message = "assigning a lot of items to a list might not be that efficient, maybe you meant to declare the list with an initial value instead"
+    )]
+    #[assoc(get_secondary_message = "list assignment has a lot of items")]
+    #[assoc(internal_lint_id = "long_list_assignment")]
+    LongListAssignment,
 }
+
+pub const LONG_LIST_ASSIGNMENT_MININUM_LENGTH: usize = 16;
 
 impl GetLintId for SpecificGrazeWarning {
     #[inline]
