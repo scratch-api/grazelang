@@ -249,15 +249,14 @@ macro_rules! implement_use_cache {
 
 macro_rules! implement_create_cache {
     ($path:expr, $hex_hash:expr, $expanded:expr, create_cache) => {
-        fs::write(
+        let _ = fs::write(
             $path,
             serde_json::to_string(&LibraryCache {
                 hash: $hex_hash,
                 value: $expanded.to_string(),
             })
             .unwrap(),
-        )
-        .unwrap();
+        );
     };
     ($path:expr, $hex_hash:expr, $expanded:expr, no_create_cache) => {};
 }
@@ -425,11 +424,10 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                     hash: hex_hash,
                     value: (library, category_entries, source_library.required_extensions),
                 };
-                ::std::fs::write(
+                let _ = ::std::fs::write(
                     output_cache_path,
                     ::serde_json::to_string(&dynamic_library_cache).ok()?,
-                )
-                .ok()?;
+                );
                 return Some(dynamic_library_cache.value);
             }
             Some((library, category_entries, source_library.required_extensions))
