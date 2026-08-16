@@ -10,3 +10,6 @@ pub mod string_unescape;
 pub mod visitor;
 pub mod zipper;
 pub mod eval;
+pub mod ast;
+#[cfg(feature = "detranspiler")]
+pub mod detranspiler;

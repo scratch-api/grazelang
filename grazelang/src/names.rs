@@ -63,3 +63,64 @@ impl Namespace {
         self.assign_name_for(original_name, name)
     }
 }
+
+type NameIdentifier = String;
+type BidirectionalNamespaceOriginalName = String;
+type BidirectionalNamespaceActualName = IString;
+
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct BidirectionalNamespace {
+    pub used_names: HashMap<BidirectionalNamespaceActualName, BidirectionalNamespaceOriginalName>,
+    pub assigned_names: HashMap<NameIdentifier, BidirectionalNamespaceActualName>,
+}
+
+impl BidirectionalNamespace {
+    pub fn get_symbol(
+        &mut self,
+        original_name: &str,
+        name_identifier: &str,
+    ) -> BidirectionalNamespaceActualName {
+        use std::fmt::Write;
+        if let Some(actual_name) = self.assigned_names.get(name_identifier) {
+            return actual_name.clone();
+        }
+        if !self.used_names.contains_key(original_name) {
+            let actual_name = original_name.into();
+            return self
+                .assign_name(
+                    original_name.to_string(),
+                    name_identifier.to_string(),
+                    actual_name,
+                )
+                .clone();
+        }
+        let mut actual_name = String::with_capacity(original_name.len() + 2);
+        let mut i = 2;
+        loop {
+            actual_name.clear();
+            write!(&mut actual_name, "{original_name}_{i}").unwrap();
+            if !self.used_names.contains_key(actual_name.as_str()) {
+                return self
+                    .assign_name(
+                        original_name.to_string(),
+                        name_identifier.to_string(),
+                        actual_name.into(),
+                    )
+                    .clone();
+            }
+            i += 1;
+        }
+    }
+
+    fn assign_name(
+        &mut self,
+        original_name: BidirectionalNamespaceOriginalName,
+        name_identifier: NameIdentifier,
+        actual_name: BidirectionalNamespaceActualName,
+    ) -> &BidirectionalNamespaceActualName {
+        self.used_names.insert(actual_name.clone(), original_name);
+        self.assigned_names
+            .entry(name_identifier)
+            .or_insert(actual_name)
+    }
+}
