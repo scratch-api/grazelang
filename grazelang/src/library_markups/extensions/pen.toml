@@ -1,3 +1,4 @@
+#:schema ../schema.json
 [[categories]]
     category = "pen"
     id = "pen"

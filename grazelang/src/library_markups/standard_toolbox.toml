@@ -1,3 +1,4 @@
+#:schema ./schema.json
 [[categories]]
     category = "%{BKY_CATEGORY_MOTION}"
     id = "motion"

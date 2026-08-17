@@ -7,7 +7,6 @@ temps
 *.sb3
 __pycache__
 migrate_todos.py
-.taplo.toml
 # Added by cargo
 
 /target
