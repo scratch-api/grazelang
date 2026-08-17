@@ -11,3 +11,4 @@ scratch_standard_library_schema.jsonc
 transform_toolbox.py
 visualizetoolbox.py
 test_*
+schema.json

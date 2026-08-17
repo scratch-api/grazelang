@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct GrazeSettings {
+pub struct GrazeBuildSettings {
     pub message_setting: GrazeMessageSetting,
     pub use_shadows: UseShadows,
     /// Path for the resources of the project or None if the resources are located in the current directory
@@ -12,6 +12,12 @@ pub struct GrazeSettings {
     pub extensions_path: Option<PathBuf>,
     pub use_cached_extensions: bool,
     pub create_cached_extensions: bool,
+}
+
+#[cfg(feature = "detranspiler")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct GrazeDetranspilerSettings {
+    pub message_setting: GrazeMessageSetting,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, clap::ValueEnum)]

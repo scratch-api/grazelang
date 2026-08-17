@@ -5,12 +5,12 @@ use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Snippet};
 use crate::{
     codegen::core::{GrazeSb3GeneratorCreationError, GrazeSb3GeneratorError},
     lexer::TextSpan,
-    messages::types::{CLIError, GetLintId, GrazeInfo, GrazeWarning},
+    messages::types::{CLIError, GetLintId, GrazeSourceInfo, GrazeSourceWarning},
     parser::cst::{GetPos, ParseError},
     zipper::WriteIntoZipError,
 };
 
-use super::types::GrazeMessage;
+use super::types::GrazeSourceMessage;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Source {
@@ -38,9 +38,9 @@ pub struct SourceDescriptor<'a> {
 
 pub fn annotate<'a, I, S, P>(iter: I, mut source_getter: S, mut printer: P)
 where
-    I: Iterator<Item = &'a GrazeMessage>,
+    I: Iterator<Item = &'a GrazeSourceMessage>,
     S: FnMut(u32) -> SourceDescriptor<'a>,
-    P: for<'b> FnMut(&'b [Group<'a>], &'b GrazeMessage),
+    P: for<'b> FnMut(&'b [Group<'a>], &'b GrazeSourceMessage),
 {
     let mut groups = Vec::with_capacity(4);
     iter.for_each(move |value| printer(value.annotate(&mut source_getter, &mut groups), value));
@@ -53,7 +53,7 @@ pub fn convert_source_span(text_span: TextSpan, line_starts: &[usize]) -> std::o
     a..b
 }
 
-impl GrazeMessage {
+impl GrazeSourceMessage {
     pub fn annotate<'a, 'b, F>(
         &'a self,
         mut source_getter: F,
@@ -64,10 +64,10 @@ impl GrazeMessage {
     {
         groups.clear();
         let value = match self {
-            GrazeMessage::Error(graze_error, _graze_suggestion) => match graze_error {
+            GrazeSourceMessage::Error(graze_error, _graze_suggestion) => match graze_error {
                 // TODO: Implement suggestions
                 // Issue: #68
-                super::types::GrazeError::Custom(string, source_span) => {
+                super::types::GrazeSourceError::Custom(string, source_span) => {
                     let SourceDescriptor {
                         content,
                         path,
@@ -86,23 +86,23 @@ impl GrazeMessage {
                                 ),
                         )
                 }
-                super::types::GrazeError::ParseError(parse_error) => {
+                super::types::GrazeSourceError::ParseError(parse_error) => {
                     parse_error.annotate(source_getter)
                 }
-                super::types::GrazeError::CodegenInitializationError(error) => {
+                super::types::GrazeSourceError::CodegenInitializationError(error) => {
                     error.annotate(source_getter)
                 }
-                super::types::GrazeError::CodegenError(graze_sb3_generator_error) => {
+                super::types::GrazeSourceError::CodegenError(graze_sb3_generator_error) => {
                     graze_sb3_generator_error.annotate(source_getter)
                 }
-                super::types::GrazeError::ZipError(error) => error.annotate(),
-                super::types::GrazeError::CLIError(error) => error.annotate(),
+                super::types::GrazeSourceError::ZipError(error) => error.annotate(),
+                super::types::GrazeSourceError::CLIError(error) => error.annotate(),
             },
-            GrazeMessage::Warning(graze_warning, _graze_suggestion) => {
+            GrazeSourceMessage::Warning(graze_warning, _graze_suggestion) => {
                 graze_warning.annotate(source_getter)
             }
-            GrazeMessage::Info(graze_info, _graze_suggestion) => graze_info.annotate(source_getter),
-            GrazeMessage::Unsuccessful {
+            GrazeSourceMessage::Info(graze_info, _graze_suggestion) => graze_info.annotate(source_getter),
+            GrazeSourceMessage::Unsuccessful {
                 error_count,
                 warning_count,
             } => Group::with_title(Level::ERROR.secondary_title({
@@ -226,7 +226,7 @@ impl GrazeSb3GeneratorError {
     }
 }
 
-impl GrazeWarning {
+impl GrazeSourceWarning {
     pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
@@ -252,7 +252,7 @@ impl GrazeWarning {
     }
 }
 
-impl GrazeInfo {
+impl GrazeSourceInfo {
     pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,

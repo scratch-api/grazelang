@@ -16,7 +16,7 @@ use crate::{
     codegen, lexer,
     messages::{
         annotations::{self, Source},
-        types::{CLIError, GrazeMessage},
+        types::{CLIError, GrazeSourceMessage},
     },
     parser::{
         self,
@@ -24,7 +24,7 @@ use crate::{
         core::{PeekableLexer, emit_message as emit_message_parse_context},
         cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
-    settings::{GrazeMessageSetting, GrazeSettings, UseShadows},
+    settings::{GrazeMessageSetting, GrazeBuildSettings, UseShadows},
     visitor::GrazeVisitor,
     zipper,
 };
@@ -245,15 +245,15 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
     ))
 }
 
-pub fn count_errors_and_warnings(messages: &[GrazeMessage]) -> (usize, usize) {
+pub fn count_errors_and_warnings(messages: &[GrazeSourceMessage]) -> (usize, usize) {
     let mut errors = 0;
     let mut warnings = 0;
     for message in messages {
         match message {
-            GrazeMessage::Error(..) => {
+            GrazeSourceMessage::Error(..) => {
                 errors += 1;
             }
-            GrazeMessage::Warning(..) => {
+            GrazeSourceMessage::Warning(..) => {
                 warnings += 1;
             }
             _ => (),
@@ -296,7 +296,7 @@ impl Cli {
     }
 
     pub fn print_errors(
-        messages: &mut Vec<GrazeMessage>,
+        messages: &mut Vec<GrazeSourceMessage>,
         source_files: &HashMap<u32, Source>,
         force_error: bool,
     ) -> Successful {
@@ -304,7 +304,7 @@ impl Cli {
         let (error_count, warning_count) = count_errors_and_warnings(messages);
         let error = error_count > 0 || force_error;
         if error {
-            messages.push(GrazeMessage::Unsuccessful {
+            messages.push(GrazeSourceMessage::Unsuccessful {
                 error_count,
                 warning_count,
             });
@@ -339,7 +339,7 @@ impl Cli {
         let total_time = Instant::now();
         let path_is_file = path.is_file();
         let mut context = ParseContext::new(
-            GrazeSettings {
+            GrazeBuildSettings {
                 message_setting: *logging,
                 use_shadows: *shadows,
                 resources_path: Some(resources.map(Path::to_path_buf).unwrap_or_else(|| {

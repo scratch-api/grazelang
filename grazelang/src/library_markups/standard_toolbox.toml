@@ -1276,6 +1276,7 @@
             kind = "input"
             name = "BROADCAST_INPUT"
             input_type = "value"
+            menu_field_name = "BROADCAST_OPTION"
 
             [categories.blocks.args.shadow]
                 type = "event_broadcast_menu"
@@ -2606,7 +2607,7 @@
 
     [[categories.blocks]]
         type = "operator_mathop"
-        alt_name = "op_atan"
+        alt_name = "atan"
         constant_expr_function_id = 27
 
         [[categories.blocks.known_params]]

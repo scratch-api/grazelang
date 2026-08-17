@@ -16,7 +16,7 @@ pub trait GetLintId {
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
-pub enum GrazeError {
+pub enum GrazeSourceError {
     #[error("{0}")]
     Custom(IString, SourceSpan),
     #[error(transparent)]
@@ -33,14 +33,14 @@ pub enum GrazeError {
 
 const EMPTY_SOURCE_SPAN: &SourceSpan = &(((0, 0), (0, 0)), 0);
 
-impl GetPos for GrazeError {
+impl GetPos for GrazeSourceError {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeError::Custom(_, source_span) => source_span,
-            GrazeError::ParseError(error) => error.get_source_span(),
-            GrazeError::CodegenInitializationError(error) => error.get_source_span(),
-            GrazeError::CodegenError(error) => error.get_source_span(),
-            GrazeError::CLIError(_) | GrazeError::ZipError(_) => EMPTY_SOURCE_SPAN,
+            GrazeSourceError::Custom(_, source_span) => source_span,
+            GrazeSourceError::ParseError(error) => error.get_source_span(),
+            GrazeSourceError::CodegenInitializationError(error) => error.get_source_span(),
+            GrazeSourceError::CodegenError(error) => error.get_source_span(),
+            GrazeSourceError::CLIError(_) | GrazeSourceError::ZipError(_) => EMPTY_SOURCE_SPAN,
         }
     }
 }
@@ -241,7 +241,7 @@ impl GetPos for ConstantExprEvaluationError {
 }
 
 #[derive(Debug, Clone, PartialEq, enum_assoc::Assoc)]
-pub enum GrazeWarning {
+pub enum GrazeSourceWarning {
     Custom {
         primary_message: IString,
         secondary_message: Option<IString>,
@@ -250,28 +250,28 @@ pub enum GrazeWarning {
     Specific(SpecificGrazeWarning, SourceSpan),
 }
 
-impl GetLintId for GrazeWarning {
+impl GetLintId for GrazeSourceWarning {
     fn get_lint_id(&self) -> &'static str {
         match self {
-            GrazeWarning::Custom { .. } => "custom_warning",
-            GrazeWarning::Specific(warning_kind, _) => warning_kind.get_lint_id(),
+            GrazeSourceWarning::Custom { .. } => "custom_warning",
+            GrazeSourceWarning::Specific(warning_kind, _) => warning_kind.get_lint_id(),
         }
     }
 }
 
-impl GrazeWarning {
+impl GrazeSourceWarning {
     pub fn get_primary_message(&self) -> &str {
         match self {
-            GrazeWarning::Custom {
+            GrazeSourceWarning::Custom {
                 primary_message, ..
             } => primary_message.as_str(),
-            GrazeWarning::Specific(graze_warning, _) => graze_warning.get_primary_message(),
+            GrazeSourceWarning::Specific(graze_warning, _) => graze_warning.get_primary_message(),
         }
     }
 
     pub fn get_secondary_message(&self) -> &str {
         match self {
-            GrazeWarning::Custom {
+            GrazeSourceWarning::Custom {
                 primary_message,
                 secondary_message,
                 ..
@@ -279,15 +279,15 @@ impl GrazeWarning {
                 .as_ref()
                 .unwrap_or(primary_message)
                 .as_str(),
-            GrazeWarning::Specific(graze_warning, _) => graze_warning.get_secondary_message(),
+            GrazeSourceWarning::Specific(graze_warning, _) => graze_warning.get_secondary_message(),
         }
     }
 }
 
-impl GetPos for GrazeWarning {
+impl GetPos for GrazeSourceWarning {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeWarning::Custom { source_span: p, .. } | GrazeWarning::Specific(_, p) => p,
+            GrazeSourceWarning::Custom { source_span: p, .. } | GrazeSourceWarning::Specific(_, p) => p,
         }
     }
 }
@@ -413,7 +413,7 @@ impl GetLintId for SpecificGrazeWarning {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum GrazeInfo {
+pub enum GrazeSourceInfo {
     Custom {
         primary_message: IString,
         secondary_message: Option<IString>,
@@ -421,18 +421,18 @@ pub enum GrazeInfo {
     },
 }
 
-impl GetLintId for GrazeInfo {
+impl GetLintId for GrazeSourceInfo {
     fn get_lint_id(&self) -> &'static str {
         match self {
-            GrazeInfo::Custom { .. } => "custom_info",
+            GrazeSourceInfo::Custom { .. } => "custom_info",
         }
     }
 }
 
-impl GrazeInfo {
+impl GrazeSourceInfo {
     pub fn get_primary_message(&self) -> &str {
         match self {
-            GrazeInfo::Custom {
+            GrazeSourceInfo::Custom {
                 primary_message, ..
             } => primary_message.as_str(),
         }
@@ -440,7 +440,7 @@ impl GrazeInfo {
 
     pub fn get_secondary_message(&self) -> &str {
         match self {
-            GrazeInfo::Custom {
+            GrazeSourceInfo::Custom {
                 primary_message,
                 secondary_message,
                 ..
@@ -452,10 +452,10 @@ impl GrazeInfo {
     }
 }
 
-impl GetPos for GrazeInfo {
+impl GetPos for GrazeSourceInfo {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeInfo::Custom { source_span: p, .. } => p,
+            GrazeSourceInfo::Custom { source_span: p, .. } => p,
         }
     }
 }
@@ -469,23 +469,34 @@ pub enum GrazeSuggestion {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum GrazeMessage {
-    Error(GrazeError, Option<GrazeSuggestion>),
-    Warning(GrazeWarning, Option<GrazeSuggestion>),
-    Info(GrazeInfo, Option<GrazeSuggestion>),
+pub enum GrazeSourceMessage {
+    Error(GrazeSourceError, Option<GrazeSuggestion>),
+    Warning(GrazeSourceWarning, Option<GrazeSuggestion>),
+    Info(GrazeSourceInfo, Option<GrazeSuggestion>),
     Unsuccessful {
         error_count: usize,
         warning_count: usize,
     },
 }
 
-impl From<ParseError> for GrazeMessage {
+#[cfg(feature = "detranspiler")]
+#[derive(Debug, Clone, PartialEq)]
+pub enum GrazeDetranspilerMessage {
+    Error(GrazeDetranspilerError),
+    Warning(GrazeDetranspilerWarning),
+    Unsuccessful {
+        error_count: usize,
+        warning_count: usize,
+    },
+}
+
+impl From<ParseError> for GrazeSourceMessage {
     fn from(value: ParseError) -> Self {
         Self::Error(value.into(), None)
     }
 }
 
-impl From<GrazeSb3GeneratorError> for GrazeMessage {
+impl From<GrazeSb3GeneratorError> for GrazeSourceMessage {
     fn from(value: GrazeSb3GeneratorError) -> Self {
         Self::Error(value.into(), None)
     }
@@ -511,20 +522,36 @@ impl GetLintId for CLIError {
     }
 }
 
-impl From<CLIError> for GrazeMessage {
+impl From<CLIError> for GrazeSourceMessage {
     fn from(value: CLIError) -> Self {
         Self::Error(value.into(), None)
     }
 }
 
-impl From<GrazeSb3GeneratorCreationError> for GrazeMessage {
+impl From<GrazeSb3GeneratorCreationError> for GrazeSourceMessage {
     fn from(value: GrazeSb3GeneratorCreationError) -> Self {
         Self::Error(value.into(), None)
     }
 }
 
-impl From<WriteIntoZipError> for GrazeMessage {
+impl From<WriteIntoZipError> for GrazeSourceMessage {
     fn from(value: WriteIntoZipError) -> Self {
         Self::Error(value.into(), None)
     }
+}
+
+#[cfg(feature = "detranspiler")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, enum_assoc::Assoc)]
+#[func(const fn internal_lint_id(&self) -> &'static str)]
+pub enum GrazeDetranspilerError {
+    #[assoc(internal_lint_id = "unknown_opcode")]
+    UnknownOpcode,
+}
+
+#[cfg(feature = "detranspiler")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// #[derive(enum_assoc::Assoc)]
+// #[func(const fn internal_lint_id(&self) -> &'static str)]
+pub enum GrazeDetranspilerWarning {
+
 }

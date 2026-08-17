@@ -10,7 +10,7 @@ use crate::{
         self, SourceFileId, SourceSpan, TextSpan, Token,
         get_source_span as internal_get_source_span,
     },
-    messages::types::{GrazeError, GrazeMessage},
+    messages::types::{GrazeSourceError, GrazeSourceMessage},
     parser::{
         context::{self, BroadcastDescriptor},
         cst::{
@@ -352,7 +352,7 @@ macro_rules! emit_error {
             GrazeMessageSetting::ExitOnError => {
                 if !matches!(
                     context.messages.last(),
-                    Some(GrazeMessage::Error(GrazeError::ParseError(other_err), None)) if other_err == &err
+                    Some(GrazeSourceMessage::Error(GrazeSourceError::ParseError(other_err), None)) if other_err == &err
                 ) {
                     context.messages.push(err.clone().into());
                 }
@@ -669,7 +669,7 @@ pub fn parse_dictionary_value<T: PeekableTokenStream>(
 
 pub fn emit_message(
     context: &mut ParseContext,
-    message: GrazeMessage,
+    message: GrazeSourceMessage,
     message_type: GrazeMessageSetting,
 ) {
     if context.settings.message_setting >= message_type {

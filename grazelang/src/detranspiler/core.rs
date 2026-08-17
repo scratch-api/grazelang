@@ -1,16 +1,21 @@
 use std::collections::HashMap;
 
-use arcstr::ArcStr as IString;
+use arcstr::{ArcStr as IString};
 use grazelang_types::project_json;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::names::BidirectionalNamespace;
+use crate::{
+    ast::core as ast_types, messages::types::GrazeDetranspilerMessage,
+    names::BidirectionalNamespace, settings::GrazeDetranspilerSettings,
+};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DetranspilerContext {
     pub targets: Vec<DetranspilerTarget>,
     pub asset_namespace: BidirectionalNamespace,
     pub assets: HashMap<AssetPath, OutAssetPath>,
+    pub messages: Vec<GrazeDetranspilerMessage>,
+    pub settings: GrazeDetranspilerSettings,
 }
 
 type OutAssetPath = String;
@@ -113,4 +118,25 @@ pub fn visit_target(
         sounds,
         is_stage: target.is_stage,
     }
+}
+
+pub fn visit_reporter_block(
+    block: &project_json::Sb3Block,
+    block_id: &str,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+) -> ast_types::Expression {
+    
+    todo!()
+}
+
+type NextBlockId = String;
+
+pub fn visit_stack_block(
+    block: &project_json::Sb3Block,
+    block_id: &str,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+) -> (ast_types::Statement, NextBlockId) {
+    todo!()
 }

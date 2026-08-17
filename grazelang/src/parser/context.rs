@@ -24,9 +24,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     codegen::{self, core::emit_message, ids::generate_random_id_as_string},
     lexer::SourceSpan,
-    messages::types::{GrazeMessage, GrazeWarning, SpecificGrazeWarning},
+    messages::types::{GrazeSourceMessage, GrazeSourceWarning, SpecificGrazeWarning},
     parser::cst::CustomBlockParamKindValue,
-    settings::{GrazeMessageSetting, GrazeSettings},
+    settings::{GrazeMessageSetting, GrazeBuildSettings},
 };
 
 pub type IdString = IString;
@@ -222,8 +222,8 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::BoundMethod { .. } => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(
-                        GrazeWarning::Specific(SpecificGrazeWarning::CallableAsInput, source_span),
+                    GrazeSourceMessage::Warning(
+                        GrazeSourceWarning::Specific(SpecificGrazeWarning::CallableAsInput, source_span),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -281,8 +281,8 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::BlockRef { id: _ } => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(
-                        GrazeWarning::Specific(SpecificGrazeWarning::BlockRefAsField, source_span),
+                    GrazeSourceMessage::Warning(
+                        GrazeSourceWarning::Specific(SpecificGrazeWarning::BlockRefAsField, source_span),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -347,8 +347,8 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::BoundMethod { .. } => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(
-                        GrazeWarning::Specific(SpecificGrazeWarning::CallableAsField, source_span),
+                    GrazeSourceMessage::Warning(
+                        GrazeSourceWarning::Specific(SpecificGrazeWarning::CallableAsField, source_span),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -359,8 +359,8 @@ impl ResolveKnownBlock for KnownBlock {
             KnownBlock::Empty => {
                 emit_message(
                     context,
-                    GrazeMessage::Warning(
-                        GrazeWarning::Specific(
+                    GrazeSourceMessage::Warning(
+                        GrazeSourceWarning::Specific(
                             SpecificGrazeWarning::EmptyExpressionAsField,
                             source_span,
                         ),
@@ -395,8 +395,8 @@ impl ResolveKnownBlock for KnownBlock {
                 } else {
                     emit_message(
                         context,
-                        GrazeMessage::Warning(
-                            GrazeWarning::Specific(
+                        GrazeSourceMessage::Warning(
+                            GrazeSourceWarning::Specific(
                                 SpecificGrazeWarning::NonFieldSingletonAsField,
                                 source_span,
                             ),
@@ -488,8 +488,8 @@ impl ResolveKnownBlock for KnownBlock {
                 {
                     emit_message(
                         context,
-                        GrazeMessage::Warning(
-                            GrazeWarning::Specific(
+                        GrazeSourceMessage::Warning(
+                            GrazeSourceWarning::Specific(
                                 SpecificGrazeWarning::AssignPropertyOfOtherTarget,
                                 source_span,
                             ),
@@ -741,15 +741,15 @@ pub struct ParseContext {
     pub next_target: Option<Target>,
     pub global_symbols: HashMap<IString, TargetSymbolDescriptor>,
     pub random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
-    pub messages: Vec<GrazeMessage>,
-    pub settings: GrazeSettings,
+    pub messages: Vec<GrazeSourceMessage>,
+    pub settings: GrazeBuildSettings,
     /// If no error was returned, this can indicate failure
     pub successful: bool,
 }
 
 impl ParseContext {
     pub fn new(
-        settings: GrazeSettings,
+        settings: GrazeBuildSettings,
         random_seed: <Xoshiro256StarStar as SeedableRng>::Seed,
     ) -> Self {
         Self {
