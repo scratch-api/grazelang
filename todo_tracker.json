@@ -714,7 +714,7 @@
     "96": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L487-L487",
         "commit": "06ee2498db534ec8e483a3e961ae0f7016cead61",
         "title": "Fallback to globals"
@@ -726,5 +726,45 @@
         "lines": "L203-L203",
         "commit": "06ee2498db534ec8e483a3e961ae0f7016cead61",
         "title": "Fill namespace with default namespaces"
+    },
+    "98": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L780-L780",
+        "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
+        "title": "Implement `convert_stack_block`"
+    },
+    "99": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L769-L769",
+        "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
+        "title": "Implement `convert_block_stack`"
+    },
+    "100": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L182-L182",
+        "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
+        "title": "Implement `block_check_name_collision`"
+    },
+    "101": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L173-L173",
+        "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
+        "title": "Implement `lookup_var_or_list`"
+    },
+    "102": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L163-L163",
+        "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
+        "title": "Implement `lookup_vlb`"
     }
 }

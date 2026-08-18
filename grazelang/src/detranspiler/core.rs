@@ -161,6 +161,7 @@ pub fn lookup_vlb(
 ) -> Option<DetranspilerVLB> {
     todo!()
     // TODO: Implement `lookup_vlb`
+    // Issue: #102
 }
 
 pub fn lookup_var_or_list(
@@ -171,6 +172,7 @@ pub fn lookup_var_or_list(
 ) -> Option<DetranspilerVarOrList> {
     todo!()
     // TODO: Implement `lookup_var_or_list`
+    // Issue: #101
 }
 
 pub fn block_check_name_collision(
@@ -180,6 +182,7 @@ pub fn block_check_name_collision(
 ) -> bool {
     todo!()
     // TODO: Implement `block_check_name_collision`
+    // Issue: #100
 }
 
 pub fn create_block_identifier(
@@ -767,6 +770,7 @@ pub fn convert_block_stack(
 ) -> DetranspilerResult<ast_types::CodeBlock> {
     todo!()
     // TODO: Implement `convert_block_stack`
+    // Issue: #99
 }
 
 pub fn convert_stack_block(
@@ -778,4 +782,5 @@ pub fn convert_stack_block(
 ) -> DetranspilerResult<(ast_types::Statement, NextBlockId)> {
     todo!()
     // TODO: Implement `convert_stack_block`
+    // Issue: #98
 }
