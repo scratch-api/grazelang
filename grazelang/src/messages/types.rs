@@ -545,7 +545,11 @@ impl From<WriteIntoZipError> for GrazeSourceMessage {
 #[func(const fn internal_lint_id(&self) -> &'static str)]
 pub enum GrazeDetranspilerError {
     #[assoc(internal_lint_id = "unknown_opcode")]
-    UnknownOpcode,
+    UnknownOpcode { opcode: String },
+    #[assoc(internal_lint_id = "unknown_variable")]
+    UnknownVariable { id: String, name: String },
+    #[assoc(internal_lint_id = "unknown_list")]
+    UnknownList { id: String, name: String },
 }
 
 #[cfg(feature = "detranspiler")]
