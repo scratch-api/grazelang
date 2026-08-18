@@ -287,7 +287,8 @@ impl GrazeSourceWarning {
 impl GetPos for GrazeSourceWarning {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            GrazeSourceWarning::Custom { source_span: p, .. } | GrazeSourceWarning::Specific(_, p) => p,
+            GrazeSourceWarning::Custom { source_span: p, .. }
+            | GrazeSourceWarning::Specific(_, p) => p,
         }
     }
 }
@@ -552,12 +553,30 @@ pub enum GrazeDetranspilerError {
     UnknownList { id: String, name: String },
     #[assoc(internal_lint_id = "unknown_broadcast")]
     UnknownBroadcast { id: String, name: String },
+    #[assoc(internal_lint_id = "invalid_block_reference")]
+    InvalidBlockReference { block_id: String },
 }
 
 #[cfg(feature = "detranspiler")]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// #[derive(enum_assoc::Assoc)]
-// #[func(const fn internal_lint_id(&self) -> &'static str)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, enum_assoc::Assoc)]
+#[func(const fn internal_lint_id(&self) -> &'static str)]
 pub enum GrazeDetranspilerWarning {
+    #[assoc(internal_lint_id = "unused_field")]
+    UnusedField { field: String, block_id: String },
+    #[assoc(internal_lint_id = "unused_input")]
+    UnusedInput { input: String, block_id: String },
+}
 
+#[cfg(feature = "detranspiler")]
+impl From<GrazeDetranspilerError> for GrazeDetranspilerMessage {
+    fn from(value: GrazeDetranspilerError) -> Self {
+        Self::Error(value)
+    }
+}
+
+#[cfg(feature = "detranspiler")]
+impl From<GrazeDetranspilerWarning> for GrazeDetranspilerMessage {
+    fn from(value: GrazeDetranspilerWarning) -> Self {
+        Self::Warning(value)
+    }
 }

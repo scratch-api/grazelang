@@ -2,11 +2,14 @@ use arcstr::{ArcStr as IString, literal};
 use grazelang_types::project_json;
 use serde::{Deserialize, Serialize};
 
+use crate::{detranspiler::core::DetranspilerResult, messages::types::GrazeDetranspilerError};
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockKindInfo {
     pub arguments: Vec<Argument>,
     pub block_category: IString,
     pub block_name: IString,
+    pub is_singleton: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -33,6 +36,13 @@ pub enum ArgumentKind {
     },
 }
 
+impl ArgumentKind {
+    #[inline]
+    pub fn is_field(&self) -> bool {
+        matches!(self, Self::Field)
+    }
+}
+
 pub const MOTION_CATEGORY: &IString = &literal!("motion");
 pub const LOOKS_CATEGORY: &IString = &literal!("looks");
 pub const COSTUME_CATEGORY: &IString = &literal!("costume");
@@ -56,8 +66,10 @@ pub const NUM1_ISTRING: &IString = &literal!("NUM1");
 pub const NUM2_ISTRING: &IString = &literal!("NUM2");
 pub const TEXT_ISTRING: &IString = &literal!("TEXT");
 
-pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<BlockKindInfo> {
-    Some(match block.opcode.as_str() {
+pub fn get_block_kind_info(
+    block: &project_json::Sb3NormalBlock,
+) -> DetranspilerResult<BlockKindInfo> {
+    Ok(match block.opcode.as_str() {
         "motion_movesteps" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("STEPS"),
@@ -69,6 +81,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("move_steps"),
+            is_singleton: false,
         },
         "motion_turnright" => BlockKindInfo {
             arguments: vec![Argument {
@@ -81,6 +94,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("turn_right"),
+            is_singleton: false,
         },
         "motion_turnleft" => BlockKindInfo {
             arguments: vec![Argument {
@@ -93,6 +107,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("turn_left"),
+            is_singleton: false,
         },
         "motion_goto" => BlockKindInfo {
             arguments: vec![Argument {
@@ -105,6 +120,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("go_to"),
+            is_singleton: false,
         },
         "motion_gotoxy" => BlockKindInfo {
             arguments: vec![
@@ -127,6 +143,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("go_to_xy"),
+            is_singleton: false,
         },
         "motion_glideto" => BlockKindInfo {
             arguments: vec![
@@ -149,6 +166,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("glide_to"),
+            is_singleton: false,
         },
         "motion_glidesecstoxy" => BlockKindInfo {
             arguments: vec![
@@ -179,6 +197,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("glide_to_xy"),
+            is_singleton: false,
         },
         "motion_pointindirection" => BlockKindInfo {
             arguments: vec![Argument {
@@ -191,6 +210,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("point_in_direction"),
+            is_singleton: false,
         },
         "motion_pointtowards" => BlockKindInfo {
             arguments: vec![Argument {
@@ -203,6 +223,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("point_towards"),
+            is_singleton: false,
         },
         "motion_changexby" => BlockKindInfo {
             arguments: vec![Argument {
@@ -215,6 +236,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("change_x_by"),
+            is_singleton: false,
         },
         "motion_setx" => BlockKindInfo {
             arguments: vec![Argument {
@@ -227,6 +249,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("set_x"),
+            is_singleton: false,
         },
         "motion_changeyby" => BlockKindInfo {
             arguments: vec![Argument {
@@ -239,6 +262,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("change_y_by"),
+            is_singleton: false,
         },
         "motion_sety" => BlockKindInfo {
             arguments: vec![Argument {
@@ -251,11 +275,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("set_y"),
+            is_singleton: false,
         },
         "motion_ifonedgebounce" => BlockKindInfo {
             arguments: vec![],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("if_on_edge_bounce"),
+            is_singleton: false,
         },
         "motion_setrotationstyle" => BlockKindInfo {
             arguments: vec![Argument {
@@ -265,21 +291,25 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("set_rotation_style"),
+            is_singleton: false,
         },
         "motion_xposition" => BlockKindInfo {
             arguments: vec![],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("x_position"),
+            is_singleton: true,
         },
         "motion_yposition" => BlockKindInfo {
             arguments: vec![],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("y_position"),
+            is_singleton: true,
         },
         "motion_direction" => BlockKindInfo {
             arguments: vec![],
             block_category: MOTION_CATEGORY.clone(),
             block_name: literal!("direction"),
+            is_singleton: true,
         },
 
         "looks_sayforsecs" => BlockKindInfo {
@@ -303,6 +333,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("say_for"),
+            is_singleton: false,
         },
         "looks_say" => BlockKindInfo {
             arguments: vec![Argument {
@@ -315,6 +346,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("say"),
+            is_singleton: false,
         },
         "looks_thinkforsecs" => BlockKindInfo {
             arguments: vec![
@@ -337,6 +369,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("think_for"),
+            is_singleton: false,
         },
         "looks_think" => BlockKindInfo {
             arguments: vec![Argument {
@@ -349,6 +382,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("think"),
+            is_singleton: false,
         },
         "looks_switchcostumeto" => BlockKindInfo {
             arguments: vec![Argument {
@@ -361,11 +395,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("switch_to_costume"),
+            is_singleton: false,
         },
         "looks_nextcostume" => BlockKindInfo {
             arguments: vec![],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("next_costume"),
+            is_singleton: false,
         },
         "looks_switchbackdropto" => BlockKindInfo {
             arguments: vec![Argument {
@@ -378,6 +414,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("switch_to_backdrop"),
+            is_singleton: false,
         },
         "looks_switchbackdroptoandwait" => BlockKindInfo {
             arguments: vec![Argument {
@@ -390,11 +427,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("switch_to_backdrop_and_wait"),
+            is_singleton: false,
         },
         "looks_nextbackdrop" => BlockKindInfo {
             arguments: vec![],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("next_backdrop"),
+            is_singleton: false,
         },
         "looks_changesizeby" => BlockKindInfo {
             arguments: vec![Argument {
@@ -407,6 +446,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("change_size_by"),
+            is_singleton: false,
         },
         "looks_setsizeto" => BlockKindInfo {
             arguments: vec![Argument {
@@ -419,6 +459,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("set_size_to"),
+            is_singleton: false,
         },
         "looks_changeeffectby" => BlockKindInfo {
             arguments: vec![
@@ -438,6 +479,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("change_graphic_effect_by"),
+            is_singleton: false,
         },
         "looks_seteffectto" => BlockKindInfo {
             arguments: vec![
@@ -457,21 +499,25 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("set_graphic_effect_to"),
+            is_singleton: false,
         },
         "looks_cleargraphiceffects" => BlockKindInfo {
             arguments: vec![],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("clear_graphic_effects"),
+            is_singleton: false,
         },
         "looks_show" => BlockKindInfo {
             arguments: vec![],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("show"),
+            is_singleton: false,
         },
         "looks_hide" => BlockKindInfo {
             arguments: vec![],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("hide"),
+            is_singleton: false,
         },
         "looks_gotofrontback" => BlockKindInfo {
             arguments: vec![Argument {
@@ -481,6 +527,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("go_to_layer"),
+            is_singleton: false,
         },
         "looks_goforwardbackwardlayers" => BlockKindInfo {
             arguments: vec![
@@ -500,57 +547,97 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("change_layer"),
+            is_singleton: false,
         },
-        "looks_costumenumbername" => BlockKindInfo {
-            arguments: vec![Argument {
-                name: literal!("NUMBER_NAME"),
-                kind: ArgumentKind::Field,
-                ignore: true,
-            }],
-            block_category: COSTUME_CATEGORY.clone(),
-            block_name: {
-                let number_name = block.fields.get("NUMBER_NAME")?;
-                if let project_json::Sb3FieldValue::Normal(project_json::Sb3Primitive::String(
-                    value,
-                )) = number_name
-                {
-                    match value.as_str() {
-                        "number" => literal!("costume_number"),
-                        "name" => literal!("costume_name"),
-                        _ => return None,
-                    }
-                } else {
-                    return None;
+        "looks_costumenumbername" => {
+            fn costume_fallback() -> BlockKindInfo {
+                BlockKindInfo {
+                    arguments: vec![Argument {
+                        name: literal!("NUMBER_NAME"),
+                        kind: ArgumentKind::Field,
+                        ignore: false,
+                    }],
+                    block_category: LOOKS_CATEGORY.clone(),
+                    block_name: literal!("get_costume"),
+                    is_singleton: false,
                 }
-            },
-        },
-        "looks_backdropnumbername" => BlockKindInfo {
-            arguments: vec![Argument {
-                name: literal!("NUMBER_NAME"),
-                kind: ArgumentKind::Field,
-                ignore: true,
-            }],
-            block_category: COSTUME_CATEGORY.clone(),
-            block_name: {
-                let number_name = block.fields.get("NUMBER_NAME")?;
-                if let project_json::Sb3FieldValue::Normal(project_json::Sb3Primitive::String(
-                    value,
-                )) = number_name
-                {
-                    match value.as_str() {
-                        "number" => literal!("backdrop_number"),
-                        "name" => literal!("backdrop_name"),
-                        _ => return None,
+            }
+            BlockKindInfo {
+                arguments: vec![Argument {
+                    name: literal!("NUMBER_NAME"),
+                    kind: ArgumentKind::Field,
+                    ignore: true,
+                }],
+                block_category: COSTUME_CATEGORY.clone(),
+                block_name: {
+                    let Some(number_name) = block.fields.get("NUMBER_NAME") else {
+                        return Ok(costume_fallback());
+                    };
+                    if let project_json::Sb3FieldValue::Normal(
+                        project_json::Sb3Primitive::String(value),
+                    ) = number_name
+                    {
+                        match value.as_str() {
+                            "number" => literal!("costume_number"),
+                            "name" => literal!("costume_name"),
+                            _ => {
+                                return Ok(costume_fallback());
+                            }
+                        }
+                    } else {
+                        return Ok(costume_fallback());
                     }
-                } else {
-                    return None;
+                },
+                is_singleton: true,
+            }
+        }
+        "looks_backdropnumbername" => {
+            fn backdrop_fallback() -> BlockKindInfo {
+                BlockKindInfo {
+                    arguments: vec![Argument {
+                        name: literal!("NUMBER_NAME"),
+                        kind: ArgumentKind::Field,
+                        ignore: false,
+                    }],
+                    block_category: LOOKS_CATEGORY.clone(),
+                    block_name: literal!("get_backdrop"),
+                    is_singleton: false,
                 }
-            },
-        },
+            }
+            BlockKindInfo {
+                arguments: vec![Argument {
+                    name: literal!("NUMBER_NAME"),
+                    kind: ArgumentKind::Field,
+                    ignore: true,
+                }],
+                block_category: COSTUME_CATEGORY.clone(),
+                block_name: {
+                    let Some(number_name) = block.fields.get("NUMBER_NAME") else {
+                        return Ok(backdrop_fallback());
+                    };
+                    if let project_json::Sb3FieldValue::Normal(
+                        project_json::Sb3Primitive::String(value),
+                    ) = number_name
+                    {
+                        match value.as_str() {
+                            "number" => literal!("backdrop_number"),
+                            "name" => literal!("backdrop_name"),
+                            _ => {
+                                return Ok(backdrop_fallback());
+                            }
+                        }
+                    } else {
+                        return Ok(backdrop_fallback());
+                    }
+                },
+                is_singleton: true,
+            }
+        }
         "looks_size" => BlockKindInfo {
             arguments: vec![],
             block_category: LOOKS_CATEGORY.clone(),
             block_name: literal!("size"),
+            is_singleton: true,
         },
 
         "sound_playuntildone" => BlockKindInfo {
@@ -564,6 +651,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("play_sound_until_done"),
+            is_singleton: false,
         },
         "sound_play" => BlockKindInfo {
             arguments: vec![Argument {
@@ -576,11 +664,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("start_sound"),
+            is_singleton: false,
         },
         "sound_stopallsounds" => BlockKindInfo {
             arguments: vec![],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("stop_all_sounds"),
+            is_singleton: false,
         },
         "sound_changeeffectby" => BlockKindInfo {
             arguments: vec![
@@ -600,6 +690,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("change_sound_effect_by"),
+            is_singleton: false,
         },
         "sound_seteffectto" => BlockKindInfo {
             arguments: vec![
@@ -619,11 +710,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("set_sound_effect_to"),
+            is_singleton: false,
         },
         "sound_cleareffects" => BlockKindInfo {
             arguments: vec![],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("clear_sound_effects"),
+            is_singleton: false,
         },
         "sound_changevolumeby" => BlockKindInfo {
             arguments: vec![Argument {
@@ -636,6 +729,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("change_volume_by"),
+            is_singleton: false,
         },
         "sound_setvolumeto" => BlockKindInfo {
             arguments: vec![Argument {
@@ -648,17 +742,20 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("set_volume_to"),
+            is_singleton: false,
         },
         "sound_volume" => BlockKindInfo {
             arguments: vec![],
             block_category: SOUND_CATEGORY.clone(),
             block_name: literal!("volume"),
+            is_singleton: true,
         },
 
         "event_whenflagclicked" => BlockKindInfo {
             arguments: vec![],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("when_green_flag_clicked"),
+            is_singleton: false,
         },
         "event_whenkeypressed" => BlockKindInfo {
             arguments: vec![Argument {
@@ -668,11 +765,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("when_key_pressed"),
+            is_singleton: false,
         },
         "event_whenthisspriteclicked" => BlockKindInfo {
             arguments: vec![],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("when_this_sprite_clicked"),
+            is_singleton: false,
         },
         "event_whenbackdropswitchesto" => BlockKindInfo {
             arguments: vec![Argument {
@@ -682,6 +781,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("when_backdrop_switches_to"),
+            is_singleton: false,
         },
         "event_whengreaterthan" => BlockKindInfo {
             arguments: vec![
@@ -701,6 +801,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("when_greater_than"),
+            is_singleton: false,
         },
         "event_whenbroadcastreceived" => BlockKindInfo {
             arguments: vec![Argument {
@@ -710,6 +811,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("when_broadcast_received"),
+            is_singleton: false,
         },
         "event_broadcast" => BlockKindInfo {
             arguments: vec![Argument {
@@ -722,6 +824,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("broadcast"),
+            is_singleton: false,
         },
         "event_broadcastandwait" => BlockKindInfo {
             arguments: vec![Argument {
@@ -734,6 +837,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: EVENTS_CATEGORY.clone(),
             block_name: literal!("broadcast_and_wait"),
+            is_singleton: false,
         },
 
         "control_wait" => BlockKindInfo {
@@ -747,6 +851,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("wait"),
+            is_singleton: false,
         },
         "control_repeat" => BlockKindInfo {
             arguments: vec![
@@ -766,6 +871,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("repeat"),
+            is_singleton: false,
         },
         "control_forever" => BlockKindInfo {
             arguments: vec![Argument {
@@ -775,6 +881,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("forever_loop"),
+            is_singleton: false,
         },
         "control_if" => BlockKindInfo {
             arguments: vec![
@@ -791,6 +898,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("if"),
+            is_singleton: false,
         },
         "control_if_else" => BlockKindInfo {
             arguments: vec![
@@ -807,6 +915,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("if_else"),
+            is_singleton: false,
         },
         "control_wait_until" => BlockKindInfo {
             arguments: vec![Argument {
@@ -816,6 +925,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("wait_until"),
+            is_singleton: false,
         },
         "control_repeat_until" => BlockKindInfo {
             arguments: vec![
@@ -832,6 +942,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("repeat_until"),
+            is_singleton: false,
         },
         "control_while" => BlockKindInfo {
             arguments: vec![
@@ -848,6 +959,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("while_loop"),
+            is_singleton: false,
         },
         "control_stop" => BlockKindInfo {
             arguments: vec![Argument {
@@ -857,11 +969,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("stop"),
+            is_singleton: false,
         },
         "control_start_as_clone" => BlockKindInfo {
             arguments: vec![],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("when_start_as_clone"),
+            is_singleton: false,
         },
         "control_create_clone_of" => BlockKindInfo {
             arguments: vec![Argument {
@@ -874,11 +988,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("create_clone_of"),
+            is_singleton: false,
         },
         "control_delete_this_clone" => BlockKindInfo {
             arguments: vec![],
             block_category: CONTROL_CATEGORY.clone(),
             block_name: literal!("delete_this_clone"),
+            is_singleton: false,
         },
 
         "sensing_touchingobject" => BlockKindInfo {
@@ -892,6 +1008,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("is_touching_object"),
+            is_singleton: false,
         },
         "sensing_touchingcolor" => BlockKindInfo {
             arguments: vec![Argument {
@@ -904,6 +1021,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("is_touching_color"),
+            is_singleton: false,
         },
         "sensing_coloristouchingcolor" => BlockKindInfo {
             arguments: vec![
@@ -926,6 +1044,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("color_is_touching_color"),
+            is_singleton: false,
         },
         "sensing_distanceto" => BlockKindInfo {
             arguments: vec![Argument {
@@ -938,6 +1057,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("distance_to"),
+            is_singleton: false,
         },
         "sensing_askandwait" => BlockKindInfo {
             arguments: vec![Argument {
@@ -950,11 +1070,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("ask_and_wait"),
+            is_singleton: false,
         },
         "sensing_answer" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("answer"),
+            is_singleton: true,
         },
         "sensing_keypressed" => BlockKindInfo {
             arguments: vec![Argument {
@@ -967,21 +1089,25 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("is_key_pressed"),
+            is_singleton: false,
         },
         "sensing_mousedown" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("is_mouse_down"),
+            is_singleton: true,
         },
         "sensing_mousex" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("mouse_x"),
+            is_singleton: true,
         },
         "sensing_mousey" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("mouse_y"),
+            is_singleton: true,
         },
         "sensing_setdragmode" => BlockKindInfo {
             arguments: vec![Argument {
@@ -991,21 +1117,25 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("set_drag_mode"),
+            is_singleton: false,
         },
         "sensing_loudness" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("loudness"),
+            is_singleton: true,
         },
         "sensing_timer" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("timer"),
+            is_singleton: true,
         },
         "sensing_resettimer" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("reset_timer"),
+            is_singleton: false,
         },
         "sensing_of" => BlockKindInfo {
             arguments: vec![
@@ -1025,6 +1155,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("property_of_object"),
+            is_singleton: false,
         },
         "sensing_current" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1034,21 +1165,25 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("current_time_unit"),
+            is_singleton: false,
         },
         "sensing_dayssince2000" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("days_since_2000"),
+            is_singleton: true,
         },
         "sensing_online" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("is_online"),
+            is_singleton: true,
         },
         "sensing_username" => BlockKindInfo {
             arguments: vec![],
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("username"),
+            is_singleton: true,
         },
 
         "operator_add" => BlockKindInfo {
@@ -1072,6 +1207,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("add_values"),
+            is_singleton: false,
         },
         "operator_subtract" => BlockKindInfo {
             arguments: vec![
@@ -1094,6 +1230,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("subtract_values"),
+            is_singleton: false,
         },
         "operator_multiply" => BlockKindInfo {
             arguments: vec![
@@ -1116,6 +1253,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("multiply_values"),
+            is_singleton: false,
         },
         "operator_divide" => BlockKindInfo {
             arguments: vec![
@@ -1138,6 +1276,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("divide_values"),
+            is_singleton: false,
         },
         "operator_random" => BlockKindInfo {
             arguments: vec![
@@ -1160,6 +1299,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("pick_random_number"),
+            is_singleton: false,
         },
         "operator_gt" => BlockKindInfo {
             arguments: vec![
@@ -1182,6 +1322,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("is_greater_than"),
+            is_singleton: false,
         },
         "operator_lt" => BlockKindInfo {
             arguments: vec![
@@ -1204,6 +1345,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("is_less_than"),
+            is_singleton: false,
         },
         "operator_equals" => BlockKindInfo {
             arguments: vec![
@@ -1226,6 +1368,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("is_equal_to"),
+            is_singleton: false,
         },
         "operator_and" => BlockKindInfo {
             arguments: vec![
@@ -1242,6 +1385,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("logical_and"),
+            is_singleton: false,
         },
         "operator_or" => BlockKindInfo {
             arguments: vec![
@@ -1258,6 +1402,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("logical_or"),
+            is_singleton: false,
         },
         "operator_not" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1267,6 +1412,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("logical_not"),
+            is_singleton: false,
         },
         "operator_join" => BlockKindInfo {
             arguments: vec![
@@ -1289,6 +1435,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("join_strings"),
+            is_singleton: false,
         },
         "operator_letter_of" => BlockKindInfo {
             arguments: vec![
@@ -1311,6 +1458,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("letter_of_string"),
+            is_singleton: false,
         },
         "operator_length" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1323,6 +1471,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("string_length"),
+            is_singleton: false,
         },
         "operator_contains" => BlockKindInfo {
             arguments: vec![
@@ -1345,6 +1494,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("string_contains"),
+            is_singleton: false,
         },
         "operator_mod" => BlockKindInfo {
             arguments: vec![
@@ -1367,6 +1517,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("modulo"),
+            is_singleton: false,
         },
         "operator_round" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1379,8 +1530,31 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("round"),
+            is_singleton: false,
         },
         "operator_mathop" => {
+            fn mathop_fallback() -> BlockKindInfo {
+                BlockKindInfo {
+                    arguments: vec![
+                        Argument {
+                            name: literal!("OPERATOR"),
+                            kind: ArgumentKind::Field,
+                            ignore: false,
+                        },
+                        Argument {
+                            name: NUM_ISTRING.clone(),
+                            kind: ArgumentKind::MenuInput {
+                                menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                                menu_field: NUM_ISTRING.clone(),
+                            },
+                            ignore: false,
+                        },
+                    ],
+                    block_category: OPERATORS_CATEGORY.clone(),
+                    block_name: literal!("math_operator"),
+                    is_singleton: false,
+                }
+            }
             let math_op_name = match block.fields.get("OPERATOR") {
                 Some(project_json::Sb3FieldValue::Normal(project_json::Sb3Primitive::String(
                     value,
@@ -1399,9 +1573,13 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                     "log" => literal!("log"),
                     "e ^" => literal!("exp"),
                     "10 ^" => literal!("pow"),
-                    _ => return None,
+                    _ => {
+                        return Ok(mathop_fallback());
+                    }
                 },
-                _ => return None,
+                _ => {
+                    return Ok(mathop_fallback());
+                }
             };
             BlockKindInfo {
                 arguments: vec![
@@ -1421,6 +1599,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 ],
                 block_category: MATH_OPS_CATEGORY.clone(),
                 block_name: math_op_name,
+                is_singleton: false,
             }
         }
 
@@ -1432,6 +1611,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("get_variable_value"),
+            is_singleton: false,
         },
         "data_setvariableto" => BlockKindInfo {
             arguments: vec![
@@ -1451,6 +1631,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("set_variable_to"),
+            is_singleton: false,
         },
         "data_changevariableby" => BlockKindInfo {
             arguments: vec![
@@ -1470,6 +1651,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("change_variable_by"),
+            is_singleton: false,
         },
         "data_showvariable" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1479,6 +1661,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("show_variable"),
+            is_singleton: false,
         },
         "data_hidevariable" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1488,6 +1671,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("hide_variable"),
+            is_singleton: false,
         },
         "data_listcontents" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1497,6 +1681,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("get_list_contents"),
+            is_singleton: false,
         },
         "data_addtolist" => BlockKindInfo {
             arguments: vec![
@@ -1516,6 +1701,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("add_to_list"),
+            is_singleton: false,
         },
         "data_deleteoflist" => BlockKindInfo {
             arguments: vec![
@@ -1535,6 +1721,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("delete_item_of_list"),
+            is_singleton: false,
         },
         "data_deletealloflist" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1544,6 +1731,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("delete_all_of_list"),
+            is_singleton: false,
         },
         "data_insertatlist" => BlockKindInfo {
             arguments: vec![
@@ -1571,6 +1759,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("insert_at_list"),
+            is_singleton: false,
         },
         "data_replaceitemoflist" => BlockKindInfo {
             arguments: vec![
@@ -1598,6 +1787,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("replace_item_of_list"),
+            is_singleton: false,
         },
         "data_itemoflist" => BlockKindInfo {
             arguments: vec![
@@ -1617,6 +1807,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("get_item_of_list"),
+            is_singleton: false,
         },
         "data_itemnumoflist" => BlockKindInfo {
             arguments: vec![
@@ -1636,6 +1827,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("get_index_of_item_in_list"),
+            is_singleton: false,
         },
         "data_lengthoflist" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1645,6 +1837,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("get_list_length"),
+            is_singleton: false,
         },
         "data_listcontainsitem" => BlockKindInfo {
             arguments: vec![
@@ -1664,6 +1857,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("list_contains_item"),
+            is_singleton: false,
         },
         "data_showlist" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1673,6 +1867,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("show_list"),
+            is_singleton: false,
         },
         "data_hidelist" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1682,27 +1877,32 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: DATA_CATEGORY.clone(),
             block_name: literal!("hide_list"),
+            is_singleton: false,
         },
 
         "pen_clear" => BlockKindInfo {
             arguments: vec![],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("clear"),
+            is_singleton: false,
         },
         "pen_stamp" => BlockKindInfo {
             arguments: vec![],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("stamp"),
+            is_singleton: false,
         },
         "pen_penDown" => BlockKindInfo {
             arguments: vec![],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("pen_down"),
+            is_singleton: false,
         },
         "pen_penUp" => BlockKindInfo {
             arguments: vec![],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("pen_up"),
+            is_singleton: false,
         },
         "pen_setPenColorToColor" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1715,6 +1915,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("set_pen_color_to"),
+            is_singleton: false,
         },
         "pen_changePenColorParamBy" => BlockKindInfo {
             arguments: vec![
@@ -1737,6 +1938,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("change_pen_param_by"),
+            is_singleton: false,
         },
         "pen_setPenColorParamTo" => BlockKindInfo {
             arguments: vec![
@@ -1759,6 +1961,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("set_pen_param_to"),
+            is_singleton: false,
         },
         "pen_changePenSizeBy" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1771,6 +1974,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("change_pen_size_by"),
+            is_singleton: false,
         },
         "pen_setPenSizeTo" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1783,6 +1987,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: PEN_CATEGORY.clone(),
             block_name: literal!("set_pen_size_to"),
+            is_singleton: false,
         },
 
         "music_playDrumForBeats" => BlockKindInfo {
@@ -1806,6 +2011,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: MUSIC_CATEGORY.clone(),
             block_name: literal!("play_drum_for_beats"),
+            is_singleton: false,
         },
         "music_restForBeats" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1818,6 +2024,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MUSIC_CATEGORY.clone(),
             block_name: literal!("rest_for_beats"),
+            is_singleton: false,
         },
         "music_playNoteForBeats" => BlockKindInfo {
             arguments: vec![
@@ -1840,6 +2047,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             ],
             block_category: MUSIC_CATEGORY.clone(),
             block_name: literal!("play_note_for_beats"),
+            is_singleton: false,
         },
         "music_setInstrument" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1852,6 +2060,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MUSIC_CATEGORY.clone(),
             block_name: literal!("set_instrument"),
+            is_singleton: false,
         },
         "music_setTempo" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1864,6 +2073,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MUSIC_CATEGORY.clone(),
             block_name: literal!("set_tempo"),
+            is_singleton: false,
         },
         "music_changeTempo" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1876,13 +2086,19 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             }],
             block_category: MUSIC_CATEGORY.clone(),
             block_name: literal!("change_tempo"),
+            is_singleton: false,
         },
         "music_getTempo" => BlockKindInfo {
             arguments: vec![],
             block_category: MUSIC_CATEGORY.clone(),
             block_name: literal!("tempo"),
+            is_singleton: true,
         },
-        _ => return None,
+        _ => {
+            return Err(GrazeDetranspilerError::UnknownOpcode {
+                opcode: block.opcode.clone(),
+            });
+        }
     })
 }
 
