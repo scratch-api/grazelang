@@ -160,6 +160,17 @@ pub fn lookup_vlb(
     context: &DetranspilerContext,
 ) -> Option<DetranspilerVLB> {
     todo!()
+    // TODO: Implement `lookup_vlb`
+}
+
+pub fn lookup_var_or_list(
+    name: &str,
+    id: &str,
+    target: &DetranspilerTarget,
+    context: &DetranspilerContext,
+) -> Option<DetranspilerVarOrList> {
+    todo!()
+    // TODO: Implement `lookup_var_or_list`
 }
 
 pub fn block_check_name_collision(
@@ -168,6 +179,7 @@ pub fn block_check_name_collision(
     context: &DetranspilerContext,
 ) -> bool {
     todo!()
+    // TODO: Implement `block_check_name_collision`
 }
 
 pub fn create_block_identifier(
@@ -694,16 +706,20 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            // TODO: Fallback to globals
-            // Issue: #96
-            let variable = target
-                .data
-                .get(id)
-                .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
-                .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
+            let variable = lookup_var_or_list(name, id, target, context).ok_or_else(|| {
+                GrazeDetranspilerError::UnknownVariable {
                     id: id.clone(),
                     name: name.clone(),
-                })?;
+                }
+            })?;
+            // let variable = target
+            //     .data
+            //     .get(id)
+            //     .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
+            //     .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
+            //         id: id.clone(),
+            //         name: name.clone(),
+            //     })?;
             Ok(ast_types::Expression::Identifier(ast_types::Identifier {
                 path: vec![ast_types::SingleIdentifier {
                     value: variable.name.clone(),
@@ -716,14 +732,20 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            let list = target
-                .data
-                .get(id)
-                .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
-                .ok_or_else(|| GrazeDetranspilerError::UnknownList {
+            let list = lookup_var_or_list(name, id, target, context).ok_or_else(|| {
+                GrazeDetranspilerError::UnknownVariable {
                     id: id.clone(),
                     name: name.clone(),
-                })?;
+                }
+            })?;
+            // let list = target
+            //     .data
+            //     .get(id)
+            //     .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
+            //     .ok_or_else(|| GrazeDetranspilerError::UnknownList {
+            //         id: id.clone(),
+            //         name: name.clone(),
+            //     })?;
             Ok(ast_types::Expression::Identifier(ast_types::Identifier {
                 path: vec![ast_types::SingleIdentifier {
                     value: list.name.clone(),
@@ -744,6 +766,7 @@ pub fn convert_block_stack(
     target: &DetranspilerTarget,
 ) -> DetranspilerResult<ast_types::CodeBlock> {
     todo!()
+    // TODO: Implement `convert_block_stack`
 }
 
 pub fn convert_stack_block(
@@ -754,4 +777,5 @@ pub fn convert_stack_block(
     target: &DetranspilerTarget,
 ) -> DetranspilerResult<(ast_types::Statement, NextBlockId)> {
     todo!()
+    // TODO: Implement `convert_stack_block`
 }
