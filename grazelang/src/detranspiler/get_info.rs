@@ -2,13 +2,16 @@ use arcstr::{ArcStr as IString, literal};
 use grazelang_types::project_json;
 use serde::{Deserialize, Serialize};
 
-use super::core::DetranspilerContext;
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockKindInfo {
     pub arguments: Vec<Argument>,
     pub block_category: IString,
     pub block_name: IString,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FieldValueInfo {
+    pub field_value_name: IString,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -42,10 +45,7 @@ pub const DATA_CATEGORY: &IString = &literal!("data");
 pub const PEN_CATEGORY: &IString = &literal!("pen");
 pub const MUSIC_CATEGORY: &IString = &literal!("music");
 
-pub fn get_block_kind_info(
-    block: &project_json::Sb3NormalBlock,
-    _context: &mut DetranspilerContext,
-) -> Option<BlockKindInfo> {
+pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<BlockKindInfo> {
     Some(match block.opcode.as_str() {
         "motion_movesteps" => BlockKindInfo {
             arguments: vec![Argument {
@@ -1581,4 +1581,447 @@ pub fn get_block_kind_info(
         },
         _ => return None,
     })
+}
+
+pub fn get_field_value_info(
+    field_value: &project_json::Sb3FieldValue,
+    block_opcode: &str,
+) -> Option<FieldValueInfo> {
+    if let project_json::Sb3FieldValue::Normal(project_json::Sb3Primitive::String(value)) =
+        field_value
+    {
+        match block_opcode {
+            "music_menu_DRUM" => {
+                return Some(match value.as_str() {
+                    "1" => FieldValueInfo {
+                        field_value_name: literal!("snare_drum"),
+                    },
+                    "2" => FieldValueInfo {
+                        field_value_name: literal!("bass_drum"),
+                    },
+                    "3" => FieldValueInfo {
+                        field_value_name: literal!("side_stick"),
+                    },
+                    "4" => FieldValueInfo {
+                        field_value_name: literal!("crash_cymbal"),
+                    },
+                    "5" => FieldValueInfo {
+                        field_value_name: literal!("open_hi_hat"),
+                    },
+                    "6" => FieldValueInfo {
+                        field_value_name: literal!("closed_hi_hat"),
+                    },
+                    "7" => FieldValueInfo {
+                        field_value_name: literal!("tambourine"),
+                    },
+                    "8" => FieldValueInfo {
+                        field_value_name: literal!("hand_clap"),
+                    },
+                    "9" => FieldValueInfo {
+                        field_value_name: literal!("claves"),
+                    },
+                    "10" => FieldValueInfo {
+                        field_value_name: literal!("wood_block"),
+                    },
+                    "11" => FieldValueInfo {
+                        field_value_name: literal!("cowbell"),
+                    },
+                    "12" => FieldValueInfo {
+                        field_value_name: literal!("triangle"),
+                    },
+                    "13" => FieldValueInfo {
+                        field_value_name: literal!("bongo"),
+                    },
+                    "14" => FieldValueInfo {
+                        field_value_name: literal!("conga"),
+                    },
+                    "15" => FieldValueInfo {
+                        field_value_name: literal!("cabasa"),
+                    },
+                    "16" => FieldValueInfo {
+                        field_value_name: literal!("guiro"),
+                    },
+                    "17" => FieldValueInfo {
+                        field_value_name: literal!("vibraslap"),
+                    },
+                    "18" => FieldValueInfo {
+                        field_value_name: literal!("cuica"),
+                    },
+                    _ => return None,
+                });
+            }
+            "music_menu_INSTRUMENT" => {
+                return Some(match value.as_str() {
+                    "1" => FieldValueInfo {
+                        field_value_name: literal!("piano"),
+                    },
+                    "2" => FieldValueInfo {
+                        field_value_name: literal!("electric_piano"),
+                    },
+                    "3" => FieldValueInfo {
+                        field_value_name: literal!("organ"),
+                    },
+                    "4" => FieldValueInfo {
+                        field_value_name: literal!("guitar"),
+                    },
+                    "5" => FieldValueInfo {
+                        field_value_name: literal!("electric_guitar"),
+                    },
+                    "6" => FieldValueInfo {
+                        field_value_name: literal!("bass"),
+                    },
+                    "7" => FieldValueInfo {
+                        field_value_name: literal!("pizzicato"),
+                    },
+                    "8" => FieldValueInfo {
+                        field_value_name: literal!("cello"),
+                    },
+                    "9" => FieldValueInfo {
+                        field_value_name: literal!("trombone"),
+                    },
+                    "10" => FieldValueInfo {
+                        field_value_name: literal!("clarinet"),
+                    },
+                    "11" => FieldValueInfo {
+                        field_value_name: literal!("saxophone"),
+                    },
+                    "12" => FieldValueInfo {
+                        field_value_name: literal!("flute"),
+                    },
+                    "13" => FieldValueInfo {
+                        field_value_name: literal!("wooden_flute"),
+                    },
+                    "14" => FieldValueInfo {
+                        field_value_name: literal!("bassoon"),
+                    },
+                    "15" => FieldValueInfo {
+                        field_value_name: literal!("choir"),
+                    },
+                    "16" => FieldValueInfo {
+                        field_value_name: literal!("vibraphone"),
+                    },
+                    "17" => FieldValueInfo {
+                        field_value_name: literal!("music_box"),
+                    },
+                    "18" => FieldValueInfo {
+                        field_value_name: literal!("steel_drum"),
+                    },
+                    "19" => FieldValueInfo {
+                        field_value_name: literal!("marimba"),
+                    },
+                    "20" => FieldValueInfo {
+                        field_value_name: literal!("synth_lead"),
+                    },
+                    "21" => FieldValueInfo {
+                        field_value_name: literal!("synth_pad"),
+                    },
+                    _ => return None,
+                });
+            }
+            _ => (),
+        }
+        Some(match value.as_str() {
+            "_random_" => FieldValueInfo {
+                field_value_name: literal!("random_position"),
+            },
+            "_mouse_" => FieldValueInfo {
+                field_value_name: literal!("mouse_pointer"),
+            },
+            "left-right" => FieldValueInfo {
+                field_value_name: literal!("left_right"),
+            },
+            "don't rotate" => FieldValueInfo {
+                field_value_name: literal!("dont_rotate"),
+            },
+            "all around" => FieldValueInfo {
+                field_value_name: literal!("all_around"),
+            },
+            "next backdrop" => FieldValueInfo {
+                field_value_name: literal!("next_backdrop"),
+            },
+            "previous backdrop" => FieldValueInfo {
+                field_value_name: literal!("previous_backdrop"),
+            },
+            "random backdrop" => FieldValueInfo {
+                field_value_name: literal!("random_backdrop"),
+            },
+            "COLOR" => FieldValueInfo {
+                field_value_name: literal!("color"),
+            },
+            "FISHEYE" => FieldValueInfo {
+                field_value_name: literal!("fisheye"),
+            },
+            "WHIRL" => FieldValueInfo {
+                field_value_name: literal!("whirl"),
+            },
+            "PIXELATE" => FieldValueInfo {
+                field_value_name: literal!("pixelate"),
+            },
+            "MOSAIC" => FieldValueInfo {
+                field_value_name: literal!("mosaic"),
+            },
+            "BRIGHTNESS" => FieldValueInfo {
+                field_value_name: literal!("brightness"),
+            },
+            "GHOST" => FieldValueInfo {
+                field_value_name: literal!("ghost"),
+            },
+            "front" => FieldValueInfo {
+                field_value_name: literal!("front"),
+            },
+            "back" => FieldValueInfo {
+                field_value_name: literal!("back"),
+            },
+            "forward" => FieldValueInfo {
+                field_value_name: literal!("forward"),
+            },
+            "backward" => FieldValueInfo {
+                field_value_name: literal!("backward"),
+            },
+            "number" => FieldValueInfo {
+                field_value_name: literal!("number"),
+            },
+            "name" => FieldValueInfo {
+                field_value_name: literal!("name"),
+            },
+            "PITCH" => FieldValueInfo {
+                field_value_name: literal!("pitch"),
+            },
+            "PAN" => FieldValueInfo {
+                field_value_name: literal!("pan_left_right"),
+            },
+            "space" => FieldValueInfo {
+                field_value_name: literal!("space"),
+            },
+            "up arrow" => FieldValueInfo {
+                field_value_name: literal!("up_arrow"),
+            },
+            "down arrow" => FieldValueInfo {
+                field_value_name: literal!("down_arrow"),
+            },
+            "right arrow" => FieldValueInfo {
+                field_value_name: literal!("right_arrow"),
+            },
+            "left arrow" => FieldValueInfo {
+                field_value_name: literal!("left_arrow"),
+            },
+            "any" => FieldValueInfo {
+                field_value_name: literal!("any"),
+            },
+            "a" => FieldValueInfo {
+                field_value_name: literal!("key_a"),
+            },
+            "b" => FieldValueInfo {
+                field_value_name: literal!("key_b"),
+            },
+            "c" => FieldValueInfo {
+                field_value_name: literal!("key_c"),
+            },
+            "d" => FieldValueInfo {
+                field_value_name: literal!("key_d"),
+            },
+            "e" => FieldValueInfo {
+                field_value_name: literal!("key_e"),
+            },
+            "f" => FieldValueInfo {
+                field_value_name: literal!("key_f"),
+            },
+            "g" => FieldValueInfo {
+                field_value_name: literal!("key_g"),
+            },
+            "h" => FieldValueInfo {
+                field_value_name: literal!("key_h"),
+            },
+            "i" => FieldValueInfo {
+                field_value_name: literal!("key_i"),
+            },
+            "j" => FieldValueInfo {
+                field_value_name: literal!("key_j"),
+            },
+            "k" => FieldValueInfo {
+                field_value_name: literal!("key_k"),
+            },
+            "l" => FieldValueInfo {
+                field_value_name: literal!("key_l"),
+            },
+            "m" => FieldValueInfo {
+                field_value_name: literal!("key_m"),
+            },
+            "n" => FieldValueInfo {
+                field_value_name: literal!("key_n"),
+            },
+            "o" => FieldValueInfo {
+                field_value_name: literal!("key_o"),
+            },
+            "p" => FieldValueInfo {
+                field_value_name: literal!("key_p"),
+            },
+            "q" => FieldValueInfo {
+                field_value_name: literal!("key_q"),
+            },
+            "r" => FieldValueInfo {
+                field_value_name: literal!("key_r"),
+            },
+            "s" => FieldValueInfo {
+                field_value_name: literal!("key_s"),
+            },
+            "t" => FieldValueInfo {
+                field_value_name: literal!("key_t"),
+            },
+            "u" => FieldValueInfo {
+                field_value_name: literal!("key_u"),
+            },
+            "v" => FieldValueInfo {
+                field_value_name: literal!("key_v"),
+            },
+            "w" => FieldValueInfo {
+                field_value_name: literal!("key_w"),
+            },
+            "x" => FieldValueInfo {
+                field_value_name: literal!("key_x"),
+            },
+            "y" => FieldValueInfo {
+                field_value_name: literal!("key_y"),
+            },
+            "z" => FieldValueInfo {
+                field_value_name: literal!("key_z"),
+            },
+            "0" => FieldValueInfo {
+                field_value_name: literal!("key_0"),
+            },
+            "1" => FieldValueInfo {
+                field_value_name: literal!("key_1"),
+            },
+            "2" => FieldValueInfo {
+                field_value_name: literal!("key_2"),
+            },
+            "3" => FieldValueInfo {
+                field_value_name: literal!("key_3"),
+            },
+            "4" => FieldValueInfo {
+                field_value_name: literal!("key_4"),
+            },
+            "5" => FieldValueInfo {
+                field_value_name: literal!("key_5"),
+            },
+            "6" => FieldValueInfo {
+                field_value_name: literal!("key_6"),
+            },
+            "7" => FieldValueInfo {
+                field_value_name: literal!("key_7"),
+            },
+            "8" => FieldValueInfo {
+                field_value_name: literal!("key_8"),
+            },
+            "9" => FieldValueInfo {
+                field_value_name: literal!("key_9"),
+            },
+            "LOUDNESS" => FieldValueInfo {
+                field_value_name: literal!("loudness"),
+            },
+            "TIMER" => FieldValueInfo {
+                field_value_name: literal!("timer"),
+            },
+            "all" => FieldValueInfo {
+                field_value_name: literal!("all"),
+            },
+            "this script" => FieldValueInfo {
+                field_value_name: literal!("this_script"),
+            },
+            "other scripts in sprite" => FieldValueInfo {
+                field_value_name: literal!("other_scripts_in_sprite"),
+            },
+            "_myself_" => FieldValueInfo {
+                field_value_name: literal!("myself"),
+            },
+            "_edge_" => FieldValueInfo {
+                field_value_name: literal!("edge"),
+            },
+            "draggable" => FieldValueInfo {
+                field_value_name: literal!("draggable"),
+            },
+            "not draggable" => FieldValueInfo {
+                field_value_name: literal!("not_draggable"),
+            },
+            "YEAR" => FieldValueInfo {
+                field_value_name: literal!("year"),
+            },
+            "MONTH" => FieldValueInfo {
+                field_value_name: literal!("month"),
+            },
+            "DATE" => FieldValueInfo {
+                field_value_name: literal!("date"),
+            },
+            "DAYOFWEEK" => FieldValueInfo {
+                field_value_name: literal!("day_of_week"),
+            },
+            "HOUR" => FieldValueInfo {
+                field_value_name: literal!("hour"),
+            },
+            "MINUTE" => FieldValueInfo {
+                field_value_name: literal!("minute"),
+            },
+            "SECOND" => FieldValueInfo {
+                field_value_name: literal!("second"),
+            },
+            "abs" => FieldValueInfo {
+                field_value_name: literal!("op_abs"),
+            },
+            "floor" => FieldValueInfo {
+                field_value_name: literal!("op_floor"),
+            },
+            "ceiling" => FieldValueInfo {
+                field_value_name: literal!("op_ceil"),
+            },
+            "sqrt" => FieldValueInfo {
+                field_value_name: literal!("op_sqrt"),
+            },
+            "sin" => FieldValueInfo {
+                field_value_name: literal!("op_sin"),
+            },
+            "cos" => FieldValueInfo {
+                field_value_name: literal!("op_cos"),
+            },
+            "tan" => FieldValueInfo {
+                field_value_name: literal!("op_tan"),
+            },
+            "asin" => FieldValueInfo {
+                field_value_name: literal!("op_asin"),
+            },
+            "acos" => FieldValueInfo {
+                field_value_name: literal!("op_acos"),
+            },
+            "atan" => FieldValueInfo {
+                field_value_name: literal!("op_atan"),
+            },
+            "ln" => FieldValueInfo {
+                field_value_name: literal!("op_ln"),
+            },
+            "log" => FieldValueInfo {
+                field_value_name: literal!("op_log"),
+            },
+            "e ^" => FieldValueInfo {
+                field_value_name: literal!("op_exp"),
+            },
+            "10 ^" => FieldValueInfo {
+                field_value_name: literal!("op_pow"),
+            },
+
+            "color" => FieldValueInfo {
+                field_value_name: literal!("pen_color"),
+            },
+            "saturation" => FieldValueInfo {
+                field_value_name: literal!("pen_saturation"),
+            },
+            "brightness" => FieldValueInfo {
+                field_value_name: literal!("pen_brightness"),
+            },
+            "transparency" => FieldValueInfo {
+                field_value_name: literal!("pen_transparency"),
+            },
+            _ => return None,
+        })
+    } else {
+        None
+    }
 }
