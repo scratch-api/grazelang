@@ -35,6 +35,7 @@ pub enum ArgumentKind {
 
 pub const MOTION_CATEGORY: &IString = &literal!("motion");
 pub const LOOKS_CATEGORY: &IString = &literal!("looks");
+pub const COSTUME_CATEGORY: &IString = &literal!("costume");
 pub const SOUND_CATEGORY: &IString = &literal!("sound");
 pub const EVENTS_CATEGORY: &IString = &literal!("events");
 pub const CONTROL_CATEGORY: &IString = &literal!("control");
@@ -45,12 +46,25 @@ pub const DATA_CATEGORY: &IString = &literal!("data");
 pub const PEN_CATEGORY: &IString = &literal!("pen");
 pub const MUSIC_CATEGORY: &IString = &literal!("music");
 
+pub const MATH_NUMBER_ISTRING: &IString = &literal!("math_number");
+pub const MATH_INTEGER_ISTRING: &IString = &literal!("math_integer");
+pub const MATH_POSITIVE_NUMBER_ISTRING: &IString = &literal!("math_positive_number");
+pub const MATH_POSITIVE_INTEGER_ISTRING: &IString = &literal!("math_whole_number");
+
+pub const NUM_ISTRING: &IString = &literal!("NUM");
+pub const NUM1_ISTRING: &IString = &literal!("NUM1");
+pub const NUM2_ISTRING: &IString = &literal!("NUM2");
+pub const TEXT_ISTRING: &IString = &literal!("TEXT");
+
 pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<BlockKindInfo> {
     Some(match block.opcode.as_str() {
         "motion_movesteps" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("STEPS"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("STEPS"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -59,7 +73,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "motion_turnright" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("DEGREES"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("DEGREES"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -68,7 +85,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "motion_turnleft" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("DEGREES"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("DEGREES"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -90,12 +110,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("X"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("X"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("Y"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("Y"),
+                    },
                     ignore: false,
                 },
             ],
@@ -106,7 +132,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("SECS"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("SECS"),
+                    },
                     ignore: false,
                 },
                 Argument {
@@ -125,17 +154,26 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("SECS"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("SECS"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("X"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("X"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("Y"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("Y"),
+                    },
                     ignore: false,
                 },
             ],
@@ -145,7 +183,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "motion_pointindirection" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("DIRECTION"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: literal!("math_angle"),
+                    menu_field: literal!("DIRECTION"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -166,7 +207,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "motion_changexby" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("DX"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("DX"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -175,7 +219,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "motion_setx" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("X"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("X"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -184,7 +231,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "motion_changeyby" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("DY"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("DY"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -193,7 +243,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "motion_sety" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("Y"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("Y"),
+                },
                 ignore: false,
             }],
             block_category: MOTION_CATEGORY.clone(),
@@ -233,12 +286,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("MESSAGE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("MESSAGE"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("SECS"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("SECS"),
+                    },
                     ignore: false,
                 },
             ],
@@ -248,7 +307,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "looks_say" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("MESSAGE"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: TEXT_ISTRING.clone(),
+                    menu_field: literal!("MESSAGE"),
+                },
                 ignore: false,
             }],
             block_category: LOOKS_CATEGORY.clone(),
@@ -258,12 +320,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("MESSAGE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("MESSAGE"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("SECS"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("SECS"),
+                    },
                     ignore: false,
                 },
             ],
@@ -273,7 +341,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "looks_think" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("MESSAGE"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: TEXT_ISTRING.clone(),
+                    menu_field: literal!("MESSAGE"),
+                },
                 ignore: false,
             }],
             block_category: LOOKS_CATEGORY.clone(),
@@ -328,7 +399,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "looks_changesizeby" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("CHANGE"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("CHANGE"),
+                },
                 ignore: false,
             }],
             block_category: LOOKS_CATEGORY.clone(),
@@ -337,7 +411,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "looks_setsizeto" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("SIZE"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("SIZE"),
+                },
                 ignore: false,
             }],
             block_category: LOOKS_CATEGORY.clone(),
@@ -352,7 +429,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("CHANGE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("CHANGE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -368,7 +448,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -407,8 +490,11 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                     ignore: false,
                 },
                 Argument {
-                    name: literal!("NUM"),
-                    kind: ArgumentKind::Input,
+                    name: NUM_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_INTEGER_ISTRING.clone(),
+                        menu_field: NUM_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
             ],
@@ -419,19 +505,47 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![Argument {
                 name: literal!("NUMBER_NAME"),
                 kind: ArgumentKind::Field,
-                ignore: false,
+                ignore: true,
             }],
-            block_category: LOOKS_CATEGORY.clone(),
-            block_name: literal!("get_costume"),
+            block_category: COSTUME_CATEGORY.clone(),
+            block_name: {
+                let number_name = block.fields.get("NUMBER_NAME")?;
+                if let project_json::Sb3FieldValue::Normal(project_json::Sb3Primitive::String(
+                    value,
+                )) = number_name
+                {
+                    match value.as_str() {
+                        "number" => literal!("costume_number"),
+                        "name" => literal!("costume_name"),
+                        _ => return None,
+                    }
+                } else {
+                    return None;
+                }
+            },
         },
         "looks_backdropnumbername" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("NUMBER_NAME"),
                 kind: ArgumentKind::Field,
-                ignore: false,
+                ignore: true,
             }],
-            block_category: LOOKS_CATEGORY.clone(),
-            block_name: literal!("get_backdrop"),
+            block_category: COSTUME_CATEGORY.clone(),
+            block_name: {
+                let number_name = block.fields.get("NUMBER_NAME")?;
+                if let project_json::Sb3FieldValue::Normal(project_json::Sb3Primitive::String(
+                    value,
+                )) = number_name
+                {
+                    match value.as_str() {
+                        "number" => literal!("backdrop_number"),
+                        "name" => literal!("backdrop_name"),
+                        _ => return None,
+                    }
+                } else {
+                    return None;
+                }
+            },
         },
         "looks_size" => BlockKindInfo {
             arguments: vec![],
@@ -477,7 +591,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -493,7 +610,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -508,7 +628,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "sound_changevolumeby" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("VOLUME"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("VOLUME"),
+                },
                 ignore: false,
             }],
             block_category: SOUND_CATEGORY.clone(),
@@ -517,7 +640,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "sound_setvolumeto" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("VOLUME"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("VOLUME"),
+                },
                 ignore: false,
             }],
             block_category: SOUND_CATEGORY.clone(),
@@ -566,7 +692,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -599,7 +728,7 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 name: literal!("BROADCAST_INPUT"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: literal!("event_broadcast_menu"),
-                    menu_field: literal!("BROADCAST_OPTION"),
+                    menu_field: literal!("BROADCAST_INPUT"),
                 },
                 ignore: false,
             }],
@@ -610,7 +739,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "control_wait" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("DURATION"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_POSITIVE_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("DURATION"),
+                },
                 ignore: false,
             }],
             block_category: CONTROL_CATEGORY.clone(),
@@ -620,7 +752,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("TIMES"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_POSITIVE_INTEGER_ISTRING.clone(),
+                        menu_field: literal!("TIMES"),
+                    },
                     ignore: false,
                 },
                 Argument {
@@ -761,7 +896,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "sensing_touchingcolor" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("COLOR"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: literal!("colour_picker"),
+                    menu_field: literal!("COLOR"),
+                },
                 ignore: false,
             }],
             block_category: SENSING_CATEGORY.clone(),
@@ -771,12 +909,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("COLOR"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: literal!("colour_picker"),
+                        menu_field: literal!("COLOR"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("COLOR2"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: literal!("colour_picker"),
+                        menu_field: literal!("COLOR2"),
+                    },
                     ignore: false,
                 },
             ],
@@ -798,7 +942,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "sensing_askandwait" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("QUESTION"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: TEXT_ISTRING.clone(),
+                    menu_field: literal!("QUESTION"),
+                },
                 ignore: false,
             }],
             block_category: SENSING_CATEGORY.clone(),
@@ -893,17 +1040,33 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             block_category: SENSING_CATEGORY.clone(),
             block_name: literal!("days_since_2000"),
         },
+        "sensing_online" => BlockKindInfo {
+            arguments: vec![],
+            block_category: SENSING_CATEGORY.clone(),
+            block_name: literal!("is_online"),
+        },
+        "sensing_username" => BlockKindInfo {
+            arguments: vec![],
+            block_category: SENSING_CATEGORY.clone(),
+            block_name: literal!("username"),
+        },
 
         "operator_add" => BlockKindInfo {
             arguments: vec![
                 Argument {
-                    name: literal!("NUM1"),
-                    kind: ArgumentKind::Input,
+                    name: NUM1_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM1_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
                 Argument {
-                    name: literal!("NUM2"),
-                    kind: ArgumentKind::Input,
+                    name: NUM2_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM2_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
             ],
@@ -913,13 +1076,19 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "operator_subtract" => BlockKindInfo {
             arguments: vec![
                 Argument {
-                    name: literal!("NUM1"),
-                    kind: ArgumentKind::Input,
+                    name: NUM1_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM1_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
                 Argument {
-                    name: literal!("NUM2"),
-                    kind: ArgumentKind::Input,
+                    name: NUM2_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM2_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
             ],
@@ -929,13 +1098,19 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "operator_multiply" => BlockKindInfo {
             arguments: vec![
                 Argument {
-                    name: literal!("NUM1"),
-                    kind: ArgumentKind::Input,
+                    name: NUM1_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM1_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
                 Argument {
-                    name: literal!("NUM2"),
-                    kind: ArgumentKind::Input,
+                    name: NUM2_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM2_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
             ],
@@ -945,13 +1120,19 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "operator_divide" => BlockKindInfo {
             arguments: vec![
                 Argument {
-                    name: literal!("NUM1"),
-                    kind: ArgumentKind::Input,
+                    name: NUM1_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM1_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
                 Argument {
-                    name: literal!("NUM2"),
-                    kind: ArgumentKind::Input,
+                    name: NUM2_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM2_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
             ],
@@ -962,12 +1143,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("FROM"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("FROM"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("TO"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("TO"),
+                    },
                     ignore: false,
                 },
             ],
@@ -978,12 +1165,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("OPERAND1"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("OPERAND1"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("OPERAND2"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("OPERAND2"),
+                    },
                     ignore: false,
                 },
             ],
@@ -994,12 +1187,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("OPERAND1"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("OPERAND1"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("OPERAND2"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("OPERAND2"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1010,12 +1209,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("OPERAND1"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("OPERAND1"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("OPERAND2"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("OPERAND2"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1067,12 +1272,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("STRING1"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("STRING1"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("STRING2"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("STRING2"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1083,12 +1294,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("LETTER"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_POSITIVE_INTEGER_ISTRING.clone(),
+                        menu_field: literal!("LETTER"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("STRING"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("STRING"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1098,7 +1315,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "operator_length" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("STRING"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: TEXT_ISTRING.clone(),
+                    menu_field: literal!("STRING"),
+                },
                 ignore: false,
             }],
             block_category: OPERATORS_CATEGORY.clone(),
@@ -1108,12 +1328,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("STRING1"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("STRING1"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("STRING2"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("STRING2"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1123,13 +1349,19 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "operator_mod" => BlockKindInfo {
             arguments: vec![
                 Argument {
-                    name: literal!("NUM1"),
-                    kind: ArgumentKind::Input,
+                    name: NUM1_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM1_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
                 Argument {
-                    name: literal!("NUM2"),
-                    kind: ArgumentKind::Input,
+                    name: NUM2_ISTRING.clone(),
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: NUM2_ISTRING.clone(),
+                    },
                     ignore: false,
                 },
             ],
@@ -1138,14 +1370,16 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         },
         "operator_round" => BlockKindInfo {
             arguments: vec![Argument {
-                name: literal!("NUM"),
-                kind: ArgumentKind::Input,
+                name: NUM_ISTRING.clone(),
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: NUM_ISTRING.clone(),
+                },
                 ignore: false,
             }],
             block_category: OPERATORS_CATEGORY.clone(),
             block_name: literal!("round"),
         },
-
         "operator_mathop" => {
             let math_op_name = match block.fields.get("OPERATOR") {
                 Some(project_json::Sb3FieldValue::Normal(project_json::Sb3Primitive::String(
@@ -1177,8 +1411,11 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                         ignore: true,
                     },
                     Argument {
-                        name: literal!("NUM"),
-                        kind: ArgumentKind::Input,
+                        name: NUM_ISTRING.clone(),
+                        kind: ArgumentKind::MenuInput {
+                            menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                            menu_field: NUM_ISTRING.clone(),
+                        },
                         ignore: false,
                     },
                 ],
@@ -1205,7 +1442,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1221,7 +1461,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1264,7 +1507,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("ITEM"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("ITEM"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1280,7 +1526,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("INDEX"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_INTEGER_ISTRING.clone(),
+                        menu_field: literal!("INDEX"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1305,12 +1554,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("INDEX"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_INTEGER_ISTRING.clone(),
+                        menu_field: literal!("INDEX"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("ITEM"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("ITEM"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1326,12 +1581,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("INDEX"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_INTEGER_ISTRING.clone(),
+                        menu_field: literal!("INDEX"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("ITEM"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("ITEM"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1347,7 +1608,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("INDEX"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_INTEGER_ISTRING.clone(),
+                        menu_field: literal!("INDEX"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1363,7 +1627,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("ITEM"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("ITEM"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1388,7 +1655,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("ITEM"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: TEXT_ISTRING.clone(),
+                        menu_field: literal!("ITEM"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1437,7 +1707,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "pen_setPenColorToColor" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("COLOR"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: literal!("colour_picker"),
+                    menu_field: literal!("COLOR"),
+                },
                 ignore: false,
             }],
             block_category: PEN_CATEGORY.clone(),
@@ -1455,7 +1728,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1474,7 +1750,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("VALUE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("VALUE"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1484,7 +1763,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "pen_changePenSizeBy" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("SIZE"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("SIZE"),
+                },
                 ignore: false,
             }],
             block_category: PEN_CATEGORY.clone(),
@@ -1493,7 +1775,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "pen_setPenSizeTo" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("SIZE"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("SIZE"),
+                },
                 ignore: false,
             }],
             block_category: PEN_CATEGORY.clone(),
@@ -1512,7 +1797,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
                 },
                 Argument {
                     name: literal!("BEATS"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("BEATS"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1522,7 +1810,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "music_restForBeats" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("BEATS"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("BEATS"),
+                },
                 ignore: false,
             }],
             block_category: MUSIC_CATEGORY.clone(),
@@ -1532,12 +1823,18 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
             arguments: vec![
                 Argument {
                     name: literal!("NOTE"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: literal!("note"),
+                        menu_field: literal!("NOTE"),
+                    },
                     ignore: false,
                 },
                 Argument {
                     name: literal!("BEATS"),
-                    kind: ArgumentKind::Input,
+                    kind: ArgumentKind::MenuInput {
+                        menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                        menu_field: literal!("BEATS"),
+                    },
                     ignore: false,
                 },
             ],
@@ -1559,7 +1856,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "music_setTempo" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("TEMPO"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("TEMPO"),
+                },
                 ignore: false,
             }],
             block_category: MUSIC_CATEGORY.clone(),
@@ -1568,7 +1868,10 @@ pub fn get_block_kind_info(block: &project_json::Sb3NormalBlock) -> Option<Block
         "music_changeTempo" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("TEMPO"),
-                kind: ArgumentKind::Input,
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: literal!("TEMPO"),
+                },
                 ignore: false,
             }],
             block_category: MUSIC_CATEGORY.clone(),
