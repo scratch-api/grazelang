@@ -16,6 +16,7 @@ pub struct IStringNamespace {
 }
 
 // TODO: Better names for these different types of namespaces
+// Issue: #95
 
 impl Namespace {
     pub fn new() -> Self {
