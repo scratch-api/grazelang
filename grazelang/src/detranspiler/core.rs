@@ -18,7 +18,7 @@ pub struct DetranspilerContext {
     pub assets: HashMap<AssetPath, OutAssetPath>,
     pub messages: Vec<GrazeDetranspilerMessage>,
     pub settings: GrazeDetranspilerSettings,
-    pub broadcasts: HashMap<IString, DetranspilerBroadcast>,
+    pub broadcasts: HashMap<DataId, DetranspilerBroadcast>,
 }
 
 type DetranspilerResult<T> = Result<T, GrazeDetranspilerError>;
@@ -39,6 +39,7 @@ pub struct DetranspilerTarget {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerBroadcast {
     pub canonical_name: Option<IString>,
+    pub name: IString,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -283,7 +284,21 @@ pub fn convert_primitive_reporter_block(
                 }
             }))
         }
-        project_json::Sb3PrimitiveBlock::Broadcast { name, id } => todo!(),
+        project_json::Sb3PrimitiveBlock::Broadcast { name, id } => {
+            let broadcast = context
+                .broadcasts
+                .get(id)
+                .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
+                .ok_or_else(|| GrazeDetranspilerError::UnknownBroadcast {
+                    id: id.clone(),
+                    name: name.clone(),
+                })?;
+            Ok(ast_types::Expression::Identifier(ast_types::Identifier {
+                path: vec![ast_types::SingleIdentifier {
+                    value: broadcast.name.clone(),
+                }],
+            }))
+        }
         project_json::Sb3PrimitiveBlock::Variable {
             name,
             id,

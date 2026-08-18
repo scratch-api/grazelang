@@ -550,6 +550,8 @@ pub enum GrazeDetranspilerError {
     UnknownVariable { id: String, name: String },
     #[assoc(internal_lint_id = "unknown_list")]
     UnknownList { id: String, name: String },
+    #[assoc(internal_lint_id = "unknown_broadcast")]
+    UnknownBroadcast { id: String, name: String },
 }
 
 #[cfg(feature = "detranspiler")]

@@ -15,6 +15,8 @@ pub struct IStringNamespace {
     pub used_names: HashMap<IString, IString>,
 }
 
+// TODO: Better names for these different types of namespaces
+
 impl Namespace {
     pub fn new() -> Self {
         Self::default()
@@ -99,6 +101,7 @@ impl IStringNamespace {
         }
         self.introduce_new_name(name)
     }
+
     pub fn assign_name_for(&mut self, original_name: IString, name: IString) -> IString {
         // Disabled to prevent panics. There is also a warning for this scenario.
         // if self.used_names.contains_key(&name) {
@@ -107,7 +110,59 @@ impl IStringNamespace {
         self.used_names.insert(name.clone(), original_name);
         name
     }
+
+    pub fn convert_to_snake_case(name: IString) -> IString {
+        let (alphanumeric, uppercase) = name.chars().fold((true, true), |(a, b), c| {
+            (
+                a && (c.is_ascii_alphanumeric() || c == '_'),
+                b && c.is_uppercase(),
+            )
+        });
+        if alphanumeric {
+            return name;
+        }
+        let mut new_name = String::with_capacity(name.len());
+        if uppercase {
+            let mut alphanumeric = name
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_alphanumeric())
+                .unwrap_or(true);
+            for c in name.chars() {
+                if c.is_ascii_alphanumeric() {
+                    new_name.push(c);
+                    alphanumeric = true;
+                } else if alphanumeric {
+                    alphanumeric = false;
+                    new_name.push('_');
+                }
+            }
+        } else {
+            let (mut alphanumeric, mut uppercase) = name
+                .chars()
+                .next()
+                .map(|c| (c.is_ascii_alphanumeric(), c.is_ascii_uppercase()))
+                .unwrap_or((true, false));
+            for c in name.chars() {
+                if c.is_ascii_alphanumeric() {
+                    if !uppercase && c.is_ascii_uppercase() {
+                        new_name.push('_');
+                    }
+                    new_name.push(c.to_ascii_lowercase());
+                    alphanumeric = true;
+                    uppercase = c.is_ascii_uppercase();
+                } else if alphanumeric {
+                    uppercase = true;
+                    alphanumeric = true;
+                    new_name.push('_');
+                }
+            }
+        }
+        new_name.into()
+    }
+
     pub fn introduce_new_name(&mut self, original_name: IString) -> IString {
+        let original_name = Self::convert_to_snake_case(original_name);
         if !self.used_names.contains_key(&original_name) {
             return self.assign_name_for(original_name.clone(), original_name);
         }
