@@ -5,8 +5,10 @@ use grazelang_types::project_json;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    ast::core as ast_types,
-    detranspiler::get_info::{Argument, ArgumentKind, get_block_kind_info, get_field_value_info},
+    ast::types as ast_types,
+    detranspiler::get_info::{
+        Argument, ArgumentKind, FieldValueInfo, get_block_kind_info, get_field_value_info,
+    },
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
     names::{BidirectionalNamespace, IStringNamespace},
     settings::{GrazeDetranspilerSettings, GrazeMessageSetting},
@@ -88,7 +90,21 @@ pub struct DetranspilerCostumeUncommonData {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerSoundUncommonData;
 
-pub fn emit_message(
+#[inline]
+pub fn emit_message<M>(
+    context: &mut DetranspilerContext,
+    message: M,
+    message_type: GrazeMessageSetting,
+) where
+    M: FnOnce() -> GrazeDetranspilerMessage,
+{
+    if context.settings.message_setting >= message_type {
+        context.messages.push(message());
+    }
+}
+
+#[inline]
+pub fn emit_message_eager(
     context: &mut DetranspilerContext,
     message: GrazeDetranspilerMessage,
     message_type: GrazeMessageSetting,
@@ -126,7 +142,7 @@ macro_rules! emit_error {
         ) {
             return Err(err);
         }
-        emit_message(context, err.into(), GrazeMessageSetting::Errors);
+        emit_message_eager(context, err.into(), GrazeMessageSetting::Errors);
     }};
 }
 
@@ -152,6 +168,32 @@ pub fn block_check_name_collision(
     context: &DetranspilerContext,
 ) -> bool {
     todo!()
+}
+
+pub fn create_block_identifier(
+    category_name: &IString,
+    block_name: &IString,
+    target: &DetranspilerTarget,
+    context: &DetranspilerContext,
+) -> ast_types::Identifier {
+    if block_check_name_collision(block_name, target, context) {
+        ast_types::Identifier {
+            path: vec![
+                ast_types::SingleIdentifier {
+                    value: category_name.clone(),
+                },
+                ast_types::SingleIdentifier {
+                    value: block_name.clone(),
+                },
+            ],
+        }
+    } else {
+        ast_types::Identifier {
+            path: vec![ast_types::SingleIdentifier {
+                value: block_name.clone(),
+            }],
+        }
+    }
 }
 
 pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast_types::Literal {
@@ -307,11 +349,17 @@ pub fn convert_normal_reporter_block(
     let block_kind_info = get_block_kind_info(block)?;
     let mut tracked_args = 0_usize;
     let mut parameters = Vec::new();
-    for Argument { name, kind, ignore } in &block_kind_info.arguments {
+    let mut stack_params = Vec::new();
+    for Argument {
+        name: argument_name,
+        kind,
+        ignore,
+    } in &block_kind_info.arguments
+    {
         if if kind.is_field() {
-            block.fields.contains_key(name.as_str())
+            block.fields.contains_key(argument_name.as_str())
         } else {
-            block.inputs.contains_key(name.as_str())
+            block.inputs.contains_key(argument_name.as_str())
         } {
             tracked_args += 1;
         }
@@ -320,56 +368,21 @@ pub fn convert_normal_reporter_block(
         }
         match kind {
             ArgumentKind::Field => {
-                let Some(field_value) = block.fields.get(name.as_str()) else {
+                let Some(field_value) = block.fields.get(argument_name.as_str()) else {
                     parameters.push(ast_types::Expression::Literal(
                         ast_types::Literal::EmptyExpression,
                     ));
                     continue;
                 };
-                match get_field_value_info(field_value, &block.opcode) {
-                    Some(value) => {
-                        parameters.push(ast_types::Expression::Identifier(ast_types::Identifier {
-                            path: vec![ast_types::SingleIdentifier {
-                                value: value.field_value_name,
-                            }],
-                        }));
-                    }
-                    None => {
-                        parameters.push(match field_value {
-                            project_json::Sb3FieldValue::Normal(value) => {
-                                ast_types::Expression::Literal(get_literal_from_sb3_primitive(
-                                    value,
-                                ))
-                            }
-                            project_json::Sb3FieldValue::WithId { value, id } => {
-                                ast_types::Expression::Identifier(ast_types::Identifier {
-                                    path: vec![ast_types::SingleIdentifier {
-                                        value: match lookup_vlb(
-                                            &value.as_cow_str(),
-                                            id,
-                                            target,
-                                            context,
-                                        )
-                                        .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
-                                            id: id.clone(),
-                                            name: value.to_string(),
-                                        })? {
-                                            DetranspilerVLB::Broadcast(broadcast) => {
-                                                broadcast.name.clone()
-                                            }
-                                            DetranspilerVLB::VarOrList(var_or_list) => {
-                                                var_or_list.name.clone()
-                                            }
-                                        },
-                                    }],
-                                })
-                            }
-                        });
-                    }
-                }
+                parameters.push(convert_field_value_info(
+                    get_field_value_info(field_value, &block.opcode),
+                    field_value,
+                    target,
+                    context,
+                )?);
             }
             ArgumentKind::Input => {
-                let Some(input) = block.inputs.get(name.as_str()) else {
+                let Some(input) = block.inputs.get(argument_name.as_str()) else {
                     parameters.push(ast_types::Expression::Literal(
                         ast_types::Literal::EmptyExpression,
                     ));
@@ -401,11 +414,155 @@ pub fn convert_normal_reporter_block(
                     ),
                 });
             }
-            ArgumentKind::StackInput => todo!(),
+            ArgumentKind::StackInput => {
+                let Some(input) = block.inputs.get(argument_name.as_str()) else {
+                    stack_params.push(ast_types::CodeBlock {
+                        statements: Vec::new(),
+                    });
+                    continue;
+                };
+                let (project_json::Sb3InputValue::Shadow(input_repr)
+                | project_json::Sb3InputValue::NoShadow(input_repr)
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: input_repr,
+                    shadow: _,
+                }) = input;
+                stack_params.push(match input_repr {
+                    project_json::Sb3InputRepr::Reference(block_id) => convert_block_stack(
+                        blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        })?,
+                        block_id,
+                        blocks,
+                        context,
+                        target,
+                    )?,
+                    project_json::Sb3InputRepr::PrimitiveBlock(_) => {
+                        emit_error!(
+                            GrazeDetranspilerError::PrimitiveBlockAsSubstack {
+                                block_id: block_id.to_string(),
+                                input_name: argument_name.to_string()
+                            },
+                            context
+                        );
+                        ast_types::CodeBlock {
+                            statements: Vec::new(),
+                        }
+                    }
+                });
+                emit_error!(
+                    GrazeDetranspilerError::SubstackInReporter {
+                        block_id: block_id.to_string(),
+                        input_name: argument_name.to_string()
+                    },
+                    context
+                );
+            }
             ArgumentKind::MenuInput {
                 menu_opcode,
                 menu_field,
-            } => todo!(),
+            } => {
+                let Some(input) = block.inputs.get(argument_name.as_str()) else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnexpectedEmptyInput {
+                                input: argument_name.to_string(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                    continue;
+                };
+                let (project_json::Sb3InputValue::Shadow(input_repr)
+                | project_json::Sb3InputValue::NoShadow(input_repr)
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: input_repr,
+                    shadow: _,
+                }) = input;
+                parameters.push(match input_repr {
+                    project_json::Sb3InputRepr::Reference(block_id) => {
+                        let inner_block = blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        })?;
+                        if let project_json::Sb3Block::Normal(inner_block) = inner_block
+                            && inner_block.opcode.as_str() == menu_opcode.as_str()
+                        {
+                            for key in inner_block.fields.keys() {
+                                if key.as_str() == menu_field.as_str() {
+                                    continue;
+                                }
+                                let arg = key.clone();
+                                emit_message(
+                                    context,
+                                    || {
+                                        GrazeDetranspilerWarning::UnusedField {
+                                            field: arg,
+                                            block_id: block_id.to_string(),
+                                        }
+                                        .into()
+                                    },
+                                    GrazeMessageSetting::Warnings,
+                                );
+                            }
+                            for key in inner_block.inputs.keys() {
+                                let arg = key.clone();
+                                emit_message(
+                                    context,
+                                    || {
+                                        GrazeDetranspilerWarning::UnusedInput {
+                                            input: arg,
+                                            block_id: block_id.to_string(),
+                                        }
+                                        .into()
+                                    },
+                                    GrazeMessageSetting::Warnings,
+                                );
+                            }
+                            if let Some(field_value) = inner_block.fields.get(menu_field.as_str()) {
+                                convert_field_value_info(
+                                    get_field_value_info(field_value, menu_opcode),
+                                    field_value,
+                                    target,
+                                    context,
+                                )?
+                            } else {
+                                parameters.push(ast_types::Expression::Literal(
+                                    ast_types::Literal::EmptyExpression,
+                                ));
+                                emit_message(
+                                    context,
+                                    || {
+                                        GrazeDetranspilerWarning::MissingMenuField {
+                                            field: menu_field.to_string(),
+                                            block_id: block_id.clone(),
+                                        }
+                                        .into()
+                                    },
+                                    GrazeMessageSetting::Warnings,
+                                );
+                                continue;
+                            }
+                        } else {
+                            convert_reporter_block(inner_block, block_id, blocks, context, target)?
+                        }
+                    }
+                    project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                        convert_primitive_reporter_block(block, blocks, context, target),
+                        context,
+                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ),
+                });
+            }
         }
     }
     if tracked_args != block.fields.len() + block.inputs.len() {
@@ -429,23 +586,75 @@ pub fn convert_normal_reporter_block(
         for (arg, is_field) in tracked_args {
             emit_message(
                 context,
-                if is_field {
-                    GrazeDetranspilerWarning::UnusedField {
-                        field: arg,
-                        block_id: block_id.to_string(),
+                || {
+                    if is_field {
+                        GrazeDetranspilerWarning::UnusedField {
+                            field: arg,
+                            block_id: block_id.to_string(),
+                        }
+                    } else {
+                        GrazeDetranspilerWarning::UnusedInput {
+                            input: arg,
+                            block_id: block_id.to_string(),
+                        }
                     }
-                } else {
-                    GrazeDetranspilerWarning::UnusedInput {
-                        input: arg,
-                        block_id: block_id.to_string(),
-                    }
-                }
-                .into(),
+                    .into()
+                },
                 GrazeMessageSetting::Warnings,
             );
         }
     }
-    todo!()
+    if block_kind_info.is_singleton && parameters.is_empty() {
+        return Ok(ast_types::Expression::Identifier(create_block_identifier(
+            &block_kind_info.block_category,
+            &block_kind_info.block_name,
+            target,
+            context,
+        )));
+    }
+    Ok(ast_types::Expression::Call {
+        function: create_block_identifier(
+            &block_kind_info.block_category,
+            &block_kind_info.block_name,
+            target,
+            context,
+        ),
+        arguments: parameters,
+    })
+}
+
+pub fn convert_field_value_info(
+    field_value_info: Option<FieldValueInfo>,
+    field_value: &project_json::Sb3FieldValue,
+    target: &DetranspilerTarget,
+    context: &mut DetranspilerContext,
+) -> DetranspilerResult<ast_types::Expression> {
+    Ok(match field_value_info {
+        Some(value) => ast_types::Expression::Identifier(ast_types::Identifier {
+            path: vec![ast_types::SingleIdentifier {
+                value: value.field_value_name,
+            }],
+        }),
+        None => match field_value {
+            project_json::Sb3FieldValue::Normal(value) => {
+                ast_types::Expression::Literal(get_literal_from_sb3_primitive(value))
+            }
+            project_json::Sb3FieldValue::WithId { value, id } => {
+                ast_types::Expression::Identifier(ast_types::Identifier {
+                    path: vec![ast_types::SingleIdentifier {
+                        value: match lookup_vlb(&value.as_cow_str(), id, target, context)
+                            .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
+                                id: id.clone(),
+                                name: value.to_string(),
+                            })? {
+                            DetranspilerVLB::Broadcast(broadcast) => broadcast.name.clone(),
+                            DetranspilerVLB::VarOrList(var_or_list) => var_or_list.name.clone(),
+                        },
+                    }],
+                })
+            }
+        },
+    })
 }
 
 pub fn convert_primitive_reporter_block(
@@ -526,6 +735,16 @@ pub fn convert_primitive_reporter_block(
 
 // IString allows for more efficient cycle detection
 type NextBlockId = IString;
+
+pub fn convert_block_stack(
+    block: &project_json::Sb3Block,
+    block_id: &str,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+    target: &DetranspilerTarget,
+) -> DetranspilerResult<ast_types::CodeBlock> {
+    todo!()
+}
 
 pub fn convert_stack_block(
     block: &project_json::Sb3Block,

@@ -22,7 +22,7 @@ use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen::{self, core::emit_message, ids::generate_random_id_as_string},
+    codegen::{self, core::emit_message_eager, ids::generate_random_id_as_string},
     lexer::SourceSpan,
     messages::types::{GrazeSourceMessage, GrazeSourceWarning, SpecificGrazeWarning},
     parser::cst::CustomBlockParamKindValue,
@@ -220,7 +220,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::BoundMethod { .. } => {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(SpecificGrazeWarning::CallableAsInput, source_span),
@@ -279,7 +279,7 @@ impl ResolveKnownBlock for KnownBlock {
             ),
             KnownBlock::FieldValue { value, categories } => (value.clone(), categories),
             KnownBlock::BlockRef { id: _ } => {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(SpecificGrazeWarning::BlockRefAsField, source_span),
@@ -345,7 +345,7 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::PartialCallable(..)
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::BoundMethod { .. } => {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(SpecificGrazeWarning::CallableAsField, source_span),
@@ -357,7 +357,7 @@ impl ResolveKnownBlock for KnownBlock {
                 (Sb3FieldValue::Normal("".into()), &*ANY_CATEGORIES)
             }
             KnownBlock::Empty => {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
@@ -393,7 +393,7 @@ impl ResolveKnownBlock for KnownBlock {
                         Sb3FieldValue::WithId { .. } => (value.clone(), &*ANY_CATEGORIES),
                     }
                 } else {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -486,7 +486,7 @@ impl ResolveKnownBlock for KnownBlock {
                     && let Some(target) = context.current_sb3_target.as_ref()
                     && bind_info.parent_target.as_str() != target.get_field_value()
                 {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(

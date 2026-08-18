@@ -555,6 +555,10 @@ pub enum GrazeDetranspilerError {
     UnknownBroadcast { id: String, name: String },
     #[assoc(internal_lint_id = "invalid_block_reference")]
     InvalidBlockReference { block_id: String },
+    #[assoc(internal_lint_id = "primitive_block_as_substack")]
+    PrimitiveBlockAsSubstack { block_id: String, input_name: String },
+    #[assoc(internal_lint_id = "substack_in_reporter")]
+    SubstackInReporter { block_id: String, input_name: String },
 }
 
 #[cfg(feature = "detranspiler")]
@@ -565,6 +569,10 @@ pub enum GrazeDetranspilerWarning {
     UnusedField { field: String, block_id: String },
     #[assoc(internal_lint_id = "unused_input")]
     UnusedInput { input: String, block_id: String },
+    #[assoc(internal_lint_id = "unexpected_empty_input")]
+    UnexpectedEmptyInput { input: String, block_id: String },
+    #[assoc(internal_lint_id = "missing_menu_field")]
+    MissingMenuField { field: String, block_id: String },
 }
 
 #[cfg(feature = "detranspiler")]

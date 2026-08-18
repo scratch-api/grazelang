@@ -1819,7 +1819,7 @@ pub fn add_known_block_to_params(
                 if !(categories.contains(category)
                     || (*category == INTEGERS_CATEGORY_ID && field_value.is_valid_i128()))
                 {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -1873,7 +1873,7 @@ pub fn add_known_block_to_params(
                                 || (*category == INTEGERS_CATEGORY_ID
                                     && sb3_primitive.is_valid_i128()))
                             {
-                                emit_message(
+                                emit_message_eager(
                                     context,
                                     GrazeSourceMessage::Warning(
                                         GrazeSourceWarning::Specific(
@@ -1900,7 +1900,7 @@ pub fn add_known_block_to_params(
                         }
                         Sb3PrimitiveBlock::Broadcast { .. } => {
                             if !BROADCAST_CATEGORIES.contains(category) {
-                                emit_message(
+                                emit_message_eager(
                                     context,
                                     GrazeSourceMessage::Warning(
                                         GrazeSourceWarning::Specific(
@@ -1928,7 +1928,7 @@ pub fn add_known_block_to_params(
                 ),
                 grazelang_types::KnownBlockInput::Menu(input_menu_value, categories) => {
                     if !categories.contains(category) {
-                        emit_message(
+                        emit_message_eager(
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
@@ -2210,7 +2210,7 @@ pub fn use_symbol_as(
     }
 }
 
-pub fn emit_message(
+pub fn emit_message_eager(
     context: &mut GrazeSb3GeneratorContext,
     message: GrazeSourceMessage,
     message_type: GrazeMessageSetting,
@@ -2230,7 +2230,7 @@ macro_rules! emit_error {
         ) {
             return Err(err);
         }
-        emit_message(context, err.into(), GrazeMessageSetting::Errors);
+        emit_message_eager(context, err.into(), GrazeMessageSetting::Errors);
     }};
 }
 
@@ -2261,7 +2261,7 @@ pub mod helpers {
         path::{Path, PathBuf},
     };
 
-    use super::{GrazeSb3GeneratorContext, emit_message};
+    use super::{GrazeSb3GeneratorContext, emit_message_eager};
     use crate::{
         codegen::core::{DataNameUsage, GrazeSb3GeneratorError},
         eval::cast::{JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
@@ -2318,7 +2318,7 @@ pub mod helpers {
             literal => {
                 let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
                 if is_nan {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -2347,7 +2347,7 @@ pub mod helpers {
             literal => literal.get_non_empty().map(|literal| {
                 let (value, is_nan) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_number_and_is_nan();
                 if is_nan {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -2376,7 +2376,7 @@ pub mod helpers {
         literal => {
             let (value, is_nab) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_boolean_and_is_nab();
             if is_nab {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
@@ -2404,7 +2404,7 @@ pub mod helpers {
             literal => literal.get_non_empty().map(|literal| {
                 let (value, is_nab) = JsPrimitive::from(Sb3PrimitiveOrBool::from(&literal)).to_boolean_and_is_nab();
                 if is_nab {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -2446,7 +2446,7 @@ pub mod helpers {
                 || (old_value.variable && data_name_usage.variable)
                 || (old_value.list && data_name_usage.list)
             {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
@@ -2509,7 +2509,7 @@ pub mod helpers {
             &mut context.lint_context.costume_names
         };
         if names.contains(name) {
-            emit_message(
+            emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
@@ -3300,7 +3300,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             );
         });
         if value.3.len() >= LONG_LIST_ASSIGNMENT_MININUM_LENGTH {
-            emit_message(
+            emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
@@ -4121,7 +4121,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         );
                     });
                     if values.len() >= LONG_LIST_ASSIGNMENT_MININUM_LENGTH {
-                        emit_message(
+                        emit_message_eager(
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
@@ -5056,7 +5056,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             y.replace(0.0);
                         },
                         _ => {
-                            emit_message(
+                            emit_message_eager(
                                 context,
                                 GrazeSourceMessage::Warning(
                                     GrazeSourceWarning::Specific(
@@ -5223,7 +5223,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         costumes.sort_by_key(|value| value.1);
         sounds.sort_by_key(|value| value.1);
         if costumes.is_empty() {
-            emit_message(
+            emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(SpecificGrazeWarning::TargetWithoutCostume, *value.3),
@@ -5286,7 +5286,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .map(|value| (value.name.clone(), *value.get_source_span()))
             .unwrap_or_else(|| (value.2.value.clone(), *value.2.get_source_span()));
         if context.lint_context.sprite_names.contains(&target_name) {
-            emit_message(
+            emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
@@ -5345,7 +5345,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         costumes.sort_by_key(|value| value.1);
         sounds.sort_by_key(|value| value.1);
         if costumes.is_empty() {
-            emit_message(
+            emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(SpecificGrazeWarning::TargetWithoutCostume, *value.5),
@@ -5432,7 +5432,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let (num, is_nan) =
                 JsPrimitive::from(Sb3PrimitiveOrBool::from(backdrop)).to_number_and_is_nan();
             if is_nan {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
@@ -5444,7 +5444,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     GrazeMessageSetting::Warnings,
                 );
             } else if !num.is_valid_i128() || num < 1.0 || num > costumes.len() as f64 {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
@@ -5462,7 +5462,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             (num.round().clamp(1.0, costumes.len() as f64) - 1.0) as usize
         }
         if context.current_target_configured {
-            emit_message(
+            emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(SpecificGrazeWarning::RepeatedTargetConfig, *value.4),
@@ -5545,7 +5545,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 if let Some(video_state) = &video_state
                     && !matches!(video_state.as_str(), "on" | "off" | "on-flipped")
                 {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -5633,7 +5633,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         "all around" | "left-right" | "don't rotate"
                     )
                 {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -5770,7 +5770,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         let mut inputs = HashMap::new();
                         add_params(context, items.iter(), &mut inputs, &mut fields)?;
                         if !inputs.is_empty() {
-                            emit_message(
+                            emit_message_eager(
                                 context,
                                 GrazeSourceMessage::Warning(
                                     GrazeSourceWarning::Specific(
@@ -5830,7 +5830,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     )?;
                 }
                 if !inputs.is_empty() {
-                    emit_message(
+                    emit_message_eager(
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
@@ -5944,7 +5944,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             value => value
         ) {
             monitor.mode = serde_json::from_str(&mode.get_json_string()).unwrap_or_else(|_| {
-                emit_message(
+                emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
@@ -5990,7 +5990,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             match value {
                 cst::DictionaryValueLiteralOrList::Literal(value) => {
                     if matches!(monitor.value, Sb3MonitorValue::List(..)) {
-                        emit_message(
+                        emit_message_eager(
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
@@ -6008,7 +6008,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
                 cst::DictionaryValueLiteralOrList::List(items) => {
                     if matches!(monitor.value, Sb3MonitorValue::Primitive(..)) {
-                        emit_message(
+                        emit_message_eager(
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
@@ -6055,7 +6055,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             monitor.y = y_position;
         }
         if let (Some(_), None) | (None, Some(_)) = (monitor.x, monitor.y) {
-            emit_message(
+            emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(

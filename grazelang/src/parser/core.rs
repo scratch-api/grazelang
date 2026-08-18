@@ -361,7 +361,7 @@ macro_rules! emit_error {
             GrazeMessageSetting::ExitOnErrorUnlogged => return Err(err),
             _ => (),
         }
-        emit_message(context, err.into(), GrazeMessageSetting::Errors);
+        emit_message_eager(context, err.into(), GrazeMessageSetting::Errors);
     }};
 }
 
@@ -667,7 +667,7 @@ pub fn parse_dictionary_value<T: PeekableTokenStream>(
     }
 }
 
-pub fn emit_message(
+pub fn emit_message_eager(
     context: &mut ParseContext,
     message: GrazeSourceMessage,
     message_type: GrazeMessageSetting,
@@ -730,7 +730,7 @@ pub fn emit_unexpected_token_message_or_return<T: PeekableTokenStream>(
             source_span,
         });
     }
-    emit_message(
+    emit_message_eager(
         context,
         ParseError::UnexpectedToken {
             message,

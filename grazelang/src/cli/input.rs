@@ -21,10 +21,13 @@ use crate::{
     parser::{
         self,
         context::ParseContext,
-        core::{PeekableLexer, emit_message as emit_message_parse_context},
+        core::{
+            PeekableLexer,
+            emit_message_eager as emit_message_eager_parse_context,
+        },
         cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
-    settings::{GrazeMessageSetting, GrazeBuildSettings, UseShadows},
+    settings::{GrazeBuildSettings, GrazeMessageSetting, UseShadows},
     visitor::GrazeVisitor,
     zipper,
 };
@@ -364,7 +367,7 @@ impl Cli {
         );
         let parse_timer = Instant::now();
         let Ok(path) = path.canonicalize() else {
-            emit_message_parse_context(
+            emit_message_eager_parse_context(
                 &mut context,
                 CLIError::PathDoesNotExist.into(),
                 GrazeMessageSetting::Errors,
@@ -383,7 +386,7 @@ impl Cli {
                 std::process::exit(1);
             })
         } else {
-            emit_message_parse_context(
+            emit_message_eager_parse_context(
                 &mut context,
                 CLIError::PathNeitherFileNorDirectory.into(),
                 GrazeMessageSetting::Errors,
