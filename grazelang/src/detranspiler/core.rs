@@ -201,6 +201,7 @@ pub fn convert_target(
     }
     let mut namespace = IStringNamespace::new();
     // TODO: Fill namespace with default namespaces
+    // Issue: #97
     let costumes = target
         .costumes
         .iter()
@@ -485,6 +486,7 @@ pub fn convert_primitive_reporter_block(
             y: _,
         } => {
             // TODO: Fallback to globals
+            // Issue: #96
             let variable = target
                 .data
                 .get(id)

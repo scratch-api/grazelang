@@ -710,5 +710,21 @@
         "lines": "L18-L18",
         "commit": "3d68dd1e6bd5689cb0a02c914412aca743204b5d",
         "title": "Better names for these different types of namespaces"
+    },
+    "96": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L487-L487",
+        "commit": "06ee2498db534ec8e483a3e961ae0f7016cead61",
+        "title": "Fallback to globals"
+    },
+    "97": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L203-L203",
+        "commit": "06ee2498db534ec8e483a3e961ae0f7016cead61",
+        "title": "Fill namespace with default namespaces"
     }
 }
