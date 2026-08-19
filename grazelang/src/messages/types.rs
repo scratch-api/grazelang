@@ -563,6 +563,8 @@ pub enum GrazeDetranspilerError {
     SubstackInReporter { block_id: String, input_name: String },
     #[assoc(internal_lint_id = "too_many_substacks")]
     TooManySubstacks { block_id: String, input_name: String },
+    #[assoc(internal_lint_id = "vlb_name_incorrect")]
+    VLBNameIncorrect { id: String, name: String, expected_name: String },
 }
 
 #[cfg(feature = "detranspiler")]

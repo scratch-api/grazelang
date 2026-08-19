@@ -39,10 +39,38 @@ pub struct DetranspilerTarget {
     pub is_stage: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum DetranspilerVLB {
-    Broadcast(DetranspilerBroadcast),
-    VarOrList(DetranspilerVarOrList),
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BorrowedDetranspilerVLB<'a> {
+    Broadcast(&'a DetranspilerBroadcast),
+    VarOrList(&'a DetranspilerVarOrList),
+}
+
+impl<'a> BorrowedDetranspilerVLB<'a> {
+    pub fn get_canonical_name(self) -> Option<&'a IString> {
+        match self {
+            BorrowedDetranspilerVLB::Broadcast(broadcast) => broadcast.canonical_name.as_ref(),
+            BorrowedDetranspilerVLB::VarOrList(var_or_list) => var_or_list.canonical_name.as_ref(),
+        }
+    }
+
+    pub fn get_name(self) -> &'a IString {
+        match self {
+            BorrowedDetranspilerVLB::Broadcast(broadcast) => &broadcast.name,
+            BorrowedDetranspilerVLB::VarOrList(var_or_list) => &var_or_list.name,
+        }
+    }
+
+    pub fn get_original_name(self) -> &'a IString {
+        match self {
+            BorrowedDetranspilerVLB::Broadcast(broadcast) => {
+                broadcast.canonical_name.as_ref().unwrap_or(&broadcast.name)
+            }
+            BorrowedDetranspilerVLB::VarOrList(var_or_list) => var_or_list
+                .canonical_name
+                .as_ref()
+                .unwrap_or(&var_or_list.name),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -56,6 +84,13 @@ pub struct DetranspilerVarOrList {
     pub canonical_name: Option<IString>,
     pub name: IString,
     pub kind: DetranspilerVarOrListKind,
+}
+
+impl DetranspilerVarOrList {
+    #[inline]
+    pub fn get_original_name(&self) -> &IString {
+        self.canonical_name.as_ref().unwrap_or(&self.name)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -132,6 +167,21 @@ macro_rules! unwrap_or_emit_message {
     };
 }
 
+macro_rules! emit_error_inline {
+    ($err:expr, $context:expr) => {{
+        let err = $err;
+        if matches!(
+            $context.settings.message_setting,
+            GrazeMessageSetting::ExitOnError | GrazeMessageSetting::ExitOnErrorUnlogged
+        ) {
+            return Err(err);
+        }
+        if $context.settings.message_setting >= GrazeMessageSetting::Errors {
+            $context.messages.push(err.into());
+        }
+    }};
+}
+
 macro_rules! emit_error {
     ($err:expr, $context:expr) => {{
         let err = $err;
@@ -153,26 +203,65 @@ where
     canonical_name.unwrap_or(name).as_ref() == check_name
 }
 
-pub fn lookup_vlb(
+pub fn lookup_vlb<'a>(
     name: &str,
     id: &str,
-    target: &DetranspilerTarget,
-    context: &DetranspilerContext,
-) -> Option<DetranspilerVLB> {
-    todo!()
-    // TODO: Implement `lookup_vlb`
-    // Issue: #102
+    target: &'a DetranspilerTarget,
+    context: &'a mut DetranspilerContext,
+) -> DetranspilerResult<Option<BorrowedDetranspilerVLB<'a>>> {
+    let result = context
+        .targets
+        .first()
+        .and_then(|value| value.data.get(id))
+        .or_else(|| target.data.get(id))
+        .map(BorrowedDetranspilerVLB::VarOrList)
+        .or_else(|| {
+            context
+                .broadcasts
+                .get(id)
+                .map(BorrowedDetranspilerVLB::Broadcast)
+        });
+    if let Some(value) = &result
+        && let expected_name = value.get_original_name().as_str()
+        && expected_name != name
+    {
+        emit_error_inline!(
+            GrazeDetranspilerError::VLBNameIncorrect {
+                id: id.to_string(),
+                name: name.to_string(),
+                expected_name: expected_name.to_string()
+            },
+            context
+        )
+    }
+    Ok(result)
 }
 
-pub fn lookup_var_or_list(
+pub fn lookup_var_or_list<'a>(
     name: &str,
     id: &str,
-    target: &DetranspilerTarget,
-    context: &DetranspilerContext,
-) -> Option<DetranspilerVarOrList> {
-    todo!()
-    // TODO: Implement `lookup_var_or_list`
-    // Issue: #101
+    target: &'a DetranspilerTarget,
+    context: &'a mut DetranspilerContext,
+) -> DetranspilerResult<Option<&'a DetranspilerVarOrList>> {
+    let result = context
+        .targets
+        .first()
+        .and_then(|value| value.data.get(id))
+        .or_else(|| target.data.get(id));
+    if let Some(value) = &result
+        && let expected_name = value.get_original_name().as_str()
+        && expected_name != name
+    {
+        emit_error_inline!(
+            GrazeDetranspilerError::VLBNameIncorrect {
+                id: id.to_string(),
+                name: name.to_string(),
+                expected_name: expected_name.to_string()
+            },
+            context
+        )
+    }
+    Ok(result)
 }
 
 pub fn block_check_name_collision(
@@ -684,13 +773,15 @@ pub fn convert_field_value_info(
             project_json::Sb3FieldValue::WithId { value, id } => {
                 ast_types::Expression::Identifier(ast_types::Identifier {
                     path: vec![ast_types::SingleIdentifier {
-                        value: match lookup_vlb(&value.as_cow_str(), id, target, context)
+                        value: match lookup_vlb(&value.as_cow_str(), id, target, context)?
                             .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
                                 id: id.clone(),
                                 name: value.to_string(),
                             })? {
-                            DetranspilerVLB::Broadcast(broadcast) => broadcast.name.clone(),
-                            DetranspilerVLB::VarOrList(var_or_list) => var_or_list.name.clone(),
+                            BorrowedDetranspilerVLB::Broadcast(broadcast) => broadcast.name.clone(),
+                            BorrowedDetranspilerVLB::VarOrList(var_or_list) => {
+                                var_or_list.name.clone()
+                            }
                         },
                     }],
                 })
@@ -736,20 +827,12 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            let variable = lookup_var_or_list(name, id, target, context).ok_or_else(|| {
+            let variable = lookup_var_or_list(name, id, target, context)?.ok_or_else(|| {
                 GrazeDetranspilerError::UnknownVariable {
                     id: id.clone(),
                     name: name.clone(),
                 }
             })?;
-            // let variable = target
-            //     .data
-            //     .get(id)
-            //     .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
-            //     .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
-            //         id: id.clone(),
-            //         name: name.clone(),
-            //     })?;
             Ok(ast_types::Expression::Identifier(ast_types::Identifier {
                 path: vec![ast_types::SingleIdentifier {
                     value: variable.name.clone(),
@@ -762,20 +845,12 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            let list = lookup_var_or_list(name, id, target, context).ok_or_else(|| {
+            let list = lookup_var_or_list(name, id, target, context)?.ok_or_else(|| {
                 GrazeDetranspilerError::UnknownVariable {
                     id: id.clone(),
                     name: name.clone(),
                 }
             })?;
-            // let list = target
-            //     .data
-            //     .get(id)
-            //     .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
-            //     .ok_or_else(|| GrazeDetranspilerError::UnknownList {
-            //         id: id.clone(),
-            //         name: name.clone(),
-            //     })?;
             Ok(ast_types::Expression::Identifier(ast_types::Identifier {
                 path: vec![ast_types::SingleIdentifier {
                     value: list.name.clone(),
