@@ -98,18 +98,22 @@
                 [[categories.blocks.args.shadow.options]]
                     label = "color"
                     value = "color"
+                    alt_name = "pen_color"
 
                 [[categories.blocks.args.shadow.options]]
                     label = "saturation"
                     value = "saturation"
+                    alt_name = "pen_saturation"
 
                 [[categories.blocks.args.shadow.options]]
                     label = "brightness"
                     value = "brightness"
+                    alt_name = "pen_brightness"
 
                 [[categories.blocks.args.shadow.options]]
                     label = "transparency"
                     value = "transparency"
+                    alt_name = "pen_transparency"
 
         [[categories.blocks.args]]
             kind = "input"
@@ -146,4 +150,4 @@
                 type = "math_number"
                 default_value = "1"
 
-required_extensions = ["pen"]
+                required_extensions = ["pen"]
