@@ -722,7 +722,7 @@
     "97": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L203-L203",
         "commit": "06ee2498db534ec8e483a3e961ae0f7016cead61",
         "title": "Fill namespace with default namespaces"
@@ -827,8 +827,8 @@
         "filepath": "grazelang/src/detranspiler/get_info.rs",
         "text": "",
         "status": "open",
-        "lines": "L2550-L2550",
-        "commit": "2ac971e7421ea3ae299a394027fa0539e0822756",
-        "title": "Implement `check_overlap_with_standard_block`"
+        "lines": "L2550-L2551",
+        "commit": "d69096512841aa711b0a9382adc90696774e5e83",
+        "title": "Implement `check_collision_with_standard_names`"
     }
 }
