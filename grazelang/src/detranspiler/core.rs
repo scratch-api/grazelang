@@ -10,14 +10,14 @@ use crate::{
         Argument, ArgumentKind, FieldValueInfo, get_block_kind_info, get_field_value_info,
     },
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
-    names::{BidirectionalNamespace, IStringNamespace},
+    names::{DetranspilerAssetNamespace, DetranspilerTargetNamespace},
     settings::{GrazeDetranspilerSettings, GrazeMessageSetting},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DetranspilerContext {
     pub targets: Vec<DetranspilerTarget>,
-    pub asset_namespace: BidirectionalNamespace,
+    pub asset_namespace: DetranspilerAssetNamespace,
     pub assets: HashMap<AssetPath, OutAssetPath>,
     pub messages: Vec<GrazeDetranspilerMessage>,
     pub settings: GrazeDetranspilerSettings,
@@ -264,39 +264,11 @@ pub fn lookup_var_or_list<'a>(
     Ok(result)
 }
 
-pub fn block_check_name_collision(
-    name: &str,
-    target: &DetranspilerTarget,
-    context: &DetranspilerContext,
-) -> bool {
-    todo!()
-    // TODO: Implement `block_check_name_collision`
-    // Issue: #100
-}
-
-pub fn create_block_identifier(
-    category_name: &IString,
-    block_name: &IString,
-    target: &DetranspilerTarget,
-    context: &DetranspilerContext,
-) -> ast_types::Identifier {
-    if block_check_name_collision(block_name, target, context) {
-        ast_types::Identifier {
-            path: vec![
-                ast_types::SingleIdentifier {
-                    value: category_name.clone(),
-                },
-                ast_types::SingleIdentifier {
-                    value: block_name.clone(),
-                },
-            ],
-        }
-    } else {
-        ast_types::Identifier {
-            path: vec![ast_types::SingleIdentifier {
-                value: block_name.clone(),
-            }],
-        }
+pub fn create_block_identifier(block_name: &IString) -> ast_types::Identifier {
+    ast_types::Identifier {
+        path: vec![ast_types::SingleIdentifier {
+            value: block_name.clone(),
+        }],
     }
 }
 
@@ -336,7 +308,7 @@ pub fn convert_target(
         asset_name
     }
     fn get_canonical_name_and_name(
-        namespace: &mut IStringNamespace,
+        namespace: &mut DetranspilerTargetNamespace,
         canonical_name: IString,
     ) -> (Option<IString>, IString) {
         let name = namespace.introduce_new_name(canonical_name.clone());
@@ -345,7 +317,7 @@ pub fn convert_target(
             name,
         )
     }
-    let mut namespace = IStringNamespace::new();
+    let mut namespace = DetranspilerTargetNamespace::new();
     // TODO: Fill namespace with default namespaces
     // Issue: #97
     let costumes = target
@@ -433,7 +405,7 @@ pub fn convert_reporter_block(
                 convert_normal_reporter_block(sb3_normal_block, block_id, blocks, context, target)
             }
             project_json::Sb3Block::Primitive(sb3_primitive_block) => {
-                convert_primitive_reporter_block(sb3_primitive_block, blocks, context, target)
+                convert_primitive_reporter_block(sb3_primitive_block, context, target)
             }
         },
         context,
@@ -512,7 +484,7 @@ macro_rules! convert_block {
                             target,
                         )?,
                         project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                            convert_primitive_reporter_block(block, blocks, context, target),
+                            convert_primitive_reporter_block(block, context, target),
                             context,
                             ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                         ),
@@ -665,7 +637,7 @@ macro_rules! convert_block {
                             }
                         }
                         project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                            convert_primitive_reporter_block(block, blocks, context, target),
+                            convert_primitive_reporter_block(block, context, target),
                             context,
                             ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                         ),
@@ -739,12 +711,7 @@ pub fn convert_normal_reporter_block(
             context
         )
     );
-    let function = create_block_identifier(
-        &block_kind_info.block_category,
-        &block_kind_info.block_name,
-        target,
-        context,
-    );
+    let function = create_block_identifier(&block_kind_info.block_name);
     if block_kind_info.is_singleton && parameters.is_empty() {
         return Ok(ast_types::Expression::Identifier(function));
     }
@@ -792,7 +759,6 @@ pub fn convert_field_value_info(
 
 pub fn convert_primitive_reporter_block(
     block: &project_json::Sb3PrimitiveBlock,
-    blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
     target: &DetranspilerTarget,
 ) -> DetranspilerResult<ast_types::Expression> {
@@ -870,9 +836,33 @@ pub fn convert_block_stack(
     context: &mut DetranspilerContext,
     target: &DetranspilerTarget,
 ) -> DetranspilerResult<ast_types::CodeBlock> {
-    todo!()
-    // TODO: Implement `convert_block_stack`
-    // Issue: #99
+    // TODO: Implement cycle detection in block conversions
+    let mut statements = Vec::new();
+    let mut current_block = block;
+    let mut current_block_id = IString::from(block_id);
+    loop {
+        let (statement, next_block_id) = unwrap_or_emit_message!(
+            convert_stack_block(current_block, &current_block_id, blocks, context, target),
+            context,
+            break
+        );
+        statements.push(statement);
+        let Some(next_block_id) = next_block_id else {
+            break;
+        };
+        let Some(next_block) = blocks.get(next_block_id.as_str()) else {
+            emit_error!(
+                GrazeDetranspilerError::InvalidBlockReference {
+                    block_id: next_block_id.to_string()
+                },
+                context
+            );
+            break;
+        };
+        current_block = next_block;
+        current_block_id = next_block_id;
+    }
+    Ok(ast_types::CodeBlock { statements })
 }
 
 pub fn convert_stack_block(
@@ -912,12 +902,7 @@ pub fn convert_stack_block(
             has_substack = true;
         }
     );
-    let function = create_block_identifier(
-        &block_kind_info.block_category,
-        &block_kind_info.block_name,
-        target,
-        context,
-    );
+    let function = create_block_identifier(&block_kind_info.block_name);
     let next_block = block.next.as_deref().map(Into::into);
     if let Some(substack) = stack_params.into_iter().next() {
         return Ok((

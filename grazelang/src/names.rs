@@ -6,31 +6,30 @@ type ActualName = String;
 type OriginalName = IString;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct Namespace {
+pub struct CodegenNamespace {
     pub used_names: HashMap<ActualName, OriginalName>,
 }
 
+#[cfg(feature = "detranspiler")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct IStringNamespace {
+pub struct DetranspilerTargetNamespace {
     pub used_names: HashMap<IString, IString>,
 }
 
-// TODO: Better names for these different types of namespaces
-// Issue: #95
-
-impl Namespace {
+impl CodegenNamespace {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl IStringNamespace {
+#[cfg(feature = "detranspiler")]
+impl DetranspilerTargetNamespace {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl Namespace {
+impl CodegenNamespace {
     // pub fn get_name_for(&mut self, original_name: OriginalName) -> ActualName {
     //     if let Some(name) = self.assigned_names.get(&original_name) {
     //         return name.to_string()
@@ -52,6 +51,7 @@ impl Namespace {
         }
         self.introduce_new_name(name)
     }
+
     pub fn assign_name_for(&mut self, original_name: OriginalName, name: ActualName) -> ActualName {
         // Disabled to prevent panics. There is also a warning for this scenario.
         // if self.used_names.contains_key(&name) {
@@ -60,6 +60,7 @@ impl Namespace {
         self.used_names.insert(name.clone(), original_name);
         name
     }
+
     pub fn introduce_new_name(&mut self, original_name: OriginalName) -> ActualName {
         use std::fmt::Write;
         let converted_name = original_name.to_string();
@@ -80,29 +81,8 @@ impl Namespace {
     }
 }
 
-impl IStringNamespace {
-    // pub fn get_name_for(&mut self, original_name: OriginalName) -> ActualName {
-    //     if let Some(name) = self.assigned_names.get(&original_name) {
-    //         return name.to_string()
-    //     }
-    //     let mut num = 2;
-    //     while self.used_names.contains_key(&format!("{}_{}", original_name, num)) {
-    //         num += 1;
-    //     }
-    //     let name = format!("{}_{}", original_name, num);
-    //     self.assign_name_for(original_name, name)
-    // }
-    pub fn introduce_new_symbol(
-        &mut self,
-        canonical_name: Option<IString>,
-        name: IString,
-    ) -> IString {
-        if let Some(canonical_name) = canonical_name {
-            return self.assign_name_for(name, canonical_name);
-        }
-        self.introduce_new_name(name)
-    }
-
+#[cfg(feature = "detranspiler")]
+impl DetranspilerTargetNamespace {
     pub fn assign_name_for(&mut self, original_name: IString, name: IString) -> IString {
         // Disabled to prevent panics. There is also a warning for this scenario.
         // if self.used_names.contains_key(&name) {
@@ -163,8 +143,11 @@ impl IStringNamespace {
     }
 
     pub fn introduce_new_name(&mut self, original_name: IString) -> IString {
+        use crate::detranspiler::get_info::check_overlap_with_standard_blocks;
         let original_name = Self::convert_to_snake_case(original_name);
-        if !self.used_names.contains_key(&original_name) {
+        if !self.used_names.contains_key(&original_name)
+            && !check_overlap_with_standard_blocks(&original_name)
+        {
             return self.assign_name_for(original_name.clone(), original_name);
         }
         let mut num = 2;
@@ -179,23 +162,29 @@ impl IStringNamespace {
     }
 }
 
+#[cfg(feature = "detranspiler")]
 type NameIdentifier = String;
+#[cfg(feature = "detranspiler")]
 type BidirectionalNamespaceOriginalName = String;
+#[cfg(feature = "detranspiler")]
 type BidirectionalNamespaceActualName = IString;
 
+#[cfg(feature = "detranspiler")]
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct BidirectionalNamespace {
+pub struct DetranspilerAssetNamespace {
     pub used_names: HashMap<BidirectionalNamespaceActualName, BidirectionalNamespaceOriginalName>,
     pub assigned_names: HashMap<NameIdentifier, BidirectionalNamespaceActualName>,
 }
 
-impl BidirectionalNamespace {
+#[cfg(feature = "detranspiler")]
+impl DetranspilerAssetNamespace {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl BidirectionalNamespace {
+#[cfg(feature = "detranspiler")]
+impl DetranspilerAssetNamespace {
     pub fn get_symbol(
         &mut self,
         original_name: &str,

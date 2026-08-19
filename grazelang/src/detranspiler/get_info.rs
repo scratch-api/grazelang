@@ -2544,3 +2544,8 @@ pub fn get_field_value_info(
         None
     }
 }
+
+pub fn check_overlap_with_standard_blocks(name: &str) -> bool {
+    todo!()
+    // TODO: Implement `check_overlap_with_standard_block`
+}

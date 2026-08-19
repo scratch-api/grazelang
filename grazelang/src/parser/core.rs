@@ -3449,32 +3449,28 @@ pub mod statement {
                         Token::RightBrace(LexedRightBrace::Normal) => break Some(Box::new(value)),
                         _ => {
                             let token = next_token!(token_stream);
-                            try_or_emit_message!(
-                                Err(create_unexpected_token_error(
-                                    token_stream,
-                                    literal!("Expected ',' or '}'."),
-                                    literal!("',' or '}'"),
-                                    #[cfg(feature = "include_context_in_parse_errors")]
-                                    literal!(static_current_context!()),
-                                    token
-                                )),
-                                context,
-                                {
-                                    find_comma_separated_entry_end(token_stream)?;
-                                    let value = cst::UseStatementContent::Invalid(
-                                        token_stream.span_from_previous_to_current(item_start_pos),
-                                    );
-                                    let comma = match peek_token!(token_stream) {
-                                        Token::Comma => {
-                                            skip_token!(token_stream);
-                                            cst::Comma(get_token_source_span(token_stream))
-                                        }
-                                        _ => break Some(Box::new(value)),
-                                    };
-                                    values.push((value, comma));
-                                    continue;
+                            let err = create_unexpected_token_error(
+                                token_stream,
+                                literal!("Expected ',' or '}'."),
+                                literal!("',' or '}'"),
+                                #[cfg(feature = "include_context_in_parse_errors")]
+                                literal!(static_current_context!()),
+                                token,
+                            );
+                            emit_error!(err, context);
+                            let value = find_comma_separated_entry_end_and_create_invalid(
+                                token_stream,
+                                item_start_pos,
+                            )?;
+                            let comma = match peek_token!(token_stream) {
+                                Token::Comma => {
+                                    skip_token!(token_stream);
+                                    cst::Comma(get_token_source_span(token_stream))
                                 }
-                            )
+                                _ => break Some(Box::new(value)),
+                            };
+                            values.push((value, comma));
+                            continue;
                         }
                     };
                     values.push((value, comma));
@@ -4084,22 +4080,20 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
         _ => {
             let token = next_token!(token_stream);
             let start = get_token_start(token_stream);
-            try_or_emit_message!(
-                Err(create_unexpected_token_error(
-                    token_stream,
-                    literal!(
-                        "Expected hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"."
-                    ),
-                    literal!(
-                        "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\""
-                    ),
-                    #[cfg(feature = "include_context_in_parse_errors")]
-                    literal!(static_current_context!()),
-                    token
-                )),
-                context,
-                find_statement_end_and_create_invalid::<SpriteStatement, _>(token_stream, start)
-            )
+            let err = create_unexpected_token_error(
+                token_stream,
+                literal!(
+                    "Expected hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\"."
+                ),
+                literal!(
+                    "hat statement, '{', '(', ';', \"let\", \"nowarp\", \"warp\", \"proc\", \"sound\" or \"costume\""
+                ),
+                #[cfg(feature = "include_context_in_parse_errors")]
+                literal!(static_current_context!()),
+                token,
+            );
+            emit_error!(err, context);
+            find_statement_end_and_create_invalid::<SpriteStatement, _>(token_stream, start)
         }
     }
 }

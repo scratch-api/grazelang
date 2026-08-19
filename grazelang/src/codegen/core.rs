@@ -40,7 +40,7 @@ use crate::{
         ConstantExprEvaluationError, GetLintId, GrazeSourceMessage, GrazeSourceWarning,
         LONG_LIST_ASSIGNMENT_MININUM_LENGTH, SpecificGrazeWarning,
     },
-    names::Namespace,
+    names::CodegenNamespace,
     parser::{
         context::{
             BROADCAST_CATEGORIES, IdString, KnownBlock, NO_CATEGORIES, ParseContext,
@@ -671,7 +671,7 @@ impl GrazeSb3GeneratorContext {
         let mut asset_files = HashMap::new();
         let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
-            let mut namespace = Namespace::new();
+            let mut namespace = CodegenNamespace::new();
 
             let is_stage = matches!(target, Target::Stage { .. });
             let symbol_count = target.borrow_symbols().len()
@@ -831,7 +831,7 @@ impl GrazeSb3GeneratorContext {
         let variables_symbol =
             symbol_table.new_child_symbol(root_symbol, literal!("vars"), None, 0);
         let lists_symbol = symbol_table.new_child_symbol(root_symbol, literal!("lists"), None, 0);
-        let mut global_namespace = Namespace::new();
+        let mut global_namespace = CodegenNamespace::new();
         {
             let stage_target_attachments = target_attachments.get_mut("stage").unwrap();
             for (name, symbol) in parse_context.global_symbols.drain() {
@@ -1043,7 +1043,7 @@ pub mod symbol_data_derivation {
             ids::generate_random_id_string,
         },
         lexer::SourceSpan,
-        names::Namespace,
+        names::CodegenNamespace,
         parser::{
             context::{
                 CustomBlockDescriptor, FileListDescriptor, KnownBlock, ListDescriptor, Symbol,
@@ -1231,7 +1231,7 @@ pub mod symbol_data_derivation {
     pub fn derive_related_data_of_target_symbol<T>(
         this: &TargetSymbolDescriptor,
         rng: &mut T,
-        namespace: &mut Namespace,
+        namespace: &mut CodegenNamespace,
         resource_directory: &Path,
     ) -> Result<TargetSymbolData, GrazeSb3GeneratorCreationError>
     where
@@ -1453,7 +1453,7 @@ pub mod symbol_data_derivation {
     fn handle_variable<T>(
         descriptor: &VarDescriptor,
         rng: &mut T,
-        namespace: &mut Namespace,
+        namespace: &mut CodegenNamespace,
     ) -> TargetSymbolData
     where
         T: Rng,
@@ -1499,7 +1499,7 @@ pub mod symbol_data_derivation {
     fn handle_list_descriptor<T: Rng>(
         descriptor: &ListDescriptor,
         rng: &mut T,
-        namespace: &mut Namespace,
+        namespace: &mut CodegenNamespace,
     ) -> TargetSymbolData {
         let id = generate_random_id_string(rng);
         let canonical_name = namespace.introduce_new_symbol(
@@ -1517,7 +1517,7 @@ pub mod symbol_data_derivation {
     fn handle_file_list_descriptor<T: Rng>(
         descriptor: &FileListDescriptor,
         rng: &mut T,
-        namespace: &mut Namespace,
+        namespace: &mut CodegenNamespace,
         resource_directory: &Path,
     ) -> Result<TargetSymbolData, GrazeSb3GeneratorCreationError> {
         use std::{
