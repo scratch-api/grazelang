@@ -2545,8 +2545,8 @@ pub fn get_field_value_info(
     }
 }
 
-pub fn check_overlap_with_standard_blocks(name: &str) -> bool {
+pub fn check_collision_with_standard_names(name: &str) -> bool {
     todo!()
-    // TODO: Implement `check_overlap_with_standard_block`
+    // TODO: Implement `check_collision_with_standard_names`
     // Issue: #110
 }

@@ -318,8 +318,6 @@ pub fn convert_target(
         )
     }
     let mut namespace = DetranspilerTargetNamespace::new();
-    // TODO: Fill namespace with default namespaces
-    // Issue: #97
     let costumes = target
         .costumes
         .iter()

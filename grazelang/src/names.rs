@@ -143,10 +143,10 @@ impl DetranspilerTargetNamespace {
     }
 
     pub fn introduce_new_name(&mut self, original_name: IString) -> IString {
-        use crate::detranspiler::get_info::check_overlap_with_standard_blocks;
+        use crate::detranspiler::get_info::check_collision_with_standard_names;
         let original_name = Self::convert_to_snake_case(original_name);
         if !self.used_names.contains_key(&original_name)
-            && !check_overlap_with_standard_blocks(&original_name)
+            && !check_collision_with_standard_names(&original_name)
         {
             return self.assign_name_for(original_name.clone(), original_name);
         }
