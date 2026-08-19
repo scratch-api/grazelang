@@ -144,17 +144,20 @@ impl DetranspilerTargetNamespace {
 
     pub fn introduce_new_name(&mut self, original_name: IString) -> IString {
         use crate::detranspiler::get_info::check_collision_with_standard_names;
+        use std::fmt::Write;
         let original_name = Self::convert_to_snake_case(original_name);
         if !self.used_names.contains_key(&original_name)
             && !check_collision_with_standard_names(&original_name)
-        // ^ only checked here because none of the standard names end with numbers except for key_0-9
+        // ^ only checked here because none of the standard names end with numbers except for key_0-9 and days_since_2000
         {
             return self.assign_name_for(original_name.clone(), original_name);
         }
         let mut num = 2;
-        if original_name.as_str() == "key" {
+        let mut name = String::with_capacity(original_name.len() + 3);
+        if matches!(original_name.as_str(), "key" | "days_since") {
             let name = loop {
-                let name = format!("{}__{}", original_name, num);
+                name.clear();
+                write!(name, "{original_name}__{num}").unwrap();
                 if !self.used_names.contains_key(name.as_str()) {
                     break name.into();
                 }
@@ -163,7 +166,8 @@ impl DetranspilerTargetNamespace {
             return self.assign_name_for(original_name, name);
         }
         let name = loop {
-            let name = format!("{}_{}", original_name, num);
+            name.clear();
+            write!(name, "{original_name}_{num}").unwrap();
             if !self.used_names.contains_key(name.as_str()) {
                 break name.into();
             }
