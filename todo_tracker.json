@@ -754,7 +754,7 @@
     "101": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L173-L173",
         "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
         "title": "Implement `lookup_var_or_list`"
@@ -762,7 +762,7 @@
     "102": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L163-L163",
         "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
         "title": "Implement `lookup_vlb`"
