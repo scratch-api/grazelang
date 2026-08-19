@@ -730,7 +730,7 @@
     "98": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L780-L780",
         "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
         "title": "Implement `convert_stack_block`"
@@ -766,5 +766,53 @@
         "lines": "L163-L163",
         "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
         "title": "Implement `lookup_vlb`"
+    },
+    "103": {
+        "filepath": "grazelang/src/ast/types.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L388-L388",
+        "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
+        "title": "Implement CST into AST converter"
+    },
+    "104": {
+        "filepath": "grazelang/src/ast/types.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L386-L386",
+        "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
+        "title": "Implement AST unparsing"
+    },
+    "105": {
+        "filepath": "grazelang/src/ast/types.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L384-L384",
+        "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
+        "title": "Implement AST into CST parser"
+    },
+    "106": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L811-L811",
+        "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
+        "title": "Implement list assignment in detranspiler"
+    },
+    "107": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L809-L809",
+        "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
+        "title": "Implement if else block and if else chains in detranspiler"
+    },
+    "108": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L637-L637",
+        "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
+        "title": "Implement binary and unary operators in detranspiler"
     }
 }

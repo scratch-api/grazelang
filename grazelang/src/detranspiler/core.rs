@@ -635,6 +635,7 @@ pub fn convert_normal_reporter_block(
     target: &DetranspilerTarget,
 ) -> DetranspilerResult<ast_types::Expression> {
     // TODO: Implement binary and unary operators in detranspiler
+    // Issue: #108
     let (block_kind_info, parameters, _) = convert_block!(
         block,
         block_id,
@@ -807,8 +808,10 @@ pub fn convert_stack_block(
     target: &DetranspilerTarget,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
     // TODO: Implement if else block and if else chains in detranspiler
+    // Issue: #107
 
     // TODO: Implement list assignment in detranspiler
+    // Issue: #106
     let project_json::Sb3Block::Normal(block) = block else {
         return Err(GrazeDetranspilerError::PrimitiveBlockAsStackBlock {
             block_id: block_id.to_string(),
