@@ -706,7 +706,7 @@
     "95": {
         "filepath": "grazelang/src/names.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L18-L18",
         "commit": "3d68dd1e6bd5689cb0a02c914412aca743204b5d",
         "title": "Better names for these different types of namespaces"
@@ -738,7 +738,7 @@
     "99": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L769-L769",
         "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
         "title": "Implement `convert_block_stack`"
@@ -746,7 +746,7 @@
     "100": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L182-L182",
         "commit": "c9b6bfd88ee5d7f36d494baa61de50e9fa603c00",
         "title": "Implement `block_check_name_collision`"
@@ -814,5 +814,21 @@
         "lines": "L637-L637",
         "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
         "title": "Implement binary and unary operators in detranspiler"
+    },
+    "109": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L839-L839",
+        "commit": "2ac971e7421ea3ae299a394027fa0539e0822756",
+        "title": "Implement cycle detection in block conversions"
+    },
+    "110": {
+        "filepath": "grazelang/src/detranspiler/get_info.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L2550-L2550",
+        "commit": "2ac971e7421ea3ae299a394027fa0539e0822756",
+        "title": "Implement `check_overlap_with_standard_block`"
     }
 }
