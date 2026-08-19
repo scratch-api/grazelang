@@ -147,10 +147,21 @@ impl DetranspilerTargetNamespace {
         let original_name = Self::convert_to_snake_case(original_name);
         if !self.used_names.contains_key(&original_name)
             && !check_collision_with_standard_names(&original_name)
+        // ^ only checked here because none of the standard names end with numbers except for key_0-9
         {
             return self.assign_name_for(original_name.clone(), original_name);
         }
         let mut num = 2;
+        if original_name.as_str() == "key" {
+            let name = loop {
+                let name = format!("{}__{}", original_name, num);
+                if !self.used_names.contains_key(name.as_str()) {
+                    break name.into();
+                }
+                num += 1;
+            };
+            return self.assign_name_for(original_name, name);
+        }
         let name = loop {
             let name = format!("{}_{}", original_name, num);
             if !self.used_names.contains_key(name.as_str()) {
