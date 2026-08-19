@@ -826,7 +826,7 @@
     "110": {
         "filepath": "grazelang/src/detranspiler/get_info.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2550-L2551",
         "commit": "d69096512841aa711b0a9382adc90696774e5e83",
         "title": "Implement `check_collision_with_standard_names`"
