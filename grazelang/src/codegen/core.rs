@@ -53,7 +53,7 @@ use crate::{
             UnOpDescriptor,
         },
     },
-    settings::{GrazeMessageSetting, GrazeBuildSettings, UseShadows},
+    settings::{GrazeBuildSettings, GrazeMessageSetting, UseShadows},
     visitor::{
         BorrowedConfigStatement, BorrowedCustomBlockDefinition, BorrowedExpressionBinaryOperation,
         BorrowedExpressionCall, BorrowedExpressionFormattedString, BorrowedExpressionGetItem,
@@ -5226,7 +5226,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(SpecificGrazeWarning::TargetWithoutCostume, *value.3),
+                    GrazeSourceWarning::Specific(
+                        SpecificGrazeWarning::TargetWithoutCostume,
+                        *value.3,
+                    ),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
@@ -5348,7 +5351,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(SpecificGrazeWarning::TargetWithoutCostume, *value.5),
+                    GrazeSourceWarning::Specific(
+                        SpecificGrazeWarning::TargetWithoutCostume,
+                        *value.5,
+                    ),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
@@ -5465,7 +5471,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(SpecificGrazeWarning::RepeatedTargetConfig, *value.4),
+                    GrazeSourceWarning::Specific(
+                        SpecificGrazeWarning::RepeatedTargetConfig,
+                        *value.4,
+                    ),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,

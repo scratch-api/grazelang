@@ -8,15 +8,13 @@ use arcstr::{ArcStr as IString, literal};
 use grazelang_types::{
     BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
     CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, ConstantExprLibraryItem,
-    DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, LISTS_CATEGORY_ID, LOCATIONS_CATEGORY_ID,
-    LibraryItem, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID, PEN_PROPERTIES_CATEGORY_ID,
-    PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, VARIABLES_CATEGORY_ID,
-    INTEGERS_CATEGORY_ID,
+    DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, INTEGERS_CATEGORY_ID, LISTS_CATEGORY_ID,
+    LOCATIONS_CATEGORY_ID, LibraryItem, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID,
+    PEN_PROPERTIES_CATEGORY_ID, PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, VARIABLES_CATEGORY_ID,
     library_parser::{
-        self,
-        LibraryCache, merge_associated_item,
-        process_constant_expr_toolbox_category, process_toolbox_category,
-    }
+        self, LibraryCache, merge_associated_item, process_constant_expr_toolbox_category,
+        process_toolbox_category,
+    },
 };
 use proc_macro::TokenStream;
 use quote::quote;
@@ -306,12 +304,12 @@ pub fn generate_constant_expr_library_no_use_cache(input: TokenStream) -> TokenS
 #[proc_macro]
 pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
     let library_path = quote! { ::grazelang_types };
-    let parser_path = quote! { #library_path::library_parser }; 
+    let parser_path = quote! { #library_path::library_parser };
     let qualifier = if input.is_empty() {
-        quote!{ }
+        quote! {}
     } else {
         let qualifier = parse_macro_input!(input as syn::Visibility);
-        quote!{ #qualifier }
+        quote! { #qualifier }
     };
     let no_category_string_2 = NO_CATEGORY_STRING.as_str();
     let variables_category_string_2 = VARIABLES_CATEGORY_STRING.as_str();
@@ -431,6 +429,6 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                 return Some(dynamic_library_cache.value);
             }
             Some((library, category_entries, source_library.required_extensions))
-        }        
+        }
     }.into()
 }

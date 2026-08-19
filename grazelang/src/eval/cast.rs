@@ -99,9 +99,9 @@ impl IsValidI128 for Sb3FieldValue {
 impl IsValidI128 for f64 {
     fn is_valid_i128(&self) -> bool {
         self.is_finite()
-        && self.fract() == 0.0
-        && *self >= i128::MIN as f64
-        && *self <= i128::MAX as f64
+            && self.fract() == 0.0
+            && *self >= i128::MIN as f64
+            && *self <= i128::MAX as f64
     }
 }
 

@@ -1,7 +1,16 @@
 use crate::{
     lexer::SourceSpan,
     parser::cst::{
-        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock, Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind, DataDeclaration, DataDeclarationScope, DictionaryEntry, Expression, ExtensionKeyword, FileKeyword, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket, LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal, MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace, RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier, SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier
+        AssetDeclaration, BackdropKeyword, BinOp, BroadcastKeyword, CanonicalIdentifier, CodeBlock,
+        Comma, CommaSeparated, ConfigKeyword, CostumeKeyword, CustomBlockParamKind,
+        DataDeclaration, DataDeclarationScope, DictionaryEntry, Expression, ExtensionKeyword,
+        FileKeyword, FormattedStringContent, GrazeProgram, Identifier, LeftBrace, LeftBracket,
+        LeftParens, LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword,
+        Literal, MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace,
+        RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier,
+        SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock,
+        StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement,
+        UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier,
     },
 };
 
@@ -2061,16 +2070,19 @@ where
             expression,
             source_span,
         ) => {
-            visitor.visit_single_file_list_declaration((
-                list_keyword.as_ref(),
-                data_declaration_scope,
-                canonical_identifier.as_ref(),
-                single_identifier,
-                normal_assignment_operator,
-                file_keyword,
-                expression,
-                source_span,
-            ), context)?;
+            visitor.visit_single_file_list_declaration(
+                (
+                    list_keyword.as_ref(),
+                    data_declaration_scope,
+                    canonical_identifier.as_ref(),
+                    single_identifier,
+                    normal_assignment_operator,
+                    file_keyword,
+                    expression,
+                    source_span,
+                ),
+                context,
+            )?;
         }
         SingleDataDeclaration::EmptyList(
             list_keyword,

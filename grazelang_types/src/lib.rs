@@ -1,5 +1,5 @@
-pub mod project_json;
 pub mod library_parser;
+pub mod project_json;
 
 use proc_macro2::TokenStream;
 use std::{
@@ -530,7 +530,6 @@ pub struct LibraryItem {
     pub namespace: HashMap<String, LibraryItem>,
     pub value: Option<LibraryItemValue>,
 }
-
 
 pub fn quote_option<T>(value: Option<&T>) -> TokenStream
 where

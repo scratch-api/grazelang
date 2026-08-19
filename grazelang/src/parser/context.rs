@@ -26,7 +26,7 @@ use crate::{
     lexer::SourceSpan,
     messages::types::{GrazeSourceMessage, GrazeSourceWarning, SpecificGrazeWarning},
     parser::cst::CustomBlockParamKindValue,
-    settings::{GrazeMessageSetting, GrazeBuildSettings},
+    settings::{GrazeBuildSettings, GrazeMessageSetting},
 };
 
 pub type IdString = IString;
@@ -223,7 +223,10 @@ impl ResolveKnownBlock for KnownBlock {
                 emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
-                        GrazeSourceWarning::Specific(SpecificGrazeWarning::CallableAsInput, source_span),
+                        GrazeSourceWarning::Specific(
+                            SpecificGrazeWarning::CallableAsInput,
+                            source_span,
+                        ),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -247,7 +250,7 @@ impl ResolveKnownBlock for KnownBlock {
                     );
                 }
                 KnownBlockInput::SimpleBlock(opcode, params)
-            },
+            }
             KnownBlock::Empty => KnownBlockInput::Empty,
         }
     }
@@ -282,7 +285,10 @@ impl ResolveKnownBlock for KnownBlock {
                 emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
-                        GrazeSourceWarning::Specific(SpecificGrazeWarning::BlockRefAsField, source_span),
+                        GrazeSourceWarning::Specific(
+                            SpecificGrazeWarning::BlockRefAsField,
+                            source_span,
+                        ),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -348,7 +354,10 @@ impl ResolveKnownBlock for KnownBlock {
                 emit_message_eager(
                     context,
                     GrazeSourceMessage::Warning(
-                        GrazeSourceWarning::Specific(SpecificGrazeWarning::CallableAsField, source_span),
+                        GrazeSourceWarning::Specific(
+                            SpecificGrazeWarning::CallableAsField,
+                            source_span,
+                        ),
                         None,
                     ),
                     GrazeMessageSetting::Warnings,
@@ -499,7 +508,7 @@ impl ResolveKnownBlock for KnownBlock {
                     );
                 }
                 assign.as_ref()
-            },
+            }
             KnownBlock::List { .. }
             | KnownBlock::FieldValue { .. }
             | KnownBlock::BlockRef { .. }

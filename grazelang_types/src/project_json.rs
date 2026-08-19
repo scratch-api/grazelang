@@ -538,16 +538,17 @@ impl ToTokens for Sb3Primitive {
             Sb3Primitive::String(s) => tokens.append_all(
                 quote!(::grazelang_types::project_json::Sb3Primitive::String(#s.to_string())),
             ),
-            Sb3Primitive::Int128(i) => tokens
-                .append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Int128(#i))),
+            Sb3Primitive::Int128(i) => {
+                tokens.append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Int128(#i)))
+            }
             Sb3Primitive::Int(i) => {
                 tokens.append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Int(#i)))
             }
-            Sb3Primitive::Float(f) => tokens
-                .append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Float(#f))),
-            // Sb3Primitive::Boolean(b) => {
-            //     tokens.append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Boolean(#b)))
-            // }
+            Sb3Primitive::Float(f) => {
+                tokens.append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Float(#f)))
+            } // Sb3Primitive::Boolean(b) => {
+              //     tokens.append_all(quote!(::grazelang_types::project_json::Sb3Primitive::Boolean(#b)))
+              // }
         }
     }
 }
@@ -558,16 +559,15 @@ impl ToTokens for Sb3PrimitiveOrBool {
             Sb3PrimitiveOrBool::String(s) => tokens.append_all(
                 quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::String(#s.to_string())),
             ),
-            Sb3PrimitiveOrBool::Int128(i) => tokens
-                .append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Int128(#i))),
-            Sb3PrimitiveOrBool::Int(i) => {
-                tokens.append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Int(#i)))
-            }
+            Sb3PrimitiveOrBool::Int128(i) => tokens.append_all(
+                quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Int128(#i)),
+            ),
+            Sb3PrimitiveOrBool::Int(i) => tokens
+                .append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Int(#i))),
             Sb3PrimitiveOrBool::Float(f) => tokens
                 .append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Float(#f))),
-            Sb3PrimitiveOrBool::Bool(b) => {
-                tokens.append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Bool(#b)))
-            }
+            Sb3PrimitiveOrBool::Bool(b) => tokens
+                .append_all(quote!(::grazelang_types::project_json::Sb3PrimitiveOrBool::Bool(#b))),
         }
     }
 }

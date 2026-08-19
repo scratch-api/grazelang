@@ -21,10 +21,7 @@ use crate::{
     parser::{
         self,
         context::ParseContext,
-        core::{
-            PeekableLexer,
-            emit_message_eager as emit_message_eager_parse_context,
-        },
+        core::{PeekableLexer, emit_message_eager as emit_message_eager_parse_context},
         cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
     settings::{GrazeBuildSettings, GrazeMessageSetting, UseShadows},

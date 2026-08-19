@@ -39,6 +39,19 @@ pub struct DetranspilerTarget {
     pub is_stage: bool,
 }
 
+pub enum DetranspilerTargetBlockStack {
+    HatBlock {
+        hat_block: (),
+        stack: ast_types::CodeBlock,
+    },
+    IsolatedStack {
+        stack: ast_types::CodeBlock,
+    },
+    IsolatedExpression {
+        expression: ast_types::Expression,
+    },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BorrowedDetranspilerVLB<'a> {
     Broadcast(&'a DetranspilerBroadcast),

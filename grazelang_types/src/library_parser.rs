@@ -1,4 +1,7 @@
-use std::{collections::{HashMap, HashSet}, hash::{DefaultHasher, Hash}};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{DefaultHasher, Hash},
+};
 
 use crate::{
     CallBlockParam, CallBlockParamKind, ConstantExprLibraryItem, ConstantExprLibraryItemValue,

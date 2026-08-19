@@ -101,7 +101,9 @@ impl GrazeSourceMessage {
             GrazeSourceMessage::Warning(graze_warning, _graze_suggestion) => {
                 graze_warning.annotate(source_getter)
             }
-            GrazeSourceMessage::Info(graze_info, _graze_suggestion) => graze_info.annotate(source_getter),
+            GrazeSourceMessage::Info(graze_info, _graze_suggestion) => {
+                graze_info.annotate(source_getter)
+            }
             GrazeSourceMessage::Unsuccessful {
                 error_count,
                 warning_count,
