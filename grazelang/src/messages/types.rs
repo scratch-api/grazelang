@@ -557,8 +557,12 @@ pub enum GrazeDetranspilerError {
     InvalidBlockReference { block_id: String },
     #[assoc(internal_lint_id = "primitive_block_as_substack")]
     PrimitiveBlockAsSubstack { block_id: String, input_name: String },
+    #[assoc(internal_lint_id = "primitive_block_as_stack_block")]
+    PrimitiveBlockAsStackBlock { block_id: String },
     #[assoc(internal_lint_id = "substack_in_reporter")]
     SubstackInReporter { block_id: String, input_name: String },
+    #[assoc(internal_lint_id = "too_many_substacks")]
+    TooManySubstacks { block_id: String, input_name: String },
 }
 
 #[cfg(feature = "detranspiler")]
