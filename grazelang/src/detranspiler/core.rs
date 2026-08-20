@@ -367,6 +367,7 @@ pub fn convert_project(project: &project_json::Sb3Root, settings: GrazeDetranspi
         broadcasts: HashMap::new(),
     };
     // TODO: Use broadcast data in detranspiler
+    // Issue: #113
     let mut has_stage = false;
     let mut exit_after_target_conversion = false;
     let mut unlogged_failure = false;
@@ -507,6 +508,7 @@ pub fn convert_target(
         );
     }
     // TODO: Use monitor data in detranspiler
+    // Issue: #112
     Ok(DetranspilerTarget {
         is_stage: target.is_stage,
         costumes,

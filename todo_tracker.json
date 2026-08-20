@@ -838,5 +838,21 @@
         "lines": "L409-L409",
         "commit": "05bdb64c41770974401141be45b7f7d82a0af500",
         "title": "Use `GrazeWarningKind::StackBlockAsReporter`"
+    },
+    "112": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L509-L509",
+        "commit": "34330c2cc3334efc6849351e374efcb9c138196e",
+        "title": "Use monitor data in detranspiler"
+    },
+    "113": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L369-L369",
+        "commit": "34330c2cc3334efc6849351e374efcb9c138196e",
+        "title": "Use broadcast data in detranspiler"
     }
 }
