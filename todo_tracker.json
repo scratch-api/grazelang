@@ -830,5 +830,13 @@
         "lines": "L2550-L2551",
         "commit": "d69096512841aa711b0a9382adc90696774e5e83",
         "title": "Implement `check_collision_with_standard_names`"
+    },
+    "111": {
+        "filepath": "grazelang/src/messages/types.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L409-L409",
+        "commit": "05bdb64c41770974401141be45b7f7d82a0af500",
+        "title": "Use `GrazeWarningKind::StackBlockAsReporter`"
     }
 }
