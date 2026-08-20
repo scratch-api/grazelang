@@ -38,7 +38,7 @@ use crate::{
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::types::{
         ConstantExprEvaluationError, GetLintId, GrazeSourceMessage, GrazeSourceWarning,
-        LONG_LIST_ASSIGNMENT_MININUM_LENGTH, SpecificGrazeWarning,
+        LONG_LIST_ASSIGNMENT_MININUM_LENGTH, GrazeWarningKind,
     },
     names::CodegenNamespace,
     parser::{
@@ -1829,11 +1829,11 @@ pub fn add_known_block_to_params(
                                             Sb3PrimitiveBlock::Variable { .. }
                                             | Sb3PrimitiveBlock::List { .. }
                                             | Sb3PrimitiveBlock::Broadcast { .. },
-                                    } => SpecificGrazeWarning::FieldValueIncorrect,
+                                    } => GrazeWarningKind::FieldValueIncorrect,
                                     KnownBlock::PrimitiveBlock { .. } => {
-                                        SpecificGrazeWarning::LiteralFieldValueIncorrect
+                                        GrazeWarningKind::LiteralFieldValueIncorrect
                                     }
-                                    _ => SpecificGrazeWarning::FieldValueIncorrect,
+                                    _ => GrazeWarningKind::FieldValueIncorrect,
                                 },
                                 known_block_source_span,
                             ),
@@ -1877,7 +1877,7 @@ pub fn add_known_block_to_params(
                                     context,
                                     GrazeSourceMessage::Warning(
                                         GrazeSourceWarning::Specific(
-                                            SpecificGrazeWarning::LiteralFieldValueIncorrect,
+                                            GrazeWarningKind::LiteralFieldValueIncorrect,
                                             known_block_source_span,
                                         ),
                                         None,
@@ -1904,7 +1904,7 @@ pub fn add_known_block_to_params(
                                     context,
                                     GrazeSourceMessage::Warning(
                                         GrazeSourceWarning::Specific(
-                                            SpecificGrazeWarning::FieldValueIncorrect,
+                                            GrazeWarningKind::FieldValueIncorrect,
                                             known_block_source_span,
                                         ),
                                         None,
@@ -1932,7 +1932,7 @@ pub fn add_known_block_to_params(
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
-                                    SpecificGrazeWarning::FieldValueIncorrect,
+                                    GrazeWarningKind::FieldValueIncorrect,
                                     known_block_source_span,
                                 ),
                                 None,
@@ -2266,7 +2266,7 @@ pub mod helpers {
         codegen::core::{DataNameUsage, GrazeSb3GeneratorError},
         eval::cast::{JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
         lexer::SourceSpan,
-        messages::types::{GrazeSourceMessage, GrazeSourceWarning, SpecificGrazeWarning},
+        messages::types::{GrazeSourceMessage, GrazeSourceWarning, GrazeWarningKind},
         parser::cst::{self, GetPos},
         settings::GrazeMessageSetting,
     };
@@ -2322,7 +2322,7 @@ pub mod helpers {
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::UnexpectedValueForNumber,
+                                GrazeWarningKind::UnexpectedValueForNumber,
                                 *literal.get_source_span(),
                             ),
                             None,
@@ -2351,7 +2351,7 @@ pub mod helpers {
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::UnexpectedValueForNumber,
+                                GrazeWarningKind::UnexpectedValueForNumber,
                                 *literal.get_source_span(),
                             ),
                             None,
@@ -2380,7 +2380,7 @@ pub mod helpers {
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::UnexpectedValueForBoolean,
+                            GrazeWarningKind::UnexpectedValueForBoolean,
                             *literal.get_source_span(),
                         ),
                         None,
@@ -2408,7 +2408,7 @@ pub mod helpers {
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::UnexpectedValueForBoolean,
+                                GrazeWarningKind::UnexpectedValueForBoolean,
                                 *literal.get_source_span(),
                             ),
                             None,
@@ -2450,7 +2450,7 @@ pub mod helpers {
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::RepeatedCanonicalName,
+                            GrazeWarningKind::RepeatedCanonicalName,
                             source_span,
                         ),
                         None,
@@ -2513,7 +2513,7 @@ pub mod helpers {
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
-                        SpecificGrazeWarning::RepeatedCanonicalName,
+                        GrazeWarningKind::RepeatedCanonicalName,
                         source_span,
                     ),
                     None,
@@ -3304,7 +3304,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
-                        SpecificGrazeWarning::LongListAssignment,
+                        GrazeWarningKind::LongListAssignment,
                         *value.3.get_source_span(),
                     ),
                     None,
@@ -4125,7 +4125,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
-                                    SpecificGrazeWarning::LongListAssignment,
+                                    GrazeWarningKind::LongListAssignment,
                                     values_source_span,
                                 ),
                                 None,
@@ -5060,7 +5060,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 context,
                                 GrazeSourceMessage::Warning(
                                     GrazeSourceWarning::Specific(
-                                        SpecificGrazeWarning::TopLevelShadowExpression,
+                                        GrazeWarningKind::TopLevelShadowExpression,
                                         param_source_span,
                                     ),
                                     None,
@@ -5227,7 +5227,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
-                        SpecificGrazeWarning::TargetWithoutCostume,
+                        GrazeWarningKind::TargetWithoutCostume,
                         *value.3,
                     ),
                     None,
@@ -5293,7 +5293,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
-                        SpecificGrazeWarning::RepeatedCanonicalName,
+                        GrazeWarningKind::RepeatedCanonicalName,
                         target_name_source_span,
                     ),
                     None,
@@ -5352,7 +5352,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
-                        SpecificGrazeWarning::TargetWithoutCostume,
+                        GrazeWarningKind::TargetWithoutCostume,
                         *value.5,
                     ),
                     None,
@@ -5442,7 +5442,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::UnexpectedValueForNumber,
+                            GrazeWarningKind::UnexpectedValueForNumber,
                             *backdrop.get_source_span(),
                         ),
                         None,
@@ -5454,7 +5454,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::InvalidCostumeNumber,
+                            GrazeWarningKind::InvalidCostumeNumber,
                             *backdrop.get_source_span(),
                         ),
                         None,
@@ -5472,7 +5472,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
-                        SpecificGrazeWarning::RepeatedTargetConfig,
+                        GrazeWarningKind::RepeatedTargetConfig,
                         *value.4,
                     ),
                     None,
@@ -5558,7 +5558,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::InvalidVideoStateValue,
+                                GrazeWarningKind::InvalidVideoStateValue,
                                 source_span,
                             ),
                             None,
@@ -5646,7 +5646,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::InvalidRotationStyleValue,
+                                GrazeWarningKind::InvalidRotationStyleValue,
                                 source_span,
                             ),
                             None,
@@ -5783,7 +5783,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 context,
                                 GrazeSourceMessage::Warning(
                                     GrazeSourceWarning::Specific(
-                                        SpecificGrazeWarning::MonitorValueHasInputs,
+                                        GrazeWarningKind::MonitorValueHasInputs,
                                         *identifier.get_source_span(),
                                     ),
                                     None,
@@ -5843,7 +5843,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::MonitorValueHasInputs,
+                                GrazeWarningKind::MonitorValueHasInputs,
                                 *source_span,
                             ),
                             None,
@@ -5957,7 +5957,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::InvalidMonitorMode,
+                            GrazeWarningKind::InvalidMonitorMode,
                             *mode.get_source_span(),
                         ),
                         None,
@@ -6003,7 +6003,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
-                                    SpecificGrazeWarning::PrimitiveValueForListMonitor,
+                                    GrazeWarningKind::PrimitiveValueForListMonitor,
                                     *value.get_source_span(),
                                 ),
                                 None,
@@ -6021,7 +6021,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             context,
                             GrazeSourceMessage::Warning(
                                 GrazeSourceWarning::Specific(
-                                    SpecificGrazeWarning::ListValueForPrimitiveMonitor,
+                                    GrazeWarningKind::ListValueForPrimitiveMonitor,
                                     *items.get_source_span(),
                                 ),
                                 None,
@@ -6068,7 +6068,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
-                        SpecificGrazeWarning::SpecifiedMonitorPositionPartially,
+                        GrazeWarningKind::SpecifiedMonitorPositionPartially,
                         *value.5,
                     ),
                     None,

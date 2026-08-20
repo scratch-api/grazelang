@@ -14,6 +14,7 @@ use grazelang_types::{
     NO_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{Sb3FieldValue, Sb3PrimitiveBlock},
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{
     codegen::core::GrazeSb3GeneratorContext,
@@ -616,4 +617,68 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
             },
         ),
     ]
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum BlockShape {
+    Hat,
+    Stack,
+    Reporter,
+}
+
+pub fn get_block_shape(opcode: &str) -> BlockShape {
+    match opcode {
+        "event_whenflagclicked"
+        | "event_whenkeypressed"
+        | "event_whenthisspriteclicked"
+        | "event_whenbackdropswitchesto"
+        | "event_whengreaterthan"
+        | "event_whenbroadcastreceived"
+        | "control_start_as_clone" => BlockShape::Hat,
+        "motion_xposition"
+        | "motion_yposition"
+        | "motion_direction"
+        | "looks_costumenumbername"
+        | "looks_backdropnumbername"
+        | "looks_size"
+        | "sound_volume"
+        | "sensing_touchingobject"
+        | "sensing_touchingcolor"
+        | "sensing_coloristouchingcolor"
+        | "sensing_distanceto"
+        | "sensing_answer"
+        | "sensing_keypressed"
+        | "sensing_mousedown"
+        | "sensing_mousex"
+        | "sensing_mousey"
+        | "sensing_loudness"
+        | "sensing_timer"
+        | "sensing_of"
+        | "sensing_current"
+        | "sensing_dayssince2000"
+        | "sensing_online"
+        | "sensing_username"
+        | "operator_add"
+        | "operator_subtract"
+        | "operator_multiply"
+        | "operator_divide"
+        | "operator_random"
+        | "operator_gt"
+        | "operator_lt"
+        | "operator_equals"
+        | "operator_and"
+        | "operator_or"
+        | "operator_not"
+        | "operator_join"
+        | "operator_letter_of"
+        | "operator_length"
+        | "operator_contains"
+        | "operator_mod"
+        | "operator_round"
+        | "operator_mathop"
+        | "data_variable"
+        | "data_listcontents"
+        | "music_getTempo" => BlockShape::Reporter,
+        _ => BlockShape::Stack,
+    }
 }

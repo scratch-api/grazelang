@@ -9,6 +9,7 @@ use crate::{
     detranspiler::get_info::{
         Argument, ArgumentKind, FieldValueInfo, get_block_kind_info, get_field_value_info,
     },
+    library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
     names::{DetranspilerAssetNamespace, DetranspilerTargetNamespace},
     settings::{GrazeDetranspilerSettings, GrazeMessageSetting},
@@ -33,15 +34,18 @@ type DataId = String;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerTarget {
+    pub is_stage: bool,
     pub costumes: HashMap<AssetId, DetranspilerAsset<DetranspilerCostumeUncommonData>>,
     pub sounds: HashMap<AssetId, DetranspilerAsset<DetranspilerSoundUncommonData>>,
     pub data: HashMap<DataId, DetranspilerVarOrList>,
-    pub is_stage: bool,
+    pub scripts: Vec<DetranspilerTargetBlockStack>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DetranspilerTargetBlockStack {
     HatBlock {
-        hat_block: (),
+        hat_function: ast_types::Identifier,
+        arguments: Vec<ast_types::Expression>,
         stack: ast_types::CodeBlock,
     },
     IsolatedStack {
@@ -216,6 +220,7 @@ where
     canonical_name.unwrap_or(name).as_ref() == check_name
 }
 
+/// Result is bubbled
 pub fn lookup_vlb<'a>(
     name: &str,
     id: &str,
@@ -300,6 +305,12 @@ pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast
     }
 }
 
+// A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
+// ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
+// A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
+// ExitOnError or ExitOnErrorUnlogged is on. A Result is bubbled iff it is not unbubbled.
+
+/// Result is bubbled
 pub fn convert_target(
     target: &project_json::Sb3Target,
     context: &mut DetranspilerContext,
@@ -311,10 +322,8 @@ pub fn convert_target(
         data_format: &str,
         md5ext: &str,
     ) -> IString {
-        use std::fmt::Write;
         let asset_name = context.asset_namespace.get_symbol(name, asset_id);
-        let mut out_asset_path = String::with_capacity(asset_name.len() + data_format.len() + 1);
-        write!(&mut out_asset_path, "{asset_name}.{}", data_format).unwrap();
+        let out_asset_path = format!("{asset_name}.{}", data_format);
         if !context.assets.contains_key(md5ext) {
             context.assets.insert(md5ext.to_string(), out_asset_path);
         }
@@ -395,14 +404,110 @@ pub fn convert_target(
             },
         );
     }
-    Ok(DetranspilerTarget {
+    let mut result = DetranspilerTarget {
+        is_stage: target.is_stage,
         costumes,
         sounds,
         data,
-        is_stage: target.is_stage,
-    })
+        scripts: Vec::new(),
+    };
+    for (block_id, block) in &target.blocks {
+        let project_json::Sb3Block::Normal(normal_block) = block else {
+            continue;
+        };
+        if !normal_block.top_level {
+            continue;
+        }
+        let block_stack = match get_block_shape(&normal_block.opcode) {
+            BlockShape::Hat => {
+                let (hat_function, arguments) = unwrap_or_emit_message!(
+                    convert_hat_block(normal_block, block_id, &target.blocks, context, &result),
+                    context,
+                    {
+                        let block_stack = if let Some(next_block_id) = &normal_block.next
+                            && let Some(next_block) = unwrap_or_emit_message!(
+                                resolve_block_ref(next_block_id, &target.blocks).map(Some),
+                                context,
+                                None
+                            ) {
+                            convert_block_stack(
+                                next_block,
+                                next_block_id,
+                                &target.blocks,
+                                context,
+                                &result,
+                            )?
+                        } else {
+                            ast_types::CodeBlock {
+                                statements: Vec::new(),
+                            }
+                        };
+                        result
+                            .scripts
+                            .push(DetranspilerTargetBlockStack::IsolatedStack {
+                                stack: block_stack,
+                            });
+                        continue;
+                    }
+                );
+                DetranspilerTargetBlockStack::HatBlock {
+                    hat_function,
+                    arguments,
+                    stack: {
+                        if let Some(next_block_id) = &normal_block.next
+                            && let Some(next_block) = unwrap_or_emit_message!(
+                                resolve_block_ref(next_block_id, &target.blocks).map(Some),
+                                context,
+                                None
+                            )
+                        {
+                            convert_block_stack(
+                                next_block,
+                                next_block_id,
+                                &target.blocks,
+                                context,
+                                &result,
+                            )?
+                        } else {
+                            ast_types::CodeBlock {
+                                statements: Vec::new(),
+                            }
+                        }
+                    },
+                }
+            }
+            BlockShape::Stack => DetranspilerTargetBlockStack::IsolatedStack {
+                stack: convert_block_stack(block, block_id, &target.blocks, context, &result)?,
+            },
+            BlockShape::Reporter => DetranspilerTargetBlockStack::IsolatedExpression {
+                expression: convert_reporter_block(
+                    block,
+                    block_id,
+                    &target.blocks,
+                    context,
+                    &result,
+                )?,
+            },
+        };
+        result.scripts.push(block_stack);
+    }
+    Ok(result)
 }
 
+/// Result is unbubbled
+pub fn resolve_block_ref<'a>(
+    block_id: &str,
+    blocks: &'a HashMap<String, project_json::Sb3Block>,
+) -> DetranspilerResult<&'a project_json::Sb3Block> {
+    let Some(next_block) = blocks.get(block_id) else {
+        return Err(GrazeDetranspilerError::InvalidBlockReference {
+            block_id: block_id.to_string(),
+        });
+    };
+    Ok(next_block)
+}
+
+/// Result is bubbled
 pub fn convert_reporter_block(
     block: &project_json::Sb3Block,
     block_id: &str,
@@ -421,11 +526,12 @@ pub fn convert_reporter_block(
         },
         context,
         Ok(ast_types::Expression::Literal(
-            ast_types::Literal::EmptyExpression
+            ast_types::Literal::EmptyExpression,
         ))
     ))
 }
 
+/// Result is unbubbled
 macro_rules! convert_block {
     ($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target:expr$(, $arg_context_pat:pat => $stack_err:expr)?) => {{
         let block = &*$block;
@@ -461,12 +567,21 @@ macro_rules! convert_block {
                         ));
                         continue;
                     };
-                    parameters.push(convert_field_value_info(
-                        get_field_value_info(field_value, &block.opcode),
-                        field_value,
-                        target,
+                    parameters.push(unwrap_or_emit_message!(
+                        convert_field_value_info(
+                            get_field_value_info(field_value, &block.opcode),
+                            field_value,
+                            target,
+                            context,
+                        ),
                         context,
-                    )?);
+                        {
+                            parameters.push(ast_types::Expression::Literal(
+                                ast_types::Literal::EmptyExpression,
+                            ));
+                            continue;
+                        }
+                    ));
                 }
                 ArgumentKind::Input => {
                     let Some(input) = block.inputs.get(argument_name.as_str()) else {
@@ -484,11 +599,20 @@ macro_rules! convert_block {
                     }) = input;
                     parameters.push(match input_repr {
                         project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
-                            blocks.get(block_id).ok_or_else(|| {
-                                GrazeDetranspilerError::InvalidBlockReference {
-                                    block_id: block_id.clone(),
+                            unwrap_or_emit_message!(
+                                blocks.get(block_id).ok_or_else(|| {
+                                    GrazeDetranspilerError::InvalidBlockReference {
+                                        block_id: block_id.clone(),
+                                    }
+                                }),
+                                context,
+                                {
+                                    parameters.push(ast_types::Expression::Literal(
+                                        ast_types::Literal::EmptyExpression,
+                                    ));
+                                    continue;
                                 }
-                            })?,
+                            ),
                             block_id,
                             blocks,
                             context,
@@ -516,11 +640,20 @@ macro_rules! convert_block {
                     }) = input;
                     stack_params.push(match input_repr {
                         project_json::Sb3InputRepr::Reference(block_id) => convert_block_stack(
-                            blocks.get(block_id).ok_or_else(|| {
-                                GrazeDetranspilerError::InvalidBlockReference {
-                                    block_id: block_id.clone(),
+                            unwrap_or_emit_message!(
+                                blocks.get(block_id).ok_or_else(|| {
+                                    GrazeDetranspilerError::InvalidBlockReference {
+                                        block_id: block_id.clone(),
+                                    }
+                                }),
+                                context,
+                                {
+                                    stack_params.push(ast_types::CodeBlock {
+                                        statements: Vec::new(),
+                                    });
+                                    continue;
                                 }
-                            })?,
+                            ),
                             block_id,
                             blocks,
                             context,
@@ -539,13 +672,6 @@ macro_rules! convert_block {
                             }
                         }
                     });
-                    // emit_error!(
-                    //     GrazeDetranspilerError::SubstackInReporter {
-                    //         block_id: block_id.to_string(),
-                    //         input_name: argument_name.to_string()
-                    //     },
-                    //     context
-                    // );
                     $(
                         let $arg_context_pat = (&mut *context, argument_name);
                         $stack_err;
@@ -580,11 +706,20 @@ macro_rules! convert_block {
                     }) = input;
                     parameters.push(match input_repr {
                         project_json::Sb3InputRepr::Reference(block_id) => {
-                            let inner_block = blocks.get(block_id).ok_or_else(|| {
-                                GrazeDetranspilerError::InvalidBlockReference {
-                                    block_id: block_id.clone(),
+                            let inner_block = unwrap_or_emit_message!(
+                                blocks.get(block_id).ok_or_else(|| {
+                                    GrazeDetranspilerError::InvalidBlockReference {
+                                        block_id: block_id.clone(),
+                                    }
+                                }),
+                                context,
+                                {
+                                    parameters.push(ast_types::Expression::Literal(
+                                        ast_types::Literal::EmptyExpression,
+                                    ));
+                                    continue;
                                 }
-                            })?;
+                            );
                             if let project_json::Sb3Block::Normal(inner_block) = inner_block
                                 && inner_block.opcode.as_str() == menu_opcode.as_str()
                             {
@@ -620,12 +755,21 @@ macro_rules! convert_block {
                                     );
                                 }
                                 if let Some(field_value) = inner_block.fields.get(menu_field.as_str()) {
-                                    convert_field_value_info(
-                                        get_field_value_info(field_value, menu_opcode),
-                                        field_value,
-                                        target,
+                                    unwrap_or_emit_message!(
+                                        convert_field_value_info(
+                                            get_field_value_info(field_value, menu_opcode),
+                                            field_value,
+                                            target,
+                                            context,
+                                        ),
                                         context,
-                                    )?
+                                        {
+                                            parameters.push(ast_types::Expression::Literal(
+                                                ast_types::Literal::EmptyExpression,
+                                            ));
+                                            continue;
+                                        }
+                                    )
                                 } else {
                                     parameters.push(ast_types::Expression::Literal(
                                         ast_types::Literal::EmptyExpression,
@@ -699,6 +843,7 @@ macro_rules! convert_block {
     }};
 }
 
+/// Result is unbubbled
 pub fn convert_normal_reporter_block(
     block: &project_json::Sb3NormalBlock,
     block_id: &str,
@@ -717,7 +862,7 @@ pub fn convert_normal_reporter_block(
         (context, input_name) => emit_error!(
             GrazeDetranspilerError::SubstackInReporter {
                 block_id: block_id.to_string(),
-                input_name: input_name.to_string()
+                input_name: input_name.to_string(),
             },
             context
         )
@@ -732,6 +877,7 @@ pub fn convert_normal_reporter_block(
     })
 }
 
+/// Result is unbubbled
 pub fn convert_field_value_info(
     field_value_info: Option<FieldValueInfo>,
     field_value: &project_json::Sb3FieldValue,
@@ -768,6 +914,7 @@ pub fn convert_field_value_info(
     })
 }
 
+/// Result is unbubbled
 pub fn convert_primitive_reporter_block(
     block: &project_json::Sb3PrimitiveBlock,
     context: &mut DetranspilerContext,
@@ -837,9 +984,36 @@ pub fn convert_primitive_reporter_block(
     }
 }
 
+/// Result is unbubbled
+pub fn convert_hat_block(
+    block: &project_json::Sb3NormalBlock,
+    block_id: &str,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+    target: &DetranspilerTarget,
+) -> DetranspilerResult<(ast_types::Identifier, Vec<ast_types::Expression>)> {
+    let (block_kind_info, parameters, _) = convert_block!(
+        block,
+        block_id,
+        blocks,
+        context,
+        target,
+        (context, input_name) => emit_error!(
+            GrazeDetranspilerError::SubstackInHatBlock {
+                block_id: block_id.to_string(),
+                input_name: input_name.to_string(),
+            },
+            context
+        )
+    );
+    let function = create_block_identifier(&block_kind_info.block_name);
+    Ok((function, parameters))
+}
+
 // IString allows for more efficient cycle detection
 type NextBlockId = IString;
 
+/// Result is bubbled
 pub fn convert_block_stack(
     block: &project_json::Sb3Block,
     block_id: &str,
@@ -862,21 +1036,15 @@ pub fn convert_block_stack(
         let Some(next_block_id) = next_block_id else {
             break;
         };
-        let Some(next_block) = blocks.get(next_block_id.as_str()) else {
-            emit_error!(
-                GrazeDetranspilerError::InvalidBlockReference {
-                    block_id: next_block_id.to_string()
-                },
-                context
-            );
-            break;
-        };
+        let next_block =
+            unwrap_or_emit_message!(resolve_block_ref(&next_block_id, blocks), context, break);
         current_block = next_block;
         current_block_id = next_block_id;
     }
     Ok(ast_types::CodeBlock { statements })
 }
 
+/// Result is unbubbled
 pub fn convert_stack_block(
     block: &project_json::Sb3Block,
     block_id: &str,

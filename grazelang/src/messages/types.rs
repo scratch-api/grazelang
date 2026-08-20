@@ -247,7 +247,7 @@ pub enum GrazeSourceWarning {
         secondary_message: Option<IString>,
         source_span: SourceSpan,
     },
-    Specific(SpecificGrazeWarning, SourceSpan),
+    Specific(GrazeWarningKind, SourceSpan),
 }
 
 impl GetLintId for GrazeSourceWarning {
@@ -297,7 +297,7 @@ impl GetPos for GrazeSourceWarning {
 #[func(const fn internal_lint_id(&self) -> &'static str)]
 #[func(pub const fn get_primary_message(&self) -> &'static str)]
 #[func(pub const fn get_secondary_message(&self) -> &'static str)]
-pub enum SpecificGrazeWarning {
+pub enum GrazeWarningKind {
     #[assoc(get_primary_message = "uncalled callable")]
     #[assoc(get_secondary_message = "should be called")]
     #[assoc(internal_lint_id = "callable_as_input")]
@@ -402,11 +402,16 @@ pub enum SpecificGrazeWarning {
     #[assoc(get_secondary_message = "list assignment has a lot of items")]
     #[assoc(internal_lint_id = "long_list_assignment")]
     LongListAssignment,
+    #[assoc(get_primary_message = "used a stack block where a reporter block was expected")]
+    #[assoc(get_secondary_message = "should be a reporter")]
+    #[assoc(internal_lint_id = "stack_block_as_reporter")]
+    StackBlockAsReporter,
+    // TODO: Use `GrazeWarningKind::StackBlockAsReporter`
 }
 
 pub const LONG_LIST_ASSIGNMENT_MININUM_LENGTH: usize = 16;
 
-impl GetLintId for SpecificGrazeWarning {
+impl GetLintId for GrazeWarningKind {
     #[inline]
     fn get_lint_id(&self) -> &'static str {
         self.internal_lint_id()
@@ -564,6 +569,11 @@ pub enum GrazeDetranspilerError {
     PrimitiveBlockAsStackBlock { block_id: String },
     #[assoc(internal_lint_id = "substack_in_reporter")]
     SubstackInReporter {
+        block_id: String,
+        input_name: String,
+    },
+    #[assoc(internal_lint_id = "substack_in_hat_block")]
+    SubstackInHatBlock {
         block_id: String,
         input_name: String,
     },

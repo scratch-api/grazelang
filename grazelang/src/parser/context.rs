@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     codegen::{self, core::emit_message_eager, ids::generate_random_id_as_string},
     lexer::SourceSpan,
-    messages::types::{GrazeSourceMessage, GrazeSourceWarning, SpecificGrazeWarning},
+    messages::types::{GrazeSourceMessage, GrazeSourceWarning, GrazeWarningKind},
     parser::cst::CustomBlockParamKindValue,
     settings::{GrazeBuildSettings, GrazeMessageSetting},
 };
@@ -224,7 +224,7 @@ impl ResolveKnownBlock for KnownBlock {
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::CallableAsInput,
+                            GrazeWarningKind::CallableAsInput,
                             source_span,
                         ),
                         None,
@@ -286,7 +286,7 @@ impl ResolveKnownBlock for KnownBlock {
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::BlockRefAsField,
+                            GrazeWarningKind::BlockRefAsField,
                             source_span,
                         ),
                         None,
@@ -355,7 +355,7 @@ impl ResolveKnownBlock for KnownBlock {
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::CallableAsField,
+                            GrazeWarningKind::CallableAsField,
                             source_span,
                         ),
                         None,
@@ -370,7 +370,7 @@ impl ResolveKnownBlock for KnownBlock {
                     context,
                     GrazeSourceMessage::Warning(
                         GrazeSourceWarning::Specific(
-                            SpecificGrazeWarning::EmptyExpressionAsField,
+                            GrazeWarningKind::EmptyExpressionAsField,
                             source_span,
                         ),
                         None,
@@ -406,7 +406,7 @@ impl ResolveKnownBlock for KnownBlock {
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::NonFieldSingletonAsField,
+                                GrazeWarningKind::NonFieldSingletonAsField,
                                 source_span,
                             ),
                             None,
@@ -499,7 +499,7 @@ impl ResolveKnownBlock for KnownBlock {
                         context,
                         GrazeSourceMessage::Warning(
                             GrazeSourceWarning::Specific(
-                                SpecificGrazeWarning::AssignPropertyOfOtherTarget,
+                                GrazeWarningKind::AssignPropertyOfOtherTarget,
                                 source_span,
                             ),
                             None,
