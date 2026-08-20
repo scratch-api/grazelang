@@ -589,6 +589,8 @@ pub enum GrazeDetranspilerError {
         name: String,
         expected_name: String,
     },
+    #[assoc(internal_lint_id = "multiple_stages")]
+    MultipleStages,
 }
 
 #[cfg(feature = "detranspiler")]

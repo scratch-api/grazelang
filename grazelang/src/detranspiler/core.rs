@@ -17,6 +17,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DetranspilerContext {
+    pub stage_target_idx: usize,
     pub targets: Vec<DetranspilerTarget>,
     pub asset_namespace: DetranspilerAssetNamespace,
     pub assets: HashMap<AssetPath, OutAssetPath>,
@@ -224,14 +225,19 @@ where
 pub fn lookup_vlb<'a>(
     name: &str,
     id: &str,
-    target: &'a DetranspilerTarget,
+    target_idx: usize,
     context: &'a mut DetranspilerContext,
 ) -> DetranspilerResult<Option<BorrowedDetranspilerVLB<'a>>> {
     let result = context
         .targets
-        .first()
-        .and_then(|value| value.data.get(id))
-        .or_else(|| target.data.get(id))
+        .get(context.stage_target_idx)
+        .and_then(|value: &DetranspilerTarget| value.data.get(id))
+        .or_else(|| {
+            context
+                .targets
+                .get(target_idx)
+                .and_then(|value| value.data.get(id))
+        })
         .map(BorrowedDetranspilerVLB::VarOrList)
         .or_else(|| {
             context
@@ -255,17 +261,23 @@ pub fn lookup_vlb<'a>(
     Ok(result)
 }
 
+/// Result is bubbled
 pub fn lookup_var_or_list<'a>(
     name: &str,
     id: &str,
-    target: &'a DetranspilerTarget,
+    target_idx: usize,
     context: &'a mut DetranspilerContext,
 ) -> DetranspilerResult<Option<&'a DetranspilerVarOrList>> {
     let result = context
         .targets
-        .first()
-        .and_then(|value| value.data.get(id))
-        .or_else(|| target.data.get(id));
+        .get(context.stage_target_idx)
+        .and_then(|value: &DetranspilerTarget| value.data.get(id))
+        .or_else(|| {
+            context
+                .targets
+                .get(target_idx)
+                .and_then(|value| value.data.get(id))
+        });
     if let Some(value) = &result
         && let expected_name = value.get_original_name().as_str()
         && expected_name != name
@@ -305,10 +317,100 @@ pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast
     }
 }
 
+pub fn convert_project(project: &project_json::Sb3Root, settings: GrazeDetranspilerSettings) {
+    macro_rules! emit_error_top_level {
+        ($context:expr, $err:expr, $unlogged_failure:ident, $exit_after_target_conversion:ident) => {{
+            let context = &mut *$context;
+            emit_message_eager(context, $err.into(), GrazeMessageSetting::Errors);
+            match context.settings.message_setting {
+                GrazeMessageSetting::ExitOnError => {
+                    context.messages.push($err.into());
+                    $exit_after_target_conversion = true;
+                    break;
+                }
+                GrazeMessageSetting::ExitOnErrorUnlogged => {
+                    $unlogged_failure = true;
+                    $exit_after_target_conversion = true;
+                    break;
+                }
+                _ => (),
+            }
+        }};
+    }
+    macro_rules! unwrap_bubbled_result_or {
+        ($context_ident:pat => $result:expr, $context:expr, $fallback:expr, $unlogged_failure:ident$(, $exit_after_target_conversion:ident)?) => {{
+            let context = &mut *$context;
+            match {
+                let $context_ident = &mut *context;
+                $result
+            } {
+                Ok(value) => value,
+                Err(err) => {
+                    if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
+                        context.messages.push(err.into());
+                    } else {
+                        $unlogged_failure = true;
+                    }
+                    $($exit_after_target_conversion = true;)?
+                    $fallback;
+                }
+            }
+        }};
+    }
+    let mut context = DetranspilerContext {
+        stage_target_idx: 0,
+        targets: Vec::new(),
+        asset_namespace: DetranspilerAssetNamespace::new(),
+        assets: HashMap::new(),
+        messages: Vec::new(),
+        settings,
+        broadcasts: HashMap::new(),
+    };
+    // TODO: Use broadcast data in detranspiler
+    let mut has_stage = false;
+    let mut exit_after_target_conversion = false;
+    let mut unlogged_failure = false;
+    for target in &project.targets {
+        if target.is_stage {
+            if has_stage {
+                emit_error_top_level!(
+                    &mut context,
+                    GrazeDetranspilerError::MultipleStages,
+                    unlogged_failure,
+                    exit_after_target_conversion
+                );
+            }
+            context.stage_target_idx = context.targets.len();
+            has_stage = true;
+        }
+        let target = unwrap_bubbled_result_or!(
+            context => convert_target(target, context),
+            &mut context,
+            break,
+            unlogged_failure,
+            exit_after_target_conversion
+        );
+        context.targets.push(target);
+    }
+    if !exit_after_target_conversion {
+        for (idx, target) in project.targets.iter().enumerate() {
+            unwrap_bubbled_result_or!(
+                context => fill_target(target, context, idx),
+                &mut context,
+                break,
+                unlogged_failure
+            );
+        }
+    }
+    todo!()
+}
+
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
 // A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A Result is bubbled iff it is not unbubbled.
+
+// Bubbling is done to allow the detranspiler to catch as many errors or warnings at once as possible
 
 /// Result is bubbled
 pub fn convert_target(
@@ -404,13 +506,22 @@ pub fn convert_target(
             },
         );
     }
-    let mut result = DetranspilerTarget {
+    // TODO: Use monitor data in detranspiler
+    Ok(DetranspilerTarget {
         is_stage: target.is_stage,
         costumes,
         sounds,
         data,
         scripts: Vec::new(),
-    };
+    })
+}
+
+/// Result is bubbled
+pub fn fill_target(
+    target: &project_json::Sb3Target,
+    context: &mut DetranspilerContext,
+    target_idx: usize,
+) -> DetranspilerResult<()> {
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(normal_block) = block else {
             continue;
@@ -421,7 +532,7 @@ pub fn convert_target(
         let block_stack = match get_block_shape(&normal_block.opcode) {
             BlockShape::Hat => {
                 let (hat_function, arguments) = unwrap_or_emit_message!(
-                    convert_hat_block(normal_block, block_id, &target.blocks, context, &result),
+                    convert_hat_block(normal_block, block_id, &target.blocks, context, target_idx),
                     context,
                     {
                         let block_stack = if let Some(next_block_id) = &normal_block.next
@@ -435,18 +546,16 @@ pub fn convert_target(
                                 next_block_id,
                                 &target.blocks,
                                 context,
-                                &result,
+                                target_idx,
                             )?
                         } else {
                             ast_types::CodeBlock {
                                 statements: Vec::new(),
                             }
                         };
-                        result
-                            .scripts
-                            .push(DetranspilerTargetBlockStack::IsolatedStack {
-                                stack: block_stack,
-                            });
+                        context.targets.get_mut(target_idx).unwrap().scripts.push(
+                            DetranspilerTargetBlockStack::IsolatedStack { stack: block_stack },
+                        );
                         continue;
                     }
                 );
@@ -466,7 +575,7 @@ pub fn convert_target(
                                 next_block_id,
                                 &target.blocks,
                                 context,
-                                &result,
+                                target_idx,
                             )?
                         } else {
                             ast_types::CodeBlock {
@@ -477,7 +586,7 @@ pub fn convert_target(
                 }
             }
             BlockShape::Stack => DetranspilerTargetBlockStack::IsolatedStack {
-                stack: convert_block_stack(block, block_id, &target.blocks, context, &result)?,
+                stack: convert_block_stack(block, block_id, &target.blocks, context, target_idx)?,
             },
             BlockShape::Reporter => DetranspilerTargetBlockStack::IsolatedExpression {
                 expression: convert_reporter_block(
@@ -485,13 +594,18 @@ pub fn convert_target(
                     block_id,
                     &target.blocks,
                     context,
-                    &result,
+                    target_idx,
                 )?,
             },
         };
-        result.scripts.push(block_stack);
+        context
+            .targets
+            .get_mut(target_idx)
+            .unwrap()
+            .scripts
+            .push(block_stack);
     }
-    Ok(result)
+    Ok(())
 }
 
 /// Result is unbubbled
@@ -513,15 +627,21 @@ pub fn convert_reporter_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target: &DetranspilerTarget,
+    target_idx: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     Ok(try_or_emit_message!(
         match block {
             project_json::Sb3Block::Normal(sb3_normal_block) => {
-                convert_normal_reporter_block(sb3_normal_block, block_id, blocks, context, target)
+                convert_normal_reporter_block(
+                    sb3_normal_block,
+                    block_id,
+                    blocks,
+                    context,
+                    target_idx,
+                )
             }
             project_json::Sb3Block::Primitive(sb3_primitive_block) => {
-                convert_primitive_reporter_block(sb3_primitive_block, context, target)
+                convert_primitive_reporter_block(sb3_primitive_block, context, target_idx)
             }
         },
         context,
@@ -533,12 +653,12 @@ pub fn convert_reporter_block(
 
 /// Result is unbubbled
 macro_rules! convert_block {
-    ($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target:expr$(, $arg_context_pat:pat => $stack_err:expr)?) => {{
+    ($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_idx:expr$(, $arg_context_pat:pat => $stack_err:expr)?) => {{
         let block = &*$block;
         let block_id = &*$block_id;
         let blocks = &*$blocks;
         let context = &mut *$context;
-        let target = &*$target;
+        let target_idx = $target_idx;
         let block_kind_info = get_block_kind_info(block)?;
         let mut tracked_args = 0_usize;
         let mut parameters = Vec::new();
@@ -571,7 +691,7 @@ macro_rules! convert_block {
                         convert_field_value_info(
                             get_field_value_info(field_value, &block.opcode),
                             field_value,
-                            target,
+                            target_idx,
                             context,
                         ),
                         context,
@@ -616,10 +736,10 @@ macro_rules! convert_block {
                             block_id,
                             blocks,
                             context,
-                            target,
+                            target_idx,
                         )?,
                         project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                            convert_primitive_reporter_block(block, context, target),
+                            convert_primitive_reporter_block(block, context, target_idx),
                             context,
                             ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                         ),
@@ -657,7 +777,7 @@ macro_rules! convert_block {
                             block_id,
                             blocks,
                             context,
-                            target,
+                            target_idx,
                         )?,
                         project_json::Sb3InputRepr::PrimitiveBlock(_) => {
                             emit_error!(
@@ -759,7 +879,7 @@ macro_rules! convert_block {
                                         convert_field_value_info(
                                             get_field_value_info(field_value, menu_opcode),
                                             field_value,
-                                            target,
+                                            target_idx,
                                             context,
                                         ),
                                         context,
@@ -788,11 +908,11 @@ macro_rules! convert_block {
                                     continue;
                                 }
                             } else {
-                                convert_reporter_block(inner_block, block_id, blocks, context, target)?
+                                convert_reporter_block(inner_block, block_id, blocks, context, target_idx)?
                             }
                         }
                         project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                            convert_primitive_reporter_block(block, context, target),
+                            convert_primitive_reporter_block(block, context, target_idx),
                             context,
                             ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                         ),
@@ -849,7 +969,7 @@ pub fn convert_normal_reporter_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target: &DetranspilerTarget,
+    target_idx: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     // TODO: Implement binary and unary operators in detranspiler
     // Issue: #108
@@ -858,7 +978,7 @@ pub fn convert_normal_reporter_block(
         block_id,
         blocks,
         context,
-        target,
+        target_idx,
         (context, input_name) => emit_error!(
             GrazeDetranspilerError::SubstackInReporter {
                 block_id: block_id.to_string(),
@@ -881,7 +1001,7 @@ pub fn convert_normal_reporter_block(
 pub fn convert_field_value_info(
     field_value_info: Option<FieldValueInfo>,
     field_value: &project_json::Sb3FieldValue,
-    target: &DetranspilerTarget,
+    target_idx: usize,
     context: &mut DetranspilerContext,
 ) -> DetranspilerResult<ast_types::Expression> {
     Ok(match field_value_info {
@@ -897,7 +1017,7 @@ pub fn convert_field_value_info(
             project_json::Sb3FieldValue::WithId { value, id } => {
                 ast_types::Expression::Identifier(ast_types::Identifier {
                     path: vec![ast_types::SingleIdentifier {
-                        value: match lookup_vlb(&value.as_cow_str(), id, target, context)?
+                        value: match lookup_vlb(&value.as_cow_str(), id, target_idx, context)?
                             .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
                                 id: id.clone(),
                                 name: value.to_string(),
@@ -918,7 +1038,7 @@ pub fn convert_field_value_info(
 pub fn convert_primitive_reporter_block(
     block: &project_json::Sb3PrimitiveBlock,
     context: &mut DetranspilerContext,
-    target: &DetranspilerTarget,
+    target_idx: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     match block {
         project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
@@ -951,7 +1071,7 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            let variable = lookup_var_or_list(name, id, target, context)?.ok_or_else(|| {
+            let variable = lookup_var_or_list(name, id, target_idx, context)?.ok_or_else(|| {
                 GrazeDetranspilerError::UnknownVariable {
                     id: id.clone(),
                     name: name.clone(),
@@ -969,7 +1089,7 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            let list = lookup_var_or_list(name, id, target, context)?.ok_or_else(|| {
+            let list = lookup_var_or_list(name, id, target_idx, context)?.ok_or_else(|| {
                 GrazeDetranspilerError::UnknownVariable {
                     id: id.clone(),
                     name: name.clone(),
@@ -990,14 +1110,14 @@ pub fn convert_hat_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target: &DetranspilerTarget,
+    target_idx: usize,
 ) -> DetranspilerResult<(ast_types::Identifier, Vec<ast_types::Expression>)> {
     let (block_kind_info, parameters, _) = convert_block!(
         block,
         block_id,
         blocks,
         context,
-        target,
+        target_idx,
         (context, input_name) => emit_error!(
             GrazeDetranspilerError::SubstackInHatBlock {
                 block_id: block_id.to_string(),
@@ -1019,7 +1139,7 @@ pub fn convert_block_stack(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target: &DetranspilerTarget,
+    target_idx: usize,
 ) -> DetranspilerResult<ast_types::CodeBlock> {
     // TODO: Implement cycle detection in block conversions
     // Issue: #109
@@ -1028,7 +1148,13 @@ pub fn convert_block_stack(
     let mut current_block_id = IString::from(block_id);
     loop {
         let (statement, next_block_id) = unwrap_or_emit_message!(
-            convert_stack_block(current_block, &current_block_id, blocks, context, target),
+            convert_stack_block(
+                current_block,
+                &current_block_id,
+                blocks,
+                context,
+                target_idx
+            ),
             context,
             break
         );
@@ -1050,7 +1176,7 @@ pub fn convert_stack_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target: &DetranspilerTarget,
+    target_idx: usize,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
     // TODO: Implement if else block and if else chains in detranspiler
     // Issue: #107
@@ -1068,7 +1194,7 @@ pub fn convert_stack_block(
         block_id,
         blocks,
         context,
-        target,
+        target_idx,
         (context, input_name) => {
             if has_substack {
                 emit_error!(
