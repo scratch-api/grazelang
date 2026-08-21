@@ -112,14 +112,23 @@ impl<'a> From<&'a str> for CountAwareChars<'a> {
 pub struct Unescaper<'a> {
     /// [`str`] cache, in reverse order.
     pub chars: CountAwareChars<'a>,
-    pub allow_escaped_dollar: bool,
+    pub allow_escaped_dollar_sign: bool,
+    pub allow_escaped_backtick: bool,
+    pub allow_escaped_quote: bool,
 }
 impl<'a> Unescaper<'a> {
     /// Build a new [`Unescaper`] from the given [`str`].
-    pub fn new(s: &'a str, allow_escaped_dollar: bool) -> Self {
+    pub fn new(
+        s: &'a str,
+        allow_escaped_quote: bool,
+        allow_escaped_backtick: bool,
+        allow_escaped_dollar_sign: bool,
+    ) -> Self {
         Self {
             chars: s.chars().into(),
-            allow_escaped_dollar,
+            allow_escaped_dollar_sign,
+            allow_escaped_backtick,
+            allow_escaped_quote,
         }
     }
 
@@ -153,14 +162,16 @@ impl<'a> Unescaper<'a> {
                 'n' => '\n',
                 'r' => '\r',
                 't' => '\t',
-                '$' if self.allow_escaped_dollar => '$',
+                '$' if self.allow_escaped_dollar_sign => c,
+                '`' if self.allow_escaped_backtick => c,
+                '\"' if self.allow_escaped_quote => c,
                 // https://github.com/hack-ink/unescaper/pull/10#issuecomment-1676443635
                 //
                 // https://www.ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf
                 // On page 4 it says: "\/ represents the solidus character (U+002F)."
 
                 // Added '`' for canonical identifiers
-                '\'' | '\"' | '`' | '\\' | '/' => c,
+                '\'' | '\\' | '/' => c,
                 'u' => self
                     .unescape_unicode_internal()
                     .map_err(|e| offset(e, self.chars.len()))?,
@@ -280,11 +291,33 @@ impl<'a> Unescaper<'a> {
 }
 
 /// Unescape the given [`str`].
-pub fn unescape(s: &str) -> UResult<String> {
-    Unescaper::new(s, false).unescape()
+#[inline]
+pub fn unescape(
+    s: &str,
+    allow_escaped_quote: bool,
+    allow_escaped_backtick: bool,
+    allow_escaped_dollar_sign: bool,
+) -> UResult<String> {
+    Unescaper::new(
+        s,
+        allow_escaped_quote,
+        allow_escaped_backtick,
+        allow_escaped_dollar_sign,
+    )
+    .unescape()
 }
 
-/// Unescape the given [`str`].
+#[inline]
+pub fn unescape_normal_string(s: &str) -> UResult<String> {
+    unescape(s, true, false, false)
+}
+
+#[inline]
 pub fn unescape_format_string(s: &str) -> UResult<String> {
-    Unescaper::new(s, true).unescape()
+    unescape(s, true, false, true)
+}
+
+#[inline]
+pub fn unescape_canonical_name(s: &str) -> UResult<String> {
+    unescape(s, false, true, false)
 }

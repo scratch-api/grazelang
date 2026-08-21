@@ -6,8 +6,9 @@ use logos::{Lexer, Logos};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::string_unescape::unescape;
-use crate::string_unescape::unescape_format_string;
+use crate::utils::string_unescape::{
+    unescape_canonical_name, unescape_format_string, unescape_normal_string,
+};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Logos)]
 #[logos(extras = (Vec<usize>, usize))]
@@ -159,6 +160,8 @@ pub enum Token {
 //  - [x] `vars`
 //  - [x] `lists`
 //  - [x] `extension`
+//  - [ ] `contains`
+//  - [ ] `join`
 // Issue: #79
 
 impl std::fmt::Debug for Token {
@@ -234,12 +237,16 @@ pub enum LexedRightBrace {
 
 pub fn parse_simple_string_literal(lex: &mut Lexer<Token>) -> Option<IString> {
     let slice = lex.slice();
-    unescape(&slice[1..slice.len() - 1]).map(Into::into).ok()
+    unescape_normal_string(&slice[1..slice.len() - 1])
+        .map(Into::into)
+        .ok()
 }
 
 pub fn parse_canonical_name(lex: &mut Lexer<Token>) -> Option<IString> {
     let slice = lex.slice();
-    unescape(&slice[1..slice.len() - 1]).map(Into::into).ok()
+    unescape_canonical_name(&slice[1..slice.len() - 1])
+        .map(Into::into)
+        .ok()
 }
 
 pub fn parse_string(lex: &mut Lexer<Token>) -> IString {

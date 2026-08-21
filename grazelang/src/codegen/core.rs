@@ -38,7 +38,7 @@ use crate::{
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::types::{
         ConstantExprEvaluationError, GetLintId, GrazeSourceMessage, GrazeSourceWarning,
-        LONG_LIST_ASSIGNMENT_MININUM_LENGTH, GrazeWarningKind,
+        GrazeWarningKind, LONG_LIST_ASSIGNMENT_MININUM_LENGTH,
     },
     names::CodegenNamespace,
     parser::{
@@ -5226,10 +5226,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(
-                        GrazeWarningKind::TargetWithoutCostume,
-                        *value.3,
-                    ),
+                    GrazeSourceWarning::Specific(GrazeWarningKind::TargetWithoutCostume, *value.3),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
@@ -5351,10 +5348,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(
-                        GrazeWarningKind::TargetWithoutCostume,
-                        *value.5,
-                    ),
+                    GrazeSourceWarning::Specific(GrazeWarningKind::TargetWithoutCostume, *value.5),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
@@ -5471,10 +5465,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(
-                        GrazeWarningKind::RepeatedTargetConfig,
-                        *value.4,
-                    ),
+                    GrazeSourceWarning::Specific(GrazeWarningKind::RepeatedTargetConfig, *value.4),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,

@@ -1837,10 +1837,10 @@ impl GetPos for BinOp {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Associativity {
     Left,
-    NotLeft,
+    Right,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1857,21 +1857,21 @@ impl BinOp {
     pub fn get_precedence(&self) -> (u8, Associativity) {
         use Associativity::Left as L;
         match self {
-            BinOp::Plus(_) => (3, L),
-            BinOp::Minus(_) => (3, L),
-            BinOp::Times(_) => (4, L),
-            BinOp::Div(_) => (4, L),
-            BinOp::Mod(_) => (4, L),
-            BinOp::Join(_) => (2, L),
-            BinOp::Contains(_) => (2, L),
-            BinOp::And(_) => (0, L),
+            BinOp::Plus(_) => (4, L),
+            BinOp::Minus(_) => (4, L),
+            BinOp::Times(_) => (5, L),
+            BinOp::Div(_) => (5, L),
+            BinOp::Mod(_) => (5, L),
+            BinOp::Join(_) => (3, L),
+            BinOp::Contains(_) => (3, L),
+            BinOp::And(_) => (1, L),
             BinOp::Or(_) => (0, L),
-            BinOp::Equals(_) => (1, L),
-            BinOp::NotEquals(_) => (1, L),
-            BinOp::LessThan(_) => (1, L),
-            BinOp::GreaterThan(_) => (1, L),
-            BinOp::LessThanOrEqual(_) => (1, L),
-            BinOp::GreaterThanOrEqual(_) => (1, L),
+            BinOp::Equals(_) => (2, L),
+            BinOp::NotEquals(_) => (2, L),
+            BinOp::LessThan(_) => (2, L),
+            BinOp::GreaterThan(_) => (2, L),
+            BinOp::LessThanOrEqual(_) => (2, L),
+            BinOp::GreaterThanOrEqual(_) => (2, L),
         }
     }
 

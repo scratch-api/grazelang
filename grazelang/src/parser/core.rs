@@ -348,6 +348,10 @@ macro_rules! emit_error {
         let err = $err;
         let context = &mut *$context;
         context.successful = false;
+        if matches!(&err, ParseError::LexerStuck { .. }) {
+            emit_message(context, || err.clone().into(), GrazeMessageSetting::ExitOnError);
+            return Err(err);
+        }
         match context.settings.message_setting {
             GrazeMessageSetting::ExitOnError => {
                 if !matches!(
@@ -672,7 +676,27 @@ pub fn emit_message_eager(
     message: GrazeSourceMessage,
     message_type: GrazeMessageSetting,
 ) {
-    if context.settings.message_setting >= message_type {
+    if context.settings.message_setting >= message_type
+        && !matches!(
+            context.messages.last(),
+            Some(other_message) if other_message == &message
+        )
+    {
+        context.messages.push(message);
+    };
+}
+
+pub fn emit_message<E>(context: &mut ParseContext, message: E, message_type: GrazeMessageSetting)
+where
+    E: FnOnce() -> GrazeSourceMessage,
+{
+    if context.settings.message_setting >= message_type
+        && let message = message()
+        && !matches!(
+            context.messages.last(),
+            Some(other_message) if other_message == &message
+        )
+    {
         context.messages.push(message);
     };
 }

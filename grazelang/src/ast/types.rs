@@ -296,7 +296,7 @@ pub enum Expression {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum BinOp {
     Plus,
     Minus,
@@ -315,11 +315,7 @@ pub enum BinOp {
     GreaterThanOrEqual,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Associativity {
-    Left,
-    NotLeft,
-}
+pub(crate) use crate::parser::cst::Associativity;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BinOpDescriptor {
@@ -331,7 +327,7 @@ pub struct BinOpDescriptor {
     pub is_negated: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UnOp {
     Minus,
     Not,

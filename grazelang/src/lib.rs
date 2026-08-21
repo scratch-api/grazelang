@@ -1,3 +1,4 @@
+#![deny(unsafe_op_in_unsafe_fn)]
 pub mod ast;
 pub mod cli;
 pub mod codegen;
@@ -10,6 +11,6 @@ pub mod messages;
 pub mod names;
 pub mod parser;
 pub mod settings;
-pub mod string_unescape;
+pub mod utils;
 pub mod visitor;
 pub mod zipper;
