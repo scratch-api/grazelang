@@ -39,6 +39,7 @@ pub struct DetranspilerTarget {
     pub costumes: HashMap<AssetId, DetranspilerAsset<DetranspilerCostumeUncommonData>>,
     pub sounds: HashMap<AssetId, DetranspilerAsset<DetranspilerSoundUncommonData>>,
     pub data: HashMap<DataId, DetranspilerVarOrList>,
+    pub monitors: Vec<DetranspilerMonitor>,
     pub scripts: Vec<DetranspilerTargetBlockStack>,
 }
 
@@ -142,6 +143,12 @@ pub struct DetranspilerCostumeUncommonData {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerSoundUncommonData;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DetranspilerMonitor {
+    pub value: ast_types::MonitorValue,
+    pub config: Vec<ast_types::DictionaryEntry>,
+}
 
 #[inline]
 pub fn emit_message<M>(
@@ -317,7 +324,10 @@ pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast
     }
 }
 
-pub fn convert_project(project: &project_json::Sb3Root, settings: GrazeDetranspilerSettings) {
+pub fn convert_project(
+    project: &project_json::Sb3Root,
+    settings: GrazeDetranspilerSettings,
+) -> ast_types::GrazeProgram {
     macro_rules! emit_error_top_level {
         ($context:expr, $err:expr, $unlogged_failure:ident, $exit_after_target_conversion:ident) => {{
             let context = &mut *$context;
@@ -369,38 +379,61 @@ pub fn convert_project(project: &project_json::Sb3Root, settings: GrazeDetranspi
     // TODO: Use broadcast data in detranspiler
     // Issue: #113
     let mut has_stage = false;
-    let mut exit_after_target_conversion = false;
+    let mut exit_after_target_conversions = false;
     let mut unlogged_failure = false;
-    for target in &project.targets {
+    let mut target_names = HashMap::with_capacity(project.targets.len());
+    for (idx, target) in project.targets.iter().enumerate() {
         if target.is_stage {
             if has_stage {
                 emit_error_top_level!(
                     &mut context,
                     GrazeDetranspilerError::MultipleStages,
                     unlogged_failure,
-                    exit_after_target_conversion
+                    exit_after_target_conversions
                 );
             }
             context.stage_target_idx = context.targets.len();
             has_stage = true;
+        } else {
+            target_names.insert(target.name.clone(), idx);
         }
         let target = unwrap_bubbled_result_or!(
             context => convert_target(target, context),
             &mut context,
             break,
             unlogged_failure,
-            exit_after_target_conversion
+            exit_after_target_conversions
         );
         context.targets.push(target);
     }
-    if !exit_after_target_conversion {
-        for (idx, target) in project.targets.iter().enumerate() {
+    if !exit_after_target_conversions {
+        let mut exit_after_monitor_conversions = false;
+        for monitor in &project.monitors {
+            let target_idx = monitor
+                .sprite_name
+                .as_ref()
+                .and_then(|value| target_names.get(value))
+                .copied()
+                .unwrap_or(context.stage_target_idx);
             unwrap_bubbled_result_or!(
-                context => fill_target(target, context, idx),
+                context => add_monitor(monitor, context, target_idx),
                 &mut context,
-                break,
+                {
+                    exit_after_monitor_conversions = true;
+                    break;
+                },
                 unlogged_failure
             );
+        }
+        if !exit_after_monitor_conversions {
+            for (idx, target) in project.targets.iter().enumerate() {
+                unwrap_bubbled_result_or!(
+                    context => fill_target(target, context, idx),
+                    &mut context,
+                    break,
+                    unlogged_failure
+                );
+            }
         }
     }
     todo!()
@@ -507,15 +540,24 @@ pub fn convert_target(
             },
         );
     }
-    // TODO: Use monitor data in detranspiler
-    // Issue: #112
     Ok(DetranspilerTarget {
         is_stage: target.is_stage,
         costumes,
         sounds,
         data,
+        monitors: Vec::new(),
         scripts: Vec::new(),
     })
+}
+
+pub fn add_monitor(
+    monitor: &project_json::Sb3Monitor,
+    context: &mut DetranspilerContext,
+    target_idx: usize,
+) -> DetranspilerResult<()> {
+    // TODO: Use monitor data in detranspiler
+    // Issue: #112
+    todo!()
 }
 
 /// Result is bubbled
