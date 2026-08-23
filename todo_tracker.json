@@ -842,7 +842,7 @@
     "112": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L509-L509",
         "commit": "34330c2cc3334efc6849351e374efcb9c138196e",
         "title": "Use monitor data in detranspiler"
