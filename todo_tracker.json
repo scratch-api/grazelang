@@ -874,7 +874,7 @@
     "116": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L417-L417",
         "commit": "87dd5dd051520183185d37443dad494b8bc0dc31",
         "title": "Add `::` to `UseStatementContent::MultiUse`"
