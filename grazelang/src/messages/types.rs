@@ -605,6 +605,8 @@ pub enum GrazeDetranspilerWarning {
     UnexpectedEmptyInput { input: String, block_id: String },
     #[assoc(internal_lint_id = "missing_menu_field")]
     MissingMenuField { field: String, block_id: String },
+    #[assoc(internal_lint_id = "unknown_vlb_value")]
+    UnknownVLBValue { field: String, block_id: String },
 }
 
 #[cfg(feature = "detranspiler")]

@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use crate::{
     ast::types as ast_types,
     detranspiler::get_info::{
-        Argument, ArgumentKind, FieldValueInfo, get_block_kind_info, get_field_value_info,
+        Argument, ArgumentKind, BlockKindInfo, FieldValueInfo, get_block_kind_info,
+        get_field_value_info,
     },
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
@@ -96,6 +97,13 @@ impl<'a> BorrowedDetranspilerVLB<'a> {
 pub struct DetranspilerBroadcast {
     pub canonical_name: Option<IString>,
     pub name: IString,
+}
+
+impl DetranspilerBroadcast {
+    #[inline]
+    pub fn get_original_name(&self) -> &IString {
+        self.canonical_name.as_ref().unwrap_or(&self.name)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -252,6 +260,29 @@ pub fn lookup_vlb<'a>(
                 .get(id)
                 .map(BorrowedDetranspilerVLB::Broadcast)
         });
+    if let Some(value) = &result
+        && let expected_name = value.get_original_name().as_str()
+        && expected_name != name
+    {
+        emit_error_inline!(
+            GrazeDetranspilerError::VLBNameIncorrect {
+                id: id.to_string(),
+                name: name.to_string(),
+                expected_name: expected_name.to_string()
+            },
+            context
+        )
+    }
+    Ok(result)
+}
+
+/// Result is bubbled
+pub fn lookup_broadcast<'a>(
+    name: &str,
+    id: &str,
+    context: &'a mut DetranspilerContext,
+) -> DetranspilerResult<Option<&'a DetranspilerBroadcast>> {
+    let result = context.broadcasts.get(id);
     if let Some(value) = &result
         && let expected_name = value.get_original_name().as_str()
         && expected_name != name
@@ -696,48 +727,81 @@ pub fn convert_reporter_block(
 }
 
 /// Result is unbubbled
-macro_rules! convert_block {
-    ($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_idx:expr$(, $arg_context_pat:pat => $stack_err:expr)?) => {{
-        let block = &*$block;
-        let block_id = &*$block_id;
-        let blocks = &*$blocks;
-        let context = &mut *$context;
-        let target_idx = $target_idx;
-        let block_kind_info = get_block_kind_info(block)?;
-        let mut tracked_args = 0_usize;
-        let mut parameters = Vec::new();
-        let mut stack_params = Vec::new();
-        for Argument {
-            name: argument_name,
-            kind,
-            ignore,
-        } in &block_kind_info.arguments
-        {
-            if if kind.is_field() {
-                block.fields.contains_key(argument_name.as_str())
-            } else {
-                block.inputs.contains_key(argument_name.as_str())
-            } {
-                tracked_args += 1;
-            }
-            if *ignore {
-                continue;
-            }
-            match kind {
-                ArgumentKind::Field => {
-                    let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+pub fn convert_block<F>(
+    block: &project_json::Sb3NormalBlock,
+    block_id: &str,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+    target_idx: usize,
+    mut on_stack_input: F,
+) -> DetranspilerResult<(
+    BlockKindInfo,
+    Vec<ast_types::Expression>,
+    Vec<ast_types::CodeBlock>,
+)>
+where
+    F: FnMut(&mut DetranspilerContext, &str) -> DetranspilerResult<()>,
+{
+    let block_kind_info = get_block_kind_info(block)?;
+    let mut tracked_args = 0_usize;
+    let mut parameters = Vec::new();
+    let mut stack_params = Vec::new();
+    for Argument {
+        name: argument_name,
+        kind,
+        ignore,
+    } in &block_kind_info.arguments
+    {
+        if if kind.is_field() {
+            block.fields.contains_key(argument_name.as_str())
+        } else {
+            block.inputs.contains_key(argument_name.as_str())
+        } {
+            tracked_args += 1;
+        }
+        if *ignore {
+            continue;
+        }
+        match kind {
+            ArgumentKind::Field => {
+                let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    continue;
+                };
+                parameters.push(unwrap_or_emit_message!(
+                    convert_field_value_info(
+                        get_field_value_info(field_value, &block.opcode),
+                        field_value,
+                        target_idx,
+                        context,
+                    ),
+                    context,
+                    {
                         parameters.push(ast_types::Expression::Literal(
                             ast_types::Literal::EmptyExpression,
                         ));
                         continue;
-                    };
-                    parameters.push(unwrap_or_emit_message!(
-                        convert_field_value_info(
-                            get_field_value_info(field_value, &block.opcode),
-                            field_value,
-                            target_idx,
-                            context,
-                        ),
+                    }
+                ));
+            }
+            ArgumentKind::VariableOrListField => {
+                let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    continue;
+                };
+                let project_json::Sb3FieldValue::WithId { value: name, id } = field_value else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    continue;
+                };
+                parameters.push(
+                    unwrap_or_emit_message!(
+                        lookup_var_or_list(&name.as_cow_str(), id, target_idx, context,),
                         context,
                         {
                             parameters.push(ast_types::Expression::Literal(
@@ -745,180 +809,258 @@ macro_rules! convert_block {
                             ));
                             continue;
                         }
-                    ));
-                }
-                ArgumentKind::Input => {
-                    let Some(input) = block.inputs.get(argument_name.as_str()) else {
-                        parameters.push(ast_types::Expression::Literal(
-                            ast_types::Literal::EmptyExpression,
-                        ));
-                        // ArgumentKind::Input is only for possibly empty inputs
-                        continue;
-                    };
-                    let (project_json::Sb3InputValue::Shadow(input_repr)
-                    | project_json::Sb3InputValue::NoShadow(input_repr)
-                    | project_json::Sb3InputValue::ObscuredShadow {
-                        value: input_repr,
-                        shadow: _,
-                    }) = input;
-                    parameters.push(match input_repr {
-                        project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
-                            unwrap_or_emit_message!(
-                                blocks.get(block_id).ok_or_else(|| {
-                                    GrazeDetranspilerError::InvalidBlockReference {
-                                        block_id: block_id.clone(),
-                                    }
-                                }),
-                                context,
-                                {
-                                    parameters.push(ast_types::Expression::Literal(
-                                        ast_types::Literal::EmptyExpression,
-                                    ));
-                                    continue;
-                                }
-                            ),
-                            block_id,
-                            blocks,
-                            context,
-                            target_idx,
-                        )?,
-                        project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                            convert_primitive_reporter_block(block, context, target_idx),
-                            context,
-                            ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
-                        ),
-                    });
-                }
-                ArgumentKind::StackInput => {
-                    let Some(input) = block.inputs.get(argument_name.as_str()) else {
-                        stack_params.push(ast_types::CodeBlock {
-                            statements: Vec::new(),
-                        });
-                        continue;
-                    };
-                    let (project_json::Sb3InputValue::Shadow(input_repr)
-                    | project_json::Sb3InputValue::NoShadow(input_repr)
-                    | project_json::Sb3InputValue::ObscuredShadow {
-                        value: input_repr,
-                        shadow: _,
-                    }) = input;
-                    stack_params.push(match input_repr {
-                        project_json::Sb3InputRepr::Reference(block_id) => convert_block_stack(
-                            unwrap_or_emit_message!(
-                                blocks.get(block_id).ok_or_else(|| {
-                                    GrazeDetranspilerError::InvalidBlockReference {
-                                        block_id: block_id.clone(),
-                                    }
-                                }),
-                                context,
-                                {
-                                    stack_params.push(ast_types::CodeBlock {
-                                        statements: Vec::new(),
-                                    });
-                                    continue;
-                                }
-                            ),
-                            block_id,
-                            blocks,
-                            context,
-                            target_idx,
-                        )?,
-                        project_json::Sb3InputRepr::PrimitiveBlock(_) => {
-                            emit_error!(
-                                GrazeDetranspilerError::PrimitiveBlockAsSubstack {
-                                    block_id: block_id.to_string(),
-                                    input_name: argument_name.to_string()
-                                },
-                                context
-                            );
-                            ast_types::CodeBlock {
-                                statements: Vec::new(),
-                            }
-                        }
-                    });
-                    $(
-                        let $arg_context_pat = (&mut *context, argument_name);
-                        $stack_err;
-                    )?
-                }
-                ArgumentKind::MenuInput {
-                    menu_opcode,
-                    menu_field,
-                } => {
-                    let Some(input) = block.inputs.get(argument_name.as_str()) else {
-                        parameters.push(ast_types::Expression::Literal(
-                            ast_types::Literal::EmptyExpression,
-                        ));
+                    )
+                    .map(|value| {
+                        ast_types::Expression::Identifier(ast_types::Identifier {
+                            path: vec![ast_types::SingleIdentifier {
+                                value: value.name.clone(),
+                            }],
+                        })
+                    })
+                    .unwrap_or_else(|| {
                         emit_message(
                             context,
                             || {
-                                GrazeDetranspilerWarning::UnexpectedEmptyInput {
-                                    input: argument_name.to_string(),
+                                GrazeDetranspilerWarning::UnknownVLBValue {
+                                    field: argument_name.to_string(),
                                     block_id: block_id.to_string(),
                                 }
                                 .into()
                             },
                             GrazeMessageSetting::Warnings,
                         );
-                        continue;
-                    };
-                    let (project_json::Sb3InputValue::Shadow(input_repr)
-                    | project_json::Sb3InputValue::NoShadow(input_repr)
-                    | project_json::Sb3InputValue::ObscuredShadow {
-                        value: input_repr,
-                        shadow: _,
-                    }) = input;
-                    parameters.push(match input_repr {
-                        project_json::Sb3InputRepr::Reference(block_id) => {
-                            let inner_block = unwrap_or_emit_message!(
-                                blocks.get(block_id).ok_or_else(|| {
-                                    GrazeDetranspilerError::InvalidBlockReference {
-                                        block_id: block_id.clone(),
-                                    }
-                                }),
-                                context,
-                                {
-                                    parameters.push(ast_types::Expression::Literal(
-                                        ast_types::Literal::EmptyExpression,
-                                    ));
+                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    }),
+                );
+            }
+            ArgumentKind::BroadcastField => {
+                let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    continue;
+                };
+                let project_json::Sb3FieldValue::WithId { value: name, id } = field_value else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    continue;
+                };
+                parameters.push(
+                    unwrap_or_emit_message!(
+                        lookup_broadcast(&name.as_cow_str(), id, context,),
+                        context,
+                        {
+                            parameters.push(ast_types::Expression::Literal(
+                                ast_types::Literal::EmptyExpression,
+                            ));
+                            continue;
+                        }
+                    )
+                    .map(|value| {
+                        ast_types::Expression::Identifier(ast_types::Identifier {
+                            path: vec![ast_types::SingleIdentifier {
+                                value: value.name.clone(),
+                            }],
+                        })
+                    })
+                    .unwrap_or_else(|| {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnknownVLBValue {
+                                    field: argument_name.to_string(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    }),
+                );
+            }
+            ArgumentKind::Input => {
+                let Some(input) = block.inputs.get(argument_name.as_str()) else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    // ArgumentKind::Input is only for possibly empty inputs
+                    continue;
+                };
+                let (project_json::Sb3InputValue::Shadow(input_repr)
+                | project_json::Sb3InputValue::NoShadow(input_repr)
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: input_repr,
+                    shadow: _,
+                }) = input;
+                parameters.push(match input_repr {
+                    project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
+                        unwrap_or_emit_message!(
+                            blocks.get(block_id).ok_or_else(|| {
+                                GrazeDetranspilerError::InvalidBlockReference {
+                                    block_id: block_id.clone(),
+                                }
+                            }),
+                            context,
+                            {
+                                parameters.push(ast_types::Expression::Literal(
+                                    ast_types::Literal::EmptyExpression,
+                                ));
+                                continue;
+                            }
+                        ),
+                        block_id,
+                        blocks,
+                        context,
+                        target_idx,
+                    )?,
+                    project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                        convert_primitive_reporter_block(block, context, target_idx),
+                        context,
+                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ),
+                });
+            }
+            ArgumentKind::StackInput => {
+                let Some(input) = block.inputs.get(argument_name.as_str()) else {
+                    stack_params.push(ast_types::CodeBlock {
+                        statements: Vec::new(),
+                    });
+                    continue;
+                };
+                let (project_json::Sb3InputValue::Shadow(input_repr)
+                | project_json::Sb3InputValue::NoShadow(input_repr)
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: input_repr,
+                    shadow: _,
+                }) = input;
+                stack_params.push(match input_repr {
+                    project_json::Sb3InputRepr::Reference(block_id) => convert_block_stack(
+                        unwrap_or_emit_message!(
+                            blocks.get(block_id).ok_or_else(|| {
+                                GrazeDetranspilerError::InvalidBlockReference {
+                                    block_id: block_id.clone(),
+                                }
+                            }),
+                            context,
+                            {
+                                stack_params.push(ast_types::CodeBlock {
+                                    statements: Vec::new(),
+                                });
+                                continue;
+                            }
+                        ),
+                        block_id,
+                        blocks,
+                        context,
+                        target_idx,
+                    )?,
+                    project_json::Sb3InputRepr::PrimitiveBlock(_) => {
+                        emit_error!(
+                            GrazeDetranspilerError::PrimitiveBlockAsSubstack {
+                                block_id: block_id.to_string(),
+                                input_name: argument_name.to_string()
+                            },
+                            context
+                        );
+                        ast_types::CodeBlock {
+                            statements: Vec::new(),
+                        }
+                    }
+                });
+                on_stack_input(context, argument_name.as_str())?;
+            }
+            ArgumentKind::MenuInput {
+                menu_opcode,
+                menu_field,
+            } => {
+                let Some(input) = block.inputs.get(argument_name.as_str()) else {
+                    parameters.push(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnexpectedEmptyInput {
+                                input: argument_name.to_string(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                    continue;
+                };
+                let (project_json::Sb3InputValue::Shadow(input_repr)
+                | project_json::Sb3InputValue::NoShadow(input_repr)
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: input_repr,
+                    shadow: _,
+                }) = input;
+                parameters.push(match input_repr {
+                    project_json::Sb3InputRepr::Reference(block_id) => {
+                        let inner_block = unwrap_or_emit_message!(
+                            blocks.get(block_id).ok_or_else(|| {
+                                GrazeDetranspilerError::InvalidBlockReference {
+                                    block_id: block_id.clone(),
+                                }
+                            }),
+                            context,
+                            {
+                                parameters.push(ast_types::Expression::Literal(
+                                    ast_types::Literal::EmptyExpression,
+                                ));
+                                continue;
+                            }
+                        );
+                        if let project_json::Sb3Block::Normal(inner_block) = inner_block
+                            && inner_block.opcode.as_str() == menu_opcode.as_str()
+                        {
+                            for key in inner_block.fields.keys() {
+                                if key.as_str() == menu_field.as_str() {
                                     continue;
                                 }
-                            );
-                            if let project_json::Sb3Block::Normal(inner_block) = inner_block
-                                && inner_block.opcode.as_str() == menu_opcode.as_str()
-                            {
-                                for key in inner_block.fields.keys() {
-                                    if key.as_str() == menu_field.as_str() {
-                                        continue;
-                                    }
-                                    let arg = key.clone();
-                                    emit_message(
-                                        context,
-                                        || {
-                                            GrazeDetranspilerWarning::UnusedField {
-                                                field: arg,
-                                                block_id: block_id.to_string(),
-                                            }
-                                            .into()
-                                        },
-                                        GrazeMessageSetting::Warnings,
-                                    );
-                                }
-                                for key in inner_block.inputs.keys() {
-                                    let arg = key.clone();
-                                    emit_message(
-                                        context,
-                                        || {
-                                            GrazeDetranspilerWarning::UnusedInput {
-                                                input: arg,
-                                                block_id: block_id.to_string(),
-                                            }
-                                            .into()
-                                        },
-                                        GrazeMessageSetting::Warnings,
-                                    );
-                                }
-                                if let Some(field_value) = inner_block.fields.get(menu_field.as_str()) {
+                                let arg = key.clone();
+                                emit_message(
+                                    context,
+                                    || {
+                                        GrazeDetranspilerWarning::UnusedField {
+                                            field: arg,
+                                            block_id: block_id.to_string(),
+                                        }
+                                        .into()
+                                    },
+                                    GrazeMessageSetting::Warnings,
+                                );
+                            }
+                            for key in inner_block.inputs.keys() {
+                                let arg = key.clone();
+                                emit_message(
+                                    context,
+                                    || {
+                                        GrazeDetranspilerWarning::UnusedInput {
+                                            input: arg,
+                                            block_id: block_id.to_string(),
+                                        }
+                                        .into()
+                                    },
+                                    GrazeMessageSetting::Warnings,
+                                );
+                            }
+                            if let Some(field_value) = inner_block.fields.get(menu_field.as_str()) {
+                                if menu_opcode.as_str() == "event_broadcast_menu"
+                                    && let project_json::Sb3FieldValue::WithId { value: name, id } =
+                                        field_value
+                                    && let Ok(Some(value)) =
+                                        lookup_broadcast(&name.as_cow_str(), id, context)
+                                {
+                                    ast_types::Expression::Identifier(ast_types::Identifier {
+                                        path: vec![ast_types::SingleIdentifier {
+                                            value: value.name.clone(),
+                                        }],
+                                    })
+                                } else {
                                     unwrap_or_emit_message!(
                                         convert_field_value_info(
                                             get_field_value_info(field_value, menu_opcode),
@@ -934,77 +1076,83 @@ macro_rules! convert_block {
                                             continue;
                                         }
                                     )
-                                } else {
-                                    parameters.push(ast_types::Expression::Literal(
-                                        ast_types::Literal::EmptyExpression,
-                                    ));
-                                    emit_message(
-                                        context,
-                                        || {
-                                            GrazeDetranspilerWarning::MissingMenuField {
-                                                field: menu_field.to_string(),
-                                                block_id: block_id.clone(),
-                                            }
-                                            .into()
-                                        },
-                                        GrazeMessageSetting::Warnings,
-                                    );
-                                    continue;
                                 }
                             } else {
-                                convert_reporter_block(inner_block, block_id, blocks, context, target_idx)?
-                            }
-                        }
-                        project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                            convert_primitive_reporter_block(block, context, target_idx),
-                            context,
-                            ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
-                        ),
-                    });
-                }
-            }
-        }
-        if tracked_args != block.fields.len() + block.inputs.len() {
-            type IsField = bool;
-            let mut tracked_args =
-                HashMap::<String, IsField>::with_capacity(block.fields.len() + block.inputs.len());
-            for key in block.fields.keys() {
-                tracked_args.insert(key.clone(), true);
-            }
-            for key in block.inputs.keys() {
-                tracked_args.insert(key.clone(), false);
-            }
-            for Argument {
-                name,
-                kind: _,
-                ignore: _,
-            } in &block_kind_info.arguments
-            {
-                tracked_args.remove(name.as_str());
-            }
-            for (arg, is_field) in tracked_args {
-                emit_message(
-                    context,
-                    || {
-                        if is_field {
-                            GrazeDetranspilerWarning::UnusedField {
-                                field: arg,
-                                block_id: block_id.to_string(),
+                                parameters.push(ast_types::Expression::Literal(
+                                    ast_types::Literal::EmptyExpression,
+                                ));
+                                emit_message(
+                                    context,
+                                    || {
+                                        GrazeDetranspilerWarning::MissingMenuField {
+                                            field: menu_field.to_string(),
+                                            block_id: block_id.clone(),
+                                        }
+                                        .into()
+                                    },
+                                    GrazeMessageSetting::Warnings,
+                                );
+                                continue;
                             }
                         } else {
-                            GrazeDetranspilerWarning::UnusedInput {
-                                input: arg,
-                                block_id: block_id.to_string(),
-                            }
+                            convert_reporter_block(
+                                inner_block,
+                                block_id,
+                                blocks,
+                                context,
+                                target_idx,
+                            )?
                         }
-                        .into()
-                    },
-                    GrazeMessageSetting::Warnings,
-                );
+                    }
+                    project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                        convert_primitive_reporter_block(block, context, target_idx),
+                        context,
+                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ),
+                });
             }
         }
-        (block_kind_info, parameters, stack_params)
-    }};
+    }
+    if tracked_args != block.fields.len() + block.inputs.len() {
+        type IsField = bool;
+        let mut tracked_args =
+            HashMap::<String, IsField>::with_capacity(block.fields.len() + block.inputs.len());
+        for key in block.fields.keys() {
+            tracked_args.insert(key.clone(), true);
+        }
+        for key in block.inputs.keys() {
+            tracked_args.insert(key.clone(), false);
+        }
+        for Argument {
+            name,
+            kind: _,
+            ignore: _,
+        } in &block_kind_info.arguments
+        {
+            tracked_args.remove(name.as_str());
+        }
+        for (arg, is_field) in tracked_args {
+            emit_message(
+                context,
+                || {
+                    if is_field {
+                        GrazeDetranspilerWarning::UnusedField {
+                            field: arg,
+                            block_id: block_id.to_string(),
+                        }
+                    } else {
+                        GrazeDetranspilerWarning::UnusedInput {
+                            input: arg,
+                            block_id: block_id.to_string(),
+                        }
+                    }
+                    .into()
+                },
+                GrazeMessageSetting::Warnings,
+            );
+        }
+    }
+    Ok((block_kind_info, parameters, stack_params))
 }
 
 /// Result is unbubbled
@@ -1017,20 +1165,23 @@ pub fn convert_normal_reporter_block(
 ) -> DetranspilerResult<ast_types::Expression> {
     // TODO: Implement binary and unary operators in detranspiler
     // Issue: #108
-    let (block_kind_info, parameters, _) = convert_block!(
+    let (block_kind_info, parameters, _) = convert_block(
         block,
         block_id,
         blocks,
         context,
         target_idx,
-        (context, input_name) => emit_error!(
-            GrazeDetranspilerError::SubstackInReporter {
-                block_id: block_id.to_string(),
-                input_name: input_name.to_string(),
-            },
-            context
-        )
-    );
+        |context, input_name| {
+            emit_error!(
+                GrazeDetranspilerError::SubstackInReporter {
+                    block_id: block_id.to_string(),
+                    input_name: input_name.to_string(),
+                },
+                context
+            );
+            Ok(())
+        },
+    )?;
     let function = create_block_identifier(&block_kind_info.block_name);
     if block_kind_info.is_singleton && parameters.is_empty() {
         return Ok(ast_types::Expression::Identifier(function));
@@ -1156,20 +1307,23 @@ pub fn convert_hat_block(
     context: &mut DetranspilerContext,
     target_idx: usize,
 ) -> DetranspilerResult<(ast_types::Identifier, Vec<ast_types::Expression>)> {
-    let (block_kind_info, parameters, _) = convert_block!(
+    let (block_kind_info, parameters, _) = convert_block(
         block,
         block_id,
         blocks,
         context,
         target_idx,
-        (context, input_name) => emit_error!(
-            GrazeDetranspilerError::SubstackInHatBlock {
-                block_id: block_id.to_string(),
-                input_name: input_name.to_string(),
-            },
-            context
-        )
-    );
+        |context, input_name| {
+            emit_error!(
+                GrazeDetranspilerError::SubstackInHatBlock {
+                    block_id: block_id.to_string(),
+                    input_name: input_name.to_string(),
+                },
+                context
+            );
+            Ok(())
+        },
+    )?;
     let function = create_block_identifier(&block_kind_info.block_name);
     Ok((function, parameters))
 }
@@ -1233,13 +1387,13 @@ pub fn convert_stack_block(
         });
     };
     let mut has_substack = false;
-    let (block_kind_info, parameters, stack_params) = convert_block!(
+    let (block_kind_info, parameters, stack_params) = convert_block(
         block,
         block_id,
         blocks,
         context,
         target_idx,
-        (context, input_name) => {
+        |context, input_name| {
             if has_substack {
                 emit_error!(
                     GrazeDetranspilerError::SubstackInReporter {
@@ -1247,11 +1401,12 @@ pub fn convert_stack_block(
                         input_name: input_name.to_string()
                     },
                     context
-                )
+                );
             }
             has_substack = true;
-        }
-    );
+            Ok(())
+        },
+    )?;
     let function = create_block_identifier(&block_kind_info.block_name);
     let next_block = block.next.as_deref().map(Into::into);
     if let Some(substack) = stack_params.into_iter().next() {

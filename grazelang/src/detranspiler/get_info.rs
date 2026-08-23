@@ -28,6 +28,8 @@ pub struct Argument {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArgumentKind {
     Field,
+    VariableOrListField,
+    BroadcastField,
     Input,
     StackInput,
     MenuInput {
@@ -39,7 +41,10 @@ pub enum ArgumentKind {
 impl ArgumentKind {
     #[inline]
     pub fn is_field(&self) -> bool {
-        matches!(self, Self::Field)
+        matches!(
+            self,
+            Self::Field | Self::VariableOrListField | Self::BroadcastField
+        )
     }
 }
 
@@ -806,7 +811,7 @@ pub fn get_block_kind_info(
         "event_whenbroadcastreceived" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("BROADCAST_OPTION"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::BroadcastField,
                 ignore: false,
             }],
             block_category: EVENTS_CATEGORY.clone(),
@@ -831,7 +836,7 @@ pub fn get_block_kind_info(
                 name: literal!("BROADCAST_INPUT"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: literal!("event_broadcast_menu"),
-                    menu_field: literal!("BROADCAST_INPUT"),
+                    menu_field: literal!("BROADCAST_OPTION"),
                 },
                 ignore: false,
             }],
@@ -1606,7 +1611,7 @@ pub fn get_block_kind_info(
         "data_variable" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("VARIABLE"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
@@ -1617,7 +1622,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("VARIABLE"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1637,7 +1642,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("VARIABLE"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1656,7 +1661,7 @@ pub fn get_block_kind_info(
         "data_showvariable" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("VARIABLE"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
@@ -1666,7 +1671,7 @@ pub fn get_block_kind_info(
         "data_hidevariable" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("VARIABLE"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
@@ -1676,7 +1681,7 @@ pub fn get_block_kind_info(
         "data_listcontents" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("LIST"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
@@ -1687,7 +1692,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("LIST"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1707,7 +1712,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("LIST"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1726,7 +1731,7 @@ pub fn get_block_kind_info(
         "data_deletealloflist" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("LIST"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
@@ -1737,7 +1742,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("LIST"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1765,7 +1770,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("LIST"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1793,7 +1798,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("LIST"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1813,7 +1818,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("LIST"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1832,7 +1837,7 @@ pub fn get_block_kind_info(
         "data_lengthoflist" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("LIST"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
@@ -1843,7 +1848,7 @@ pub fn get_block_kind_info(
             arguments: vec![
                 Argument {
                     name: literal!("LIST"),
-                    kind: ArgumentKind::Field,
+                    kind: ArgumentKind::VariableOrListField,
                     ignore: false,
                 },
                 Argument {
@@ -1862,7 +1867,7 @@ pub fn get_block_kind_info(
         "data_showlist" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("LIST"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
@@ -1872,7 +1877,7 @@ pub fn get_block_kind_info(
         "data_hidelist" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("LIST"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::VariableOrListField,
                 ignore: false,
             }],
             block_category: DATA_CATEGORY.clone(),
