@@ -1334,7 +1334,7 @@ impl GetPos for DoubleColon {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DoubleColonOrDot {
     DoubleColon(DoubleColon),
     Dot(Dot),
@@ -1343,8 +1343,8 @@ pub enum DoubleColonOrDot {
 impl GetPos for DoubleColonOrDot {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
-            DoubleColonOrDot::DoubleColon(value) => *value.get_source_span(),
-            DoubleColonOrDot::Dot(value) => *value.get_source_span(),
+            DoubleColonOrDot::DoubleColon(value) => value.get_source_span(),
+            DoubleColonOrDot::Dot(value) => value.get_source_span(),
         }
     }
 }

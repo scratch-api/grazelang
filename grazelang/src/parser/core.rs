@@ -1122,7 +1122,7 @@ pub mod statement {
         eval::cast::{JsPrimitive, ScratchVmToNumber},
         lexer::{self, LexedRightBrace},
         parser::cst::{
-            AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword, ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope, DictionaryEntry, DoubleColon, DoubleColonOrDot, EMPTY_ISTRING_REF, LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword, MonitorDeclarationFromContent, MonitorKeyword, MonitorValue, NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier
+            AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword, ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope, DictionaryEntry, DoubleColonOrDot, EMPTY_ISTRING_REF, LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword, MonitorDeclarationFromContent, MonitorKeyword, MonitorValue, NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier
         },
     };
 
@@ -3377,7 +3377,7 @@ pub mod statement {
                         path,
                         fields: Vec::new(),
                     },
-                    Some((DoubleColorOrDot::DoubleColor(sep), from_stream_pos::<LeftBrace, _>(token_stream))),
+                    Some((DoubleColonOrDot::DoubleColon(sep), from_stream_pos::<LeftBrace, _>(token_stream))),
                 ));
             });
             let mut fields = Vec::new();
@@ -3414,7 +3414,7 @@ pub mod statement {
                         path,
                         fields,
                     },
-                    Some((DoubleColorOrDot::Dot(sep), from_stream_pos::<LeftBrace, _>(token_stream))),
+                    Some((DoubleColonOrDot::Dot(sep), from_stream_pos::<LeftBrace, _>(token_stream))),
                 ));
             });
             Ok((
