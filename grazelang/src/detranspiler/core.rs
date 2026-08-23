@@ -40,6 +40,7 @@ pub struct DetranspilerTarget {
     pub costumes: HashMap<AssetId, DetranspilerAsset<DetranspilerCostumeUncommonData>>,
     pub sounds: HashMap<AssetId, DetranspilerAsset<DetranspilerSoundUncommonData>>,
     pub data: HashMap<DataId, DetranspilerVarOrList>,
+    pub namespace: DetranspilerTargetNamespace,
     pub monitors: Vec<DetranspilerMonitor>,
     pub scripts: Vec<DetranspilerTargetBlockStack>,
 }
@@ -63,6 +64,25 @@ pub enum DetranspilerTargetBlockStack {
 pub enum BorrowedDetranspilerVLB<'a> {
     Broadcast(&'a DetranspilerBroadcast),
     VarOrList(&'a DetranspilerVarOrList),
+}
+
+impl<'a> From<BorrowedDetranspilerVLB<'a>> for InternalVLBIdentifier {
+    fn from(value: BorrowedDetranspilerVLB<'a>) -> Self {
+        match value {
+            BorrowedDetranspilerVLB::Broadcast(value) => {
+                InternalVLBIdentifier::Broadcast(value.name.clone())
+            }
+            BorrowedDetranspilerVLB::VarOrList(value) => {
+                InternalVLBIdentifier::VarOrList(value.name.clone())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum InternalVLBIdentifier {
+    Broadcast(IString),
+    VarOrList(IString),
 }
 
 impl<'a> BorrowedDetranspilerVLB<'a> {
@@ -357,14 +377,6 @@ pub fn find_var_or_list_by_name<'a>(
         .map(|value| value.1)
 }
 
-pub fn create_block_identifier(block_name: &IString) -> ast_types::Identifier {
-    ast_types::Identifier {
-        path: vec![ast_types::SingleIdentifier {
-            value: block_name.clone(),
-        }],
-    }
-}
-
 pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast_types::Literal {
     match value {
         project_json::Sb3Primitive::String(value) => ast_types::Literal::String(value.into()),
@@ -432,8 +444,6 @@ pub fn convert_project(
         settings,
         broadcasts: HashMap::new(),
     };
-    // TODO: Use broadcast data in detranspiler
-    // Issue: #113
     let mut has_stage = false;
     let mut exit_after_target_conversions = false;
     let mut unlogged_failure = false;
@@ -446,6 +456,20 @@ pub fn convert_project(
                     GrazeDetranspilerError::MultipleStages,
                     unlogged_failure,
                     exit_after_target_conversions
+                );
+            }
+            let mut namespace = DetranspilerTargetNamespace::new();
+            context.broadcasts.reserve(target.broadcasts.len());
+            for (id, canonical_name) in &target.broadcasts {
+                let canonical_name = IString::from(canonical_name);
+                let name = namespace.introduce_new_name(canonical_name.clone());
+                context.broadcasts.insert(
+                    id.to_string(),
+                    DetranspilerBroadcast {
+                        canonical_name: (name.as_str() != canonical_name.as_str())
+                            .then_some(canonical_name),
+                        name,
+                    },
                 );
             }
             context.stage_target_idx = context.targets.len();
@@ -601,11 +625,13 @@ pub fn convert_target(
         costumes,
         sounds,
         data,
+        namespace,
         monitors: Vec::new(),
         scripts: Vec::new(),
     })
 }
 
+/// Result is bubbled
 pub fn add_monitor(
     monitor: &project_json::Sb3Monitor,
     context: &mut DetranspilerContext,
@@ -645,11 +671,9 @@ pub fn add_monitor(
                 return Ok(());
             };
             (
-                ast_types::MonitorValue::Identifier(ast_types::Identifier {
-                    path: vec![ast_types::SingleIdentifier {
-                        value: var_or_list.name.clone(),
-                    }],
-                }),
+                ast_types::MonitorValue::Identifier(create_simple_identifier(
+                    var_or_list.name.clone(),
+                )),
                 MonitorKind::Variable,
             )
         }
@@ -681,11 +705,9 @@ pub fn add_monitor(
                 return Ok(());
             };
             (
-                ast_types::MonitorValue::Identifier(ast_types::Identifier {
-                    path: vec![ast_types::SingleIdentifier {
-                        value: var_or_list.name.clone(),
-                    }],
-                }),
+                ast_types::MonitorValue::Identifier(create_simple_identifier(
+                    var_or_list.name.clone(),
+                )),
                 MonitorKind::List,
             )
         }
@@ -697,11 +719,9 @@ pub fn add_monitor(
             );
             if block_kind_info.arguments.is_empty() && block_kind_info.is_singleton {
                 (
-                    ast_types::MonitorValue::Identifier(ast_types::Identifier {
-                        path: vec![ast_types::SingleIdentifier {
-                            value: block_kind_info.block_name,
-                        }],
-                    }),
+                    ast_types::MonitorValue::Identifier(create_simple_identifier(
+                        block_kind_info.block_name,
+                    )),
                     MonitorKind::Generic,
                 )
             } else {
@@ -742,15 +762,12 @@ pub fn add_monitor(
                                 );
                                 continue;
                             };
-                            if let Some(value) = convert_field_value_info_for_monitor(
-                                get_normal_field_value_info(
+                            if let Some(value) =
+                                convert_field_value_info_for_monitor(get_normal_field_value_info(
                                     &field_value.as_cow_str(),
                                     &monitor.opcode,
-                                ),
-                                field_value,
-                                target_idx,
-                                context,
-                            ) {
+                                ))
+                            {
                                 value
                             } else {
                                 emit_error!(
@@ -784,11 +801,7 @@ pub fn add_monitor(
                                 );
                                 continue;
                             };
-                            ast_types::Identifier {
-                                path: vec![ast_types::SingleIdentifier {
-                                    value: var_or_list.name.clone(),
-                                }],
-                            }
+                            create_simple_identifier(var_or_list.name.clone())
                         }
                         ArgumentKind::BroadcastField => unreachable!(),
                         ArgumentKind::Input => unreachable!(),
@@ -798,11 +811,7 @@ pub fn add_monitor(
                 }
                 (
                     ast_types::MonitorValue::Call {
-                        function: ast_types::Identifier {
-                            path: vec![ast_types::SingleIdentifier {
-                                value: block_kind_info.block_name,
-                            }],
-                        },
+                        function: create_simple_identifier(block_kind_info.block_name),
                         arguments,
                     },
                     MonitorKind::Generic,
@@ -1234,11 +1243,9 @@ where
                         }
                     )
                     .map(|value| {
-                        ast_types::Expression::Identifier(ast_types::Identifier {
-                            path: vec![ast_types::SingleIdentifier {
-                                value: value.name.clone(),
-                            }],
-                        })
+                        ast_types::Expression::Identifier(create_simple_identifier(
+                            value.name.clone(),
+                        ))
                     })
                     .unwrap_or_else(|| {
                         emit_message(
@@ -1288,11 +1295,9 @@ where
                         }
                     )
                     .map(|value| {
-                        ast_types::Expression::Identifier(ast_types::Identifier {
-                            path: vec![ast_types::SingleIdentifier {
-                                value: value.name.clone(),
-                            }],
-                        })
+                        ast_types::Expression::Identifier(create_simple_identifier(
+                            value.name.clone(),
+                        ))
                     })
                     .unwrap_or_else(|| {
                         emit_message(
@@ -1485,11 +1490,9 @@ where
                                     && let Ok(Some(value)) =
                                         lookup_broadcast(&name.as_cow_str(), id, context)
                                 {
-                                    ast_types::Expression::Identifier(ast_types::Identifier {
-                                        path: vec![ast_types::SingleIdentifier {
-                                            value: value.name.clone(),
-                                        }],
-                                    })
+                                    ast_types::Expression::Identifier(create_simple_identifier(
+                                        value.name.clone(),
+                                    ))
                                 } else {
                                     unwrap_or_emit_message!(
                                         convert_field_value_info(
@@ -1612,7 +1615,7 @@ pub fn convert_normal_reporter_block(
             Ok(())
         },
     )?;
-    let function = create_block_identifier(&block_kind_info.block_name);
+    let function = create_simple_identifier(block_kind_info.block_name.clone());
     if block_kind_info.is_singleton && parameters.is_empty() {
         return Ok(ast_types::Expression::Identifier(function));
     }
@@ -1630,29 +1633,21 @@ pub fn convert_field_value_info(
     context: &mut DetranspilerContext,
 ) -> DetranspilerResult<ast_types::Expression> {
     Ok(match field_value_info {
-        Some(value) => ast_types::Expression::Identifier(ast_types::Identifier {
-            path: vec![ast_types::SingleIdentifier {
-                value: value.field_value_name,
-            }],
-        }),
+        Some(value) => {
+            ast_types::Expression::Identifier(create_simple_identifier(value.field_value_name))
+        }
         None => match field_value {
             project_json::Sb3FieldValue::Normal(value) => {
                 ast_types::Expression::Literal(get_literal_from_sb3_primitive(value))
             }
             project_json::Sb3FieldValue::WithId { value, id } => {
-                ast_types::Expression::Identifier(ast_types::Identifier {
-                    path: vec![ast_types::SingleIdentifier {
-                        value: match lookup_vlb(&value.as_cow_str(), id, target_idx, context)?
-                            .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
-                                id: id.clone(),
-                                name: value.to_string(),
-                            })? {
-                            BorrowedDetranspilerVLB::Broadcast(broadcast) => broadcast.name.clone(),
-                            BorrowedDetranspilerVLB::VarOrList(var_or_list) => {
-                                var_or_list.name.clone()
-                            }
-                        },
-                    }],
+                ast_types::Expression::Identifier({
+                    let vlb = lookup_vlb(&value.as_cow_str(), id, target_idx, context)?
+                        .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
+                            id: id.clone(),
+                            name: value.to_string(),
+                        })?;
+                    create_vlb_identifier(vlb.into(), &context.targets, target_idx)
                 })
             }
         },
@@ -1661,15 +1656,55 @@ pub fn convert_field_value_info(
 
 pub fn convert_field_value_info_for_monitor(
     field_value_info: Option<FieldValueInfo>,
-    field_value: &project_json::Sb3Primitive,
-    target_idx: usize,
-    context: &mut DetranspilerContext,
 ) -> Option<ast_types::Identifier> {
-    field_value_info.map(|value| ast_types::Identifier {
-        path: vec![ast_types::SingleIdentifier {
-            value: value.field_value_name,
-        }],
-    })
+    field_value_info.map(|value| create_simple_identifier(value.field_value_name))
+}
+
+pub fn create_broadcast_identifier(
+    broadcast_name: IString,
+    targets: &[DetranspilerTarget],
+    target_idx: usize,
+) -> ast_types::Identifier {
+    if targets
+        .get(target_idx)
+        .unwrap()
+        .namespace
+        .used_names
+        .contains_key(&broadcast_name)
+    {
+        ast_types::Identifier {
+            path: vec![
+                ast_types::SingleIdentifier {
+                    value: literal!("broadcasts"),
+                },
+                ast_types::SingleIdentifier {
+                    value: broadcast_name,
+                },
+            ],
+        }
+    } else {
+        create_simple_identifier(broadcast_name)
+    }
+}
+
+#[inline]
+pub fn create_simple_identifier(name: IString) -> ast_types::Identifier {
+    ast_types::Identifier {
+        path: vec![ast_types::SingleIdentifier { value: name }],
+    }
+}
+
+pub fn create_vlb_identifier(
+    broadcast: InternalVLBIdentifier,
+    targets: &[DetranspilerTarget],
+    target_idx: usize,
+) -> ast_types::Identifier {
+    match broadcast {
+        InternalVLBIdentifier::Broadcast(value) => {
+            create_broadcast_identifier(value, targets, target_idx)
+        }
+        InternalVLBIdentifier::VarOrList(value) => create_simple_identifier(value),
+    }
 }
 
 /// Result is unbubbled
@@ -1697,11 +1732,9 @@ pub fn convert_primitive_reporter_block(
                     id: id.clone(),
                     name: name.clone(),
                 })?;
-            Ok(ast_types::Expression::Identifier(ast_types::Identifier {
-                path: vec![ast_types::SingleIdentifier {
-                    value: broadcast.name.clone(),
-                }],
-            }))
+            Ok(ast_types::Expression::Identifier(
+                create_broadcast_identifier(broadcast.name.clone(), &context.targets, target_idx),
+            ))
         }
         project_json::Sb3PrimitiveBlock::Variable {
             name,
@@ -1715,11 +1748,10 @@ pub fn convert_primitive_reporter_block(
                     name: name.clone(),
                 }
             })?;
-            Ok(ast_types::Expression::Identifier(ast_types::Identifier {
-                path: vec![ast_types::SingleIdentifier {
-                    value: variable.name.clone(),
-                }],
-            }))
+
+            Ok(ast_types::Expression::Identifier(create_simple_identifier(
+                variable.name.clone(),
+            )))
         }
         project_json::Sb3PrimitiveBlock::List {
             name,
@@ -1733,11 +1765,9 @@ pub fn convert_primitive_reporter_block(
                     name: name.clone(),
                 }
             })?;
-            Ok(ast_types::Expression::Identifier(ast_types::Identifier {
-                path: vec![ast_types::SingleIdentifier {
-                    value: list.name.clone(),
-                }],
-            }))
+            Ok(ast_types::Expression::Identifier(create_simple_identifier(
+                list.name.clone(),
+            )))
         }
     }
 }
@@ -1767,7 +1797,7 @@ pub fn convert_hat_block(
             Ok(())
         },
     )?;
-    let function = create_block_identifier(&block_kind_info.block_name);
+    let function = create_simple_identifier(block_kind_info.block_name.clone());
     Ok((function, parameters))
 }
 
@@ -1850,7 +1880,7 @@ pub fn convert_stack_block(
             Ok(())
         },
     )?;
-    let function = create_block_identifier(&block_kind_info.block_name);
+    let function = create_simple_identifier(block_kind_info.block_name.clone());
     let next_block = block.next.as_deref().map(Into::into);
     if let Some(substack) = stack_params.into_iter().next() {
         return Ok((

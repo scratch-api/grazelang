@@ -190,7 +190,7 @@ pub fn convert_generated_library(
 
 /// Output is not guaranteed to be correct
 pub fn get_standard_library_namespace_count() -> usize {
-    12
+    15
 }
 
 pub fn populate_field_category_entries(
