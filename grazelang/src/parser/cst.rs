@@ -414,6 +414,7 @@ pub enum UseStatementContent {
     },
     MultiUse {
         root: Identifier,
+        // TODO: Add `::` to `UseStatementContent::MultiUse`
         left_brace: LeftBrace,
         content: CommaSeparated<UseStatementContent>,
         right_brace: RightBrace,

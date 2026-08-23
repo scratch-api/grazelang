@@ -554,7 +554,7 @@ impl UnparseAST for (&SingleDataDeclaration, SingleDataDeclarationDefaultKind) {
                     f.write_char(' ')?;
                 }
                 identifier.unparse_into(f)?;
-                f.write_str(" = ")?;
+                f.write_str(" = file ")?;
                 source.unparse_into(f)
             }
         }
@@ -592,7 +592,7 @@ impl UnparseAST for StageStatement {
                 f.write_char(';')
             }
             StageStatement::SoundDeclaration(asset_declaration) => {
-                f.write_str("costume ")?;
+                f.write_str("sound ")?;
                 asset_declaration.unparse_into(f)?;
                 f.write_char(';')
             }
@@ -613,9 +613,8 @@ impl UnparseAST for StageStatement {
                 parameters,
                 code_block,
             } => {
-                f.write_str("proc ")?;
                 is_warp.unparse_into(f)?;
-                f.write_char(' ')?;
+                f.write_str(" proc ")?;
                 if let Some(canonical_identifier) = canonical_identifier {
                     canonical_identifier.unparse_into(f)?;
                     f.write_char(' ')?;
@@ -694,7 +693,7 @@ impl UnparseAST for SpriteStatement {
                 f.write_char(';')
             }
             SpriteStatement::SoundDeclaration(asset_declaration) => {
-                f.write_str("costume ")?;
+                f.write_str("sound ")?;
                 asset_declaration.unparse_into(f)?;
                 f.write_char(';')
             }
@@ -715,9 +714,8 @@ impl UnparseAST for SpriteStatement {
                 parameters,
                 code_block,
             } => {
-                f.write_str("proc ")?;
                 is_warp.unparse_into(f)?;
-                f.write_char(' ')?;
+                f.write_str(" proc ")?;
                 if let Some(canonical_identifier) = canonical_identifier {
                     canonical_identifier.unparse_into(f)?;
                     f.write_char(' ')?;
