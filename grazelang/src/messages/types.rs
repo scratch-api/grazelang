@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
 use arcstr::ArcStr as IString;
+#[cfg(feature = "detranspiler")]
+use grazelang_types::project_json;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -563,6 +565,10 @@ pub enum GrazeDetranspilerError {
     UnknownVLBName { name: String },
     #[assoc(internal_lint_id = "unknown_field_value_in_monitor")]
     UnknownFieldValueInMonitor { name: String, value: String },
+    #[assoc(internal_lint_id = "malformed_block_reference")]
+    MalformedBlockReference {
+        block_id: Box<project_json::Sb3InputValue>,
+    },
     #[assoc(internal_lint_id = "invalid_block_reference")]
     InvalidBlockReference { block_id: String },
     #[assoc(internal_lint_id = "primitive_block_as_substack")]
@@ -597,10 +603,16 @@ pub enum GrazeDetranspilerError {
     MultipleStages,
     #[assoc(internal_lint_id = "invalid_monitor_opcode")]
     InvalidMonitorOpcode { opcode: String },
+    #[assoc(internal_lint_id = "missing_input")]
+    MissingInput { input: String, block_id: String },
     #[assoc(internal_lint_id = "missing_field")]
     MissingField { field: String, block_id: String },
     #[assoc(internal_lint_id = "missing_field_in_monitor")]
     MissingFieldInMonitor { field: String },
+    #[assoc(internal_lint_id = "missing_mutation")]
+    MissingMutation { block_id: String },
+    #[assoc(internal_lint_id = "incorrect_mutation_type")]
+    IncorrectMutationType { block_id: String },
 }
 
 #[cfg(feature = "detranspiler")]

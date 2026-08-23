@@ -622,6 +622,7 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum BlockShape {
     Hat,
+    ProcedureDefinition,
     Stack,
     Reporter,
 }
@@ -679,6 +680,7 @@ pub fn get_block_shape(opcode: &str) -> BlockShape {
         | "data_variable"
         | "data_listcontents"
         | "music_getTempo" => BlockShape::Reporter,
+        "procedures_definition" => BlockShape::ProcedureDefinition,
         _ => BlockShape::Stack,
     }
 }

@@ -92,13 +92,17 @@ impl DetranspilerTargetNamespace {
         name
     }
 
-    pub fn convert_to_snake_case(name: IString) -> IString {
-        let (alphanumeric, uppercase) = name.chars().fold((true, true), |(a, b), c| {
+    pub fn is_case_conforming_and_uppercase(name: &str) -> (bool, bool) {
+        name.chars().fold((true, true), |(a, b), c| {
             (
                 a && (c.is_ascii_alphanumeric() || c == '_'),
                 b && c.is_uppercase(),
             )
-        });
+        })
+    }
+
+    pub fn convert_to_snake_case(name: IString) -> IString {
+        let (alphanumeric, uppercase) = Self::is_case_conforming_and_uppercase(&name);
         if alphanumeric {
             return name;
         }
@@ -134,7 +138,7 @@ impl DetranspilerTargetNamespace {
                     uppercase = c.is_ascii_uppercase();
                 } else if alphanumeric {
                     uppercase = true;
-                    alphanumeric = true;
+                    alphanumeric = false;
                     new_name.push('_');
                 }
             }

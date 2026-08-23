@@ -42,6 +42,7 @@ pub struct DetranspilerTarget {
     pub data: HashMap<DataId, DetranspilerVarOrList>,
     pub namespace: DetranspilerTargetNamespace,
     pub monitors: Vec<DetranspilerMonitor>,
+    pub procedures: HashMap<IString, DetranspilerCustomBlockDescriptor>,
     pub scripts: Vec<DetranspilerTargetBlockStack>,
 }
 
@@ -51,6 +52,17 @@ pub enum DetranspilerTargetBlockStack {
         hat_function: ast_types::Identifier,
         arguments: Vec<ast_types::Expression>,
         stack: ast_types::CodeBlock,
+    },
+    CustomBlock {
+        is_warp: ast_types::WarpSpecifier,
+        canonical_identifier: Option<ast_types::CanonicalIdentifier>,
+        identifier: ast_types::SingleIdentifier,
+        parameters: Vec<(
+            Option<ast_types::CustomBlockParamKind>,
+            Option<ast_types::CanonicalIdentifier>,
+            ast_types::SingleIdentifier,
+        )>,
+        code_block: ast_types::CodeBlock,
     },
     IsolatedStack {
         stack: ast_types::CodeBlock,
@@ -176,6 +188,13 @@ pub struct DetranspilerSoundUncommonData;
 pub struct DetranspilerMonitor {
     pub value: ast_types::MonitorValue,
     pub config: Vec<ast_types::DictionaryEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DetranspilerCustomBlockDescriptor {
+    pub canonical_name: Option<IString>,
+    pub name: IString,
+    pub argument_count: usize,
 }
 
 #[inline]
@@ -517,6 +536,7 @@ pub fn convert_project(
         }
     }
     todo!()
+    // TODO: Implement `convert_project`
 }
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
@@ -620,6 +640,60 @@ pub fn convert_target(
             },
         );
     }
+    let mut custom_blocks = HashMap::new();
+    for (block_id, block) in &target.blocks {
+        let project_json::Sb3Block::Normal(block) = block else {
+            continue;
+        };
+        if !block.top_level || block.opcode == "procedures_definition" {
+            continue;
+        }
+        let Some(proto_block_id) = block.inputs.get("custom_block") else {
+            emit_error!(
+                GrazeDetranspilerError::MissingInput {
+                    input: "custom_block".to_string(),
+                    block_id: block_id.clone()
+                },
+                context
+            );
+            continue;
+        };
+        let (project_json::Sb3InputValue::NoShadow(project_json::Sb3InputRepr::Reference(
+            proto_block_id,
+        ))
+        | project_json::Sb3InputValue::ObscuredShadow {
+            value: project_json::Sb3InputRepr::Reference(proto_block_id),
+            shadow: _,
+        }
+        | project_json::Sb3InputValue::Shadow(project_json::Sb3InputRepr::Reference(
+            proto_block_id,
+        ))) = proto_block_id
+        else {
+            emit_error!(
+                GrazeDetranspilerError::MalformedBlockReference {
+                    block_id: Box::new(proto_block_id.clone())
+                },
+                context
+            );
+            continue;
+        };
+        let Some(project_json::Sb3Block::Normal(proto_block)) = target.blocks.get(proto_block_id)
+        else {
+            emit_error!(
+                GrazeDetranspilerError::InvalidBlockReference {
+                    block_id: proto_block_id.clone()
+                },
+                context
+            );
+            continue;
+        };
+        let (proccode, descriptor) = unwrap_or_emit_message!(
+            convert_procedure_prototype_for_namespace(proto_block, proto_block_id, &mut namespace),
+            context,
+            continue
+        );
+        custom_blocks.insert(proccode, descriptor);
+    }
     Ok(DetranspilerTarget {
         is_stage: target.is_stage,
         costumes,
@@ -627,6 +701,7 @@ pub fn convert_target(
         data,
         namespace,
         monitors: Vec::new(),
+        procedures: custom_blocks,
         scripts: Vec::new(),
     })
 }
@@ -1070,6 +1145,67 @@ pub fn fill_target(
                     },
                 }
             }
+            BlockShape::ProcedureDefinition => {
+                let project_json::Sb3Block::Normal(block) = block else {
+                    continue;
+                };
+                let Some(proto_block_id) = block.inputs.get("custom_block") else {
+                    continue;
+                };
+                let (project_json::Sb3InputValue::NoShadow(project_json::Sb3InputRepr::Reference(
+                    proto_block_id,
+                ))
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: project_json::Sb3InputRepr::Reference(proto_block_id),
+                    shadow: _,
+                }
+                | project_json::Sb3InputValue::Shadow(project_json::Sb3InputRepr::Reference(
+                    proto_block_id,
+                ))) = proto_block_id
+                else {
+                    continue;
+                };
+                let Some(project_json::Sb3Block::Normal(proto_block)) =
+                    target.blocks.get(proto_block_id)
+                else {
+                    continue;
+                };
+                let Some(mutation) = &proto_block.mutation else {
+                    return Err(GrazeDetranspilerError::MissingMutation {
+                        block_id: proto_block_id.to_string(),
+                    });
+                };
+                let project_json::Sb3BlockMutation::ProceduresPrototype {
+                    procedure_code: proccode,
+                    argument_ids: _,
+                    warp: _,
+                    argument_names: _,
+                    argument_defaults: _,
+                } = mutation
+                else {
+                    return Err(GrazeDetranspilerError::IncorrectMutationType {
+                        block_id: proto_block_id.to_string(),
+                    });
+                };
+                let Some(procedure) = context
+                    .targets
+                    .get(target_idx)
+                    .unwrap()
+                    .procedures
+                    .get(proccode.as_str())
+                else {
+                    continue;
+                };
+                convert_procedure_definition(
+                    normal_block,
+                    block_id,
+                    procedure.canonical_name.clone(),
+                    procedure.name.clone(),
+                    &target.blocks,
+                    context,
+                    target_idx,
+                )?
+            }
             BlockShape::Stack => DetranspilerTargetBlockStack::IsolatedStack {
                 stack: convert_block_stack(block, block_id, &target.blocks, context, target_idx)?,
             },
@@ -1091,6 +1227,123 @@ pub fn fill_target(
             .push(block_stack);
     }
     Ok(())
+}
+
+/// Result is unbubbled
+pub fn convert_procedure_prototype_for_namespace(
+    block: &project_json::Sb3NormalBlock,
+    block_id: &str,
+    namespace: &mut DetranspilerTargetNamespace,
+) -> DetranspilerResult<(IString, DetranspilerCustomBlockDescriptor)> {
+    let Some(mutation) = &block.mutation else {
+        return Err(GrazeDetranspilerError::MissingMutation {
+            block_id: block_id.to_string(),
+        });
+    };
+    let project_json::Sb3BlockMutation::ProceduresPrototype {
+        procedure_code: proccode,
+        argument_ids: _,
+        warp: _,
+        argument_names,
+        argument_defaults: _,
+    } = mutation
+    else {
+        return Err(GrazeDetranspilerError::IncorrectMutationType {
+            block_id: block_id.to_string(),
+        });
+    };
+    let proccode = IString::from(proccode);
+    if let Some(proccode_name) = check_proccode_name_eligibility(&proccode, argument_names.len())
+        && DetranspilerTargetNamespace::is_case_conforming_and_uppercase(proccode_name).0
+        && !namespace.used_names.contains_key(proccode_name)
+    {
+        let proccode_name = IString::from(proccode_name);
+        let chosen_name = namespace.introduce_new_name(proccode_name.clone());
+        if let Some(value) = namespace.used_names.get_mut(&chosen_name) {
+            *value = proccode.clone();
+        }
+        return Ok((
+            proccode.clone(),
+            DetranspilerCustomBlockDescriptor {
+                canonical_name: (chosen_name.as_str() != proccode_name.as_str())
+                    .then_some(proccode),
+                name: chosen_name,
+                argument_count: argument_names.len(),
+            },
+        ));
+    }
+    let name = IString::from(get_name_from_proccode(&proccode));
+    let chosen_name = namespace.introduce_new_name(name);
+    if let Some(value) = namespace.used_names.get_mut(&chosen_name) {
+        *value = proccode.clone();
+    }
+    Ok((
+        proccode.clone(),
+        DetranspilerCustomBlockDescriptor {
+            canonical_name: Some(proccode),
+            name: chosen_name,
+            argument_count: argument_names.len(),
+        },
+    ))
+}
+
+pub fn check_proccode_name_eligibility(proccode: &str, arguments: usize) -> Option<&str> {
+    let start_pos = proccode.len().checked_sub(arguments * 3)?;
+    for i in 0..arguments {
+        let idx = start_pos + i * 3;
+        if !matches!(&proccode.get(idx..idx + 3), Some(" %s" | " %b" | " %n")) {
+            return None;
+        }
+    }
+    proccode.get(..start_pos)
+}
+
+pub fn get_name_from_proccode(proccode: &str) -> String {
+    let mut new_name = String::with_capacity(proccode.len());
+    let (mut alphanumeric, mut uppercase) = proccode
+        .chars()
+        .next()
+        .map(|c| (c.is_ascii_alphanumeric(), c.is_ascii_uppercase()))
+        .unwrap_or((true, false));
+    let mut percent = false;
+    for c in proccode.chars() {
+        if percent && matches!(c, 'n' | 's' | 'b') {
+            percent = false;
+            continue;
+        }
+        percent = c == '%';
+        if c.is_ascii_alphanumeric() {
+            if !uppercase && c.is_ascii_uppercase() {
+                new_name.push('_');
+            }
+            new_name.push(c.to_ascii_lowercase());
+            alphanumeric = true;
+            uppercase = c.is_ascii_uppercase();
+        } else if alphanumeric {
+            uppercase = true;
+            alphanumeric = false;
+            new_name.push('_');
+        }
+    }
+    if let Some(c) = new_name.pop()
+        && c != '_'
+    {
+        new_name.push(c);
+    }
+    new_name
+}
+
+pub fn convert_procedure_definition(
+    block: &project_json::Sb3NormalBlock,
+    block_id: &str,
+    canonical_name: Option<IString>,
+    name: IString,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+    target_idx: usize,
+) -> DetranspilerResult<DetranspilerTargetBlockStack> {
+    todo!()
+    // TODO: Implement `convert_procedure_definition`
 }
 
 /// Result is unbubbled
