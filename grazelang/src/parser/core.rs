@@ -1038,10 +1038,7 @@ pub fn parse_single_identifier_as_identifier<T: PeekableTokenStream>(
 }
 
 macro_rules! parse_identifier_segments_with_sep {
-    ($token_stream:expr, $segment_token:pat, $store:expr) => {
-        parse_identifier_segments_with_sep!($token_stream, $segment_token, $store, false, panic!())
-    };
-    ($token_stream:expr, $segment_token:pat, $store:expr, $allow_left_brace:expr, $left_brace_ret:expr) => {
+    ($token_stream:expr, $segment_token:pat, $store:expr$(, $sep_ident:pat => $left_brace_ret:expr)?) => {
         let token_stream = &mut *$token_stream;
         loop {
             let sep = match match peek_token!(token_stream => Option) {
@@ -1057,7 +1054,10 @@ macro_rules! parse_identifier_segments_with_sep {
             $store.push({
                 let (value, source_span) = match next_token!(token_stream) {
                     Token::Identifier(value) => (value, get_token_source_span(token_stream)),
-                    Token::LeftBrace if $allow_left_brace => $left_brace_ret,
+                    $(Token::LeftBrace => {
+                        let $sep_ident = sep;
+                        $left_brace_ret
+                    },)?
                     token => emit_unexpected_token!(
                         token_stream,
                         "Expected a segment of an identifier.",
@@ -1122,14 +1122,7 @@ pub mod statement {
         eval::cast::{JsPrimitive, ScratchVmToNumber},
         lexer::{self, LexedRightBrace},
         parser::cst::{
-            AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword,
-            ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue,
-            DataDeclaration, DataDeclarationScope, DictionaryEntry, EMPTY_ISTRING_REF, LeftBrace,
-            LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword,
-            MonitorDeclarationFromContent, MonitorKeyword, MonitorValue, NormalAssignmentOperator,
-            RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration,
-            SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf,
-            VarKeyword, VarsKeyword, WarpSpecifier,
+            AssetDeclaration, CanonicalIdentifier, Colon, Comma, ConfigKeyword, ConfigStatementFromContent, CustomBlockParamKind, CustomBlockParamKindValue, DataDeclaration, DataDeclarationScope, DictionaryEntry, DoubleColon, DoubleColonOrDot, EMPTY_ISTRING_REF, LeftBrace, LeftBracket, LeftParens, LetKeyword, ListEntry, ListKeyword, ListsKeyword, MonitorDeclarationFromContent, MonitorKeyword, MonitorValue, NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon, SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType, SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier
         },
     };
 
@@ -3358,11 +3351,11 @@ pub mod statement {
         fn parse_use_identifier<T: PeekableTokenStream>(
             token_stream: &mut T,
             context: &mut ParseContext,
-        ) -> ParseOut<(Identifier, Option<LeftBrace>)> {
+        ) -> ParseOut<(Identifier, Option<(DoubleColonOrDot, LeftBrace)>)> {
             let root = parse_single_identifier_as_identifier(token_stream, context)?;
             let start_pos = get_token_start(token_stream);
             let mut path = Vec::new();
-            parse_identifier_segments_with_sep!(token_stream, Token::DoubleColon, path, true, {
+            parse_identifier_segments_with_sep!(token_stream, Token::DoubleColon, path, sep => {
                 return Ok((
                     Identifier {
                         source_span: {
@@ -3384,11 +3377,11 @@ pub mod statement {
                         path,
                         fields: Vec::new(),
                     },
-                    Some(from_stream_pos::<LeftBrace, _>(token_stream)),
+                    Some((DoubleColorOrDot::DoubleColor(sep), from_stream_pos::<LeftBrace, _>(token_stream))),
                 ));
             });
             let mut fields = Vec::new();
-            parse_identifier_segments_with_sep!(token_stream, Token::Dot, fields, true, {
+            parse_identifier_segments_with_sep!(token_stream, Token::Dot, fields, sep => {
                 return Ok((
                     Identifier {
                         source_span: {
@@ -3421,7 +3414,7 @@ pub mod statement {
                         path,
                         fields,
                     },
-                    Some(from_stream_pos::<LeftBrace, _>(token_stream)),
+                    Some((DoubleColorOrDot::Dot(sep), from_stream_pos::<LeftBrace, _>(token_stream))),
                 ));
             });
             Ok((
@@ -3435,7 +3428,7 @@ pub mod statement {
             ))
         }
         let start = peek_token_start(token_stream);
-        let (ident, left_brace) = try_or_emit_message!(
+        let (ident, extra_data) = try_or_emit_message!(
             parse_use_identifier(token_stream, context),
             context,
             find_comma_separated_entry_end_and_create_invalid::<cst::UseStatementContent, _>(
@@ -3443,7 +3436,7 @@ pub mod statement {
                 start
             )
         );
-        if let Some(left_brace) = left_brace {
+        if let Some((double_colon_or_dot, left_brace)) = extra_data {
             let inner = {
                 let mut start_pos = None;
                 let mut values = Vec::new();
@@ -3508,6 +3501,7 @@ pub mod statement {
             );
             return Ok(cst::UseStatementContent::MultiUse {
                 root: ident,
+                double_colon_or_dot,
                 left_brace,
                 content: inner,
                 right_brace,
@@ -3687,6 +3681,7 @@ pub fn parse_statement<T: PeekableTokenStream>(
                     }
                     | cst::UseStatementContent::MultiUse {
                         root,
+                        double_colon_or_dot: _,
                         left_brace: _,
                         content: _,
                         right_brace: _,
@@ -4061,6 +4056,7 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
                     }
                     | cst::UseStatementContent::MultiUse {
                         root,
+                        double_colon_or_dot: _,
                         left_brace: _,
                         content: _,
                         right_brace: _,
@@ -4411,6 +4407,7 @@ pub fn parse_stage_statement<T: PeekableTokenStream>(
                     }
                     | cst::UseStatementContent::MultiUse {
                         root,
+                        double_colon_or_dot: _,
                         left_brace: _,
                         content: _,
                         right_brace: _,
@@ -4656,6 +4653,7 @@ pub fn parse_top_level_statement<T: PeekableTokenStream>(
                     }
                     | cst::UseStatementContent::MultiUse {
                         root,
+                        double_colon_or_dot: _,
                         left_brace: _,
                         content: _,
                         right_brace: _,

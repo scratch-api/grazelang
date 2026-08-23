@@ -414,8 +414,7 @@ pub enum UseStatementContent {
     },
     MultiUse {
         root: Identifier,
-        // TODO: Add `::` to `UseStatementContent::MultiUse`
-        // Issue: #116
+        double_colon_or_dot: DoubleColonOrDot,
         left_brace: LeftBrace,
         content: CommaSeparated<UseStatementContent>,
         right_brace: RightBrace,
@@ -434,6 +433,7 @@ impl GetPos for UseStatementContent {
             }
             | UseStatementContent::MultiUse {
                 root: _,
+                double_colon_or_dot: _,
                 left_brace: _,
                 content: _,
                 right_brace: _,
@@ -1331,6 +1331,21 @@ impl GetPos for DoubleColon {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)
+pub enum DoubleColonOrDot {
+    DoubleColon(DoubleColon),
+    Dot(Dot),
+}
+
+impl GetPos for DoubleColonOrDot {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            DoubleColonOrDot::DoubleColon(value) => *value.get_source_span(),
+            DoubleColonOrDot::Dot(value) => *value.get_source_span(),
+        }
     }
 }
 

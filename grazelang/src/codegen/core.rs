@@ -5138,6 +5138,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 }
                 cst::UseStatementContent::MultiUse {
                     root,
+                    double_colon_or_dot: _,
                     left_brace: _,
                     content,
                     right_brace: _,
