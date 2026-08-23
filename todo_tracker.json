@@ -870,5 +870,13 @@
         "lines": "L668-L668",
         "commit": "dfff5c0bff81b55fc416bef0a0ec4bb1bc9b8b99",
         "title": "Add optional semicolon to config statements etc"
+    },
+    "116": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L417-L417",
+        "commit": "87dd5dd051520183185d37443dad494b8bc0dc31",
+        "title": "Add `::` to `UseStatementContent::MultiUse`"
     }
 }
