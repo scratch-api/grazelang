@@ -559,6 +559,10 @@ pub enum GrazeDetranspilerError {
     UnknownList { id: String, name: String },
     #[assoc(internal_lint_id = "unknown_broadcast")]
     UnknownBroadcast { id: String, name: String },
+    #[assoc(internal_lint_id = "unknown_vlb_name")]
+    UnknownVLBName { name: String },
+    #[assoc(internal_lint_id = "unknown_field_value_in_monitor")]
+    UnknownFieldValueInMonitor { name: String, value: String },
     #[assoc(internal_lint_id = "invalid_block_reference")]
     InvalidBlockReference { block_id: String },
     #[assoc(internal_lint_id = "primitive_block_as_substack")]
@@ -591,6 +595,12 @@ pub enum GrazeDetranspilerError {
     },
     #[assoc(internal_lint_id = "multiple_stages")]
     MultipleStages,
+    #[assoc(internal_lint_id = "invalid_monitor_opcode")]
+    InvalidMonitorOpcode { opcode: String },
+    #[assoc(internal_lint_id = "missing_field")]
+    MissingField { field: String, block_id: String },
+    #[assoc(internal_lint_id = "missing_field_in_monitor")]
+    MissingFieldInMonitor { field: String },
 }
 
 #[cfg(feature = "detranspiler")]
@@ -607,6 +617,8 @@ pub enum GrazeDetranspilerWarning {
     MissingMenuField { field: String, block_id: String },
     #[assoc(internal_lint_id = "unknown_vlb_value")]
     UnknownVLBValue { field: String, block_id: String },
+    #[assoc(internal_lint_id = "unknown_vlb_value_in_monitor")]
+    UnknownVLBValueInMonitor { monitor_id: String },
 }
 
 #[cfg(feature = "detranspiler")]

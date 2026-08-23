@@ -911,7 +911,12 @@ impl UnparseAST for MonitorValue {
                 arguments,
             } => {
                 function.unparse_into(f)?;
-                unparse_expression_list(arguments, f)
+                f.write_char('(')?;
+                for i in arguments {
+                    i.unparse_into(f)?;
+                    f.write_str(", ")?;
+                }
+                f.write_char(')')
             }
         }
     }

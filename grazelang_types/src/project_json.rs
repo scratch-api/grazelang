@@ -1485,8 +1485,8 @@ pub struct Sb3Monitor {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Sb3MonitorValue {
-    List(Vec<Sb3Primitive>),
-    Primitive(Sb3Primitive),
+    List(Vec<Sb3PrimitiveOrBool>),
+    Primitive(Sb3PrimitiveOrBool),
 }
 
 impl Serialize for Sb3MonitorValue {
@@ -1519,9 +1519,11 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
             where
                 A: de::SeqAccess<'de>,
             {
-                Ok(Sb3MonitorValue::List(Vec::<Sb3Primitive>::deserialize(
-                    serde::de::value::SeqAccessDeserializer::new(seq),
-                )?))
+                Ok(Sb3MonitorValue::List(
+                    Vec::<Sb3PrimitiveOrBool>::deserialize(
+                        serde::de::value::SeqAccessDeserializer::new(seq),
+                    )?,
+                ))
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -1529,7 +1531,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_str(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_str(v)?,
                 ))
             }
 
@@ -1538,7 +1540,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_string(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_string(v)?,
                 ))
             }
 
@@ -1547,7 +1549,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_i64(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_i64(v)?,
                 ))
             }
 
@@ -1556,7 +1558,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_i128(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_i128(v)?,
                 ))
             }
 
@@ -1565,7 +1567,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_u64(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_u64(v)?,
                 ))
             }
 
@@ -1574,7 +1576,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_u128(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_u128(v)?,
                 ))
             }
 
@@ -1583,7 +1585,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_f64(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_f64(v)?,
                 ))
             }
 
@@ -1592,7 +1594,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_bool(v)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_bool(v)?,
                 ))
             }
 
@@ -1601,7 +1603,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 D: de::Deserializer<'de>,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_some(deserializer)?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_some(deserializer)?,
                 ))
             }
 
@@ -1610,7 +1612,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
                 E: de::Error,
             {
                 Ok(Sb3MonitorValue::Primitive(
-                    sb3_primitive::Sb3PrimitiveVisitor.visit_none()?,
+                    sb3_primitive::Sb3PrimitiveOrBoolVisitor.visit_none()?,
                 ))
             }
         }
@@ -1618,7 +1620,7 @@ impl<'de> Deserialize<'de> for Sb3MonitorValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Sb3MonitorMode {
     #[default]
@@ -1626,6 +1628,23 @@ pub enum Sb3MonitorMode {
     Large,
     Slider,
     List,
+}
+
+impl Sb3MonitorMode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Sb3MonitorMode::Default => "default",
+            Sb3MonitorMode::Large => "large",
+            Sb3MonitorMode::Slider => "slider",
+            Sb3MonitorMode::List => "list",
+        }
+    }
+}
+
+impl Display for Sb3MonitorMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

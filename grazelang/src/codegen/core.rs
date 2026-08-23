@@ -5865,7 +5865,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     })
                     .collect(),
                 sprite_name,
-                value: Sb3MonitorValue::Primitive(Sb3Primitive::String("".into())),
+                value: Sb3MonitorValue::Primitive(Sb3PrimitiveOrBool::String("".into())),
                 width: 0.0,
                 height: 0.0,
                 x: None,
@@ -5919,7 +5919,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     })
                     .collect(),
                 sprite_name,
-                value: Sb3MonitorValue::Primitive(Sb3Primitive::String("".into())),
+                value: Sb3MonitorValue::Primitive(Sb3PrimitiveOrBool::String("".into())),
                 width: 0.0,
                 height: 0.0,
                 x: None,
@@ -6003,9 +6003,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             GrazeMessageSetting::Warnings,
                         );
                     }
-                    monitor.value = Sb3MonitorValue::Primitive(Sb3Primitive::from(
-                        Sb3PrimitiveOrBool::from(&value),
-                    ));
+                    monitor.value = Sb3MonitorValue::Primitive(Sb3PrimitiveOrBool::from(&value));
                 }
                 cst::DictionaryValueLiteralOrList::List(items) => {
                     if matches!(monitor.value, Sb3MonitorValue::Primitive(..)) {
@@ -6025,13 +6023,21 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         items
                             .into_iter()
                             .map(|value| {
-                                Ok(extract_data_from_dictionary_value!(
-                                    context,
-                                    Some(value),
-                                    Some(value) => value.to_literal(),
-                                    value => Sb3Primitive::from(Sb3PrimitiveOrBool::from(&value))
-                                )
-                                .unwrap_or_else(|| "".into()))
+                                Ok(match value.to_literal() {
+                                    Ok(value) => {
+                                        let value = value;
+                                        Sb3PrimitiveOrBool::from(&value)
+                                    }
+                                    Err(err) => {
+                                        emit_error!(
+                                            GrazeSb3GeneratorError::DictionaryTypeError {
+                                                error: err
+                                            },
+                                            context
+                                        );
+                                        "".into()
+                                    }
+                                })
                             })
                             .collect::<Result<_, _>>()?,
                     );

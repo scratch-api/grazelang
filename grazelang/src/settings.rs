@@ -18,6 +18,8 @@ pub struct GrazeBuildSettings {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct GrazeDetranspilerSettings {
     pub message_setting: GrazeMessageSetting,
+    pub preserve_monitor_ids: bool,
+    pub preserve_internal_monitor_value: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, clap::ValueEnum)]

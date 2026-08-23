@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use arcstr::ArcStr as IString;
+use arcstr::{ArcStr as IString, format as format_istring, literal};
 use grazelang_types::project_json;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
@@ -8,7 +8,7 @@ use crate::{
     ast::types as ast_types,
     detranspiler::get_info::{
         Argument, ArgumentKind, BlockKindInfo, FieldValueInfo, get_block_kind_info,
-        get_field_value_info,
+        get_field_value_info, get_normal_field_value_info,
     },
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
@@ -246,7 +246,7 @@ pub fn lookup_vlb<'a>(
     let result = context
         .targets
         .get(context.stage_target_idx)
-        .and_then(|value: &DetranspilerTarget| value.data.get(id))
+        .and_then(|value| value.data.get(id))
         .or_else(|| {
             context
                 .targets
@@ -309,7 +309,7 @@ pub fn lookup_var_or_list<'a>(
     let result = context
         .targets
         .get(context.stage_target_idx)
-        .and_then(|value: &DetranspilerTarget| value.data.get(id))
+        .and_then(|value| value.data.get(id))
         .or_else(|| {
             context
                 .targets
@@ -330,6 +330,31 @@ pub fn lookup_var_or_list<'a>(
         )
     }
     Ok(result)
+}
+
+pub fn find_var_or_list_by_name<'a>(
+    name: &str,
+    target_idx: usize,
+    context: &'a mut DetranspilerContext,
+) -> Option<&'a DetranspilerVarOrList> {
+    context
+        .targets
+        .get(context.stage_target_idx)
+        .and_then(|value: &DetranspilerTarget| {
+            value
+                .data
+                .iter()
+                .find(|value| value.1.get_original_name().as_str() == name)
+        })
+        .or_else(|| {
+            context.targets.get(target_idx).and_then(|value| {
+                value
+                    .data
+                    .iter()
+                    .find(|value| value.1.get_original_name().as_str() == name)
+            })
+        })
+        .map(|value| value.1)
 }
 
 pub fn create_block_identifier(block_name: &IString) -> ast_types::Identifier {
@@ -586,9 +611,385 @@ pub fn add_monitor(
     context: &mut DetranspilerContext,
     target_idx: usize,
 ) -> DetranspilerResult<()> {
-    // TODO: Use monitor data in detranspiler
-    // Issue: #112
-    todo!()
+    enum MonitorKind {
+        List,
+        Variable,
+        Generic,
+    }
+    let (value, kind): (_, MonitorKind) = match monitor.opcode.as_str() {
+        "data_variable" => {
+            let Some(var_or_list) = try_or_emit_message!(
+                lookup_var_or_list(
+                    &monitor
+                        .params
+                        .get("VARIABLE")
+                        .map(|value| value.as_cow_str())
+                        .unwrap_or_default(),
+                    &monitor.id,
+                    target_idx,
+                    context,
+                ),
+                context,
+                Ok(())
+            ) else {
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnknownVLBValueInMonitor {
+                            monitor_id: monitor.id.clone(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+                return Ok(());
+            };
+            (
+                ast_types::MonitorValue::Identifier(ast_types::Identifier {
+                    path: vec![ast_types::SingleIdentifier {
+                        value: var_or_list.name.clone(),
+                    }],
+                }),
+                MonitorKind::Variable,
+            )
+        }
+        "data_listcontents" => {
+            let Some(var_or_list) = try_or_emit_message!(
+                lookup_var_or_list(
+                    &monitor
+                        .params
+                        .get("LIST")
+                        .map(|value| value.as_cow_str())
+                        .unwrap_or_default(),
+                    &monitor.id,
+                    target_idx,
+                    context,
+                ),
+                context,
+                Ok(())
+            ) else {
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnknownVLBValueInMonitor {
+                            monitor_id: monitor.id.clone(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+                return Ok(());
+            };
+            (
+                ast_types::MonitorValue::Identifier(ast_types::Identifier {
+                    path: vec![ast_types::SingleIdentifier {
+                        value: var_or_list.name.clone(),
+                    }],
+                }),
+                MonitorKind::List,
+            )
+        }
+        _ => {
+            let block_kind_info = try_or_emit_message!(
+                get_block_kind_info(&monitor.opcode, |value| monitor.params.get(value)),
+                context,
+                Ok(())
+            );
+            if block_kind_info.arguments.is_empty() && block_kind_info.is_singleton {
+                (
+                    ast_types::MonitorValue::Identifier(ast_types::Identifier {
+                        path: vec![ast_types::SingleIdentifier {
+                            value: block_kind_info.block_name,
+                        }],
+                    }),
+                    MonitorKind::Generic,
+                )
+            } else {
+                let mut arguments = Vec::new();
+                for Argument {
+                    name: argument_name,
+                    kind,
+                    ignore,
+                } in &block_kind_info.arguments
+                {
+                    if matches!(
+                        kind,
+                        ArgumentKind::Input
+                            | ArgumentKind::MenuInput { .. }
+                            | ArgumentKind::StackInput
+                            | ArgumentKind::BroadcastField
+                    ) {
+                        emit_error!(
+                            GrazeDetranspilerError::InvalidMonitorOpcode {
+                                opcode: monitor.opcode.clone()
+                            },
+                            context
+                        );
+                        continue;
+                    }
+                    if *ignore {
+                        continue;
+                    }
+                    arguments.push(match kind {
+                        ArgumentKind::Field => {
+                            let Some(field_value) = monitor.params.get(argument_name.as_str())
+                            else {
+                                emit_error!(
+                                    GrazeDetranspilerError::MissingFieldInMonitor {
+                                        field: argument_name.to_string(),
+                                    },
+                                    context
+                                );
+                                continue;
+                            };
+                            if let Some(value) = convert_field_value_info_for_monitor(
+                                get_normal_field_value_info(
+                                    &field_value.as_cow_str(),
+                                    &monitor.opcode,
+                                ),
+                                field_value,
+                                target_idx,
+                                context,
+                            ) {
+                                value
+                            } else {
+                                emit_error!(
+                                    GrazeDetranspilerError::UnknownFieldValueInMonitor {
+                                        name: argument_name.to_string(),
+                                        value: field_value.to_string()
+                                    },
+                                    context
+                                );
+                                continue;
+                            }
+                        }
+                        ArgumentKind::VariableOrListField => {
+                            let Some(name) = monitor.params.get(argument_name.as_str()) else {
+                                emit_error!(
+                                    GrazeDetranspilerError::MissingFieldInMonitor {
+                                        field: argument_name.to_string(),
+                                    },
+                                    context
+                                );
+                                continue;
+                            };
+                            let Some(var_or_list) =
+                                find_var_or_list_by_name(&name.as_cow_str(), target_idx, context)
+                            else {
+                                emit_error!(
+                                    GrazeDetranspilerError::UnknownVLBName {
+                                        name: name.to_string(),
+                                    },
+                                    context
+                                );
+                                continue;
+                            };
+                            ast_types::Identifier {
+                                path: vec![ast_types::SingleIdentifier {
+                                    value: var_or_list.name.clone(),
+                                }],
+                            }
+                        }
+                        ArgumentKind::BroadcastField => unreachable!(),
+                        ArgumentKind::Input => unreachable!(),
+                        ArgumentKind::StackInput => unreachable!(),
+                        ArgumentKind::MenuInput { .. } => unreachable!(),
+                    });
+                }
+                (
+                    ast_types::MonitorValue::Call {
+                        function: ast_types::Identifier {
+                            path: vec![ast_types::SingleIdentifier {
+                                value: block_kind_info.block_name,
+                            }],
+                        },
+                        arguments,
+                    },
+                    MonitorKind::Generic,
+                )
+            }
+        }
+    };
+    let internal_value = context
+        .settings
+        .preserve_internal_monitor_value
+        .then_some(&monitor.value);
+    let id = if matches!(kind, MonitorKind::Generic) {
+        context
+            .settings
+            .preserve_monitor_ids
+            .then(|| monitor.id.as_str().into())
+    } else {
+        None
+    };
+    let mode = if matches!(kind, MonitorKind::List) {
+        (monitor.mode != project_json::Sb3MonitorMode::List).then_some(monitor.mode)
+    } else {
+        (monitor.mode != project_json::Sb3MonitorMode::Default).then_some(monitor.mode)
+    };
+    let width = monitor.width;
+    let height = monitor.height;
+    let x = monitor.x;
+    let y = monitor.y;
+    let visible = monitor.visible;
+    let slider_min = if matches!(kind, MonitorKind::List) {
+        monitor.slider_min.map(Some)
+    } else {
+        monitor
+            .slider_min
+            .is_none_or(|value| value != 0.0)
+            .then_some(monitor.slider_min)
+    };
+    let slider_max = if matches!(kind, MonitorKind::List) {
+        monitor.slider_max.map(Some)
+    } else {
+        monitor
+            .slider_max
+            .is_none_or(|value| value != 0.0)
+            .then_some(monitor.slider_max)
+    };
+    let is_discrete = if matches!(kind, MonitorKind::List) {
+        monitor.is_discrete.map(Some)
+    } else {
+        monitor
+            .is_discrete
+            .is_none_or(|value| !value)
+            .then_some(monitor.is_discrete)
+    };
+    let mut config = Vec::with_capacity(
+        2 + id.is_some() as usize
+            + mode.is_some() as usize
+            + x.is_some() as usize
+            + y.is_some() as usize
+            + !visible as usize
+            + slider_min.is_some() as usize
+            + slider_max.is_some() as usize
+            + is_discrete.is_some() as usize
+            + internal_value.is_some() as usize,
+    );
+    config.push(ast_types::DictionaryEntry {
+        identifier: ast_types::SingleIdentifier {
+            value: literal!("width"),
+        },
+        value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
+            format_istring!("{width}"),
+        )),
+    });
+    config.push(ast_types::DictionaryEntry {
+        identifier: ast_types::SingleIdentifier {
+            value: literal!("height"),
+        },
+        value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
+            format_istring!("{height}"),
+        )),
+    });
+    if let Some(id) = id {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("id"),
+            },
+            value: ast_types::DictionaryValue::Primitive(ast_types::Literal::String(id)),
+        });
+    }
+    if let Some(mode) = mode {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("mode"),
+            },
+            value: ast_types::DictionaryValue::Primitive(ast_types::Literal::String(
+                format_istring!("{mode}"),
+            )),
+        });
+    }
+    if let Some(x) = x {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("x"),
+            },
+            value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
+                format_istring!("{x}"),
+            )),
+        });
+    }
+    if let Some(y) = y {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("y"),
+            },
+            value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
+                format_istring!("{y}"),
+            )),
+        });
+    }
+    if !visible {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("visible"),
+            },
+            value: ast_types::DictionaryValue::Primitive(ast_types::Literal::Bool(false)),
+        });
+    }
+    if let Some(slider_min) = slider_min {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("slider_min"),
+            },
+            value: ast_types::DictionaryValue::Primitive(if let Some(slider_min) = slider_min {
+                ast_types::Literal::DecimalFloat(format_istring!("{slider_min}"))
+            } else {
+                ast_types::Literal::EmptyExpression
+            }),
+        });
+    }
+    if let Some(slider_max) = slider_max {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("slider_max"),
+            },
+            value: ast_types::DictionaryValue::Primitive(if let Some(slider_max) = slider_max {
+                ast_types::Literal::DecimalFloat(format_istring!("{slider_max}"))
+            } else {
+                ast_types::Literal::EmptyExpression
+            }),
+        });
+    }
+    if let Some(is_discrete) = is_discrete {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("is_discrete"),
+            },
+            value: ast_types::DictionaryValue::Primitive(if let Some(is_discrete) = is_discrete {
+                ast_types::Literal::Bool(is_discrete)
+            } else {
+                ast_types::Literal::EmptyExpression
+            }),
+        });
+    }
+    if let Some(value) = internal_value {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier {
+                value: literal!("value"),
+            },
+            value: match value {
+                project_json::Sb3MonitorValue::List(values) => ast_types::DictionaryValue::List(
+                    values
+                        .iter()
+                        .map(|value| ast_types::DictionaryValue::Primitive(value.into()))
+                        .collect(),
+                ),
+                project_json::Sb3MonitorValue::Primitive(value) => {
+                    ast_types::DictionaryValue::Primitive(value.into())
+                }
+            },
+        });
+    }
+    context
+        .targets
+        .get_mut(target_idx)
+        .unwrap()
+        .monitors
+        .push(DetranspilerMonitor { value, config });
+    Ok(())
 }
 
 /// Result is bubbled
@@ -742,7 +1143,15 @@ pub fn convert_block<F>(
 where
     F: FnMut(&mut DetranspilerContext, &str) -> DetranspilerResult<()>,
 {
-    let block_kind_info = get_block_kind_info(block)?;
+    let block_kind_info = get_block_kind_info(&block.opcode, |value| {
+        block.fields.get(value).and_then(|value| {
+            if let project_json::Sb3FieldValue::Normal(value) = value {
+                Some(value)
+            } else {
+                None
+            }
+        })
+    })?;
     let mut tracked_args = 0_usize;
     let mut parameters = Vec::new();
     let mut stack_params = Vec::new();
@@ -765,6 +1174,13 @@ where
         match kind {
             ArgumentKind::Field => {
                 let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingField {
+                            field: argument_name.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
                     parameters.push(ast_types::Expression::Literal(
                         ast_types::Literal::EmptyExpression,
                     ));
@@ -788,6 +1204,13 @@ where
             }
             ArgumentKind::VariableOrListField => {
                 let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingField {
+                            field: argument_name.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
                     parameters.push(ast_types::Expression::Literal(
                         ast_types::Literal::EmptyExpression,
                     ));
@@ -835,6 +1258,13 @@ where
             }
             ArgumentKind::BroadcastField => {
                 let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingField {
+                            field: argument_name.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
                     parameters.push(ast_types::Expression::Literal(
                         ast_types::Literal::EmptyExpression,
                     ));
@@ -1226,6 +1656,19 @@ pub fn convert_field_value_info(
                 })
             }
         },
+    })
+}
+
+pub fn convert_field_value_info_for_monitor(
+    field_value_info: Option<FieldValueInfo>,
+    field_value: &project_json::Sb3Primitive,
+    target_idx: usize,
+    context: &mut DetranspilerContext,
+) -> Option<ast_types::Identifier> {
+    field_value_info.map(|value| ast_types::Identifier {
+        path: vec![ast_types::SingleIdentifier {
+            value: value.field_value_name,
+        }],
     })
 }
 

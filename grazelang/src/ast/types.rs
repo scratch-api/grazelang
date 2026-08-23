@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use arcstr::ArcStr as IString;
+use arcstr::{ArcStr as IString, format as format_istring};
 
-use grazelang_types::project_json::Sb3PrimitiveBlock;
+use grazelang_types::project_json::{Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -222,7 +222,7 @@ pub enum MonitorValue {
     Identifier(Identifier),
     Call {
         function: Identifier,
-        arguments: Vec<Expression>,
+        arguments: Vec<Identifier>,
     },
 }
 
@@ -353,6 +353,29 @@ pub enum Literal {
     BinaryInt(IString),
     Bool(bool),
     EmptyExpression,
+}
+
+impl From<&Sb3Primitive> for Literal {
+    fn from(value: &Sb3Primitive) -> Self {
+        match value {
+            Sb3Primitive::String(value) => Literal::String(value.as_str().into()),
+            Sb3Primitive::Int128(value) => Literal::DecimalInt(format_istring!("{value}")),
+            Sb3Primitive::Int(value) => Literal::DecimalInt(format_istring!("{value}")),
+            Sb3Primitive::Float(value) => Literal::DecimalFloat(format_istring!("{value}")),
+        }
+    }
+}
+
+impl From<&Sb3PrimitiveOrBool> for Literal {
+    fn from(value: &Sb3PrimitiveOrBool) -> Self {
+        match value {
+            Sb3PrimitiveOrBool::String(value) => Literal::String(value.as_str().into()),
+            Sb3PrimitiveOrBool::Int128(value) => Literal::DecimalInt(format_istring!("{value}")),
+            Sb3PrimitiveOrBool::Int(value) => Literal::DecimalInt(format_istring!("{value}")),
+            Sb3PrimitiveOrBool::Float(value) => Literal::DecimalFloat(format_istring!("{value}")),
+            Sb3PrimitiveOrBool::Bool(value) => Literal::Bool(*value),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
