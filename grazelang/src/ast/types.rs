@@ -379,9 +379,6 @@ pub struct CanonicalIdentifier {
 // TODO: Implement AST into CST parser
 // Issue: #105
 
-// TODO: Implement AST unparsing
-// Issue: #104
-
 // TODO: Implement CST unparsing
 // Issue: #114
 
