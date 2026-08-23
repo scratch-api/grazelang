@@ -537,6 +537,7 @@ pub fn convert_project(
     }
     todo!()
     // TODO: Implement `convert_project`
+    // Issue: #118
 }
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
@@ -1344,6 +1345,7 @@ pub fn convert_procedure_definition(
 ) -> DetranspilerResult<DetranspilerTargetBlockStack> {
     todo!()
     // TODO: Implement `convert_procedure_definition`
+    // Issue: #117
 }
 
 /// Result is unbubbled
