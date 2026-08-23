@@ -2330,15 +2330,7 @@ pub mod statement {
                     Some(value) => value,
                     None => break None,
                 } {
-                    Token::Semicolon => break None,
-                    Token::Identifier(_) => {
-                        if let Token::Identifier(ident) = peek_token!(token_stream) {
-                            if ident.as_str() != "else" {
-                                break None;
-                            }
-                        } else {
-                            break None;
-                        }
+                    Token::Identifier(ident) if ident.as_str() == "else" => {
                         let else_identifier =
                             parse_single_identifier_as_identifier(token_stream, context)?;
                         let Some(syntactic_else) = else_identifier.to_syntactic_else() else {

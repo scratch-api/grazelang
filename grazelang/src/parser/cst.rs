@@ -665,6 +665,7 @@ pub enum SpriteStatement {
         RightBrace,
         SourceSpan,
     ),
+    // TODO: Add optional semicolon to config statements etc
     MonitorDeclaration(
         MonitorKeyword,
         MonitorValue,

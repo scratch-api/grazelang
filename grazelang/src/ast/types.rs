@@ -190,11 +190,12 @@ pub enum DataDeclaration {
     Single(Box<SingleDataDeclaration>),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum DataDeclarationScope {
     Global,
     Local,
     Cloud,
+    Unset,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -315,8 +316,6 @@ pub enum BinOp {
     GreaterThanOrEqual,
 }
 
-pub(crate) use crate::parser::cst::Associativity;
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BinOpDescriptor {
     pub opcode: String,
@@ -382,6 +381,8 @@ pub struct CanonicalIdentifier {
 
 // TODO: Implement AST unparsing
 // Issue: #104
+
+// TODO: Implement CST unparsing
 
 // TODO: Implement CST into AST converter
 // Issue: #103
