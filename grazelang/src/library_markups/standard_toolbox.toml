@@ -3005,5 +3005,54 @@
 [[categories]]
     category = "%{BKY_CATEGORY_MYBLOCKS}"
     id = "my_blocks"
-    blocks = []
     alt_name = "my_blocks"
+
+    [[categories.blocks]]
+        type = "argument_reporter_string_number"
+        alt_name = "string_number_argument"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "VALUE"
+            field_type = "field_dropdown"
+            option_category = "any"
+
+    [[categories.blocks]]
+        type = "argument_reporter_boolean"
+        alt_name = "boolean_argument"
+
+        [[categories.blocks.args]]
+            kind = "field"
+            name = "VALUE"
+            field_type = "field_dropdown"
+            option_category = "any"
+    
+    [[categories.blocks]]
+        type = "argument_reporter_boolean"
+        args = []
+        alt_name = "is_turbowarp"
+        is_singleton = true
+
+        [[categories.blocks.known_params]]
+            value = ["is TurboWarp?"]
+
+            [categories.blocks.known_params.param]
+                kind = "field"
+                name = "VALUE"
+                field_type = "field_dropdown"
+                option_category = "any"
+    
+    [[categories.blocks]]
+        type = "argument_reporter_boolean"
+        args = []
+        alt_name = "is_compiled"
+        is_singleton = true
+
+        [[categories.blocks.known_params]]
+            value = ["is compiled?"]
+
+            [categories.blocks.known_params.param]
+                kind = "field"
+                name = "VALUE"
+                field_type = "field_dropdown"
+                option_category = "any"

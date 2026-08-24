@@ -6,7 +6,7 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_types::{
-    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
+    ANY_CATEGORY_ID, BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
     CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, ConstantExprLibraryItem,
     DESTINATIONS_CATEGORY_ID, DIRECTIONS_CATEGORY_ID, INTEGERS_CATEGORY_ID, LISTS_CATEGORY_ID,
     LOCATIONS_CATEGORY_ID, LibraryItem, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID,
@@ -38,6 +38,7 @@ const PROPERTIES_CATEGORY_STRING: &IString = &literal!("properties");
 const OBJECTS_CATEGORY_STRING: &IString = &literal!("objects");
 const PEN_PROPERTIES_CATEGORY_STRING: &IString = &literal!("pen_properties");
 const INTEGERS_CATEGORY_STRING: &IString = &literal!("integers");
+const ANY_CATEGORY_STRING: &IString = &literal!("any");
 
 macro_rules! implement_generate_library {
     ($input:ident, $use_cache:ident, $create_cache:ident) => {{
@@ -84,6 +85,7 @@ macro_rules! implement_generate_library {
             (OBJECTS_CATEGORY_STRING.clone(), OBJECTS_CATEGORY_ID),
             (PEN_PROPERTIES_CATEGORY_STRING.clone(), PEN_PROPERTIES_CATEGORY_ID),
             (INTEGERS_CATEGORY_STRING.clone(), INTEGERS_CATEGORY_ID),
+            (ANY_CATEGORY_STRING.clone(), ANY_CATEGORY_ID),
         ]);
         let mut category_entries = HashMap::<u32, HashSet<String>>::new();
         for namespace in v {
@@ -328,6 +330,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
     let objects_category_string_2 = OBJECTS_CATEGORY_STRING.as_str();
     let pen_properties_category_string_2 = PEN_PROPERTIES_CATEGORY_STRING.as_str();
     let integers_category_string_2 = INTEGERS_CATEGORY_STRING.as_str();
+    let any_category_string_2 = ANY_CATEGORY_STRING.as_str();
     quote! {
         #qualifier fn dynamic_generate_library(
             path: &::std::path::Path,
@@ -393,6 +396,7 @@ pub fn generate_dynamic_generate_library(input: TokenStream) -> TokenStream {
                     #library_path::PEN_PROPERTIES_CATEGORY_ID,
                 ),
                 (::arcstr::literal!(#integers_category_string_2), #library_path::INTEGERS_CATEGORY_ID),
+                (::arcstr::literal!(#any_category_string_2), #library_path::ANY_CATEGORY_ID),
             ]);
             let mut category_entries = ::std::collections::HashMap::<::std::primitive::u32, ::std::collections::HashSet<::std::string::String>>::new();
             for namespace in v {

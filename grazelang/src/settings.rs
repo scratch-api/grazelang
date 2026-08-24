@@ -20,6 +20,7 @@ pub struct GrazeDetranspilerSettings {
     pub message_setting: GrazeMessageSetting,
     pub preserve_monitor_ids: bool,
     pub preserve_internal_monitor_value: bool,
+    pub explicitly_typed_string_parameters: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, clap::ValueEnum)]

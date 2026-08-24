@@ -25,6 +25,8 @@ pub struct DetranspilerContext {
     pub messages: Vec<GrazeDetranspilerMessage>,
     pub settings: GrazeDetranspilerSettings,
     pub broadcasts: HashMap<DataId, DetranspilerBroadcast>,
+    pub current_procedure_parameters:
+        HashMap<ProcedureParameterOriginalName, ProcedureParameterInternalName>,
 }
 
 pub(super) type DetranspilerResult<T> = Result<T, GrazeDetranspilerError>;
@@ -33,6 +35,8 @@ type OutAssetPath = String;
 type AssetPath = String;
 type AssetId = String;
 type DataId = String;
+type ProcedureParameterOriginalName = IString;
+type ProcedureParameterInternalName = IString;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerTarget {
@@ -462,6 +466,7 @@ pub fn convert_project(
         messages: Vec::new(),
         settings,
         broadcasts: HashMap::new(),
+        current_procedure_parameters: HashMap::new(),
     };
     let mut has_stage = false;
     let mut exit_after_target_conversions = false;
@@ -1178,10 +1183,10 @@ pub fn fill_target(
                 };
                 let project_json::Sb3BlockMutation::ProceduresPrototype {
                     procedure_code: proccode,
-                    argument_ids: _,
-                    warp: _,
-                    argument_names: _,
-                    argument_defaults: _,
+                    argument_ids,
+                    warp,
+                    argument_names,
+                    argument_defaults,
                 } = mutation
                 else {
                     return Err(GrazeDetranspilerError::IncorrectMutationType {
@@ -1197,15 +1202,27 @@ pub fn fill_target(
                 else {
                     continue;
                 };
-                convert_procedure_definition(
-                    normal_block,
-                    block_id,
-                    procedure.canonical_name.clone(),
-                    procedure.name.clone(),
-                    &target.blocks,
+                unwrap_or_emit_message!(
+                    convert_procedure_definition(
+                        normal_block,
+                        ProcedureInfo {
+                            prototype_block: proto_block,
+                            prototype_block_id: proto_block_id,
+                            proccode,
+                            argument_ids,
+                            warp: *warp,
+                            argument_names,
+                            argument_defaults,
+                            canonical_name: procedure.canonical_name.clone(),
+                            name: procedure.name.clone(),
+                        },
+                        &target.blocks,
+                        context,
+                        target_idx,
+                    ),
                     context,
-                    target_idx,
-                )?
+                    continue
+                )
             }
             BlockShape::Stack => DetranspilerTargetBlockStack::IsolatedStack {
                 stack: convert_block_stack(block, block_id, &target.blocks, context, target_idx)?,
@@ -1334,18 +1351,99 @@ pub fn get_name_from_proccode(proccode: &str) -> String {
     new_name
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProcedureInfo<'a> {
+    pub prototype_block: &'a project_json::Sb3NormalBlock,
+    pub prototype_block_id: &'a str,
+    pub proccode: &'a str,
+    pub argument_ids: &'a [String],
+    pub warp: bool,
+    pub argument_names: &'a [String],
+    pub argument_defaults: &'a [serde_json::Value],
+    pub canonical_name: Option<IString>,
+    pub name: IString,
+}
+
+/// Result is unbubbled
 pub fn convert_procedure_definition(
     block: &project_json::Sb3NormalBlock,
-    block_id: &str,
-    canonical_name: Option<IString>,
-    name: IString,
+    procedure_info: ProcedureInfo<'_>,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
     target_idx: usize,
 ) -> DetranspilerResult<DetranspilerTargetBlockStack> {
-    todo!()
-    // TODO: Implement `convert_procedure_definition`
-    // Issue: #117
+    let mut parameters = Vec::with_capacity(procedure_info.argument_names.len());
+    let mut proccode_chars = procedure_info.proccode.chars();
+    let mut argument_names = procedure_info.argument_names.iter();
+    while let Some(c) = proccode_chars.next() {
+        if c == '%'
+            && let Some(c) = proccode_chars.next()
+        {
+            let param_kind = match c {
+                's' => context
+                    .settings
+                    .explicitly_typed_string_parameters
+                    .then_some(ast_types::CustomBlockParamKind::String),
+                'b' => Some(ast_types::CustomBlockParamKind::Boolean),
+                'n' => Some(ast_types::CustomBlockParamKind::Number),
+                _ => continue,
+            };
+            let Some(original_name) = argument_names.next() else {
+                return Err(GrazeDetranspilerError::InvalidMutationValue {
+                    block_id: procedure_info.prototype_block_id.to_string(),
+                });
+            };
+            let original_name = IString::from(original_name);
+            let chosen_name = context
+                .targets
+                .get_mut(target_idx)
+                .unwrap()
+                .namespace
+                .introduce_new_name(original_name.clone());
+            context
+                .current_procedure_parameters
+                .insert(original_name.clone(), chosen_name.clone());
+            parameters.push((
+                param_kind,
+                (chosen_name.as_str() != original_name.as_str()).then_some(
+                    ast_types::CanonicalIdentifier {
+                        name: original_name,
+                    },
+                ),
+                ast_types::SingleIdentifier { value: chosen_name },
+            ));
+        }
+    }
+    let code_block = if let Some(next_block_id) = &block.next
+        && let Some(next_block) = unwrap_or_emit_message!(
+            resolve_block_ref(next_block_id, blocks).map(Some),
+            context,
+            None
+        ) {
+        convert_block_stack(next_block, next_block_id, blocks, context, target_idx)?
+    } else {
+        ast_types::CodeBlock {
+            statements: Vec::new(),
+        }
+    };
+    let namespace = &mut context.targets.get_mut(target_idx).unwrap().namespace;
+    for (_, _, ast_types::SingleIdentifier { value: name }) in &parameters {
+        namespace.used_names.remove(name);
+    }
+    context.current_procedure_parameters.clear();
+    Ok(DetranspilerTargetBlockStack::CustomBlock {
+        is_warp: ast_types::WarpSpecifier {
+            is_warp: procedure_info.warp,
+        },
+        canonical_identifier: procedure_info
+            .canonical_name
+            .map(|value| ast_types::CanonicalIdentifier { name: value }),
+        identifier: ast_types::SingleIdentifier {
+            value: procedure_info.name,
+        },
+        parameters,
+        code_block,
+    })
 }
 
 /// Result is unbubbled
@@ -1853,6 +1951,50 @@ pub fn convert_normal_reporter_block(
 ) -> DetranspilerResult<ast_types::Expression> {
     // TODO: Implement binary and unary operators in detranspiler
     // Issue: #108
+    match block.opcode.as_str() {
+        "argument_reporter_boolean" | "argument_reporter_string_number"
+            if block
+                .fields
+                .get("VALUE")
+                .is_some_and(|value| matches!(value, project_json::Sb3FieldValue::Normal(_))) =>
+        {
+            let project_json::Sb3FieldValue::Normal(name) = block.fields.get("VALUE").unwrap()
+            else {
+                unreachable!()
+            };
+            if let project_json::Sb3Primitive::String(name) = name {
+                if let Some(name) = context.current_procedure_parameters.get(name.as_str()) {
+                    return Ok(ast_types::Expression::Identifier(create_simple_identifier(
+                        name.clone(),
+                    )));
+                }
+                match name.as_str() {
+                    "is TurboWarp?" => {
+                        return Ok(ast_types::Expression::Identifier(create_simple_identifier(
+                            literal!("is_turbowarp"),
+                        )));
+                    }
+                    "is compiled?" => {
+                        return Ok(ast_types::Expression::Identifier(create_simple_identifier(
+                            literal!("is_compiled"),
+                        )));
+                    }
+                    _ => (),
+                }
+            }
+            return Ok(ast_types::Expression::Call {
+                function: create_simple_identifier(
+                    if block.opcode.as_str() == "argument_reporter_string_number" {
+                        literal!("string_number_argument")
+                    } else {
+                        literal!("boolean_argument")
+                    },
+                ),
+                arguments: vec![ast_types::Expression::Literal(name.into())],
+            });
+        }
+        _ => (),
+    }
     let (block_kind_info, parameters, _) = convert_block(
         block,
         block_id,

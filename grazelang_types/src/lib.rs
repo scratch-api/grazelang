@@ -31,6 +31,7 @@ pub const PROPERTIES_CATEGORY_ID: u32 = 13;
 pub const OBJECTS_CATEGORY_ID: u32 = 14; // sprites or the stage
 pub const PEN_PROPERTIES_CATEGORY_ID: u32 = 15;
 pub const INTEGERS_CATEGORY_ID: u32 = 16;
+pub const ANY_CATEGORY_ID: u32 = 17;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BindInfo {

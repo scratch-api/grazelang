@@ -613,6 +613,8 @@ pub enum GrazeDetranspilerError {
     MissingMutation { block_id: String },
     #[assoc(internal_lint_id = "incorrect_mutation_type")]
     IncorrectMutationType { block_id: String },
+    #[assoc(internal_lint_id = "invalid_mutation_value")]
+    InvalidMutationValue { block_id: String },
 }
 
 #[cfg(feature = "detranspiler")]

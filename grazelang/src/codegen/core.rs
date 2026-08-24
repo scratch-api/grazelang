@@ -10,8 +10,8 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_types::{
-    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID, BindInfo,
-    CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
+    ANY_CATEGORY_ID, BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
+    BindInfo, CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID,
     DIRECTIONS_CATEGORY_ID, HasShadow, INTEGERS_CATEGORY_ID, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID,
     OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
@@ -1817,7 +1817,8 @@ pub fn add_known_block_to_params(
                 let (field_value, categories) =
                     value.resolve_for_field(known_block_source_span, context);
                 if !(categories.contains(category)
-                    || (*category == INTEGERS_CATEGORY_ID && field_value.is_valid_i128()))
+                    || (*category == INTEGERS_CATEGORY_ID && field_value.is_valid_i128())
+                    || *category == ANY_CATEGORY_ID)
                 {
                     emit_message_eager(
                         context,
@@ -1871,7 +1872,8 @@ pub fn add_known_block_to_params(
                                 .unwrap_or_else(|| &*NO_CATEGORIES);
                             if !(categories.contains(category)
                                 || (*category == INTEGERS_CATEGORY_ID
-                                    && sb3_primitive.is_valid_i128()))
+                                    && sb3_primitive.is_valid_i128())
+                                || *category == ANY_CATEGORY_ID)
                             {
                                 emit_message_eager(
                                     context,
