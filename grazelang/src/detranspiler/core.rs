@@ -2285,6 +2285,7 @@ pub fn convert_normal_reporter_block(
     target_idx: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     // TODO: Implement normal block primitives in detranspiler
+    // Issue: #119
     if let Some(reporter) = check_special_reporter(block, blocks) {
         return convert_special_reporter_block(
             reporter, block, block_id, blocks, context, target_idx,

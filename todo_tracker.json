@@ -810,7 +810,7 @@
     "108": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L637-L637",
         "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
         "title": "Implement binary and unary operators in detranspiler"
@@ -894,5 +894,13 @@
         "lines": "L539-L539",
         "commit": "1ff4ec5e3b0ebd01aafbd0e4e65bbc1477d8ed9a",
         "title": "Implement `convert_project`"
+    },
+    "119": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L2287-L2287",
+        "commit": "adbd488f825452d5c8259710bfa8526f2f43568a",
+        "title": "Implement normal block primitives in detranspiler"
     }
 }
