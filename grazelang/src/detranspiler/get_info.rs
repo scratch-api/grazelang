@@ -1,8 +1,13 @@
+use std::collections::HashMap;
+
 use arcstr::{ArcStr as IString, literal};
 use grazelang_types::project_json;
 use serde::{Deserialize, Serialize};
 
-use crate::{detranspiler::core::DetranspilerResult, messages::types::GrazeDetranspilerError};
+use crate::{
+    ast::types as ast_types, detranspiler::core::DetranspilerResult,
+    messages::types::GrazeDetranspilerError,
+};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockKindInfo {
@@ -2888,4 +2893,217 @@ pub fn check_collision_with_standard_names(name: &str) -> bool {
             | "lists"
             | "extension"
     )
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SpecialReporterInfo {
+    BinOp {
+        binop: ast_types::BinOp,
+        left_operand: IString,
+        right_operand: IString,
+    },
+    NegatedBinOp {
+        binop: ast_types::BinOp,
+        outer_operand: IString,
+        inner_left_operand: IString,
+        inner_right_operand: IString,
+    },
+    UnOp {
+        unop: ast_types::UnOp,
+        operand: IString,
+        unused_operand: Option<IString>,
+        unused_field: Option<IString>,
+    },
+    ProcedureArgument {
+        is_bool: bool,
+    },
+}
+
+pub fn check_special_reporter(
+    block: &project_json::Sb3NormalBlock,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+) -> Option<SpecialReporterInfo> {
+    const NUM1: &IString = &literal!("NUM1");
+    const NUM2: &IString = &literal!("NUM2");
+    const NUM: &IString = &literal!("NUM");
+    const STRING1: &IString = &literal!("STRING1");
+    const STRING2: &IString = &literal!("STRING2");
+    const OPERAND1: &IString = &literal!("OPERAND1");
+    const OPERAND2: &IString = &literal!("OPERAND2");
+    const OPERAND: &IString = &literal!("OPERAND");
+    const OPERATOR: &IString = &literal!("OPERATOR");
+    Some(match block.opcode.as_str() {
+        "argument_reporter_boolean" | "argument_reporter_string_number"
+            if block
+                .fields
+                .get("VALUE")
+                .is_some_and(|value| matches!(value, project_json::Sb3FieldValue::Normal(_))) =>
+        {
+            SpecialReporterInfo::ProcedureArgument { is_bool: block.opcode.as_str() == "argument_reporter_boolean" }
+        }
+        "operator_add" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Plus,
+            left_operand: NUM1.clone(),
+            right_operand: NUM2.clone(),
+        },
+        "operator_subtract" => {
+            if let Some(
+                project_json::Sb3InputValue::NoShadow(left_operand_value)
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: left_operand_value,
+                    shadow: _,
+                }
+                | project_json::Sb3InputValue::Shadow(left_operand_value),
+            ) = block.inputs.get("NUM1")
+                && let project_json::Sb3InputRepr::PrimitiveBlock(
+                    project_json::Sb3PrimitiveBlock::String(project_json::Sb3Primitive::String(
+                        left_operand_value,
+                    ))
+                    | project_json::Sb3PrimitiveBlock::Number(project_json::Sb3Primitive::String(
+                        left_operand_value,
+                    )),
+                ) = left_operand_value
+                && left_operand_value.is_empty()
+            {
+                SpecialReporterInfo::UnOp {
+                    unop: ast_types::UnOp::Minus,
+                    operand: NUM2.clone(),
+                    unused_operand: Some(NUM1.clone()),
+                    unused_field: None,
+                }
+            } else {
+                SpecialReporterInfo::BinOp {
+                    binop: ast_types::BinOp::Minus,
+                    left_operand: NUM1.clone(),
+                    right_operand: NUM2.clone(),
+                }
+            }
+        }
+        "operator_multiply" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Times,
+            left_operand: NUM1.clone(),
+            right_operand: NUM2.clone(),
+        },
+        "operator_divide" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Div,
+            left_operand: NUM1.clone(),
+            right_operand: NUM2.clone(),
+        },
+        "operator_mod" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Mod,
+            left_operand: NUM1.clone(),
+            right_operand: NUM2.clone(),
+        },
+        "operator_join" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Join,
+            left_operand: STRING1.clone(),
+            right_operand: STRING2.clone(),
+        },
+        "operator_contains" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Contains,
+            left_operand: STRING1.clone(),
+            right_operand: STRING2.clone(),
+        },
+        "operator_and" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::And,
+            left_operand: OPERAND1.clone(),
+            right_operand: OPERAND2.clone(),
+        },
+        "operator_or" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Or,
+            left_operand: OPERAND1.clone(),
+            right_operand: OPERAND2.clone(),
+        },
+        "operator_equals" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::Equals,
+            left_operand: OPERAND1.clone(),
+            right_operand: OPERAND2.clone(),
+        },
+        "operator_lt" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::LessThan,
+            left_operand: OPERAND1.clone(),
+            right_operand: OPERAND2.clone(),
+        },
+        "operator_gt" => SpecialReporterInfo::BinOp {
+            binop: ast_types::BinOp::GreaterThan,
+            left_operand: OPERAND1.clone(),
+            right_operand: OPERAND2.clone(),
+        },
+        "operator_not" => {
+            if let Some(
+                project_json::Sb3InputValue::NoShadow(inner_block_id)
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: inner_block_id,
+                    shadow: _,
+                }
+                | project_json::Sb3InputValue::Shadow(inner_block_id),
+            ) = block.inputs.get("OPERAND")
+                && let project_json::Sb3InputRepr::Reference(inner_block_id) = inner_block_id
+                && let Some(project_json::Sb3Block::Normal(inner_block)) =
+                    blocks.get(inner_block_id)
+            {
+                match inner_block.opcode.as_str() {
+                    "operator_equals" => {
+                        return Some(SpecialReporterInfo::NegatedBinOp {
+                            binop: ast_types::BinOp::NotEquals,
+                            outer_operand: OPERAND.clone(),
+                            inner_left_operand: OPERAND1.clone(),
+                            inner_right_operand: OPERAND2.clone(),
+                        });
+                    }
+                    "operator_lt" => {
+                        return Some(SpecialReporterInfo::NegatedBinOp {
+                            binop: ast_types::BinOp::GreaterThanOrEqual,
+                            outer_operand: OPERAND.clone(),
+                            inner_left_operand: OPERAND1.clone(),
+                            inner_right_operand: OPERAND2.clone(),
+                        });
+                    }
+                    "operator_gt" => {
+                        return Some(SpecialReporterInfo::NegatedBinOp {
+                            binop: ast_types::BinOp::LessThanOrEqual,
+                            outer_operand: OPERAND.clone(),
+                            inner_left_operand: OPERAND1.clone(),
+                            inner_right_operand: OPERAND2.clone(),
+                        });
+                    }
+                    _ => (),
+                }
+            }
+            SpecialReporterInfo::UnOp {
+                unop: ast_types::UnOp::Not,
+                operand: OPERAND.clone(),
+                unused_operand: None,
+                unused_field: None,
+            }
+        }
+        "operator_mathop" => {
+            if let Some(project_json::Sb3FieldValue::Normal(operator)) =
+                block.fields.get("OPERATOR")
+                && let project_json::Sb3Primitive::String(operator) = operator
+            {
+                match operator.as_str() {
+                    "e ^" => {
+                        return Some(SpecialReporterInfo::UnOp {
+                            unop: ast_types::UnOp::Exp,
+                            operand: NUM.clone(),
+                            unused_operand: None,
+                            unused_field: Some(OPERATOR.clone()),
+                        });
+                    }
+                    "10 ^" => {
+                        return Some(SpecialReporterInfo::UnOp {
+                            unop: ast_types::UnOp::Pow,
+                            operand: NUM.clone(),
+                            unused_operand: None,
+                            unused_field: Some(OPERATOR.clone()),
+                        });
+                    }
+                    _ => (),
+                }
+            }
+            return None;
+        }
+        _ => return None,
+    })
 }

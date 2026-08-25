@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use crate::{
     ast::types as ast_types,
     detranspiler::get_info::{
-        Argument, ArgumentKind, BlockKindInfo, FieldValueInfo, get_block_kind_info,
-        get_field_value_info, get_normal_field_value_info,
+        Argument, ArgumentKind, BlockKindInfo, FieldValueInfo, SpecialReporterInfo,
+        check_special_reporter, get_block_kind_info, get_field_value_info,
+        get_normal_field_value_info,
     },
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
@@ -1941,23 +1942,304 @@ where
     Ok((block_kind_info, parameters, stack_params))
 }
 
-/// Result is unbubbled
-pub fn convert_normal_reporter_block(
+/// Result is bubbled
+pub fn convert_special_reporter_block(
+    reporter: SpecialReporterInfo,
     block: &project_json::Sb3NormalBlock,
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
     target_idx: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
-    // TODO: Implement binary and unary operators in detranspiler
-    // Issue: #108
-    match block.opcode.as_str() {
-        "argument_reporter_boolean" | "argument_reporter_string_number"
-            if block
-                .fields
-                .get("VALUE")
-                .is_some_and(|value| matches!(value, project_json::Sb3FieldValue::Normal(_))) =>
-        {
+    /// Result is bubbled
+    fn convert_operand_input_value(
+        operand: &project_json::Sb3InputValue,
+        blocks: &HashMap<String, project_json::Sb3Block>,
+        context: &mut DetranspilerContext,
+        target_idx: usize,
+    ) -> DetranspilerResult<ast_types::Expression> {
+        let (project_json::Sb3InputValue::Shadow(input_repr)
+        | project_json::Sb3InputValue::NoShadow(input_repr)
+        | project_json::Sb3InputValue::ObscuredShadow {
+            value: input_repr,
+            shadow: _,
+        }) = operand;
+        Ok(match input_repr {
+            project_json::Sb3InputRepr::Reference(block_id) => unwrap_or_emit_message!(
+                blocks
+                    .get(block_id)
+                    .ok_or_else(|| {
+                        GrazeDetranspilerError::InvalidBlockReference {
+                            block_id: block_id.clone(),
+                        }
+                    })
+                    .map(|block| {
+                        convert_reporter_block(block, block_id, blocks, context, target_idx)
+                    }),
+                context,
+                Ok(ast_types::Expression::Literal(
+                    ast_types::Literal::EmptyExpression
+                ))
+            )?,
+            project_json::Sb3InputRepr::PrimitiveBlock(block) => {
+                unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, context, target_idx),
+                    context,
+                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                )
+            }
+        })
+    }
+    Ok(match reporter {
+        crate::detranspiler::get_info::SpecialReporterInfo::BinOp {
+            binop,
+            left_operand,
+            right_operand,
+        } => {
+            let mut operands_present = 0;
+            let left_operand_expression =
+                if let Some(operand) = block.inputs.get(left_operand.as_str()) {
+                    operands_present += 1;
+                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                } else {
+                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                };
+            let right_operand_expression =
+                if let Some(operand) = block.inputs.get(right_operand.as_str()) {
+                    operands_present += 1;
+                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                } else {
+                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                };
+            for key in block.fields.keys() {
+                let arg = key.clone();
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnusedField {
+                            field: arg,
+                            block_id: block_id.to_string(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            if block.inputs.len() != operands_present {
+                for key in block.inputs.keys() {
+                    if key.as_str() == left_operand.as_str()
+                        || key.as_str() == right_operand.as_str()
+                    {
+                        continue;
+                    }
+                    let arg = key.clone();
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: arg,
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            ast_types::Expression::BinOp {
+                operator: binop,
+                left_operand: Box::new(left_operand_expression),
+                right_operand: Box::new(right_operand_expression),
+            }
+        }
+        crate::detranspiler::get_info::SpecialReporterInfo::NegatedBinOp {
+            binop,
+            outer_operand,
+            inner_left_operand,
+            inner_right_operand,
+        } => {
+            let Some(
+                project_json::Sb3InputValue::Shadow(project_json::Sb3InputRepr::Reference(
+                    inner_block_id,
+                ))
+                | project_json::Sb3InputValue::NoShadow(project_json::Sb3InputRepr::Reference(
+                    inner_block_id,
+                ))
+                | project_json::Sb3InputValue::ObscuredShadow {
+                    value: project_json::Sb3InputRepr::Reference(inner_block_id),
+                    shadow: _,
+                },
+            ) = block.inputs.get(outer_operand.as_str())
+            else {
+                unreachable!()
+            };
+            let Some(project_json::Sb3Block::Normal(inner_block)) = blocks.get(inner_block_id)
+            else {
+                unreachable!()
+            };
+            let mut inner_operands_present = 0;
+            let left_operand_expression =
+                if let Some(operand) = inner_block.inputs.get(inner_left_operand.as_str()) {
+                    inner_operands_present += 1;
+                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                } else {
+                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                };
+            let right_operand_expression =
+                if let Some(operand) = inner_block.inputs.get(inner_right_operand.as_str()) {
+                    inner_operands_present += 1;
+                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                } else {
+                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                };
+            for key in block.fields.keys() {
+                let arg = key.clone();
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnusedField {
+                            field: arg,
+                            block_id: block_id.to_string(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            for key in inner_block.fields.keys() {
+                let arg = key.clone();
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnusedField {
+                            field: arg,
+                            block_id: inner_block_id.to_string(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            if block.inputs.len() != 1 {
+                for key in block.inputs.keys() {
+                    if key.as_str() == outer_operand.as_str() {
+                        continue;
+                    }
+                    let arg = key.clone();
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: arg,
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            if inner_block.inputs.len() != inner_operands_present {
+                for key in block.inputs.keys() {
+                    if key.as_str() == inner_left_operand.as_str()
+                        || key.as_str() == inner_right_operand.as_str()
+                    {
+                        continue;
+                    }
+                    let arg = key.clone();
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: arg,
+                                block_id: inner_block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            ast_types::Expression::BinOp {
+                operator: binop,
+                left_operand: Box::new(left_operand_expression),
+                right_operand: Box::new(right_operand_expression),
+            }
+        }
+        crate::detranspiler::get_info::SpecialReporterInfo::UnOp {
+            unop,
+            operand,
+            unused_operand,
+            unused_field,
+        } => {
+            let mut operands_present = 0;
+            let mut unused_field_present = 0;
+            let operand_expression = if let Some(operand) = block.inputs.get(operand.as_str()) {
+                convert_operand_input_value(operand, blocks, context, target_idx)?
+            } else {
+                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+            };
+            if let Some(unused_operand) = &unused_operand
+                && block.inputs.contains_key(unused_operand.as_str())
+            {
+                operands_present += 1;
+            }
+            if let Some(unused_field) = &unused_field
+                && block.fields.contains_key(unused_field.as_str())
+            {
+                unused_field_present = 1;
+            }
+            if block.fields.len() != unused_field_present {
+                for key in block.fields.keys() {
+                    if let Some(unused_field) = &unused_field
+                        && key.as_str() == unused_field.as_str()
+                    {
+                        continue;
+                    }
+                    let arg = key.clone();
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: arg,
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            if block.inputs.len() != operands_present {
+                for key in block.inputs.keys() {
+                    if key.as_str() == operand.as_str() {
+                        continue;
+                    }
+                    if let Some(unused_operand) = &unused_operand
+                        && key.as_str() == unused_operand.as_str()
+                    {
+                        continue;
+                    }
+                    let arg = key.clone();
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: arg,
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            ast_types::Expression::UnOp {
+                operator: unop,
+                operand: Box::new(operand_expression),
+            }
+        }
+        crate::detranspiler::get_info::SpecialReporterInfo::ProcedureArgument { is_bool } => {
             let project_json::Sb3FieldValue::Normal(name) = block.fields.get("VALUE").unwrap()
             else {
                 unreachable!()
@@ -1982,18 +2264,31 @@ pub fn convert_normal_reporter_block(
                     _ => (),
                 }
             }
-            return Ok(ast_types::Expression::Call {
-                function: create_simple_identifier(
-                    if block.opcode.as_str() == "argument_reporter_string_number" {
-                        literal!("string_number_argument")
-                    } else {
-                        literal!("boolean_argument")
-                    },
-                ),
+            ast_types::Expression::Call {
+                function: create_simple_identifier(if is_bool {
+                    literal!("boolean_argument")
+                } else {
+                    literal!("string_number_argument")
+                }),
                 arguments: vec![ast_types::Expression::Literal(name.into())],
-            });
+            }
         }
-        _ => (),
+    })
+}
+
+/// Result is unbubbled
+pub fn convert_normal_reporter_block(
+    block: &project_json::Sb3NormalBlock,
+    block_id: &str,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+    target_idx: usize,
+) -> DetranspilerResult<ast_types::Expression> {
+    // TODO: Implement normal block primitives in detranspiler
+    if let Some(reporter) = check_special_reporter(block, blocks) {
+        return convert_special_reporter_block(
+            reporter, block, block_id, blocks, context, target_idx,
+        );
     }
     let (block_kind_info, parameters, _) = convert_block(
         block,
