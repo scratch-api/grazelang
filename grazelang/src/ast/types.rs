@@ -190,11 +190,12 @@ pub enum DataDeclaration {
     Single(Box<SingleDataDeclaration>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub enum DataDeclarationScope {
     Global,
     Local,
     Cloud,
+    #[default]
     Unset,
 }
 
@@ -389,14 +390,35 @@ pub struct Identifier {
     pub path: Vec<SingleIdentifier>,
 }
 
+impl Identifier {
+    #[inline]
+    pub fn new(path: Vec<SingleIdentifier>) -> Self {
+        Self { path }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SingleIdentifier {
     pub value: IString,
 }
 
+impl SingleIdentifier {
+    #[inline]
+    pub fn new(value: IString) -> Self {
+        Self { value }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanonicalIdentifier {
     pub name: IString,
+}
+
+impl CanonicalIdentifier {
+    #[inline]
+    pub fn new(name: IString) -> Self {
+        Self { name }
+    }
 }
 
 // TODO: Implement AST into CST parser

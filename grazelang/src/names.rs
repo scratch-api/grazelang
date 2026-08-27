@@ -146,13 +146,18 @@ impl DetranspilerTargetNamespace {
         new_name.into()
     }
 
-    pub fn introduce_new_name(&mut self, original_name: IString) -> IString {
+    pub fn introduce_new_name(
+        &mut self,
+        original_name: IString,
+        global_namespace: Option<&HashMap<IString, IString>>,
+    ) -> IString {
         use crate::detranspiler::get_info::check_collision_with_standard_names;
         use std::fmt::Write;
         let original_name = Self::convert_to_snake_case(original_name);
         if !self.used_names.contains_key(&original_name)
             && !check_collision_with_standard_names(&original_name)
-        // ^ only checked here because none of the standard names end with numbers except for key_0-9 and days_since_2000
+            // ^ only checked here because none of the standard names end with numbers except for key_0-9 and days_since_2000
+            && global_namespace.is_none_or(|value| !value.contains_key(&original_name))
         {
             return self.assign_name_for(original_name.clone(), original_name);
         }
@@ -162,7 +167,9 @@ impl DetranspilerTargetNamespace {
             let name = loop {
                 name.clear();
                 write!(name, "{original_name}__{num}").unwrap();
-                if !self.used_names.contains_key(name.as_str()) {
+                if !self.used_names.contains_key(name.as_str())
+                    && global_namespace.is_none_or(|value| !value.contains_key(&original_name))
+                {
                     break name.into();
                 }
                 num += 1;

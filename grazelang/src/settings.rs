@@ -21,6 +21,16 @@ pub struct GrazeDetranspilerSettings {
     pub preserve_monitor_ids: bool,
     pub preserve_internal_monitor_value: bool,
     pub explicitly_typed_string_parameters: bool,
+    pub multi_asset_declarations: bool,
+    pub multi_data_declarations: MultiDataDeclarationsMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+pub enum MultiDataDeclarationsMode {
+    #[default]
+    None,
+    HomogeneousDeclarations,
+    MixedDeclarations,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, clap::ValueEnum)]

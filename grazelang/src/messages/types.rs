@@ -601,6 +601,8 @@ pub enum GrazeDetranspilerError {
     },
     #[assoc(internal_lint_id = "multiple_stages")]
     MultipleStages,
+    #[assoc(internal_lint_id = "stage_missing")]
+    StageMissing,
     #[assoc(internal_lint_id = "invalid_monitor_opcode")]
     InvalidMonitorOpcode { opcode: String },
     #[assoc(internal_lint_id = "missing_input")]

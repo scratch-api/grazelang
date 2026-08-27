@@ -4,13 +4,17 @@ use arcstr::{ArcStr as IString, format as format_istring, literal};
 use grazelang_types::project_json;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::{
-    ast::types as ast_types,
-    detranspiler::get_info::{
+use super::{
+    get_info::{
         Argument, ArgumentKind, BlockKindInfo, FieldValueInfo, SpecialReporterInfo,
         check_special_reporter, get_block_kind_info, get_field_value_info,
         get_normal_field_value_info,
     },
+    into_ast::{IntoAST, assets_to_asset_declaration},
+};
+use crate::{
+    ast::types::{self as ast_types},
+    detranspiler::into_ast::{data_to_data_declaration, data_to_split_data_declaration},
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
     names::{DetranspilerAssetNamespace, DetranspilerTargetNamespace},
@@ -28,11 +32,12 @@ pub struct DetranspilerContext {
     pub broadcasts: HashMap<DataId, DetranspilerBroadcast>,
     pub current_procedure_parameters:
         HashMap<ProcedureParameterOriginalName, ProcedureParameterInternalName>,
+    pub global_namespace: DetranspilerTargetNamespace,
 }
 
 pub(super) type DetranspilerResult<T> = Result<T, GrazeDetranspilerError>;
 
-type OutAssetPath = String;
+type OutAssetPath = IString;
 type AssetPath = String;
 type AssetId = String;
 type DataId = String;
@@ -56,7 +61,7 @@ pub enum DetranspilerTargetBlockStack {
     HatBlock {
         hat_function: ast_types::Identifier,
         arguments: Vec<ast_types::Expression>,
-        stack: ast_types::CodeBlock,
+        code_block: ast_types::CodeBlock,
     },
     CustomBlock {
         is_warp: ast_types::WarpSpecifier,
@@ -70,7 +75,7 @@ pub enum DetranspilerTargetBlockStack {
         code_block: ast_types::CodeBlock,
     },
     IsolatedStack {
-        stack: ast_types::CodeBlock,
+        code_block: ast_types::CodeBlock,
     },
     IsolatedExpression {
         expression: ast_types::Expression,
@@ -177,13 +182,13 @@ where
     pub name: IString,
     pub file_extension: String,
     pub uncommon_data: D,
-    pub asset_name: IString,
+    pub asset_path: IString,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerCostumeUncommonData {
-    rotation_center_x: f64,
-    rotation_center_y: f64,
+    pub rotation_center_x: f64,
+    pub rotation_center_y: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -448,13 +453,13 @@ pub fn convert_project(
             } {
                 Ok(value) => value,
                 Err(err) => {
-                    if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
+                    if context.settings.message_setting >= GrazeMessageSetting::ExitOnError {
                         context.messages.push(err.into());
                     } else {
                         $unlogged_failure = true;
                     }
                     $($exit_after_target_conversion = true;)?
-                    $fallback;
+                    $fallback
                 }
             }
         }};
@@ -468,76 +473,276 @@ pub fn convert_project(
         settings,
         broadcasts: HashMap::new(),
         current_procedure_parameters: HashMap::new(),
+        global_namespace: DetranspilerTargetNamespace::new(),
     };
     let mut has_stage = false;
-    let mut exit_after_target_conversions = false;
+    let mut conversion_cancelled = false;
     let mut unlogged_failure = false;
     let mut target_names = HashMap::with_capacity(project.targets.len());
-    for (idx, target) in project.targets.iter().enumerate() {
+    let target_internal_names = project
+        .targets
+        .iter()
+        .map(|value| {
+            let canonical_name = IString::from(&value.name);
+            let name = context
+                .global_namespace
+                .introduce_new_name(canonical_name.clone(), None);
+            (canonical_name, name)
+        })
+        .collect::<Vec<_>>();
+    for target in &project.targets {
         if target.is_stage {
             if has_stage {
                 emit_error_top_level!(
                     &mut context,
                     GrazeDetranspilerError::MultipleStages,
                     unlogged_failure,
-                    exit_after_target_conversions
+                    conversion_cancelled
                 );
             }
-            let mut namespace = DetranspilerTargetNamespace::new();
             context.broadcasts.reserve(target.broadcasts.len());
             for (id, canonical_name) in &target.broadcasts {
                 let canonical_name = IString::from(canonical_name);
-                let name = namespace.introduce_new_name(canonical_name.clone());
+                let name = context
+                    .global_namespace
+                    .introduce_new_name(canonical_name.clone(), None);
                 context.broadcasts.insert(
                     id.to_string(),
                     DetranspilerBroadcast {
-                        canonical_name: (name.as_str() != canonical_name.as_str())
-                            .then_some(canonical_name),
+                        canonical_name: (name != canonical_name).then_some(canonical_name),
                         name,
                     },
                 );
             }
-            context.stage_target_idx = context.targets.len();
             has_stage = true;
         } else {
-            target_names.insert(target.name.clone(), idx);
+            continue;
         }
         let target = unwrap_bubbled_result_or!(
             context => convert_target(target, context),
             &mut context,
             break,
             unlogged_failure,
-            exit_after_target_conversions
+            conversion_cancelled
         );
         context.targets.push(target);
     }
-    if !exit_after_target_conversions {
-        let mut exit_after_monitor_conversions = false;
-        for monitor in &project.monitors {
-            let target_idx = monitor
-                .sprite_name
-                .as_ref()
-                .and_then(|value| target_names.get(value))
-                .copied()
-                .unwrap_or(context.stage_target_idx);
-            unwrap_bubbled_result_or!(
-                context => add_monitor(monitor, context, target_idx),
+    let mut stage = unwrap_bubbled_result_or!(
+        context => context.targets.pop().ok_or({
+            GrazeDetranspilerError::StageMissing
+        }).map(Some),
+        &mut context,
+        None,
+        unlogged_failure,
+        conversion_cancelled
+    );
+    if !conversion_cancelled {
+        for (idx, target) in project.targets.iter().enumerate() {
+            if target.is_stage
+                && let Some(stage) = stage.take()
+            {
+                context.stage_target_idx = context.targets.len();
+                context.targets.push(stage);
+                continue;
+            } else {
+                target_names.insert(target.name.clone(), idx);
+            }
+            let target = unwrap_bubbled_result_or!(
+                context => convert_target(target, context),
                 &mut context,
-                {
-                    exit_after_monitor_conversions = true;
-                    break;
-                },
-                unlogged_failure
+                break,
+                unlogged_failure,
+                conversion_cancelled
             );
+            context.targets.push(target);
         }
-        if !exit_after_monitor_conversions {
-            for (idx, target) in project.targets.iter().enumerate() {
+        if !conversion_cancelled {
+            for monitor in &project.monitors {
+                let target_idx = monitor
+                    .sprite_name
+                    .as_ref()
+                    .and_then(|value| target_names.get(value))
+                    .copied()
+                    .unwrap_or(context.stage_target_idx);
                 unwrap_bubbled_result_or!(
-                    context => fill_target(target, context, idx),
+                    context => add_monitor(monitor, context, target_idx),
                     &mut context,
-                    break,
+                    {
+                        conversion_cancelled = true;
+                        break;
+                    },
                     unlogged_failure
                 );
+            }
+            if !conversion_cancelled {
+                for (idx, target) in project.targets.iter().enumerate() {
+                    unwrap_bubbled_result_or!(
+                        context => fill_target(target, context, idx),
+                        &mut context,
+                        break,
+                        unlogged_failure
+                    );
+                }
+                let mut statements =
+                    Vec::with_capacity(context.broadcasts.len() + context.targets.len());
+                for broadcast in context.broadcasts.values() {
+                    statements.push(broadcast.into_ast());
+                }
+                for (target_idx, target) in context.targets.iter_mut().enumerate() {
+                    statements.push(if target.is_stage {
+                        let mut stage_statements = Vec::with_capacity(
+                            target.costumes.len()
+                                + target.sounds.len()
+                                + target.data.len()
+                                + target.monitors.len()
+                                + target.scripts.len(),
+                        );
+                        if context.settings.multi_asset_declarations {
+                            stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
+                                assets_to_asset_declaration(target.costumes.values()),
+                            ));
+                            stage_statements.push(ast_types::StageStatement::SoundDeclaration(
+                                assets_to_asset_declaration(target.sounds.values()),
+                            ));
+                        } else {
+                            target
+                                .costumes
+                                .values()
+                                .for_each(|value| stage_statements.push(value.into_ast()));
+                            target
+                                .sounds
+                                .values()
+                                .for_each(|value| stage_statements.push(value.into_ast()));
+                        }
+                        match context.settings.multi_data_declarations {
+                            crate::settings::MultiDataDeclarationsMode::None => {
+                                target
+                                    .data
+                                    .values()
+                                    .for_each(|value| stage_statements.push(value.into_ast()));
+                            }
+                            crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
+                                let (vars, lists) =
+                                    data_to_split_data_declaration(target.data.values());
+                                stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                                    ast_types::DataDeclaration::Vars {
+                                        scope: Default::default(),
+                                        declarations: vars,
+                                    },
+                                ));
+                                stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                                    ast_types::DataDeclaration::Lists {
+                                        scope: Default::default(),
+                                        declarations: lists,
+                                    },
+                                ));
+                            }
+                            crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
+                                stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                                    ast_types::DataDeclaration::Mixed {
+                                        scope: Default::default(),
+                                        declarations: data_to_data_declaration(
+                                            target.data.values(),
+                                        ),
+                                    },
+                                ));
+                            }
+                        }
+                        std::mem::take(&mut target.monitors)
+                            .into_iter()
+                            .for_each(|value| stage_statements.push(value.into_ast()));
+                        std::mem::take(&mut target.scripts)
+                            .into_iter()
+                            .for_each(|value| stage_statements.push(value.into_ast()));
+                        ast_types::TopLevelStatement::Stage {
+                            code_block: ast_types::StageCodeBlock {
+                                statements: stage_statements,
+                            },
+                        }
+                    } else {
+                        let mut sprite_statements = Vec::with_capacity(
+                            target.costumes.len()
+                                + target.sounds.len()
+                                + target.data.len()
+                                + target.monitors.len()
+                                + target.scripts.len(),
+                        );
+                        if context.settings.multi_asset_declarations {
+                            sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
+                                assets_to_asset_declaration(target.costumes.values()),
+                            ));
+                            sprite_statements.push(ast_types::SpriteStatement::SoundDeclaration(
+                                assets_to_asset_declaration(target.sounds.values()),
+                            ));
+                        } else {
+                            target
+                                .costumes
+                                .values()
+                                .for_each(|value| sprite_statements.push(value.into_ast()));
+                            target
+                                .sounds
+                                .values()
+                                .for_each(|value| sprite_statements.push(value.into_ast()));
+                        }
+                        match context.settings.multi_data_declarations {
+                            crate::settings::MultiDataDeclarationsMode::None => {
+                                target
+                                    .data
+                                    .values()
+                                    .for_each(|value| sprite_statements.push(value.into_ast()));
+                            }
+                            crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
+                                let (vars, lists) =
+                                    data_to_split_data_declaration(target.data.values());
+                                sprite_statements.push(
+                                    ast_types::SpriteStatement::DataDeclaration(
+                                        ast_types::DataDeclaration::Vars {
+                                            scope: Default::default(),
+                                            declarations: vars,
+                                        },
+                                    ),
+                                );
+                                sprite_statements.push(
+                                    ast_types::SpriteStatement::DataDeclaration(
+                                        ast_types::DataDeclaration::Lists {
+                                            scope: Default::default(),
+                                            declarations: lists,
+                                        },
+                                    ),
+                                );
+                            }
+                            crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
+                                sprite_statements.push(
+                                    ast_types::SpriteStatement::DataDeclaration(
+                                        ast_types::DataDeclaration::Mixed {
+                                            scope: Default::default(),
+                                            declarations: data_to_data_declaration(
+                                                target.data.values(),
+                                            ),
+                                        },
+                                    ),
+                                );
+                            }
+                        }
+                        std::mem::take(&mut target.monitors)
+                            .into_iter()
+                            .for_each(|value| sprite_statements.push(value.into_ast()));
+                        std::mem::take(&mut target.scripts)
+                            .into_iter()
+                            .for_each(|value| sprite_statements.push(value.into_ast()));
+                        let (canonical_name, name) = target_internal_names.get(target_idx).unwrap();
+                        ast_types::TopLevelStatement::Sprite {
+                            canonical_identifier: (canonical_name != name).then(|| {
+                                ast_types::CanonicalIdentifier::new(canonical_name.clone())
+                            }),
+                            identifier: ast_types::SingleIdentifier::new(name.clone()),
+                            code_block: ast_types::SpriteCodeBlock {
+                                statements: sprite_statements,
+                            },
+                        }
+                    });
+                }
+                let program = ast_types::GrazeProgram(statements);
             }
         }
     }
@@ -558,7 +763,7 @@ pub fn convert_target(
     target: &project_json::Sb3Target,
     context: &mut DetranspilerContext,
 ) -> DetranspilerResult<DetranspilerTarget> {
-    fn get_asset_name_and_register_asset(
+    fn get_asset_path_and_register_asset(
         context: &mut DetranspilerContext,
         name: &str,
         asset_id: &str,
@@ -566,21 +771,31 @@ pub fn convert_target(
         md5ext: &str,
     ) -> IString {
         let asset_name = context.asset_namespace.get_symbol(name, asset_id);
-        let out_asset_path = format!("{asset_name}.{}", data_format);
+        let out_asset_path = arcstr::format!("{asset_name}.{}", data_format);
         if !context.assets.contains_key(md5ext) {
-            context.assets.insert(md5ext.to_string(), out_asset_path);
+            context
+                .assets
+                .insert(md5ext.to_string(), out_asset_path.clone());
         }
-        asset_name
+        out_asset_path
     }
     fn get_canonical_name_and_name(
         namespace: &mut DetranspilerTargetNamespace,
         canonical_name: IString,
+        is_stage: bool,
+        context: &mut DetranspilerContext,
     ) -> (Option<IString>, IString) {
-        let name = namespace.introduce_new_name(canonical_name.clone());
-        (
-            (name.as_str() != canonical_name.as_str()).then_some(canonical_name),
-            name,
-        )
+        let name = if is_stage {
+            context
+                .global_namespace
+                .introduce_new_name(canonical_name.clone(), None)
+        } else {
+            namespace.introduce_new_name(
+                canonical_name.clone(),
+                Some(&context.global_namespace.used_names),
+            )
+        };
+        ((name != canonical_name).then_some(canonical_name), name)
     }
     let mut namespace = DetranspilerTargetNamespace::new();
     let costumes = target
@@ -588,8 +803,12 @@ pub fn convert_target(
         .iter()
         .map(|value| {
             (value.asset_id.clone(), {
-                let (canonical_name, name) =
-                    get_canonical_name_and_name(&mut namespace, value.name.as_str().into());
+                let (canonical_name, name) = get_canonical_name_and_name(
+                    &mut namespace,
+                    value.name.as_str().into(),
+                    target.is_stage,
+                    context,
+                );
                 DetranspilerAsset {
                     canonical_name,
                     name,
@@ -598,7 +817,7 @@ pub fn convert_target(
                         rotation_center_x: value.rotation_center_x,
                         rotation_center_y: value.rotation_center_y,
                     },
-                    asset_name: get_asset_name_and_register_asset(
+                    asset_path: get_asset_path_and_register_asset(
                         context,
                         &value.name,
                         &value.asset_id,
@@ -614,14 +833,18 @@ pub fn convert_target(
         .iter()
         .map(|value| {
             (value.asset_id.clone(), {
-                let (canonical_name, name) =
-                    get_canonical_name_and_name(&mut namespace, value.name.as_str().into());
+                let (canonical_name, name) = get_canonical_name_and_name(
+                    &mut namespace,
+                    value.name.as_str().into(),
+                    target.is_stage,
+                    context,
+                );
                 DetranspilerAsset {
                     canonical_name,
                     name,
                     file_extension: value.data_format.clone(),
                     uncommon_data: DetranspilerSoundUncommonData,
-                    asset_name: get_asset_name_and_register_asset(
+                    asset_path: get_asset_path_and_register_asset(
                         context,
                         &value.name,
                         &value.asset_id,
@@ -634,8 +857,12 @@ pub fn convert_target(
         .collect();
     let mut data = HashMap::with_capacity(target.variables.len() + target.lists.len());
     for (id, variable) in &target.variables {
-        let (canonical_name, name) =
-            get_canonical_name_and_name(&mut namespace, variable.name.as_str().into());
+        let (canonical_name, name) = get_canonical_name_and_name(
+            &mut namespace,
+            variable.name.as_str().into(),
+            target.is_stage,
+            context,
+        );
         data.insert(
             id.to_string(),
             DetranspilerVarOrList {
@@ -695,7 +922,12 @@ pub fn convert_target(
             continue;
         };
         let (proccode, descriptor) = unwrap_or_emit_message!(
-            convert_procedure_prototype_for_namespace(proto_block, proto_block_id, &mut namespace),
+            convert_procedure_prototype_for_namespace(
+                proto_block,
+                proto_block_id,
+                &mut namespace,
+                (!target.is_stage).then_some(&context.global_namespace.used_names)
+            ),
             context,
             continue
         );
@@ -959,34 +1191,26 @@ pub fn add_monitor(
             + internal_value.is_some() as usize,
     );
     config.push(ast_types::DictionaryEntry {
-        identifier: ast_types::SingleIdentifier {
-            value: literal!("width"),
-        },
+        identifier: ast_types::SingleIdentifier::new(literal!("width")),
         value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
             format_istring!("{width}"),
         )),
     });
     config.push(ast_types::DictionaryEntry {
-        identifier: ast_types::SingleIdentifier {
-            value: literal!("height"),
-        },
+        identifier: ast_types::SingleIdentifier::new(literal!("height")),
         value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
             format_istring!("{height}"),
         )),
     });
     if let Some(id) = id {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("id"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("id")),
             value: ast_types::DictionaryValue::Primitive(ast_types::Literal::String(id)),
         });
     }
     if let Some(mode) = mode {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("mode"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("mode")),
             value: ast_types::DictionaryValue::Primitive(ast_types::Literal::String(
                 format_istring!("{mode}"),
             )),
@@ -994,9 +1218,7 @@ pub fn add_monitor(
     }
     if let Some(x) = x {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("x"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("x")),
             value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
                 format_istring!("{x}"),
             )),
@@ -1004,9 +1226,7 @@ pub fn add_monitor(
     }
     if let Some(y) = y {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("y"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("y")),
             value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
                 format_istring!("{y}"),
             )),
@@ -1014,17 +1234,13 @@ pub fn add_monitor(
     }
     if !visible {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("visible"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("visible")),
             value: ast_types::DictionaryValue::Primitive(ast_types::Literal::Bool(false)),
         });
     }
     if let Some(slider_min) = slider_min {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("slider_min"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("slider_min")),
             value: ast_types::DictionaryValue::Primitive(if let Some(slider_min) = slider_min {
                 ast_types::Literal::DecimalFloat(format_istring!("{slider_min}"))
             } else {
@@ -1034,9 +1250,7 @@ pub fn add_monitor(
     }
     if let Some(slider_max) = slider_max {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("slider_max"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("slider_max")),
             value: ast_types::DictionaryValue::Primitive(if let Some(slider_max) = slider_max {
                 ast_types::Literal::DecimalFloat(format_istring!("{slider_max}"))
             } else {
@@ -1046,9 +1260,7 @@ pub fn add_monitor(
     }
     if let Some(is_discrete) = is_discrete {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("is_discrete"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("is_discrete")),
             value: ast_types::DictionaryValue::Primitive(if let Some(is_discrete) = is_discrete {
                 ast_types::Literal::Bool(is_discrete)
             } else {
@@ -1058,9 +1270,7 @@ pub fn add_monitor(
     }
     if let Some(value) = internal_value {
         config.push(ast_types::DictionaryEntry {
-            identifier: ast_types::SingleIdentifier {
-                value: literal!("value"),
-            },
+            identifier: ast_types::SingleIdentifier::new(literal!("value")),
             value: match value {
                 project_json::Sb3MonitorValue::List(values) => ast_types::DictionaryValue::List(
                     values
@@ -1121,7 +1331,9 @@ pub fn fill_target(
                             }
                         };
                         context.targets.get_mut(target_idx).unwrap().scripts.push(
-                            DetranspilerTargetBlockStack::IsolatedStack { stack: block_stack },
+                            DetranspilerTargetBlockStack::IsolatedStack {
+                                code_block: block_stack,
+                            },
                         );
                         continue;
                     }
@@ -1129,7 +1341,7 @@ pub fn fill_target(
                 DetranspilerTargetBlockStack::HatBlock {
                     hat_function,
                     arguments,
-                    stack: {
+                    code_block: {
                         if let Some(next_block_id) = &normal_block.next
                             && let Some(next_block) = unwrap_or_emit_message!(
                                 resolve_block_ref(next_block_id, &target.blocks).map(Some),
@@ -1220,13 +1432,20 @@ pub fn fill_target(
                         &target.blocks,
                         context,
                         target_idx,
+                        target.is_stage
                     ),
                     context,
                     continue
                 )
             }
             BlockShape::Stack => DetranspilerTargetBlockStack::IsolatedStack {
-                stack: convert_block_stack(block, block_id, &target.blocks, context, target_idx)?,
+                code_block: convert_block_stack(
+                    block,
+                    block_id,
+                    &target.blocks,
+                    context,
+                    target_idx,
+                )?,
             },
             BlockShape::Reporter => DetranspilerTargetBlockStack::IsolatedExpression {
                 expression: convert_reporter_block(
@@ -1253,6 +1472,7 @@ pub fn convert_procedure_prototype_for_namespace(
     block: &project_json::Sb3NormalBlock,
     block_id: &str,
     namespace: &mut DetranspilerTargetNamespace,
+    global_namespace: Option<&HashMap<IString, IString>>,
 ) -> DetranspilerResult<(IString, DetranspilerCustomBlockDescriptor)> {
     let Some(mutation) = &block.mutation else {
         return Err(GrazeDetranspilerError::MissingMutation {
@@ -1277,22 +1497,21 @@ pub fn convert_procedure_prototype_for_namespace(
         && !namespace.used_names.contains_key(proccode_name)
     {
         let proccode_name = IString::from(proccode_name);
-        let chosen_name = namespace.introduce_new_name(proccode_name.clone());
+        let chosen_name = namespace.introduce_new_name(proccode_name.clone(), global_namespace);
         if let Some(value) = namespace.used_names.get_mut(&chosen_name) {
             *value = proccode.clone();
         }
         return Ok((
             proccode.clone(),
             DetranspilerCustomBlockDescriptor {
-                canonical_name: (chosen_name.as_str() != proccode_name.as_str())
-                    .then_some(proccode),
+                canonical_name: (chosen_name != proccode_name).then_some(proccode),
                 name: chosen_name,
                 argument_count: argument_names.len(),
             },
         ));
     }
     let name = IString::from(get_name_from_proccode(&proccode));
-    let chosen_name = namespace.introduce_new_name(name);
+    let chosen_name = namespace.introduce_new_name(name, global_namespace);
     if let Some(value) = namespace.used_names.get_mut(&chosen_name) {
         *value = proccode.clone();
     }
@@ -1372,6 +1591,7 @@ pub fn convert_procedure_definition(
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
     target_idx: usize,
+    is_stage: bool,
 ) -> DetranspilerResult<DetranspilerTargetBlockStack> {
     let mut parameters = Vec::with_capacity(procedure_info.argument_names.len());
     let mut proccode_chars = procedure_info.proccode.chars();
@@ -1400,18 +1620,18 @@ pub fn convert_procedure_definition(
                 .get_mut(target_idx)
                 .unwrap()
                 .namespace
-                .introduce_new_name(original_name.clone());
+                .introduce_new_name(
+                    original_name.clone(),
+                    (!is_stage).then_some(&context.global_namespace.used_names),
+                );
             context
                 .current_procedure_parameters
                 .insert(original_name.clone(), chosen_name.clone());
             parameters.push((
                 param_kind,
-                (chosen_name.as_str() != original_name.as_str()).then_some(
-                    ast_types::CanonicalIdentifier {
-                        name: original_name,
-                    },
-                ),
-                ast_types::SingleIdentifier { value: chosen_name },
+                (chosen_name != original_name)
+                    .then_some(ast_types::CanonicalIdentifier::new(original_name)),
+                ast_types::SingleIdentifier::new(chosen_name),
             ));
         }
     }
@@ -1438,10 +1658,8 @@ pub fn convert_procedure_definition(
         },
         canonical_identifier: procedure_info
             .canonical_name
-            .map(|value| ast_types::CanonicalIdentifier { name: value }),
-        identifier: ast_types::SingleIdentifier {
-            value: procedure_info.name,
-        },
+            .map(ast_types::CanonicalIdentifier::new),
+        identifier: ast_types::SingleIdentifier::new(procedure_info.name),
         parameters,
         code_block,
     })
@@ -2365,16 +2583,10 @@ pub fn create_broadcast_identifier(
         .used_names
         .contains_key(&broadcast_name)
     {
-        ast_types::Identifier {
-            path: vec![
-                ast_types::SingleIdentifier {
-                    value: literal!("broadcasts"),
-                },
-                ast_types::SingleIdentifier {
-                    value: broadcast_name,
-                },
-            ],
-        }
+        ast_types::Identifier::new(vec![
+            ast_types::SingleIdentifier::new(literal!("broadcasts")),
+            ast_types::SingleIdentifier::new(broadcast_name),
+        ])
     } else {
         create_simple_identifier(broadcast_name)
     }
@@ -2382,9 +2594,7 @@ pub fn create_broadcast_identifier(
 
 #[inline]
 pub fn create_simple_identifier(name: IString) -> ast_types::Identifier {
-    ast_types::Identifier {
-        path: vec![ast_types::SingleIdentifier { value: name }],
-    }
+    ast_types::Identifier::new(vec![ast_types::SingleIdentifier::new(name)])
 }
 
 pub fn create_vlb_identifier(

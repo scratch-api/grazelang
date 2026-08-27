@@ -2939,7 +2939,9 @@ pub fn check_special_reporter(
                 .get("VALUE")
                 .is_some_and(|value| matches!(value, project_json::Sb3FieldValue::Normal(_))) =>
         {
-            SpecialReporterInfo::ProcedureArgument { is_bool: block.opcode.as_str() == "argument_reporter_boolean" }
+            SpecialReporterInfo::ProcedureArgument {
+                is_bool: block.opcode.as_str() == "argument_reporter_boolean",
+            }
         }
         "operator_add" => SpecialReporterInfo::BinOp {
             binop: ast_types::BinOp::Plus,

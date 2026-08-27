@@ -59,9 +59,7 @@ where
 {
     match value.len() {
         1 => value.first().unwrap().unparse_into(f),
-        2.. => {
-            unparse_expression_list(value, f)
-        }
+        2.. => unparse_expression_list(value, f),
         0 => Ok(()),
     }
 }
