@@ -10,14 +10,14 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_types::{
-    ANY_CATEGORY_ID, BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
+    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
     BindInfo, CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID,
-    DIRECTIONS_CATEGORY_ID, HasShadow, INTEGERS_CATEGORY_ID, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID,
+    DIRECTIONS_CATEGORY_ID, HasShadow, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID,
     OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{
-        IsShadow, Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
-        Sb3InputValue, Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3NormalBlock, Sb3Primitive,
+        Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
+        Sb3InputValue, Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3Primitive,
         Sb3PrimitiveBlock, Sb3PrimitiveOrBool, Sb3Root, Sb3Target, TargetAttachment,
     },
 };
@@ -43,7 +43,7 @@ use crate::{
     names::CodegenNamespace,
     parser::{
         context::{
-            BROADCAST_CATEGORIES, IdString, KnownBlock, NO_CATEGORIES, ParseContext,
+            IdString, KnownBlock, ParseContext,
             ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
@@ -1581,110 +1581,6 @@ pub enum Param {
     BlockStack(Option<String>),
 }
 
-pub fn make_block(
-    parent: Option<String>,
-    opcode: String,
-    inputs: HashMap<String, Sb3InputValue>,
-    fields: HashMap<String, Sb3FieldValue>,
-    shadow: bool,
-    mutation: Option<Sb3BlockMutation>,
-) -> Sb3Block {
-    let top_level = parent.is_none();
-    Sb3Block::Normal(Sb3NormalBlock {
-        opcode,
-        next: None,
-        parent,
-        inputs,
-        fields,
-        shadow,
-        top_level,
-        mutation,
-        x: top_level.then_some(0.0),
-        y: top_level.then_some(0.0),
-    })
-}
-
-pub fn make_top_level_block(
-    opcode: String,
-    inputs: HashMap<String, Sb3InputValue>,
-    fields: HashMap<String, Sb3FieldValue>,
-    shadow: bool,
-    mutation: Option<Sb3BlockMutation>,
-    pos: (f64, f64),
-) -> Sb3Block {
-    Sb3Block::Normal(Sb3NormalBlock {
-        opcode,
-        next: None,
-        parent: None,
-        inputs,
-        fields,
-        shadow,
-        top_level: true,
-        mutation,
-        x: Some(pos.0),
-        y: Some(pos.1),
-    })
-}
-
-pub fn set_params_or_unreachable(
-    block: Option<&mut Sb3Block>,
-    inputs: HashMap<String, Sb3InputValue>,
-    fields: HashMap<String, Sb3FieldValue>,
-) {
-    match block {
-        Some(Sb3Block::Normal(block)) => {
-            block.inputs = inputs;
-            block.fields = fields;
-        }
-        _ => unreachable!(),
-    }
-}
-
-pub fn wrap_in_reporter<F, O>(context: &mut GrazeSb3GeneratorContext, action: F) -> O
-where
-    O: Sized,
-    F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString) -> O,
-{
-    let block_id = context.get_current_block_id();
-    let old_parent = context.current_parent.replace(block_id.to_string());
-    context.new_block();
-    let out = action(context, old_parent.clone(), block_id);
-    context.current_parent = old_parent;
-    out
-}
-
-pub fn wrap_in_statement<F, O>(context: &mut GrazeSb3GeneratorContext, action: F) -> O
-where
-    O: Sized,
-    F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString) -> O,
-{
-    let block_id = context.get_current_block_id();
-    let old_parent = context.current_parent.replace(block_id.to_string());
-    context.new_block();
-    if let Some(previous) = context.current_previous_block.take() {
-        match context
-            .current_sb3_target
-            .as_mut()
-            .unwrap()
-            .blocks
-            .get_mut(previous.as_str())
-        {
-            Some(Sb3Block::Normal(block)) => {
-                block.next = Some(block_id.to_string());
-            }
-            _ => unreachable!(),
-        }
-    } else if old_parent.is_some() {
-        // First statement in block stack is used in STACK argument of parent or similar
-        let value = Param::BlockStack(Some(block_id.to_string()));
-        context.push_param(value);
-    }
-    let out = action(context, old_parent.clone(), block_id.clone());
-    context.current_parent = Some(block_id.to_string());
-    context.current_previous_block = Some(block_id);
-    out
-}
-
 macro_rules! static_resolve_identifier {
     ($context:expr, [$start:expr $(, $segments:expr)* $(,)?]) => {
         static_resolve_identifier!(
@@ -1731,485 +1627,6 @@ macro_rules! with_known_block {
             }
         }
     };
-}
-
-pub fn get_symbol_id(
-    context: &mut GrazeSb3GeneratorContext,
-    identifier: &Identifier,
-) -> Result<SymbolId, GrazeSb3GeneratorError> {
-    context.resolve_identifier(identifier).ok_or_else(|| {
-        GrazeSb3GeneratorError::UnknownIdentifier {
-            identifier: identifier.clone(),
-        }
-    })
-}
-
-pub fn get_known_block<'a>(
-    symbol: &'a Symbol,
-    identifier: &Identifier,
-) -> Result<&'a Rc<KnownBlock>, GrazeSb3GeneratorError> {
-    symbol
-        .known_block
-        .as_ref()
-        .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotABlock {
-            identifier: identifier.clone(),
-        })
-}
-
-pub fn introduce_input_menu(
-    opcode: &IString,
-    field_name: &IString,
-    value: Sb3FieldValue,
-    context: &mut GrazeSb3GeneratorContext,
-) -> IdString {
-    wrap_in_reporter(context, |context, parent, this_id| {
-        add_block(
-            context,
-            &this_id,
-            make_block(
-                parent,
-                opcode.to_string(),
-                HashMap::new(),
-                HashMap::from([(field_name.to_string(), value)]),
-                true,
-                None,
-            ),
-        );
-        this_id
-    })
-}
-
-pub fn create_input_value<D>(
-    input_repr: Option<(Sb3InputRepr, IsShadow)>,
-    default: Option<D>,
-) -> Option<Sb3InputValue>
-where
-    ((Sb3InputRepr, IsShadow), Option<D>): Into<Sb3InputValue>,
-    D: Into<Sb3InputValue>,
-{
-    if let Some(input_repr) = input_repr {
-        Some((input_repr, default).into())
-    } else {
-        default.map(Into::into)
-    }
-}
-
-pub fn add_known_block_to_params(
-    context: &mut GrazeSb3GeneratorContext,
-    param: &CallBlockParam,
-    value: &KnownBlock,
-    known_block_source_span: SourceSpan,
-    inputs: &mut HashMap<String, Sb3InputValue>,
-    fields: &mut HashMap<String, Sb3FieldValue>,
-) -> Result<(), GrazeSb3GeneratorError> {
-    let param_name = param.name.to_string();
-    match &param.kind {
-        CallBlockParamKind::Input { default } => {
-            if let Some(input_value) = create_input_value(
-                known_block_to_input_repr_no_menu(value, known_block_source_span, context)?,
-                default.as_ref(),
-            ) {
-                inputs.insert(param_name, input_value);
-            }
-        }
-        CallBlockParamKind::Field { category, .. } => {
-            fields.insert(param_name, {
-                let (field_value, categories) =
-                    value.resolve_for_field(known_block_source_span, context);
-                if !(categories.contains(category)
-                    || (*category == INTEGERS_CATEGORY_ID && field_value.is_valid_i128())
-                    || *category == ANY_CATEGORY_ID)
-                {
-                    emit_message_eager(
-                        context,
-                        GrazeSourceMessage::Warning(
-                            GrazeSourceWarning::Specific(
-                                match value {
-                                    KnownBlock::PrimitiveBlock {
-                                        value:
-                                            Sb3PrimitiveBlock::Variable { .. }
-                                            | Sb3PrimitiveBlock::List { .. }
-                                            | Sb3PrimitiveBlock::Broadcast { .. },
-                                    } => GrazeWarningKind::FieldValueIncorrect,
-                                    KnownBlock::PrimitiveBlock { .. } => {
-                                        GrazeWarningKind::LiteralFieldValueIncorrect
-                                    }
-                                    _ => GrazeWarningKind::FieldValueIncorrect,
-                                },
-                                known_block_source_span,
-                            ),
-                            None,
-                        ),
-                        GrazeMessageSetting::Warnings,
-                    );
-                }
-                field_value
-            });
-        }
-        CallBlockParamKind::MenuInput {
-            opcode,
-            field_name,
-            default,
-            category,
-        } => {
-            let (input_repr, is_shadow) = match value
-                .resolve_for_input(known_block_source_span, context)
-            {
-                grazelang_types::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
-                    let is_shadow = sb3_primitive_block.is_shadow();
-                    match &sb3_primitive_block {
-                        Sb3PrimitiveBlock::Number(sb3_primitive)
-                        | Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
-                        | Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
-                        | Sb3PrimitiveBlock::Integer(sb3_primitive)
-                        | Sb3PrimitiveBlock::Angle(sb3_primitive)
-                        | Sb3PrimitiveBlock::Color(sb3_primitive)
-                        | Sb3PrimitiveBlock::String(sb3_primitive) => {
-                            let cow_str = sb3_primitive.as_cow_str();
-                            let categories = context
-                                .field_entry_categories
-                                .get(&*cow_str)
-                                .unwrap_or_else(|| &*NO_CATEGORIES);
-                            if !(categories.contains(category)
-                                || (*category == INTEGERS_CATEGORY_ID
-                                    && sb3_primitive.is_valid_i128())
-                                || *category == ANY_CATEGORY_ID)
-                            {
-                                emit_message_eager(
-                                    context,
-                                    GrazeSourceMessage::Warning(
-                                        GrazeSourceWarning::Specific(
-                                            GrazeWarningKind::LiteralFieldValueIncorrect,
-                                            known_block_source_span,
-                                        ),
-                                        None,
-                                    ),
-                                    GrazeMessageSetting::Warnings,
-                                );
-                            }
-                            (
-                                Sb3InputRepr::Reference(
-                                    introduce_input_menu(
-                                        opcode,
-                                        field_name,
-                                        Sb3FieldValue::Normal(cow_str.to_string().into()),
-                                        context,
-                                    )
-                                    .to_string(),
-                                ),
-                                IsShadow::Yes,
-                            )
-                        }
-                        Sb3PrimitiveBlock::Broadcast { .. } => {
-                            if !BROADCAST_CATEGORIES.contains(category) {
-                                emit_message_eager(
-                                    context,
-                                    GrazeSourceMessage::Warning(
-                                        GrazeSourceWarning::Specific(
-                                            GrazeWarningKind::FieldValueIncorrect,
-                                            known_block_source_span,
-                                        ),
-                                        None,
-                                    ),
-                                    GrazeMessageSetting::Warnings,
-                                );
-                            }
-                            (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow)
-                        }
-                        _ => (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow),
-                    }
-                }
-                grazelang_types::KnownBlockInput::BlockRef(id) => {
-                    (Sb3InputRepr::Reference(id.to_string()), IsShadow::No)
-                }
-                grazelang_types::KnownBlockInput::SimpleBlock(opcode, params) => (
-                    Sb3InputRepr::Reference(
-                        introduce_input_simple_block(opcode, params.iter(), context)?.to_string(),
-                    ),
-                    IsShadow::No,
-                ),
-                grazelang_types::KnownBlockInput::Menu(input_menu_value, categories) => {
-                    if !categories.contains(category) {
-                        emit_message_eager(
-                            context,
-                            GrazeSourceMessage::Warning(
-                                GrazeSourceWarning::Specific(
-                                    GrazeWarningKind::FieldValueIncorrect,
-                                    known_block_source_span,
-                                ),
-                                None,
-                            ),
-                            GrazeMessageSetting::Warnings,
-                        );
-                    }
-                    (
-                        Sb3InputRepr::Reference(
-                            introduce_input_menu(opcode, field_name, input_menu_value, context)
-                                .to_string(),
-                        ),
-                        IsShadow::Yes,
-                    )
-                }
-                grazelang_types::KnownBlockInput::Empty => (
-                    Sb3InputRepr::Reference(
-                        introduce_input_menu(opcode, field_name, default.clone(), context)
-                            .to_string(),
-                    ),
-                    IsShadow::Yes,
-                ),
-            };
-            inputs.insert(
-                param_name,
-                if is_shadow == IsShadow::Yes {
-                    Sb3InputValue::Shadow(input_repr)
-                } else {
-                    Sb3InputValue::ObscuredShadow {
-                        value: input_repr,
-                        shadow: Sb3InputRepr::Reference(
-                            introduce_input_menu(opcode, field_name, default.clone(), context)
-                                .to_string(),
-                        ),
-                    }
-                },
-            );
-        }
-        CallBlockParamKind::BlockStack => {
-            return Err(GrazeSb3GeneratorError::BlockStackHasNoKnownBlock {
-                source_span: known_block_source_span,
-            });
-        }
-    }
-    Ok(())
-}
-
-pub fn add_params<'a, I>(
-    context: &mut GrazeSb3GeneratorContext,
-    params: I,
-    inputs: &mut HashMap<String, Sb3InputValue>,
-    fields: &mut HashMap<String, Sb3FieldValue>,
-) -> Result<(), GrazeSb3GeneratorError>
-where
-    I: Iterator<Item = &'a (CallBlockParam, KnownBlock)>,
-{
-    for (param, value) in params {
-        add_known_block_to_params(context, param, value, Default::default(), inputs, fields)?;
-    }
-    Ok(())
-}
-
-pub fn introduce_input_simple_block<'a, I>(
-    opcode: &IString,
-    params: I,
-    context: &mut GrazeSb3GeneratorContext,
-) -> Result<IdString, GrazeSb3GeneratorError>
-where
-    I: Iterator<Item = &'a (CallBlockParam, KnownBlock)>,
-{
-    wrap_in_reporter(context, |context, parent, this_id| {
-        let mut fields = HashMap::new();
-        let mut inputs = HashMap::new();
-        add_params(context, params, &mut inputs, &mut fields)?;
-        add_block(
-            context,
-            &this_id,
-            make_block(parent, opcode.to_string(), inputs, fields, false, None),
-        );
-        Ok(this_id)
-    })
-}
-
-pub fn known_block_to_input_repr_no_menu(
-    known_block: &KnownBlock,
-    known_block_source_span: SourceSpan,
-    context: &mut GrazeSb3GeneratorContext,
-) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
-    let known_block_input = known_block.resolve_for_input(known_block_source_span, context);
-    match known_block_input {
-        grazelang_types::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
-            let is_shadow = sb3_primitive_block.is_shadow();
-            Ok(Some((
-                Sb3InputRepr::PrimitiveBlock(sb3_primitive_block),
-                is_shadow,
-            )))
-        }
-        grazelang_types::KnownBlockInput::BlockRef(id) => Ok(Some((
-            Sb3InputRepr::Reference(id.to_string()),
-            IsShadow::No,
-        ))),
-        grazelang_types::KnownBlockInput::SimpleBlock(opcode, params) => Ok(Some((
-            Sb3InputRepr::Reference(
-                introduce_input_simple_block(opcode, params.iter(), context)?.to_string(),
-            ),
-            IsShadow::No,
-        ))),
-        grazelang_types::KnownBlockInput::Menu(input_menu_value, _) => {
-            Err(GrazeSb3GeneratorError::UnexpectedMenuInput {
-                menu_input_value: input_menu_value,
-                source_span: known_block_source_span,
-            })
-        }
-        grazelang_types::KnownBlockInput::Empty => Ok(None),
-    }
-}
-
-pub fn param_to_input_repr_no_menu(
-    param: Param,
-    param_source_span: SourceSpan,
-    context: &mut GrazeSb3GeneratorContext,
-) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
-    with_known_block!(context, param, param_source_span, value => {
-        known_block_to_input_repr_no_menu(value, param_source_span, context)
-    })
-}
-
-pub fn add_param_to_params(
-    context: &mut GrazeSb3GeneratorContext,
-    param: &CallBlockParam,
-    value: Param,
-    known_block_source_span: SourceSpan,
-    inputs: &mut HashMap<String, Sb3InputValue>,
-    fields: &mut HashMap<String, Sb3FieldValue>,
-) -> Result<(), GrazeSb3GeneratorError> {
-    with_known_block!(context, value, known_block_source_span, value => {
-        add_known_block_to_params(context, param, value, known_block_source_span, inputs, fields)?;
-    });
-    Ok(())
-}
-
-pub fn make_proc_call_mutation(
-    mutation: (&IString, &[(IString, HasShadow)], &bool),
-) -> Sb3BlockMutation {
-    Sb3BlockMutation::ProceduresCall {
-        procedure_code: mutation.0.to_string(),
-        argument_ids: mutation.1.iter().map(|value| value.0.to_string()).collect(),
-        warp: *mutation.2,
-    }
-}
-
-pub fn add_block(context: &mut GrazeSb3GeneratorContext, id: &IdString, block: Sb3Block) {
-    context
-        .current_sb3_target
-        .as_mut()
-        .unwrap() // the visitor should always guarantee there is a target when blocks are added
-        .blocks
-        .insert(id.to_string(), block);
-}
-
-pub fn create_control_block<I>(
-    context: &mut GrazeSb3GeneratorContext,
-    identifier: &Identifier,
-    args: (I, usize),
-    args_source_span: SourceSpan,
-    substack: (Param, SourceSpan),
-    parent: Option<String>,
-    this_id: IString,
-) -> Result<(), GrazeSb3GeneratorError>
-where
-    I: Iterator<Item = (Param, SourceSpan)>,
-{
-    let (args, arg_count) = args;
-    let (substack, substack_source_span) = substack;
-    let symbol_id = get_symbol_id(context, identifier)?;
-    let symbol = &context.symbol_table[symbol_id];
-    let known_block = get_known_block(symbol, identifier)?.clone();
-    let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
-        .resolve_for_call_block(context)
-        .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
-            identifier: identifier.clone(),
-        })?;
-    let mut fields = HashMap::new();
-    let mut inputs = HashMap::new();
-    add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
-    if params.len() != arg_count + 1 {
-        return Err(GrazeSb3GeneratorError::IncorrectParamCount {
-            unexpected: arg_count,
-            expected: params.len() - 1,
-            source_span: args_source_span,
-        });
-    }
-    let CallBlockParam {
-        kind: CallBlockParamKind::BlockStack,
-        name: substack_input_name,
-    } = params.last().unwrap()
-    else {
-        return Err(GrazeSb3GeneratorError::BlockNotCBlock {
-            identifier: identifier.clone(),
-        });
-    };
-    let Param::BlockStack(substack) = substack else {
-        return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
-            param: Box::new(substack),
-            source_span: substack_source_span,
-        });
-    };
-    for (param, (value, source_span)) in zip(params.iter(), args) {
-        add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
-    }
-    if let Some(substack) = substack {
-        inputs.insert(
-            substack_input_name.to_string(),
-            Sb3InputValue::NoShadow(Sb3InputRepr::Reference(substack)),
-        );
-    }
-    add_block(
-        context,
-        &this_id,
-        make_block(
-            parent,
-            opcode.to_string(),
-            inputs,
-            fields,
-            false,
-            mutation.map(make_proc_call_mutation),
-        ),
-    );
-    Ok(())
-}
-
-#[inline]
-pub fn wrap_in_scope<F, O>(
-    context: &mut GrazeSb3GeneratorContext,
-    action: F,
-) -> Result<O, GrazeSb3GeneratorError>
-where
-    F: FnOnce(&mut GrazeSb3GeneratorContext) -> Result<O, GrazeSb3GeneratorError>,
-{
-    context.scope_stack.push(HashMap::new());
-    let value = action(context)?;
-    let namespace = &mut context.symbol_table[Default::default()].namespace;
-    for (key, value) in context.scope_stack.pop().unwrap() {
-        if let Some(value) = value {
-            namespace.insert(key, value);
-        } else {
-            namespace.remove(&key);
-        }
-    }
-    Ok(value)
-}
-
-pub fn use_symbol_as(
-    context: &mut GrazeSb3GeneratorContext,
-    symbol: SymbolId,
-    name: IString,
-    overwrite: bool,
-) {
-    if overwrite
-        || context
-            .symbol_table
-            .get_child(Default::default(), &name)
-            .is_none()
-    {
-        let previous_value =
-            context
-                .symbol_table
-                .insert_alias(Default::default(), name.clone(), symbol);
-        context
-            .scope_stack
-            .last_mut()
-            .unwrap()
-            .entry(name)
-            .or_insert(previous_value);
-    }
 }
 
 pub fn emit_message_eager(
@@ -2260,23 +1677,611 @@ macro_rules! extract_data_from_dictionary_value {
 pub mod helpers {
     use std::{
         collections::HashMap,
-        path::{Path, PathBuf},
+        path::{Path, PathBuf}, rc::Rc,
     };
 
-    use super::{GrazeSb3GeneratorContext, emit_message_eager};
+    use super::{
+        DataNameUsage, GrazeSb3GeneratorContext, GrazeSb3GeneratorError, Param, emit_message_eager,
+    };
     use crate::{
-        codegen::core::{DataNameUsage, GrazeSb3GeneratorError},
-        eval::cast::{JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
-        lexer::SourceSpan,
-        messages::types::{GrazeSourceMessage, GrazeSourceWarning, GrazeWarningKind},
-        parser::cst::{self, GetPos},
-        settings::GrazeMessageSetting,
+        eval::cast::{IsValidI128, JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber}, lexer::SourceSpan, messages::types::{GrazeSourceMessage, GrazeSourceWarning, GrazeWarningKind}, parser::{
+            context::{BROADCAST_CATEGORIES, IdString, NO_CATEGORIES, ResolveKnownBlock, Symbol, SymbolId},
+            cst::{self, GetPos, Identifier},
+        }, settings::GrazeMessageSetting
     };
     use arcstr::ArcStr as IString;
-    use grazelang_types::project_json::Sb3PrimitiveOrBool;
+    use grazelang_types::{
+        ANY_CATEGORY_ID, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature,
+        HasShadow, INTEGERS_CATEGORY_ID, KnownBlock,
+        project_json::{
+            IsShadow, Sb3Block, Sb3BlockMutation, Sb3FieldValue, Sb3InputRepr, Sb3InputValue,
+            Sb3NormalBlock, Sb3PrimitiveBlock, Sb3PrimitiveOrBool,
+        },
+    };
 
-    // TODO: Move more helpers into `grazelang::codegen::core::helpers`
-    // Issue: #84
+    pub fn get_symbol_id(
+        context: &mut GrazeSb3GeneratorContext,
+        identifier: &Identifier,
+    ) -> Result<SymbolId, GrazeSb3GeneratorError> {
+        context.resolve_identifier(identifier).ok_or_else(|| {
+            GrazeSb3GeneratorError::UnknownIdentifier {
+                identifier: identifier.clone(),
+            }
+        })
+    }
+    
+    pub fn get_known_block<'a>(
+        symbol: &'a Symbol,
+        identifier: &Identifier,
+    ) -> Result<&'a Rc<KnownBlock>, GrazeSb3GeneratorError> {
+        symbol
+            .known_block
+            .as_ref()
+            .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotABlock {
+                identifier: identifier.clone(),
+            })
+    }
+
+    pub fn make_block(
+        parent: Option<String>,
+        opcode: String,
+        inputs: HashMap<String, Sb3InputValue>,
+        fields: HashMap<String, Sb3FieldValue>,
+        shadow: bool,
+        mutation: Option<Sb3BlockMutation>,
+    ) -> Sb3Block {
+        let top_level = parent.is_none();
+        Sb3Block::Normal(Sb3NormalBlock {
+            opcode,
+            next: None,
+            parent,
+            inputs,
+            fields,
+            shadow,
+            top_level,
+            mutation,
+            x: top_level.then_some(0.0),
+            y: top_level.then_some(0.0),
+        })
+    }
+
+    pub fn make_top_level_block(
+        opcode: String,
+        inputs: HashMap<String, Sb3InputValue>,
+        fields: HashMap<String, Sb3FieldValue>,
+        shadow: bool,
+        mutation: Option<Sb3BlockMutation>,
+        pos: (f64, f64),
+    ) -> Sb3Block {
+        Sb3Block::Normal(Sb3NormalBlock {
+            opcode,
+            next: None,
+            parent: None,
+            inputs,
+            fields,
+            shadow,
+            top_level: true,
+            mutation,
+            x: Some(pos.0),
+            y: Some(pos.1),
+        })
+    }
+
+    pub fn set_params_or_unreachable(
+        block: Option<&mut Sb3Block>,
+        inputs: HashMap<String, Sb3InputValue>,
+        fields: HashMap<String, Sb3FieldValue>,
+    ) {
+        match block {
+            Some(Sb3Block::Normal(block)) => {
+                block.inputs = inputs;
+                block.fields = fields;
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn wrap_in_reporter<F, O>(context: &mut GrazeSb3GeneratorContext, action: F) -> O
+    where
+        O: Sized,
+        F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString) -> O,
+    {
+        let block_id = context.get_current_block_id();
+        let old_parent = context.current_parent.replace(block_id.to_string());
+        context.new_block();
+        let out = action(context, old_parent.clone(), block_id);
+        context.current_parent = old_parent;
+        out
+    }
+
+    pub fn wrap_in_statement<F, O>(context: &mut GrazeSb3GeneratorContext, action: F) -> O
+    where
+        O: Sized,
+        F: FnOnce(&mut GrazeSb3GeneratorContext, Option<String>, IString) -> O,
+    {
+        let block_id = context.get_current_block_id();
+        let old_parent = context.current_parent.replace(block_id.to_string());
+        context.new_block();
+        if let Some(previous) = context.current_previous_block.take() {
+            match context
+                .current_sb3_target
+                .as_mut()
+                .unwrap()
+                .blocks
+                .get_mut(previous.as_str())
+            {
+                Some(Sb3Block::Normal(block)) => {
+                    block.next = Some(block_id.to_string());
+                }
+                _ => unreachable!(),
+            }
+        } else if old_parent.is_some() {
+            // First statement in block stack is used in STACK argument of parent or similar
+            let value = Param::BlockStack(Some(block_id.to_string()));
+            context.push_param(value);
+        }
+        let out = action(context, old_parent.clone(), block_id.clone());
+        context.current_parent = Some(block_id.to_string());
+        context.current_previous_block = Some(block_id);
+        out
+    }
+
+    pub fn introduce_input_menu(
+        opcode: &IString,
+        field_name: &IString,
+        value: Sb3FieldValue,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> IdString {
+        wrap_in_reporter(context, |context, parent, this_id| {
+            add_block(
+                context,
+                &this_id,
+                make_block(
+                    parent,
+                    opcode.to_string(),
+                    HashMap::new(),
+                    HashMap::from([(field_name.to_string(), value)]),
+                    true,
+                    None,
+                ),
+            );
+            this_id
+        })
+    }
+
+    pub fn create_input_value<D>(
+        input_repr: Option<(Sb3InputRepr, IsShadow)>,
+        default: Option<D>,
+    ) -> Option<Sb3InputValue>
+    where
+        ((Sb3InputRepr, IsShadow), Option<D>): Into<Sb3InputValue>,
+        D: Into<Sb3InputValue>,
+    {
+        if let Some(input_repr) = input_repr {
+            Some((input_repr, default).into())
+        } else {
+            default.map(Into::into)
+        }
+    }
+
+    pub fn add_known_block_to_params(
+        context: &mut GrazeSb3GeneratorContext,
+        param: &CallBlockParam,
+        value: &KnownBlock,
+        known_block_source_span: SourceSpan,
+        inputs: &mut HashMap<String, Sb3InputValue>,
+        fields: &mut HashMap<String, Sb3FieldValue>,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        let param_name = param.name.to_string();
+        match &param.kind {
+            CallBlockParamKind::Input { default } => {
+                if let Some(input_value) = create_input_value(
+                    known_block_to_input_repr_no_menu(value, known_block_source_span, context)?,
+                    default.as_ref(),
+                ) {
+                    inputs.insert(param_name, input_value);
+                }
+            }
+            CallBlockParamKind::Field { category, .. } => {
+                fields.insert(param_name, {
+                    let (field_value, categories) =
+                        value.resolve_for_field(known_block_source_span, context);
+                    if !(categories.contains(category)
+                        || (*category == INTEGERS_CATEGORY_ID && field_value.is_valid_i128())
+                        || *category == ANY_CATEGORY_ID)
+                    {
+                        emit_message_eager(
+                            context,
+                            GrazeSourceMessage::Warning(
+                                GrazeSourceWarning::Specific(
+                                    match value {
+                                        KnownBlock::PrimitiveBlock {
+                                            value:
+                                                Sb3PrimitiveBlock::Variable { .. }
+                                                | Sb3PrimitiveBlock::List { .. }
+                                                | Sb3PrimitiveBlock::Broadcast { .. },
+                                        } => GrazeWarningKind::FieldValueIncorrect,
+                                        KnownBlock::PrimitiveBlock { .. } => {
+                                            GrazeWarningKind::LiteralFieldValueIncorrect
+                                        }
+                                        _ => GrazeWarningKind::FieldValueIncorrect,
+                                    },
+                                    known_block_source_span,
+                                ),
+                                None,
+                            ),
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                    field_value
+                });
+            }
+            CallBlockParamKind::MenuInput {
+                opcode,
+                field_name,
+                default,
+                category,
+            } => {
+                let (input_repr, is_shadow) = match value
+                    .resolve_for_input(known_block_source_span, context)
+                {
+                    grazelang_types::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
+                        let is_shadow = sb3_primitive_block.is_shadow();
+                        match &sb3_primitive_block {
+                            Sb3PrimitiveBlock::Number(sb3_primitive)
+                            | Sb3PrimitiveBlock::PositiveNumber(sb3_primitive)
+                            | Sb3PrimitiveBlock::PositiveInteger(sb3_primitive)
+                            | Sb3PrimitiveBlock::Integer(sb3_primitive)
+                            | Sb3PrimitiveBlock::Angle(sb3_primitive)
+                            | Sb3PrimitiveBlock::Color(sb3_primitive)
+                            | Sb3PrimitiveBlock::String(sb3_primitive) => {
+                                let cow_str = sb3_primitive.as_cow_str();
+                                let categories = context
+                                    .field_entry_categories
+                                    .get(&*cow_str)
+                                    .unwrap_or_else(|| &*NO_CATEGORIES);
+                                if !(categories.contains(category)
+                                    || (*category == INTEGERS_CATEGORY_ID
+                                        && sb3_primitive.is_valid_i128())
+                                    || *category == ANY_CATEGORY_ID)
+                                {
+                                    emit_message_eager(
+                                        context,
+                                        GrazeSourceMessage::Warning(
+                                            GrazeSourceWarning::Specific(
+                                                GrazeWarningKind::LiteralFieldValueIncorrect,
+                                                known_block_source_span,
+                                            ),
+                                            None,
+                                        ),
+                                        GrazeMessageSetting::Warnings,
+                                    );
+                                }
+                                (
+                                    Sb3InputRepr::Reference(
+                                        introduce_input_menu(
+                                            opcode,
+                                            field_name,
+                                            Sb3FieldValue::Normal(cow_str.to_string().into()),
+                                            context,
+                                        )
+                                        .to_string(),
+                                    ),
+                                    IsShadow::Yes,
+                                )
+                            }
+                            Sb3PrimitiveBlock::Broadcast { .. } => {
+                                if !BROADCAST_CATEGORIES.contains(category) {
+                                    emit_message_eager(
+                                        context,
+                                        GrazeSourceMessage::Warning(
+                                            GrazeSourceWarning::Specific(
+                                                GrazeWarningKind::FieldValueIncorrect,
+                                                known_block_source_span,
+                                            ),
+                                            None,
+                                        ),
+                                        GrazeMessageSetting::Warnings,
+                                    );
+                                }
+                                (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow)
+                            }
+                            _ => (Sb3InputRepr::PrimitiveBlock(sb3_primitive_block), is_shadow),
+                        }
+                    }
+                    grazelang_types::KnownBlockInput::BlockRef(id) => {
+                        (Sb3InputRepr::Reference(id.to_string()), IsShadow::No)
+                    }
+                    grazelang_types::KnownBlockInput::SimpleBlock(opcode, params) => (
+                        Sb3InputRepr::Reference(
+                            introduce_input_simple_block(opcode, params.iter(), context)?
+                                .to_string(),
+                        ),
+                        IsShadow::No,
+                    ),
+                    grazelang_types::KnownBlockInput::Menu(input_menu_value, categories) => {
+                        if !categories.contains(category) {
+                            emit_message_eager(
+                                context,
+                                GrazeSourceMessage::Warning(
+                                    GrazeSourceWarning::Specific(
+                                        GrazeWarningKind::FieldValueIncorrect,
+                                        known_block_source_span,
+                                    ),
+                                    None,
+                                ),
+                                GrazeMessageSetting::Warnings,
+                            );
+                        }
+                        (
+                            Sb3InputRepr::Reference(
+                                introduce_input_menu(opcode, field_name, input_menu_value, context)
+                                    .to_string(),
+                            ),
+                            IsShadow::Yes,
+                        )
+                    }
+                    grazelang_types::KnownBlockInput::Empty => (
+                        Sb3InputRepr::Reference(
+                            introduce_input_menu(opcode, field_name, default.clone(), context)
+                                .to_string(),
+                        ),
+                        IsShadow::Yes,
+                    ),
+                };
+                inputs.insert(
+                    param_name,
+                    if is_shadow == IsShadow::Yes {
+                        Sb3InputValue::Shadow(input_repr)
+                    } else {
+                        Sb3InputValue::ObscuredShadow {
+                            value: input_repr,
+                            shadow: Sb3InputRepr::Reference(
+                                introduce_input_menu(opcode, field_name, default.clone(), context)
+                                    .to_string(),
+                            ),
+                        }
+                    },
+                );
+            }
+            CallBlockParamKind::BlockStack => {
+                return Err(GrazeSb3GeneratorError::BlockStackHasNoKnownBlock {
+                    source_span: known_block_source_span,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    pub fn add_params<'a, I>(
+        context: &mut GrazeSb3GeneratorContext,
+        params: I,
+        inputs: &mut HashMap<String, Sb3InputValue>,
+        fields: &mut HashMap<String, Sb3FieldValue>,
+    ) -> Result<(), GrazeSb3GeneratorError>
+    where
+        I: Iterator<Item = &'a (CallBlockParam, KnownBlock)>,
+    {
+        for (param, value) in params {
+            add_known_block_to_params(context, param, value, Default::default(), inputs, fields)?;
+        }
+        Ok(())
+    }
+
+    pub fn introduce_input_simple_block<'a, I>(
+        opcode: &IString,
+        params: I,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<IdString, GrazeSb3GeneratorError>
+    where
+        I: Iterator<Item = &'a (CallBlockParam, KnownBlock)>,
+    {
+        wrap_in_reporter(context, |context, parent, this_id| {
+            let mut fields = HashMap::new();
+            let mut inputs = HashMap::new();
+            add_params(context, params, &mut inputs, &mut fields)?;
+            add_block(
+                context,
+                &this_id,
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+            );
+            Ok(this_id)
+        })
+    }
+
+    pub fn known_block_to_input_repr_no_menu(
+        known_block: &KnownBlock,
+        known_block_source_span: SourceSpan,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
+        let known_block_input = known_block.resolve_for_input(known_block_source_span, context);
+        match known_block_input {
+            grazelang_types::KnownBlockInput::PrimitiveInput(sb3_primitive_block) => {
+                let is_shadow = sb3_primitive_block.is_shadow();
+                Ok(Some((
+                    Sb3InputRepr::PrimitiveBlock(sb3_primitive_block),
+                    is_shadow,
+                )))
+            }
+            grazelang_types::KnownBlockInput::BlockRef(id) => Ok(Some((
+                Sb3InputRepr::Reference(id.to_string()),
+                IsShadow::No,
+            ))),
+            grazelang_types::KnownBlockInput::SimpleBlock(opcode, params) => Ok(Some((
+                Sb3InputRepr::Reference(
+                    introduce_input_simple_block(opcode, params.iter(), context)?.to_string(),
+                ),
+                IsShadow::No,
+            ))),
+            grazelang_types::KnownBlockInput::Menu(input_menu_value, _) => {
+                Err(GrazeSb3GeneratorError::UnexpectedMenuInput {
+                    menu_input_value: input_menu_value,
+                    source_span: known_block_source_span,
+                })
+            }
+            grazelang_types::KnownBlockInput::Empty => Ok(None),
+        }
+    }
+
+    pub fn param_to_input_repr_no_menu(
+        param: Param,
+        param_source_span: SourceSpan,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<Option<(Sb3InputRepr, IsShadow)>, GrazeSb3GeneratorError> {
+        with_known_block!(context, param, param_source_span, value => {
+            known_block_to_input_repr_no_menu(value, param_source_span, context)
+        })
+    }
+
+    pub fn add_param_to_params(
+        context: &mut GrazeSb3GeneratorContext,
+        param: &CallBlockParam,
+        value: Param,
+        known_block_source_span: SourceSpan,
+        inputs: &mut HashMap<String, Sb3InputValue>,
+        fields: &mut HashMap<String, Sb3FieldValue>,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        with_known_block!(context, value, known_block_source_span, value => {
+            add_known_block_to_params(context, param, value, known_block_source_span, inputs, fields)?;
+        });
+        Ok(())
+    }
+
+    pub fn make_proc_call_mutation(
+        mutation: (&IString, &[(IString, HasShadow)], &bool),
+    ) -> Sb3BlockMutation {
+        Sb3BlockMutation::ProceduresCall {
+            procedure_code: mutation.0.to_string(),
+            argument_ids: mutation.1.iter().map(|value| value.0.to_string()).collect(),
+            warp: *mutation.2,
+        }
+    }
+
+    pub fn add_block(context: &mut GrazeSb3GeneratorContext, id: &IdString, block: Sb3Block) {
+        context
+            .current_sb3_target
+            .as_mut()
+            .unwrap() // the visitor should always guarantee there is a target when blocks are added
+            .blocks
+            .insert(id.to_string(), block);
+    }
+
+    pub fn create_control_block<I>(
+        context: &mut GrazeSb3GeneratorContext,
+        identifier: &Identifier,
+        args: (I, usize),
+        args_source_span: SourceSpan,
+        substack: (Param, SourceSpan),
+        parent: Option<String>,
+        this_id: IString,
+    ) -> Result<(), GrazeSb3GeneratorError>
+    where
+        I: Iterator<Item = (Param, SourceSpan)>,
+    {
+        let (args, arg_count) = args;
+        let (substack, substack_source_span) = substack;
+        let symbol_id = get_symbol_id(context, identifier)?;
+        let symbol = &context.symbol_table[symbol_id];
+        let known_block = get_known_block(symbol, identifier)?.clone();
+        let CallableKnownBlockSignature(opcode, params, known_params, mutation) = known_block
+            .resolve_for_call_block(context)
+            .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
+                identifier: identifier.clone(),
+            })?;
+        let mut fields = HashMap::new();
+        let mut inputs = HashMap::new();
+        add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+        if params.len() != arg_count + 1 {
+            return Err(GrazeSb3GeneratorError::IncorrectParamCount {
+                unexpected: arg_count,
+                expected: params.len() - 1,
+                source_span: args_source_span,
+            });
+        }
+        let CallBlockParam {
+            kind: CallBlockParamKind::BlockStack,
+            name: substack_input_name,
+        } = params.last().unwrap()
+        else {
+            return Err(GrazeSb3GeneratorError::BlockNotCBlock {
+                identifier: identifier.clone(),
+            });
+        };
+        let Param::BlockStack(substack) = substack else {
+            return Err(GrazeSb3GeneratorError::PassedNormalParamAsBlockStack {
+                param: Box::new(substack),
+                source_span: substack_source_span,
+            });
+        };
+        for (param, (value, source_span)) in std::iter::zip(params.iter(), args) {
+            add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
+        }
+        if let Some(substack) = substack {
+            inputs.insert(
+                substack_input_name.to_string(),
+                Sb3InputValue::NoShadow(Sb3InputRepr::Reference(substack)),
+            );
+        }
+        add_block(
+            context,
+            &this_id,
+            make_block(
+                parent,
+                opcode.to_string(),
+                inputs,
+                fields,
+                false,
+                mutation.map(make_proc_call_mutation),
+            ),
+        );
+        Ok(())
+    }
+
+    #[inline]
+    pub fn wrap_in_scope<F, O>(
+        context: &mut GrazeSb3GeneratorContext,
+        action: F,
+    ) -> Result<O, GrazeSb3GeneratorError>
+    where
+        F: FnOnce(&mut GrazeSb3GeneratorContext) -> Result<O, GrazeSb3GeneratorError>,
+    {
+        context.scope_stack.push(HashMap::new());
+        let value = action(context)?;
+        let namespace = &mut context.symbol_table[Default::default()].namespace;
+        for (key, value) in context.scope_stack.pop().unwrap() {
+            if let Some(value) = value {
+                namespace.insert(key, value);
+            } else {
+                namespace.remove(&key);
+            }
+        }
+        Ok(value)
+    }
+
+    pub fn use_symbol_as(
+        context: &mut GrazeSb3GeneratorContext,
+        symbol: SymbolId,
+        name: IString,
+        overwrite: bool,
+    ) {
+        if overwrite
+            || context
+                .symbol_table
+                .get_child(Default::default(), &name)
+                .is_none()
+        {
+            let previous_value =
+                context
+                    .symbol_table
+                    .insert_alias(Default::default(), name.clone(), symbol);
+            context
+                .scope_stack
+                .last_mut()
+                .unwrap()
+                .entry(name)
+                .or_insert(previous_value);
+        }
+    }
 
     pub fn get_data_from_dictionary<M>(
         context: &mut GrazeSb3GeneratorContext,
