@@ -618,7 +618,7 @@
     "84": {
         "filepath": "grazelang/src/codegen/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2116-L2116",
         "commit": "5cd4f643cde6b12eefd130f546949fec94c6a6ba",
         "title": "Move more helpers into `grazelang::codegen::core::helpers`"
