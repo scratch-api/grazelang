@@ -1,4 +1,7 @@
-use std::fmt::{Error as FormatError, Result as FormatResult, Write};
+use std::{
+    fmt::{Error as FormatError, Result as FormatResult, Write},
+    io,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -15,10 +18,19 @@ use crate::{
     utils::string_escape,
 };
 
+type IOResult = io::Result<()>;
+
 pub trait UnparseAST {
     fn unparse_into<W>(&self, f: &mut W) -> FormatResult
     where
         W: Write;
+
+    fn unparse_into_io<W>(&self, f: &mut W) -> IOResult
+    where
+        W: io::Write,
+    {
+        write!(f, "{}", UnparseASTAdapter(self))
+    }
 
     fn unparse_to_string(&self) -> Result<String, FormatError> {
         let mut string = String::new();
@@ -29,11 +41,11 @@ pub trait UnparseAST {
 
 struct UnparseASTAdapter<'a, T>(&'a T)
 where
-    T: UnparseAST;
+    T: UnparseAST + ?Sized;
 
 impl<'a, T> std::fmt::Display for UnparseASTAdapter<'a, T>
 where
-    T: UnparseAST,
+    T: UnparseAST + ?Sized,
 {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FormatResult {
