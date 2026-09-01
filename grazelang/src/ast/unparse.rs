@@ -29,7 +29,9 @@ pub trait UnparseAST {
     where
         W: io::Write,
     {
-        write!(f, "{}", UnparseASTAdapter(self))
+        let mut adapter = WriteAdapter::new(f);
+        self.unparse_into(&mut adapter)
+            .map_err(|_| adapter.err.take().unwrap())
     }
 
     fn unparse_to_string(&self) -> Result<String, FormatError> {
@@ -39,17 +41,49 @@ pub trait UnparseAST {
     }
 }
 
-struct UnparseASTAdapter<'a, T>(&'a T)
+struct WriteAdapter<'a, W>
 where
-    T: UnparseAST + ?Sized;
-
-impl<'a, T> std::fmt::Display for UnparseASTAdapter<'a, T>
-where
-    T: UnparseAST + ?Sized,
+    W: io::Write + ?Sized,
 {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> FormatResult {
-        self.0.unparse_into(f)
+    buf: &'a mut W,
+    err: Option<io::Error>,
+}
+
+impl<'a, W> WriteAdapter<'a, W>
+where
+    W: io::Write + ?Sized,
+{
+    fn new(f: &'a mut W) -> Self {
+        Self { buf: f, err: None }
+    }
+}
+
+impl<'a, W> Write for WriteAdapter<'a, W>
+where
+    W: io::Write + ?Sized,
+{
+    fn write_char(&mut self, c: char) -> FormatResult {
+        let mut buf = [0; 4];
+        self.buf
+            .write_all(c.encode_utf8(&mut buf).as_bytes())
+            .map_err(|err| {
+                self.err.replace(err);
+                FormatError
+            })
+    }
+
+    fn write_str(&mut self, s: &str) -> FormatResult {
+        self.buf.write_all(s.as_bytes()).map_err(|err| {
+            self.err.replace(err);
+            FormatError
+        })
+    }
+
+    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> FormatResult {
+        self.buf.write_fmt(args).map_err(|err| {
+            self.err.replace(err);
+            FormatError
+        })
     }
 }
 
@@ -89,9 +123,9 @@ impl UnparseAST for Literal {
             | Literal::DecimalFloat(value)
             | Literal::HexadecimalInt(value)
             | Literal::OctalInt(value)
-            | Literal::BinaryInt(value) => write!(f, "{value} "),
-            Literal::Bool(value) => write!(f, "{value} "),
-            Literal::EmptyExpression => write!(f, "()"),
+            | Literal::BinaryInt(value) => f.write_str(value),
+            Literal::Bool(value) => write!(f, "{value}"),
+            Literal::EmptyExpression => f.write_str("()"),
         }
     }
 }
@@ -101,12 +135,12 @@ impl UnparseAST for UnOp {
     where
         W: Write,
     {
-        match self {
-            UnOp::Minus => write!(f, "-"),
-            UnOp::Not => write!(f, "!"),
-            UnOp::Exp => write!(f, "10^"),
-            UnOp::Pow => write!(f, "e^"),
-        }
+        f.write_str(match self {
+            UnOp::Minus => "-",
+            UnOp::Not => "!",
+            UnOp::Exp => "10^",
+            UnOp::Pow => "e^",
+        })
     }
 }
 
@@ -115,27 +149,23 @@ impl UnparseAST for BinOp {
     where
         W: Write,
     {
-        write!(
-            f,
-            "{}",
-            match self {
-                BinOp::Plus => "+",
-                BinOp::Minus => "-",
-                BinOp::Times => "*",
-                BinOp::Div => "/",
-                BinOp::Mod => "%",
-                BinOp::Join => "++",
-                BinOp::Contains => "contains",
-                BinOp::And => "&&",
-                BinOp::Or => "||",
-                BinOp::Equals => "==",
-                BinOp::NotEquals => "!=",
-                BinOp::LessThan => "<",
-                BinOp::GreaterThan => ">",
-                BinOp::LessThanOrEqual => "<=",
-                BinOp::GreaterThanOrEqual => ">=",
-            }
-        )
+        f.write_str(match self {
+            BinOp::Plus => "+",
+            BinOp::Minus => "-",
+            BinOp::Times => "*",
+            BinOp::Div => "/",
+            BinOp::Mod => "%",
+            BinOp::Join => "++",
+            BinOp::Contains => "contains",
+            BinOp::And => "&&",
+            BinOp::Or => "||",
+            BinOp::Equals => "==",
+            BinOp::NotEquals => "!=",
+            BinOp::LessThan => "<",
+            BinOp::GreaterThan => ">",
+            BinOp::LessThanOrEqual => "<=",
+            BinOp::GreaterThanOrEqual => ">=",
+        })
     }
 }
 
@@ -144,7 +174,7 @@ impl UnparseAST for SingleIdentifier {
     where
         W: Write,
     {
-        write!(f, "{}", &self.value)
+        f.write_str(&self.value)
     }
 }
 
@@ -153,13 +183,13 @@ impl UnparseAST for Identifier {
     where
         W: Write,
     {
-        use UnparseASTAdapter as u;
         let mut iter = self.path.iter();
         if let Some(value) = iter.next() {
             value.unparse_into(f)?;
         }
         for i in iter {
-            write!(f, "::{}", u(i))?;
+            f.write_str("::")?;
+            i.unparse_into(f)?;
         }
         Ok(())
     }
@@ -208,7 +238,6 @@ impl UnparseAST for Expression {
     where
         W: Write,
     {
-        use UnparseASTAdapter as u;
         match self {
             Expression::Literal(value) => value.unparse_into(f),
             Expression::FormattedString(value) => {
@@ -216,7 +245,9 @@ impl UnparseAST for Expression {
                 for i in value {
                     match i {
                         crate::ast::types::FormattedStringContent::Expression(expression) => {
-                            write!(f, "${{{}}}", u(expression.as_ref()))?;
+                            f.write_str("${")?;
+                            expression.unparse_into(f)?;
+                            f.write_char('}')?;
                         }
                         crate::ast::types::FormattedStringContent::String(value) => {
                             string_escape::format_string_escaper(value).escape_into(f)?;
@@ -254,18 +285,25 @@ impl UnparseAST for Expression {
                                     associativity != Associativity::Right
                                 }))
                     {
-                        return write!(f, "({})", u(expression));
+                        f.write_char('(')?;
+                        expression.unparse_into(f)?;
+                        return f.write_char(')');
                     }
                     expression.unparse_into(f)
                 }
                 let (precedence, associativity) = operator.get_precedence();
                 unparse_expression_in_binop(left_operand, true, precedence, associativity, f)?;
-                write!(f, " {} ", u(operator))?;
+                f.write_char(' ')?;
+                operator.unparse_into(f)?;
+                f.write_char(' ')?;
                 unparse_expression_in_binop(right_operand, false, precedence, associativity, f)
             }
             Expression::UnOp { operator, operand } => {
                 if operand.requires_parentheses_for_unops() {
-                    write!(f, "{}({})", u(operator), u(operand.as_ref()))
+                    operator.unparse_into(f)?;
+                    f.write_char('(')?;
+                    operand.unparse_into(f)?;
+                    f.write_char(')')
                 } else {
                     operator.unparse_into(f)?;
                     operand.unparse_into(f)
@@ -280,10 +318,16 @@ impl UnparseAST for Expression {
                 unparse_expression_list(arguments, f)
             }
             Expression::GetItem { list, item } => {
-                write!(f, "{}[{}]", u(list), u(item.as_ref()))
+                list.unparse_into(f)?;
+                f.write_char('[')?;
+                item.unparse_into(f)?;
+                f.write_char(']')
             }
             Expression::GetLetter { expression, letter } => {
-                write!(f, "{}@[{}]", u(expression.as_ref()), u(letter.as_ref()))
+                expression.unparse_into(f)?;
+                f.write_str("@[")?;
+                letter.unparse_into(f)?;
+                f.write_char(']')
             }
         }
     }
@@ -294,14 +338,16 @@ impl UnparseAST for Statement {
     where
         W: Write,
     {
-        use UnparseASTAdapter as u;
         match self {
             Statement::DataDeclaration(data_declaration) => {
                 data_declaration.unparse_into(f)?;
                 f.write_char(';')
             }
             Statement::Assignment { target, value } => {
-                write!(f, "{} = {};", u(target), u(value))
+                target.unparse_into(f)?;
+                f.write_str(" = ")?;
+                value.unparse_into(f)?;
+                f.write_char(';')
             }
             Statement::ListAssignment { target, value } => {
                 target.unparse_into(f)?;
@@ -313,7 +359,12 @@ impl UnparseAST for Statement {
                 f.write_str("];")
             }
             Statement::SetItem { list, item, value } => {
-                write!(f, "{}[{}] = {};", u(list), u(item), u(value))
+                list.unparse_into(f)?;
+                f.write_char('[')?;
+                item.unparse_into(f)?;
+                f.write_str("] = ");
+                value.unparse_into(f)?;
+                f.write_char(';')
             }
             Statement::Call {
                 function,
@@ -338,9 +389,15 @@ impl UnparseAST for Statement {
                 alternative_branches,
                 else_branch,
             } => {
-                write!(f, "if {} {}", u(&first_branch.0), u(&first_branch.1))?;
+                f.write_str("if ")?;
+                first_branch.0.unparse_into(f)?;
+                f.write_char(' ')?;
+                first_branch.1.unparse_into(f)?;
                 for i in alternative_branches {
-                    write!(f, "else if {} {}", u(&i.0), u(&i.1))?;
+                    f.write_str("else if ")?;
+                    i.0.unparse_into(f)?;
+                    f.write_char(' ')?;
+                    i.1.unparse_into(f)?;
                 }
                 if let Some(else_branch) = else_branch {
                     f.write_str("else ")?;
@@ -349,10 +406,14 @@ impl UnparseAST for Statement {
                 Ok(())
             }
             Statement::UseStatement(use_statement_content) => {
-                write!(f, "use {};", u(use_statement_content))
+                f.write_str("use ")?;
+                use_statement_content.unparse_into(f)?;
+                f.write_char(';')
             }
             Statement::UseExtensionStatement(use_statement_content) => {
-                write!(f, "use extension {};", u(use_statement_content))
+                f.write_str("use extension ")?;
+                use_statement_content.unparse_into(f)?;
+                f.write_char(';')
             }
         }
     }
@@ -403,7 +464,6 @@ impl UnparseAST for DataDeclaration {
     where
         W: Write,
     {
-        use UnparseASTAdapter as u;
         match self {
             DataDeclaration::Mixed {
                 scope,
@@ -412,7 +472,9 @@ impl UnparseAST for DataDeclaration {
                 if scope == &DataDeclarationScope::Unset {
                     f.write_str("let (")?;
                 } else {
-                    write!(f, "let {} (", u(scope))?;
+                    f.write_str("let ")?;
+                    scope.unparse_into(f)?;
+                    f.write_str(" (")?;
                 }
                 for i in declarations {
                     (i, SingleDataDeclarationDefaultKind::Variable).unparse_into(f)?;
@@ -427,7 +489,9 @@ impl UnparseAST for DataDeclaration {
                 if scope == &DataDeclarationScope::Unset {
                     f.write_str("let vars {")?;
                 } else {
-                    write!(f, "let {} vars {{", u(scope))?;
+                    f.write_str("let ")?;
+                    scope.unparse_into(f)?;
+                    f.write_str(" vars {")?;
                 }
                 for i in declarations {
                     (i, SingleDataDeclarationDefaultKind::Variable).unparse_into(f)?;
@@ -442,7 +506,9 @@ impl UnparseAST for DataDeclaration {
                 if scope == &DataDeclarationScope::Unset {
                     f.write_str("let lists {")?;
                 } else {
-                    write!(f, "let {} lists {{", u(scope))?;
+                    f.write_str("let ")?;
+                    scope.unparse_into(f)?;
+                    f.write_str(" lists {")?;
                 }
                 for i in declarations {
                     (i, SingleDataDeclarationDefaultKind::List).unparse_into(f)?;
