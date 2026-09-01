@@ -28,6 +28,7 @@ pub struct DetranspilerContext {
     pub asset_namespace: DetranspilerAssetNamespace,
     pub assets: HashMap<AssetPath, OutAssetPath>,
     pub messages: Vec<GrazeDetranspilerMessage>,
+    pub unreturned_failure: bool,
     pub settings: GrazeDetranspilerSettings,
     pub broadcasts: HashMap<DataId, DetranspilerBroadcast>,
     pub current_procedure_parameters:
@@ -258,6 +259,7 @@ macro_rules! emit_error_inline {
         ) {
             return Err(err);
         }
+        $context.unreturned_failure = true;
         if $context.settings.message_setting >= GrazeMessageSetting::Errors {
             $context.messages.push(err.into());
         }
@@ -274,6 +276,7 @@ macro_rules! emit_error {
         ) {
             return Err(err);
         }
+        context.unreturned_failure = true;
         emit_message_eager(context, err.into(), GrazeMessageSetting::Errors);
     }};
 }
@@ -424,29 +427,27 @@ pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast
 pub fn convert_project(
     project: &project_json::Sb3Root,
     settings: GrazeDetranspilerSettings,
-) -> ast_types::GrazeProgram {
+) -> Result<(ast_types::GrazeProgram, Vec<GrazeDetranspilerMessage>), Vec<GrazeDetranspilerMessage>>
+{
     macro_rules! emit_error_top_level {
-        ($context:expr, $err:expr, $unlogged_failure:ident, $exit_after_target_conversion:ident) => {{
-            let context = &mut *$context;
+        ($context:expr, $err:expr) => {{
+            let context = &mut $context;
             emit_message_eager(context, $err.into(), GrazeMessageSetting::Errors);
             match context.settings.message_setting {
                 GrazeMessageSetting::ExitOnError => {
                     context.messages.push($err.into());
-                    $exit_after_target_conversion = true;
-                    break;
+                    return Err($context.messages);
                 }
                 GrazeMessageSetting::ExitOnErrorUnlogged => {
-                    $unlogged_failure = true;
-                    $exit_after_target_conversion = true;
-                    break;
+                    return Err($context.messages);
                 }
                 _ => (),
             }
         }};
     }
     macro_rules! unwrap_bubbled_result_or {
-        ($context_ident:pat => $result:expr, $context:expr, $fallback:expr, $unlogged_failure:ident$(, $exit_after_target_conversion:ident)?) => {{
-            let context = &mut *$context;
+        ($context_ident:pat => $result:expr, $context:expr) => {{
+            let context = &mut $context;
             match {
                 let $context_ident = &mut *context;
                 $result
@@ -455,11 +456,8 @@ pub fn convert_project(
                 Err(err) => {
                     if context.settings.message_setting >= GrazeMessageSetting::ExitOnError {
                         context.messages.push(err.into());
-                    } else {
-                        $unlogged_failure = true;
                     }
-                    $($exit_after_target_conversion = true;)?
-                    $fallback
+                    return Err($context.messages);
                 }
             }
         }};
@@ -470,14 +468,13 @@ pub fn convert_project(
         asset_namespace: DetranspilerAssetNamespace::new(),
         assets: HashMap::new(),
         messages: Vec::new(),
+        unreturned_failure: false,
         settings,
         broadcasts: HashMap::new(),
         current_procedure_parameters: HashMap::new(),
         global_namespace: DetranspilerTargetNamespace::new(),
     };
     let mut has_stage = false;
-    let mut conversion_cancelled = false;
-    let mut unlogged_failure = false;
     let mut target_names = HashMap::with_capacity(project.targets.len());
     let target_internal_names = project
         .targets
@@ -493,12 +490,7 @@ pub fn convert_project(
     for target in &project.targets {
         if target.is_stage {
             if has_stage {
-                emit_error_top_level!(
-                    &mut context,
-                    GrazeDetranspilerError::MultipleStages,
-                    unlogged_failure,
-                    conversion_cancelled
-                );
+                emit_error_top_level!(context, GrazeDetranspilerError::MultipleStages);
             }
             context.broadcasts.reserve(target.broadcasts.len());
             for (id, canonical_name) in &target.broadcasts {
@@ -520,10 +512,7 @@ pub fn convert_project(
         }
         let target = unwrap_bubbled_result_or!(
             context => convert_target(target, context),
-            &mut context,
-            break,
-            unlogged_failure,
-            conversion_cancelled
+            context
         );
         context.targets.push(target);
     }
@@ -531,224 +520,205 @@ pub fn convert_project(
         context => context.targets.pop().ok_or({
             GrazeDetranspilerError::StageMissing
         }).map(Some),
-        &mut context,
-        None,
-        unlogged_failure,
-        conversion_cancelled
+        context
     );
-    if !conversion_cancelled {
-        for (idx, target) in project.targets.iter().enumerate() {
-            if target.is_stage
-                && let Some(stage) = stage.take()
-            {
-                context.stage_target_idx = context.targets.len();
-                context.targets.push(stage);
-                continue;
-            } else {
-                target_names.insert(target.name.clone(), idx);
-            }
-            let target = unwrap_bubbled_result_or!(
-                context => convert_target(target, context),
-                &mut context,
-                break,
-                unlogged_failure,
-                conversion_cancelled
-            );
-            context.targets.push(target);
+    for (idx, target) in project.targets.iter().enumerate() {
+        if target.is_stage
+            && let Some(stage) = stage.take()
+        {
+            context.stage_target_idx = context.targets.len();
+            context.targets.push(stage);
+            continue;
+        } else {
+            target_names.insert(target.name.clone(), idx);
         }
-        if !conversion_cancelled {
-            for monitor in &project.monitors {
-                let target_idx = monitor
-                    .sprite_name
-                    .as_ref()
-                    .and_then(|value| target_names.get(value))
-                    .copied()
-                    .unwrap_or(context.stage_target_idx);
-                unwrap_bubbled_result_or!(
-                    context => add_monitor(monitor, context, target_idx),
-                    &mut context,
-                    {
-                        conversion_cancelled = true;
-                        break;
-                    },
-                    unlogged_failure
-                );
+        let target = unwrap_bubbled_result_or!(
+            context => convert_target(target, context),
+            context
+        );
+        context.targets.push(target);
+    }
+    for monitor in &project.monitors {
+        let target_idx = monitor
+            .sprite_name
+            .as_ref()
+            .and_then(|value| target_names.get(value))
+            .copied()
+            .unwrap_or(context.stage_target_idx);
+        unwrap_bubbled_result_or!(
+            context => add_monitor(monitor, context, target_idx),
+            context
+        );
+    }
+    if context.unreturned_failure {
+        return Err(context.messages);
+    }
+    for (idx, target) in project.targets.iter().enumerate() {
+        unwrap_bubbled_result_or!(
+            context => fill_target(target, context, idx),
+            context
+        );
+    }
+    let mut statements =
+        Vec::with_capacity(context.broadcasts.len() + context.targets.len());
+    for broadcast in context.broadcasts.values() {
+        statements.push(broadcast.into_ast());
+    }
+    for (target_idx, target) in context.targets.iter_mut().enumerate() {
+        statements.push(if target.is_stage {
+            let mut stage_statements = Vec::with_capacity(
+                target.costumes.len()
+                    + target.sounds.len()
+                    + target.data.len()
+                    + target.monitors.len()
+                    + target.scripts.len(),
+            );
+            if context.settings.multi_asset_declarations {
+                stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
+                    assets_to_asset_declaration(target.costumes.values()),
+                ));
+                stage_statements.push(ast_types::StageStatement::SoundDeclaration(
+                    assets_to_asset_declaration(target.sounds.values()),
+                ));
+            } else {
+                target
+                    .costumes
+                    .values()
+                    .for_each(|value| stage_statements.push(value.into_ast()));
+                target
+                    .sounds
+                    .values()
+                    .for_each(|value| stage_statements.push(value.into_ast()));
             }
-            if !conversion_cancelled {
-                for (idx, target) in project.targets.iter().enumerate() {
-                    unwrap_bubbled_result_or!(
-                        context => fill_target(target, context, idx),
-                        &mut context,
-                        break,
-                        unlogged_failure
+            match context.settings.multi_data_declarations {
+                crate::settings::MultiDataDeclarationsMode::None => {
+                    target
+                        .data
+                        .values()
+                        .for_each(|value| stage_statements.push(value.into_ast()));
+                }
+                crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
+                    let (vars, lists) =
+                        data_to_split_data_declaration(target.data.values());
+                    stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                        ast_types::DataDeclaration::Vars {
+                            scope: Default::default(),
+                            declarations: vars,
+                        },
+                    ));
+                    stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                        ast_types::DataDeclaration::Lists {
+                            scope: Default::default(),
+                            declarations: lists,
+                        },
+                    ));
+                }
+                crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
+                    stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                        ast_types::DataDeclaration::Mixed {
+                            scope: Default::default(),
+                            declarations: data_to_data_declaration(
+                                target.data.values(),
+                            ),
+                        },
+                    ));
+                }
+            }
+            std::mem::take(&mut target.monitors)
+                .into_iter()
+                .for_each(|value| stage_statements.push(value.into_ast()));
+            std::mem::take(&mut target.scripts)
+                .into_iter()
+                .for_each(|value| stage_statements.push(value.into_ast()));
+            ast_types::TopLevelStatement::Stage {
+                code_block: ast_types::StageCodeBlock {
+                    statements: stage_statements,
+                },
+            }
+        } else {
+            let mut sprite_statements = Vec::with_capacity(
+                target.costumes.len()
+                    + target.sounds.len()
+                    + target.data.len()
+                    + target.monitors.len()
+                    + target.scripts.len(),
+            );
+            if context.settings.multi_asset_declarations {
+                sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
+                    assets_to_asset_declaration(target.costumes.values()),
+                ));
+                sprite_statements.push(ast_types::SpriteStatement::SoundDeclaration(
+                    assets_to_asset_declaration(target.sounds.values()),
+                ));
+            } else {
+                target
+                    .costumes
+                    .values()
+                    .for_each(|value| sprite_statements.push(value.into_ast()));
+                target
+                    .sounds
+                    .values()
+                    .for_each(|value| sprite_statements.push(value.into_ast()));
+            }
+            match context.settings.multi_data_declarations {
+                crate::settings::MultiDataDeclarationsMode::None => {
+                    target
+                        .data
+                        .values()
+                        .for_each(|value| sprite_statements.push(value.into_ast()));
+                }
+                crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
+                    let (vars, lists) =
+                        data_to_split_data_declaration(target.data.values());
+                    sprite_statements.push(
+                        ast_types::SpriteStatement::DataDeclaration(
+                            ast_types::DataDeclaration::Vars {
+                                scope: Default::default(),
+                                declarations: vars,
+                            },
+                        ),
+                    );
+                    sprite_statements.push(
+                        ast_types::SpriteStatement::DataDeclaration(
+                            ast_types::DataDeclaration::Lists {
+                                scope: Default::default(),
+                                declarations: lists,
+                            },
+                        ),
                     );
                 }
-                let mut statements =
-                    Vec::with_capacity(context.broadcasts.len() + context.targets.len());
-                for broadcast in context.broadcasts.values() {
-                    statements.push(broadcast.into_ast());
-                }
-                for (target_idx, target) in context.targets.iter_mut().enumerate() {
-                    statements.push(if target.is_stage {
-                        let mut stage_statements = Vec::with_capacity(
-                            target.costumes.len()
-                                + target.sounds.len()
-                                + target.data.len()
-                                + target.monitors.len()
-                                + target.scripts.len(),
-                        );
-                        if context.settings.multi_asset_declarations {
-                            stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
-                                assets_to_asset_declaration(target.costumes.values()),
-                            ));
-                            stage_statements.push(ast_types::StageStatement::SoundDeclaration(
-                                assets_to_asset_declaration(target.sounds.values()),
-                            ));
-                        } else {
-                            target
-                                .costumes
-                                .values()
-                                .for_each(|value| stage_statements.push(value.into_ast()));
-                            target
-                                .sounds
-                                .values()
-                                .for_each(|value| stage_statements.push(value.into_ast()));
-                        }
-                        match context.settings.multi_data_declarations {
-                            crate::settings::MultiDataDeclarationsMode::None => {
-                                target
-                                    .data
-                                    .values()
-                                    .for_each(|value| stage_statements.push(value.into_ast()));
-                            }
-                            crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
-                                let (vars, lists) =
-                                    data_to_split_data_declaration(target.data.values());
-                                stage_statements.push(ast_types::StageStatement::DataDeclaration(
-                                    ast_types::DataDeclaration::Vars {
-                                        scope: Default::default(),
-                                        declarations: vars,
-                                    },
-                                ));
-                                stage_statements.push(ast_types::StageStatement::DataDeclaration(
-                                    ast_types::DataDeclaration::Lists {
-                                        scope: Default::default(),
-                                        declarations: lists,
-                                    },
-                                ));
-                            }
-                            crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
-                                stage_statements.push(ast_types::StageStatement::DataDeclaration(
-                                    ast_types::DataDeclaration::Mixed {
-                                        scope: Default::default(),
-                                        declarations: data_to_data_declaration(
-                                            target.data.values(),
-                                        ),
-                                    },
-                                ));
-                            }
-                        }
-                        std::mem::take(&mut target.monitors)
-                            .into_iter()
-                            .for_each(|value| stage_statements.push(value.into_ast()));
-                        std::mem::take(&mut target.scripts)
-                            .into_iter()
-                            .for_each(|value| stage_statements.push(value.into_ast()));
-                        ast_types::TopLevelStatement::Stage {
-                            code_block: ast_types::StageCodeBlock {
-                                statements: stage_statements,
+                crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
+                    sprite_statements.push(
+                        ast_types::SpriteStatement::DataDeclaration(
+                            ast_types::DataDeclaration::Mixed {
+                                scope: Default::default(),
+                                declarations: data_to_data_declaration(
+                                    target.data.values(),
+                                ),
                             },
-                        }
-                    } else {
-                        let mut sprite_statements = Vec::with_capacity(
-                            target.costumes.len()
-                                + target.sounds.len()
-                                + target.data.len()
-                                + target.monitors.len()
-                                + target.scripts.len(),
-                        );
-                        if context.settings.multi_asset_declarations {
-                            sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
-                                assets_to_asset_declaration(target.costumes.values()),
-                            ));
-                            sprite_statements.push(ast_types::SpriteStatement::SoundDeclaration(
-                                assets_to_asset_declaration(target.sounds.values()),
-                            ));
-                        } else {
-                            target
-                                .costumes
-                                .values()
-                                .for_each(|value| sprite_statements.push(value.into_ast()));
-                            target
-                                .sounds
-                                .values()
-                                .for_each(|value| sprite_statements.push(value.into_ast()));
-                        }
-                        match context.settings.multi_data_declarations {
-                            crate::settings::MultiDataDeclarationsMode::None => {
-                                target
-                                    .data
-                                    .values()
-                                    .for_each(|value| sprite_statements.push(value.into_ast()));
-                            }
-                            crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
-                                let (vars, lists) =
-                                    data_to_split_data_declaration(target.data.values());
-                                sprite_statements.push(
-                                    ast_types::SpriteStatement::DataDeclaration(
-                                        ast_types::DataDeclaration::Vars {
-                                            scope: Default::default(),
-                                            declarations: vars,
-                                        },
-                                    ),
-                                );
-                                sprite_statements.push(
-                                    ast_types::SpriteStatement::DataDeclaration(
-                                        ast_types::DataDeclaration::Lists {
-                                            scope: Default::default(),
-                                            declarations: lists,
-                                        },
-                                    ),
-                                );
-                            }
-                            crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
-                                sprite_statements.push(
-                                    ast_types::SpriteStatement::DataDeclaration(
-                                        ast_types::DataDeclaration::Mixed {
-                                            scope: Default::default(),
-                                            declarations: data_to_data_declaration(
-                                                target.data.values(),
-                                            ),
-                                        },
-                                    ),
-                                );
-                            }
-                        }
-                        std::mem::take(&mut target.monitors)
-                            .into_iter()
-                            .for_each(|value| sprite_statements.push(value.into_ast()));
-                        std::mem::take(&mut target.scripts)
-                            .into_iter()
-                            .for_each(|value| sprite_statements.push(value.into_ast()));
-                        let (canonical_name, name) = target_internal_names.get(target_idx).unwrap();
-                        ast_types::TopLevelStatement::Sprite {
-                            canonical_identifier: (canonical_name != name).then(|| {
-                                ast_types::CanonicalIdentifier::new(canonical_name.clone())
-                            }),
-                            identifier: ast_types::SingleIdentifier::new(name.clone()),
-                            code_block: ast_types::SpriteCodeBlock {
-                                statements: sprite_statements,
-                            },
-                        }
-                    });
+                        ),
+                    );
                 }
-                let program = ast_types::GrazeProgram(statements);
             }
-        }
+            std::mem::take(&mut target.monitors)
+                .into_iter()
+                .for_each(|value| sprite_statements.push(value.into_ast()));
+            std::mem::take(&mut target.scripts)
+                .into_iter()
+                .for_each(|value| sprite_statements.push(value.into_ast()));
+            let (canonical_name, name) = target_internal_names.get(target_idx).unwrap();
+            ast_types::TopLevelStatement::Sprite {
+                canonical_identifier: (canonical_name != name).then(|| {
+                    ast_types::CanonicalIdentifier::new(canonical_name.clone())
+                }),
+                identifier: ast_types::SingleIdentifier::new(name.clone()),
+                code_block: ast_types::SpriteCodeBlock {
+                    statements: sprite_statements,
+                },
+            }
+        });
     }
-    todo!()
-    // TODO: Implement `convert_project`
-    // Issue: #118
+    Ok((ast_types::GrazeProgram(statements), context.messages))
 }
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
