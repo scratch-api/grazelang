@@ -742,14 +742,19 @@ pub fn convert_project(
 }
 
 // TODO: Implement extensions in detranspiler
+// Issue: #124
 
 // TODO: Implement `procedures_call` in detranspiler
+// Issue: #123
 
 // TODO: Implement assignments in detranspiler
+// Issue: #122
 
 // TODO: Implement list entries with `..` in detranspiler
+// Issue: #121
 
 // TODO: Implement list methods in detranspiler
+// Issue: #120
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.

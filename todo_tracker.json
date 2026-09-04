@@ -902,5 +902,45 @@
         "lines": "L2287-L2287",
         "commit": "adbd488f825452d5c8259710bfa8526f2f43568a",
         "title": "Implement normal block primitives in detranspiler"
+    },
+    "120": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L752-L752",
+        "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
+        "title": "Implement list methods in detranspiler"
+    },
+    "121": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L750-L750",
+        "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
+        "title": "Implement list entries with `..` in detranspiler"
+    },
+    "122": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L748-L748",
+        "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
+        "title": "Implement assignments in detranspiler"
+    },
+    "123": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L746-L746",
+        "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
+        "title": "Implement `procedures_call` in detranspiler"
+    },
+    "124": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L744-L744",
+        "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
+        "title": "Implement extensions in detranspiler"
     }
 }
