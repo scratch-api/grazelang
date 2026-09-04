@@ -48,8 +48,8 @@ type ProcedureParameterInternalName = IString;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerTarget {
     pub is_stage: bool,
-    pub costumes: HashMap<AssetId, DetranspilerAsset<DetranspilerCostumeUncommonData>>,
-    pub sounds: HashMap<AssetId, DetranspilerAsset<DetranspilerSoundUncommonData>>,
+    pub costumes: Vec<(AssetId, DetranspilerAsset<DetranspilerCostumeUncommonData>)>,
+    pub sounds: Vec<(AssetId, DetranspilerAsset<DetranspilerSoundUncommonData>)>,
     pub data: HashMap<DataId, DetranspilerVarOrList>,
     pub namespace: DetranspilerTargetNamespace,
     pub monitors: Vec<DetranspilerMonitor>,
@@ -427,8 +427,14 @@ pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast
 pub fn convert_project(
     project: &project_json::Sb3Root,
     settings: GrazeDetranspilerSettings,
-) -> Result<(ast_types::GrazeProgram, Vec<GrazeDetranspilerMessage>), Vec<GrazeDetranspilerMessage>>
-{
+) -> Result<
+    (
+        ast_types::GrazeProgram,
+        HashMap<AssetPath, OutAssetPath>,
+        Vec<GrazeDetranspilerMessage>,
+    ),
+    Vec<GrazeDetranspilerMessage>,
+> {
     macro_rules! emit_error_top_level {
         ($context:expr, $err:expr) => {{
             let context = &mut $context;
@@ -559,8 +565,7 @@ pub fn convert_project(
             context
         );
     }
-    let mut statements =
-        Vec::with_capacity(context.broadcasts.len() + context.targets.len());
+    let mut statements = Vec::with_capacity(context.broadcasts.len() + context.targets.len());
     for broadcast in context.broadcasts.values() {
         statements.push(broadcast.into_ast());
     }
@@ -574,20 +579,26 @@ pub fn convert_project(
                     + target.scripts.len(),
             );
             if context.settings.multi_asset_declarations {
-                stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
-                    assets_to_asset_declaration(target.costumes.values()),
-                ));
-                stage_statements.push(ast_types::StageStatement::SoundDeclaration(
-                    assets_to_asset_declaration(target.sounds.values()),
-                ));
+                if !target.costumes.is_empty() {
+                    stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
+                        assets_to_asset_declaration(target.costumes.iter().map(|(_, value)| value)),
+                    ));
+                }
+                if !target.sounds.is_empty() {
+                    stage_statements.push(ast_types::StageStatement::SoundDeclaration(
+                        assets_to_asset_declaration(target.sounds.iter().map(|(_, value)| value)),
+                    ));
+                }
             } else {
                 target
                     .costumes
-                    .values()
+                    .iter()
+                    .map(|(_, value)| value)
                     .for_each(|value| stage_statements.push(value.into_ast()));
                 target
                     .sounds
-                    .values()
+                    .iter()
+                    .map(|(_, value)| value)
                     .for_each(|value| stage_statements.push(value.into_ast()));
             }
             match context.settings.multi_data_declarations {
@@ -598,30 +609,33 @@ pub fn convert_project(
                         .for_each(|value| stage_statements.push(value.into_ast()));
                 }
                 crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
-                    let (vars, lists) =
-                        data_to_split_data_declaration(target.data.values());
-                    stage_statements.push(ast_types::StageStatement::DataDeclaration(
-                        ast_types::DataDeclaration::Vars {
-                            scope: Default::default(),
-                            declarations: vars,
-                        },
-                    ));
-                    stage_statements.push(ast_types::StageStatement::DataDeclaration(
-                        ast_types::DataDeclaration::Lists {
-                            scope: Default::default(),
-                            declarations: lists,
-                        },
-                    ));
+                    let (vars, lists) = data_to_split_data_declaration(target.data.values());
+                    if !vars.is_empty() {
+                        stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                            ast_types::DataDeclaration::Vars {
+                                scope: Default::default(),
+                                declarations: vars,
+                            },
+                        ));
+                    }
+                    if !lists.is_empty() {
+                        stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                            ast_types::DataDeclaration::Lists {
+                                scope: Default::default(),
+                                declarations: lists,
+                            },
+                        ));
+                    }
                 }
                 crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
-                    stage_statements.push(ast_types::StageStatement::DataDeclaration(
-                        ast_types::DataDeclaration::Mixed {
-                            scope: Default::default(),
-                            declarations: data_to_data_declaration(
-                                target.data.values(),
-                            ),
-                        },
-                    ));
+                    if !target.data.is_empty() {
+                        stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                            ast_types::DataDeclaration::Mixed {
+                                scope: Default::default(),
+                                declarations: data_to_data_declaration(target.data.values()),
+                            },
+                        ));
+                    }
                 }
             }
             std::mem::take(&mut target.monitors)
@@ -644,20 +658,26 @@ pub fn convert_project(
                     + target.scripts.len(),
             );
             if context.settings.multi_asset_declarations {
-                sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
-                    assets_to_asset_declaration(target.costumes.values()),
-                ));
-                sprite_statements.push(ast_types::SpriteStatement::SoundDeclaration(
-                    assets_to_asset_declaration(target.sounds.values()),
-                ));
+                if !target.costumes.is_empty() {
+                    sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
+                        assets_to_asset_declaration(target.costumes.iter().map(|(_, value)| value)),
+                    ));
+                }
+                if !target.sounds.is_empty() {
+                    sprite_statements.push(ast_types::SpriteStatement::SoundDeclaration(
+                        assets_to_asset_declaration(target.sounds.iter().map(|(_, value)| value)),
+                    ));
+                }
             } else {
                 target
                     .costumes
-                    .values()
+                    .iter()
+                    .map(|(_, value)| value)
                     .for_each(|value| sprite_statements.push(value.into_ast()));
                 target
                     .sounds
-                    .values()
+                    .iter()
+                    .map(|(_, value)| value)
                     .for_each(|value| sprite_statements.push(value.into_ast()));
             }
             match context.settings.multi_data_declarations {
@@ -668,36 +688,33 @@ pub fn convert_project(
                         .for_each(|value| sprite_statements.push(value.into_ast()));
                 }
                 crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
-                    let (vars, lists) =
-                        data_to_split_data_declaration(target.data.values());
-                    sprite_statements.push(
-                        ast_types::SpriteStatement::DataDeclaration(
+                    let (vars, lists) = data_to_split_data_declaration(target.data.values());
+                    if !vars.is_empty() {
+                        sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
                             ast_types::DataDeclaration::Vars {
                                 scope: Default::default(),
                                 declarations: vars,
                             },
-                        ),
-                    );
-                    sprite_statements.push(
-                        ast_types::SpriteStatement::DataDeclaration(
+                        ));
+                    }
+                    if !lists.is_empty() {
+                        sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
                             ast_types::DataDeclaration::Lists {
                                 scope: Default::default(),
                                 declarations: lists,
                             },
-                        ),
-                    );
+                        ));
+                    }
                 }
                 crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
-                    sprite_statements.push(
-                        ast_types::SpriteStatement::DataDeclaration(
+                    if !target.data.is_empty() {
+                        sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
                             ast_types::DataDeclaration::Mixed {
                                 scope: Default::default(),
-                                declarations: data_to_data_declaration(
-                                    target.data.values(),
-                                ),
+                                declarations: data_to_data_declaration(target.data.values()),
                             },
-                        ),
-                    );
+                        ));
+                    }
                 }
             }
             std::mem::take(&mut target.monitors)
@@ -708,9 +725,8 @@ pub fn convert_project(
                 .for_each(|value| sprite_statements.push(value.into_ast()));
             let (canonical_name, name) = target_internal_names.get(target_idx).unwrap();
             ast_types::TopLevelStatement::Sprite {
-                canonical_identifier: (canonical_name != name).then(|| {
-                    ast_types::CanonicalIdentifier::new(canonical_name.clone())
-                }),
+                canonical_identifier: (canonical_name != name)
+                    .then(|| ast_types::CanonicalIdentifier::new(canonical_name.clone())),
                 identifier: ast_types::SingleIdentifier::new(name.clone()),
                 code_block: ast_types::SpriteCodeBlock {
                     statements: sprite_statements,
@@ -718,8 +734,22 @@ pub fn convert_project(
             }
         });
     }
-    Ok((ast_types::GrazeProgram(statements), context.messages))
+    Ok((
+        ast_types::GrazeProgram(statements),
+        context.assets,
+        context.messages,
+    ))
 }
+
+// TODO: Implement extensions in detranspiler
+
+// TODO: Implement `procedures_call` in detranspiler
+
+// TODO: Implement assignments in detranspiler
+
+// TODO: Implement list entries with `..` in detranspiler
+
+// TODO: Implement list methods in detranspiler
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
@@ -844,12 +874,30 @@ pub fn convert_target(
             },
         );
     }
+    for (id, list) in &target.lists {
+        let (canonical_name, name) = get_canonical_name_and_name(
+            &mut namespace,
+            list.0.as_str().into(),
+            target.is_stage,
+            context,
+        );
+        data.insert(
+            id.to_string(),
+            DetranspilerVarOrList {
+                canonical_name,
+                name,
+                kind: DetranspilerVarOrListKind::List {
+                    value: list.1.clone(),
+                },
+            },
+        );
+    }
     let mut custom_blocks = HashMap::new();
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(block) = block else {
             continue;
         };
-        if !block.top_level || block.opcode == "procedures_definition" {
+        if !block.top_level || block.opcode != "procedures_definition" {
             continue;
         }
         let Some(proto_block_id) = block.inputs.get("custom_block") else {

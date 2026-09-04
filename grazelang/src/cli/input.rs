@@ -13,10 +13,11 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen, lexer,
+    ast::unparse::UnparseAST,
+    codegen, detranspiler, lexer,
     messages::{
         annotations::{self, Source},
-        types::{CLIError, GrazeSourceMessage},
+        types::{CLIError, GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeSourceMessage},
     },
     parser::{
         self,
@@ -24,7 +25,10 @@ use crate::{
         core::{PeekableLexer, emit_message_eager as emit_message_eager_parse_context},
         cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
-    settings::{GrazeBuildSettings, GrazeMessageSetting, UseShadows},
+    settings::{
+        GrazeBuildSettings, GrazeDetranspilerSettings, GrazeMessageSetting,
+        MultiDataDeclarationsMode, UseShadows,
+    },
     visitor::GrazeVisitor,
     zipper,
 };
@@ -68,6 +72,31 @@ pub enum Commands {
         #[arg(long, default_value = "true", action = clap::ArgAction::Set)]
         create_cached_extensions: bool,
         /// Path of the file or project directory
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+    Unbuild {
+        #[arg(long)]
+        preserve_monitor_ids: bool,
+        #[arg(long)]
+        preserve_internal_monitor_value: bool,
+        #[arg(long)]
+        explicitly_typed_string_parameters: bool,
+        #[arg(long)]
+        multi_asset_declarations: bool,
+        #[arg(value_enum, long, default_value = "none")]
+        multi_data_declarations: MultiDataDeclarationsMode,
+        #[arg(value_enum, short, long, default_value = "all")]
+        logging: GrazeMessageSetting,
+        #[arg(long)]
+        log_time: bool,
+        /// Path for the project
+        #[arg(short, long)]
+        target: Option<PathBuf>,
+        /// Path for the resources of the project (default: project directory)
+        #[arg(short = 'R', long)]
+        resources: Option<PathBuf>,
+        /// Path of the file
         #[arg(default_value = ".")]
         path: PathBuf,
     },
@@ -269,7 +298,7 @@ pub enum Successful {
 }
 
 impl Cli {
-    pub fn execute(&self) {
+    pub fn execute(&self) -> i32 {
         match &self.command {
             Commands::Build {
                 shadows,
@@ -282,8 +311,8 @@ impl Cli {
                 path,
                 log_time,
             } => Self::build(
-                shadows,
-                logging,
+                *shadows,
+                *logging,
                 target.as_deref(),
                 resources.as_deref(),
                 extensions.as_deref(),
@@ -292,10 +321,33 @@ impl Cli {
                 path,
                 *log_time,
             ),
+            Commands::Unbuild {
+                preserve_monitor_ids,
+                preserve_internal_monitor_value,
+                explicitly_typed_string_parameters,
+                multi_asset_declarations,
+                multi_data_declarations,
+                logging,
+                log_time,
+                target,
+                resources,
+                path,
+            } => Self::unbuild(
+                *preserve_monitor_ids,
+                *preserve_internal_monitor_value,
+                *explicitly_typed_string_parameters,
+                *multi_asset_declarations,
+                *multi_data_declarations,
+                *logging,
+                *log_time,
+                target.as_deref(),
+                resources.as_deref(),
+                path.as_path(),
+            ),
         }
     }
 
-    pub fn print_errors(
+    pub fn print_build_errors(
         messages: &mut Vec<GrazeSourceMessage>,
         source_files: &HashMap<u32, Source>,
         force_error: bool,
@@ -326,8 +378,8 @@ impl Cli {
 
     #[expect(clippy::too_many_arguments)]
     pub fn build(
-        shadows: &UseShadows,
-        logging: &GrazeMessageSetting,
+        shadows: UseShadows,
+        logging: GrazeMessageSetting,
         target: Option<&Path>,
         resources: Option<&Path>,
         extensions: Option<&Path>,
@@ -335,13 +387,13 @@ impl Cli {
         create_cached_extensions: bool,
         path: &Path,
         log_time: bool,
-    ) {
+    ) -> i32 {
         let total_time = Instant::now();
         let path_is_file = path.is_file();
         let mut context = ParseContext::new(
             GrazeBuildSettings {
-                message_setting: *logging,
-                use_shadows: *shadows,
+                message_setting: logging,
+                use_shadows: shadows,
                 resources_path: Some(resources.map(Path::to_path_buf).unwrap_or_else(|| {
                     if path_is_file {
                         path.parent().unwrap_or(Path::new("/")).to_path_buf()
@@ -369,32 +421,38 @@ impl Cli {
                 CLIError::PathDoesNotExist.into(),
                 GrazeMessageSetting::Errors,
             );
-            Self::print_errors(&mut context.messages, &HashMap::new(), true);
+            Self::print_build_errors(&mut context.messages, &HashMap::new(), true);
             std::process::exit(1);
         };
         let (parsed, source_files) = if path.is_dir() {
-            parse_project_directory(&path, &mut context).unwrap_or_else(|(_, source_files)| {
-                Self::print_errors(&mut context.messages, &source_files, true);
-                std::process::exit(1);
-            })
+            match parse_project_directory(&path, &mut context) {
+                Ok(value) => value,
+                Err((_, source_files)) => {
+                    Self::print_build_errors(&mut context.messages, &source_files, true);
+                    return 1;
+                }
+            }
         } else if path_is_file {
-            parse_single_file(&path, &mut context).unwrap_or_else(|(_, source_files)| {
-                Self::print_errors(&mut context.messages, &source_files, true);
-                std::process::exit(1);
-            })
+            match parse_single_file(&path, &mut context) {
+                Ok(value) => value,
+                Err((_, source_files)) => {
+                    Self::print_build_errors(&mut context.messages, &source_files, true);
+                    return 1;
+                }
+            }
         } else {
             emit_message_eager_parse_context(
                 &mut context,
                 CLIError::PathNeitherFileNorDirectory.into(),
                 GrazeMessageSetting::Errors,
             );
-            Self::print_errors(&mut context.messages, &HashMap::new(), true);
-            std::process::exit(1);
+            Self::print_build_errors(&mut context.messages, &HashMap::new(), true);
+            return 1;
         };
         let parse_time = parse_timer.elapsed();
         if !context.successful {
-            Self::print_errors(&mut context.messages, &source_files, true);
-            std::process::exit(1);
+            Self::print_build_errors(&mut context.messages, &source_files, true);
+            return 1;
         }
         let codegen_timer = Instant::now();
         let mut context = {
@@ -405,8 +463,8 @@ impl Cli {
                     if message_setting >= GrazeMessageSetting::ExitOnError {
                         messages.push(err.into());
                     }
-                    Self::print_errors(&mut messages, &source_files, true);
-                    std::process::exit(1);
+                    Self::print_build_errors(&mut messages, &source_files, true);
+                    return 1;
                 }
             }
         };
@@ -416,15 +474,15 @@ impl Cli {
                 context.settings.message_setting,
                 GrazeMessageSetting::None | GrazeMessageSetting::ExitOnErrorUnlogged
             ) {
-                Self::print_errors(&mut context.messages, &source_files, true);
-                std::process::exit(1);
+                Self::print_build_errors(&mut context.messages, &source_files, true);
+                return 1;
             }
             context.messages.push(err.into());
         }
         let codegen_time = codegen_timer.elapsed();
         if !context.successful {
-            Self::print_errors(&mut context.messages, &source_files, true);
-            std::process::exit(1);
+            Self::print_build_errors(&mut context.messages, &source_files, true);
+            return 1;
         }
         let (mut output_path, set_extension) = match target {
             Some(target) if target.is_file() || !target.exists() => (target.to_path_buf(), false),
@@ -441,8 +499,7 @@ impl Cli {
                     let mut path = path;
                     if path
                         .extension()
-                        .map(|value| value == OsStr::new("sb3"))
-                        .unwrap_or_default()
+                        .is_some_and(|value| value == OsStr::new("sb3"))
                     {
                         path.set_extension("out");
                         path.add_extension("sb3");
@@ -468,11 +525,11 @@ impl Cli {
             if context.settings.message_setting >= GrazeMessageSetting::ExitOnError {
                 context.messages.push(err.into());
             }
-            Self::print_errors(&mut context.messages, &source_files, true);
-            std::process::exit(1);
+            Self::print_build_errors(&mut context.messages, &source_files, true);
+            return 1;
         }
-        if Self::print_errors(&mut context.messages, &source_files, false) == Successful::No {
-            std::process::exit(1);
+        if Self::print_build_errors(&mut context.messages, &source_files, false) == Successful::No {
+            return 1;
         }
         let zip_time = zip_timer.elapsed();
         if log_time {
@@ -481,5 +538,230 @@ impl Cli {
             println!("Zipping took: {:?}", zip_time);
             println!("Total time: {:?}", total_time.elapsed());
         }
+        0
+    }
+
+    pub fn print_unbuild_errors(
+        messages: &mut Vec<GrazeDetranspilerMessage>,
+        force_error: bool,
+    ) -> Successful {
+        if messages.is_empty() {
+            return if force_error {
+                Successful::No
+            } else {
+                Successful::Yes
+            };
+        }
+        dbg!(messages);
+        return Successful::Yes;
+        // let renderer = Renderer::styled();
+        // let (error_count, warning_count) = count_errors_and_warnings(messages);
+        // let error = error_count > 0 || force_error;
+        // if error {
+        //     messages.push(GrazeSourceMessage::Unsuccessful {
+        //         error_count,
+        //         warning_count,
+        //     });
+        // }
+        // annotations::annotate(
+        //     messages.iter(),
+        //     |id| source_files.get(&id).unwrap().as_descriptor(),
+        //     |ann, _| {
+        //         let rendered = renderer.render(ann);
+        //         anstream::eprintln!("{rendered}");
+        //     },
+        // );
+        // if error {
+        //     Successful::No
+        // } else {
+        //     Successful::Yes
+        // }
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    pub fn unbuild(
+        preserve_monitor_ids: bool,
+        preserve_internal_monitor_value: bool,
+        explicitly_typed_string_parameters: bool,
+        multi_asset_declarations: bool,
+        multi_data_declarations: MultiDataDeclarationsMode,
+        logging: GrazeMessageSetting,
+        log_time: bool,
+        target: Option<&Path>,
+        resources: Option<&Path>,
+        path: &Path,
+    ) -> i32 {
+        macro_rules! single_error {
+            ($logging:expr, $error:expr) => {{
+                let mut errors = if $logging >= GrazeMessageSetting::ExitOnError {
+                    vec![$error]
+                } else {
+                    Vec::new()
+                };
+                Self::print_unbuild_errors(&mut errors, true);
+                return 1;
+            }};
+        }
+        let total_time = Instant::now();
+        if !path.is_file() {
+            single_error!(
+                logging,
+                GrazeDetranspilerMessage::Error(GrazeDetranspilerError::PathIsNotAFile {
+                    path: path.to_path_buf(),
+                })
+            );
+        }
+        let unzip_1_timer = Instant::now();
+        let Ok(path) = path.canonicalize() else {
+            single_error!(
+                logging,
+                GrazeDetranspilerMessage::Error(GrazeDetranspilerError::PathIsNotAFile {
+                    path: path.to_path_buf(),
+                })
+            );
+        };
+        let Ok(reader) = std::fs::File::open(&path) else {
+            single_error!(
+                logging,
+                GrazeDetranspilerMessage::Error(GrazeDetranspilerError::CannotReadFile { path })
+            );
+        };
+        let Ok(mut zip_file) = zip::ZipArchive::new(reader) else {
+            single_error!(
+                logging,
+                GrazeDetranspilerMessage::Error(GrazeDetranspilerError::InvalidZipFile { path })
+            );
+        };
+        let Ok(mut project_file) = zip_file.by_name("project.json") else {
+            single_error!(
+                logging,
+                GrazeDetranspilerMessage::Error(GrazeDetranspilerError::InvalidZipFile { path })
+            );
+        };
+        let mut project = String::with_capacity(project_file.size() as usize);
+        let Ok(_) = project_file.read_to_string(&mut project) else {
+            single_error!(
+                logging,
+                GrazeDetranspilerMessage::Error(GrazeDetranspilerError::InvalidZipFile { path })
+            );
+        };
+        drop(project_file);
+        let Ok(project) = serde_json::from_str(&project) else {
+            single_error!(
+                logging,
+                GrazeDetranspilerMessage::Error(GrazeDetranspilerError::InvalidProjectJson {
+                    path
+                })
+            );
+        };
+        let unzip_1_time = unzip_1_timer.elapsed();
+        let settings = GrazeDetranspilerSettings {
+            preserve_monitor_ids,
+            preserve_internal_monitor_value,
+            explicitly_typed_string_parameters,
+            multi_asset_declarations,
+            multi_data_declarations,
+            message_setting: logging,
+        };
+        let build_ast_timer = Instant::now();
+        let (ast, assets, mut messages) =
+            match detranspiler::core::convert_project(&project, settings) {
+                Ok(value) => value,
+                Err(mut errors) => {
+                    Self::print_unbuild_errors(&mut errors, true);
+                    return 1;
+                }
+            };
+        let build_ast_time = build_ast_timer.elapsed();
+        let unparse_timer = Instant::now();
+        let output_path = match target {
+            Some(target) if target.is_file() || !target.exists() => target.to_path_buf(),
+            Some(target) => target.join("main.graze"),
+            None => {
+                let mut path = path.to_path_buf();
+                if path
+                    .extension()
+                    .is_some_and(|value| value == OsStr::new("graze"))
+                {
+                    path.add_extension("out");
+                    path.add_extension("graze");
+                } else {
+                    path.set_extension("graze");
+                }
+                path
+            }
+        };
+        let Ok(mut output_file) = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(&output_path)
+        else {
+            messages.push(GrazeDetranspilerMessage::Error(
+                GrazeDetranspilerError::CannotWriteFile { path: output_path },
+            ));
+            Self::print_unbuild_errors(&mut messages, true);
+            return 1;
+        };
+        let Ok(()) = ast.unparse_into_io(&mut output_file) else {
+            messages.push(GrazeDetranspilerMessage::Error(
+                GrazeDetranspilerError::CannotWriteFile { path: output_path },
+            ));
+            Self::print_unbuild_errors(&mut messages, true);
+            return 1;
+        };
+        let unparse_time = unparse_timer.elapsed();
+        let unzip_2_timer = Instant::now();
+        let resource_path = match resources {
+            Some(resource_path) => resource_path,
+            None => match target {
+                Some(target) if target.is_file() || !target.exists() => {
+                    target.parent().unwrap_or(Path::new("/"))
+                }
+                Some(target) => target,
+                None => path.parent().unwrap_or(Path::new("/")),
+            },
+        };
+        for (zip_asset, out_asset) in assets {
+            let output_path = resource_path.join(out_asset.as_str());
+            let Ok(mut output_file) = std::fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(&output_path)
+            else {
+                messages.push(GrazeDetranspilerMessage::Error(
+                    GrazeDetranspilerError::CannotWriteFile { path: output_path },
+                ));
+                Self::print_unbuild_errors(&mut messages, true);
+                return 1;
+            };
+            let Ok(mut asset_file) = zip_file.by_name(&zip_asset) else {
+                messages.push(GrazeDetranspilerMessage::Error(
+                    GrazeDetranspilerError::MissingAsset { md3ext: zip_asset },
+                ));
+                Self::print_unbuild_errors(&mut messages, true);
+                return 1;
+            };
+            let Ok(_) = std::io::copy(&mut asset_file, &mut output_file) else {
+                messages.push(GrazeDetranspilerMessage::Error(
+                    GrazeDetranspilerError::CannotWriteFile { path: output_path },
+                ));
+                Self::print_unbuild_errors(&mut messages, true);
+                return 1;
+            };
+        }
+        if Self::print_unbuild_errors(&mut messages, false) == Successful::No {
+            return 1;
+        }
+        let unzip_2_time = unzip_2_timer.elapsed();
+        if log_time {
+            println!("Extracting project json took: {:?}", unzip_1_time);
+            println!("Building AST took {:?}", build_ast_time);
+            println!("Unparsing AST took: {:?}", unparse_time);
+            println!("Unzipping assets took: {:?}", unzip_2_time);
+            println!("Total time: {:?}", total_time.elapsed());
+        }
+        0
     }
 }

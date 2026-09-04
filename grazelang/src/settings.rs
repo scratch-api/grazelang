@@ -25,7 +25,7 @@ pub struct GrazeDetranspilerSettings {
     pub multi_data_declarations: MultiDataDeclarationsMode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default, clap::ValueEnum)]
 pub enum MultiDataDeclarationsMode {
     #[default]
     None,

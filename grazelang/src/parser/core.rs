@@ -3903,7 +3903,7 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
                             start_pos,
                         );
                     }
-                    if expressions.values.is_empty() && expressions.tail_value.is_some() {
+                    if expressions.values.is_empty() && let Some(tail_value) = expressions.tail_value {
                         let source_span = left_parens.span_to(&right_parens);
                         return parse_sprite_rest_of_single_input_control(
                             token_stream,
@@ -3911,7 +3911,7 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
                             identifier,
                             Expression::Parentheses(
                                 left_parens,
-                                expressions.tail_value.unwrap(),
+                                tail_value,
                                 right_parens,
                                 source_span,
                             ),
@@ -4273,7 +4273,7 @@ pub fn parse_stage_statement<T: PeekableTokenStream>(
                             start_pos,
                         );
                     }
-                    if expressions.values.is_empty() && expressions.tail_value.is_some() {
+                    if expressions.values.is_empty() && let Some(tail_value) = expressions.tail_value {
                         let source_span = left_parens.span_to(&right_parens);
                         return parse_stage_rest_of_single_input_control(
                             token_stream,
@@ -4281,7 +4281,7 @@ pub fn parse_stage_statement<T: PeekableTokenStream>(
                             identifier,
                             Expression::Parentheses(
                                 left_parens,
-                                expressions.tail_value.unwrap(),
+                                tail_value,
                                 right_parens,
                                 source_span,
                             ),

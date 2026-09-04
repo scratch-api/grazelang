@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+#[cfg(feature = "detranspiler")]
+use std::path::PathBuf;
 
 use arcstr::ArcStr as IString;
 #[cfg(feature = "detranspiler")]
@@ -617,6 +619,18 @@ pub enum GrazeDetranspilerError {
     IncorrectMutationType { block_id: String },
     #[assoc(internal_lint_id = "invalid_mutation_value")]
     InvalidMutationValue { block_id: String },
+    #[assoc(internal_lint_id = "path_is_not_a_file")]
+    PathIsNotAFile { path: PathBuf },
+    #[assoc(internal_lint_id = "cannot_read_file")]
+    CannotReadFile { path: PathBuf },
+    #[assoc(internal_lint_id = "invalid_zip_file")]
+    InvalidZipFile { path: PathBuf },
+    #[assoc(internal_lint_id = "invalid_project_json")]
+    InvalidProjectJson { path: PathBuf },
+    #[assoc(internal_lint_id = "cannot_write_file")]
+    CannotWriteFile { path: PathBuf },
+    #[assoc(internal_lint_id = "missing_asset")]
+    MissingAsset { md3ext: String },
 }
 
 #[cfg(feature = "detranspiler")]

@@ -9,7 +9,7 @@ use crate::{
     ast::types::{
         AssetDeclaration, BinOp, CanonicalIdentifier, CodeBlock, CustomBlockParamKind,
         DataDeclaration, DataDeclarationScope, DictionaryEntry, DictionaryValue, Expression,
-        Identifier, ListEntry, Literal, MonitorValue, SingleAssetDeclaration,
+        GrazeProgram, Identifier, ListEntry, Literal, MonitorValue, SingleAssetDeclaration,
         SingleAssetDeclarationValue, SingleDataDeclaration, SingleIdentifier, SpriteCodeBlock,
         SpriteStatement, StageCodeBlock, StageStatement, Statement, TopLevelStatement, UnOp,
         UseStatementContent, WarpSpecifier,
@@ -62,25 +62,8 @@ impl<'a, W> Write for WriteAdapter<'a, W>
 where
     W: io::Write + ?Sized,
 {
-    fn write_char(&mut self, c: char) -> FormatResult {
-        let mut buf = [0; 4];
-        self.buf
-            .write_all(c.encode_utf8(&mut buf).as_bytes())
-            .map_err(|err| {
-                self.err.replace(err);
-                FormatError
-            })
-    }
-
     fn write_str(&mut self, s: &str) -> FormatResult {
         self.buf.write_all(s.as_bytes()).map_err(|err| {
-            self.err.replace(err);
-            FormatError
-        })
-    }
-
-    fn write_fmt(&mut self, args: std::fmt::Arguments<'_>) -> FormatResult {
-        self.buf.write_fmt(args).map_err(|err| {
             self.err.replace(err);
             FormatError
         })
@@ -362,7 +345,7 @@ impl UnparseAST for Statement {
                 list.unparse_into(f)?;
                 f.write_char('[')?;
                 item.unparse_into(f)?;
-                f.write_str("] = ");
+                f.write_str("] = ")?;
                 value.unparse_into(f)?;
                 f.write_char(';')
             }
@@ -380,6 +363,7 @@ impl UnparseAST for Statement {
                 code_block,
             } => {
                 control_function.unparse_into(f)?;
+                f.write_char(' ')?;
                 unparse_flexible_expression_list(arguments, f)?;
                 f.write_char(' ')?;
                 code_block.unparse_into(f)
@@ -464,15 +448,15 @@ impl UnparseAST for DataDeclaration {
     where
         W: Write,
     {
+        f.write_str("let ")?;
         match self {
             DataDeclaration::Mixed {
                 scope,
                 declarations,
             } => {
                 if scope == &DataDeclarationScope::Unset {
-                    f.write_str("let (")?;
+                    f.write_char('(')?;
                 } else {
-                    f.write_str("let ")?;
                     scope.unparse_into(f)?;
                     f.write_str(" (")?;
                 }
@@ -487,9 +471,8 @@ impl UnparseAST for DataDeclaration {
                 declarations,
             } => {
                 if scope == &DataDeclarationScope::Unset {
-                    f.write_str("let vars {")?;
+                    f.write_str("vars {")?;
                 } else {
-                    f.write_str("let ")?;
                     scope.unparse_into(f)?;
                     f.write_str(" vars {")?;
                 }
@@ -504,9 +487,8 @@ impl UnparseAST for DataDeclaration {
                 declarations,
             } => {
                 if scope == &DataDeclarationScope::Unset {
-                    f.write_str("let lists {")?;
+                    f.write_str("lists {")?;
                 } else {
-                    f.write_str("let ")?;
                     scope.unparse_into(f)?;
                     f.write_str(" lists {")?;
                 }
@@ -678,6 +660,7 @@ impl UnparseAST for StageStatement {
                 code_block,
             } => {
                 hat_function.unparse_into(f)?;
+                f.write_char(' ')?;
                 unparse_flexible_expression_list(arguments, f)?;
                 f.write_char(' ')?;
                 code_block.unparse_into(f)
@@ -779,6 +762,7 @@ impl UnparseAST for SpriteStatement {
                 code_block,
             } => {
                 hat_function.unparse_into(f)?;
+                f.write_char(' ')?;
                 unparse_flexible_expression_list(arguments, f)?;
                 f.write_char(' ')?;
                 code_block.unparse_into(f)
@@ -1071,5 +1055,17 @@ impl UnparseAST for TopLevelStatement {
                 f.write_char(';')
             }
         }
+    }
+}
+
+impl UnparseAST for GrazeProgram {
+    fn unparse_into<W>(&self, f: &mut W) -> FormatResult
+    where
+        W: Write,
+    {
+        for statement in &self.0 {
+            statement.unparse_into(f)?;
+        }
+        Ok(())
     }
 }

@@ -2328,12 +2328,14 @@ pub struct Identifier {
 
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.root)?;
+        f.write_str(self.root.value.as_str())?;
         for (_, segment) in &self.path {
-            write!(f, "::{}", segment.value)?;
+            f.write_str("::")?;
+            f.write_str(segment.value.as_str())?;
         }
         for (_, segment) in &self.fields {
-            write!(f, ".{}", segment.value)?;
+            f.write_str(".")?;
+            f.write_str(segment.value.as_str())?;
         }
         Ok(())
     }
@@ -2495,7 +2497,7 @@ pub struct SingleIdentifier {
 
 impl Display for SingleIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.value)
+        f.write_str(self.value.as_str())
     }
 }
 
