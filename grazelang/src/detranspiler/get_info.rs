@@ -3109,3 +3109,17 @@ pub fn check_special_reporter(
         _ => return None,
     })
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SpecialStackBlockInfo {
+    ProcedureCall,
+}
+
+pub fn check_special_stack_block(
+    block: &project_json::Sb3NormalBlock,
+) -> Option<SpecialStackBlockInfo> {
+    match block.opcode.as_str() {
+        "procedures_call" => Some(SpecialStackBlockInfo::ProcedureCall),
+        _ => None,
+    }
+}

@@ -14,7 +14,10 @@ use super::{
 };
 use crate::{
     ast::types::{self as ast_types},
-    detranspiler::into_ast::{data_to_data_declaration, data_to_split_data_declaration},
+    detranspiler::{
+        get_info::{SpecialStackBlockInfo, check_special_stack_block},
+        into_ast::{data_to_data_declaration, data_to_split_data_declaration},
+    },
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
     names::{DetranspilerAssetNamespace, DetranspilerTargetNamespace},
@@ -205,7 +208,7 @@ pub struct DetranspilerMonitor {
 pub struct DetranspilerCustomBlockDescriptor {
     pub canonical_name: Option<IString>,
     pub name: IString,
-    pub argument_count: usize,
+    pub argument_names: Vec<IString>,
 }
 
 #[inline]
@@ -956,6 +959,18 @@ pub fn convert_target(
         );
         custom_blocks.insert(proccode, descriptor);
     }
+    {
+        let global_namespace = (!target.is_stage).then_some(&context.global_namespace.used_names);
+        for descriptor in custom_blocks.values_mut() {
+            for argument_name in &mut descriptor.argument_names {
+                *argument_name =
+                    namespace.introduce_new_name(argument_name.clone(), global_namespace);
+            }
+            for internal_argument_name in &descriptor.argument_names {
+                namespace.used_names.remove(internal_argument_name);
+            }
+        }
+    }
     Ok(DetranspilerTarget {
         is_stage: target.is_stage,
         costumes,
@@ -1529,7 +1544,7 @@ pub fn convert_procedure_prototype_for_namespace(
             DetranspilerCustomBlockDescriptor {
                 canonical_name: (chosen_name != proccode_name).then_some(proccode),
                 name: chosen_name,
-                argument_count: argument_names.len(),
+                argument_names: argument_names.iter().map(Into::into).collect(),
             },
         ));
     }
@@ -1543,7 +1558,7 @@ pub fn convert_procedure_prototype_for_namespace(
         DetranspilerCustomBlockDescriptor {
             canonical_name: Some(proccode),
             name: chosen_name,
-            argument_count: argument_names.len(),
+            argument_names: argument_names.iter().map(Into::into).collect(),
         },
     ))
 }
@@ -1950,6 +1965,13 @@ where
                         context,
                         ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                     ),
+                    project_json::Sb3InputRepr::Missing => {
+                        parameters.push(ast_types::Expression::Literal(
+                            ast_types::Literal::EmptyExpression,
+                        ));
+                        // ArgumentKind::Input is only for possibly empty inputs
+                        continue;
+                    }
                 });
             }
             ArgumentKind::StackInput => {
@@ -1997,6 +2019,12 @@ where
                         ast_types::CodeBlock {
                             statements: Vec::new(),
                         }
+                    }
+                    project_json::Sb3InputRepr::Missing => {
+                        stack_params.push(ast_types::CodeBlock {
+                            statements: Vec::new(),
+                        });
+                        continue;
                     }
                 });
                 on_stack_input(context, argument_name.as_str())?;
@@ -2137,6 +2165,23 @@ where
                         context,
                         ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                     ),
+                    project_json::Sb3InputRepr::Missing => {
+                        parameters.push(ast_types::Expression::Literal(
+                            ast_types::Literal::EmptyExpression,
+                        ));
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnexpectedEmptyInput {
+                                    input: argument_name.to_string(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        continue;
+                    }
                 });
             }
         }
@@ -2228,6 +2273,9 @@ pub fn convert_special_reporter_block(
                     context,
                     ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                 )
+            }
+            project_json::Sb3InputRepr::Missing => {
+                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
             }
         })
     }
@@ -2785,6 +2833,40 @@ pub fn convert_stack_block(
             block_id: block_id.to_string(),
         });
     };
+    if let Some(special_stack_block_info) = check_special_stack_block(block) {
+        match special_stack_block_info {
+            SpecialStackBlockInfo::ProcedureCall => {
+                let Some(mutation) = &block.mutation else {
+                    return Err(GrazeDetranspilerError::MissingMutation {
+                        block_id: block_id.to_string(),
+                    });
+                };
+                let project_json::Sb3BlockMutation::ProceduresCall {
+                    procedure_code,
+                    argument_ids,
+                    warp: _,
+                } = mutation
+                else {
+                    return Err(GrazeDetranspilerError::IncorrectMutationType {
+                        block_id: block_id.to_string(),
+                    });
+                };
+                let Some(procedure_info) = context
+                    .targets
+                    .get(target_idx)
+                    .unwrap()
+                    .procedures
+                    .get(procedure_code.as_str())
+                else {
+                    return Err(GrazeDetranspilerError::UnknownProccode {
+                        block_id: block_id.to_string(),
+                        proccode: procedure_code.clone(),
+                    });
+                };
+                todo!()
+            }
+        }
+    }
     let mut has_substack = false;
     let (block_kind_info, parameters, stack_params) = convert_block(
         block,
