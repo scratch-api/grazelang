@@ -2939,7 +2939,7 @@ pub fn convert_stack_block(
                         function: procedure_identifier,
                         arguments,
                     },
-                    block.next.as_ref().map(Into::into),
+                    block.next.as_deref().map(Into::into),
                 ));
             }
         }
@@ -2966,7 +2966,7 @@ pub fn convert_stack_block(
         },
     )?;
     let function = create_simple_identifier(block_kind_info.block_name.clone());
-    let next_block = block.next.as_ref().map(Into::into);
+    let next_block = block.next.as_deref().map(Into::into);
     if let Some(substack) = stack_params.into_iter().next() {
         return Ok((
             ast_types::Statement::Control {
