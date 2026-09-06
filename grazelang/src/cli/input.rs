@@ -553,7 +553,7 @@ impl Cli {
             };
         }
         dbg!(messages);
-        return Successful::Yes;
+        Successful::Yes
         // let renderer = Renderer::styled();
         // let (error_count, warning_count) = count_errors_and_warnings(messages);
         // let error = error_count > 0 || force_error;

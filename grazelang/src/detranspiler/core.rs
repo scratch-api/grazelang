@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use arcstr::{ArcStr as IString, format as format_istring, literal};
 use grazelang_types::project_json;
@@ -208,7 +208,7 @@ pub struct DetranspilerMonitor {
 pub struct DetranspilerCustomBlockDescriptor {
     pub canonical_name: Option<IString>,
     pub name: IString,
-    pub argument_names: Vec<IString>,
+    pub argument_count: usize,
 }
 
 #[inline]
@@ -427,17 +427,16 @@ pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast
     }
 }
 
+pub type DetranspiledProjectData = (
+    ast_types::GrazeProgram,
+    HashMap<AssetPath, OutAssetPath>,
+    Vec<GrazeDetranspilerMessage>,
+);
+
 pub fn convert_project(
     project: &project_json::Sb3Root,
     settings: GrazeDetranspilerSettings,
-) -> Result<
-    (
-        ast_types::GrazeProgram,
-        HashMap<AssetPath, OutAssetPath>,
-        Vec<GrazeDetranspilerMessage>,
-    ),
-    Vec<GrazeDetranspilerMessage>,
-> {
+) -> Result<DetranspiledProjectData, Vec<GrazeDetranspilerMessage>> {
     macro_rules! emit_error_top_level {
         ($context:expr, $err:expr) => {{
             let context = &mut $context;
@@ -747,8 +746,7 @@ pub fn convert_project(
 // TODO: Implement extensions in detranspiler
 // Issue: #124
 
-// TODO: Implement `procedures_call` in detranspiler
-// Issue: #123
+// TODO: Implement pretty detranspiler logging
 
 // TODO: Implement assignments in detranspiler
 // Issue: #122
@@ -958,18 +956,6 @@ pub fn convert_target(
             continue
         );
         custom_blocks.insert(proccode, descriptor);
-    }
-    {
-        let global_namespace = (!target.is_stage).then_some(&context.global_namespace.used_names);
-        for descriptor in custom_blocks.values_mut() {
-            for argument_name in &mut descriptor.argument_names {
-                *argument_name =
-                    namespace.introduce_new_name(argument_name.clone(), global_namespace);
-            }
-            for internal_argument_name in &descriptor.argument_names {
-                namespace.used_names.remove(internal_argument_name);
-            }
-        }
     }
     Ok(DetranspilerTarget {
         is_stage: target.is_stage,
@@ -1544,7 +1530,7 @@ pub fn convert_procedure_prototype_for_namespace(
             DetranspilerCustomBlockDescriptor {
                 canonical_name: (chosen_name != proccode_name).then_some(proccode),
                 name: chosen_name,
-                argument_names: argument_names.iter().map(Into::into).collect(),
+                argument_count: argument_names.len(),
             },
         ));
     }
@@ -1558,7 +1544,7 @@ pub fn convert_procedure_prototype_for_namespace(
         DetranspilerCustomBlockDescriptor {
             canonical_name: Some(proccode),
             name: chosen_name,
-            argument_names: argument_names.iter().map(Into::into).collect(),
+            argument_count: argument_names.len(),
         },
     ))
 }
@@ -2863,7 +2849,98 @@ pub fn convert_stack_block(
                         proccode: procedure_code.clone(),
                     });
                 };
-                todo!()
+                let procedure_identifier = create_simple_identifier(procedure_info.name.clone());
+                let mut arguments = Vec::with_capacity(argument_ids.len());
+                let mut tracked_args = 0_usize;
+                for argument_id in argument_ids {
+                    let Some(input) = block.inputs.get(argument_id) else {
+                        arguments.push(ast_types::Expression::Literal(
+                            ast_types::Literal::EmptyExpression,
+                        ));
+                        continue;
+                    };
+                    tracked_args += 1;
+                    let (project_json::Sb3InputValue::Shadow(input_repr)
+                    | project_json::Sb3InputValue::NoShadow(input_repr)
+                    | project_json::Sb3InputValue::ObscuredShadow {
+                        value: input_repr,
+                        shadow: _,
+                    }) = input;
+                    arguments.push(match input_repr {
+                        project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
+                            unwrap_or_emit_message!(
+                                blocks.get(block_id).ok_or_else(|| {
+                                    GrazeDetranspilerError::InvalidBlockReference {
+                                        block_id: block_id.clone(),
+                                    }
+                                }),
+                                context,
+                                {
+                                    arguments.push(ast_types::Expression::Literal(
+                                        ast_types::Literal::EmptyExpression,
+                                    ));
+                                    continue;
+                                }
+                            ),
+                            block_id,
+                            blocks,
+                            context,
+                            target_idx,
+                        )?,
+                        project_json::Sb3InputRepr::PrimitiveBlock(block) => {
+                            unwrap_or_emit_message!(
+                                convert_primitive_reporter_block(block, context, target_idx),
+                                context,
+                                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                            )
+                        }
+                        project_json::Sb3InputRepr::Missing => {
+                            ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                        }
+                    });
+                }
+                if tracked_args != block.inputs.len() {
+                    let mut tracked_args = HashSet::<String>::with_capacity(block.inputs.len());
+                    for key in block.inputs.keys() {
+                        tracked_args.insert(key.clone());
+                    }
+                    for argument_id in argument_ids {
+                        tracked_args.remove(argument_id);
+                    }
+                    for arg in tracked_args {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnusedInput {
+                                    input: arg,
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                }
+                for key in block.fields.keys() {
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: key.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                return Ok((
+                    ast_types::Statement::Call {
+                        function: procedure_identifier,
+                        arguments,
+                    },
+                    block.next.as_ref().map(Into::into),
+                ));
             }
         }
     }
@@ -2889,7 +2966,7 @@ pub fn convert_stack_block(
         },
     )?;
     let function = create_simple_identifier(block_kind_info.block_name.clone());
-    let next_block = block.next.as_deref().map(Into::into);
+    let next_block = block.next.as_ref().map(Into::into);
     if let Some(substack) = stack_params.into_iter().next() {
         return Ok((
             ast_types::Statement::Control {
