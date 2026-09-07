@@ -1351,9 +1351,7 @@ pub fn fill_target(
                                 target_idx,
                             )?
                         } else {
-                            ast_types::CodeBlock {
-                                statements: Vec::new(),
-                            }
+                            ast_types::CodeBlock::default()
                         };
                         context.targets.get_mut(target_idx).unwrap().scripts.push(
                             DetranspilerTargetBlockStack::IsolatedStack {
@@ -1382,9 +1380,7 @@ pub fn fill_target(
                                 target_idx,
                             )?
                         } else {
-                            ast_types::CodeBlock {
-                                statements: Vec::new(),
-                            }
+                            ast_types::CodeBlock::default()
                         }
                     },
                 }
@@ -1668,9 +1664,7 @@ pub fn convert_procedure_definition(
         ) {
         convert_block_stack(next_block, next_block_id, blocks, context, target_idx)?
     } else {
-        ast_types::CodeBlock {
-            statements: Vec::new(),
-        }
+        ast_types::CodeBlock::default()
     };
     let namespace = &mut context.targets.get_mut(target_idx).unwrap().namespace;
     for (_, _, ast_types::SingleIdentifier { value: name }) in &parameters {
@@ -1727,9 +1721,7 @@ pub fn convert_reporter_block(
             }
         },
         context,
-        Ok(ast_types::Expression::Literal(
-            ast_types::Literal::EmptyExpression,
-        ))
+        Ok(ast_types::Expression::default())
     ))
 }
 
@@ -1787,9 +1779,7 @@ where
                         },
                         context
                     );
-                    parameters.push(ast_types::Expression::Literal(
-                        ast_types::Literal::EmptyExpression,
-                    ));
+                    parameters.push(ast_types::Expression::default());
                     continue;
                 };
                 parameters.push(unwrap_or_emit_message!(
@@ -1801,9 +1791,7 @@ where
                     ),
                     context,
                     {
-                        parameters.push(ast_types::Expression::Literal(
-                            ast_types::Literal::EmptyExpression,
-                        ));
+                        parameters.push(ast_types::Expression::default());
                         continue;
                     }
                 ));
@@ -1817,15 +1805,11 @@ where
                         },
                         context
                     );
-                    parameters.push(ast_types::Expression::Literal(
-                        ast_types::Literal::EmptyExpression,
-                    ));
+                    parameters.push(ast_types::Expression::default());
                     continue;
                 };
                 let project_json::Sb3FieldValue::WithId { value: name, id } = field_value else {
-                    parameters.push(ast_types::Expression::Literal(
-                        ast_types::Literal::EmptyExpression,
-                    ));
+                    parameters.push(ast_types::Expression::default());
                     continue;
                 };
                 parameters.push(
@@ -1833,9 +1817,7 @@ where
                         lookup_var_or_list(&name.as_cow_str(), id, target_idx, context,),
                         context,
                         {
-                            parameters.push(ast_types::Expression::Literal(
-                                ast_types::Literal::EmptyExpression,
-                            ));
+                            parameters.push(ast_types::Expression::default());
                             continue;
                         }
                     )
@@ -1856,7 +1838,7 @@ where
                             },
                             GrazeMessageSetting::Warnings,
                         );
-                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                        ast_types::Expression::default()
                     }),
                 );
             }
@@ -1869,15 +1851,11 @@ where
                         },
                         context
                     );
-                    parameters.push(ast_types::Expression::Literal(
-                        ast_types::Literal::EmptyExpression,
-                    ));
+                    parameters.push(ast_types::Expression::default());
                     continue;
                 };
                 let project_json::Sb3FieldValue::WithId { value: name, id } = field_value else {
-                    parameters.push(ast_types::Expression::Literal(
-                        ast_types::Literal::EmptyExpression,
-                    ));
+                    parameters.push(ast_types::Expression::default());
                     continue;
                 };
                 parameters.push(
@@ -1885,9 +1863,7 @@ where
                         lookup_broadcast(&name.as_cow_str(), id, context,),
                         context,
                         {
-                            parameters.push(ast_types::Expression::Literal(
-                                ast_types::Literal::EmptyExpression,
-                            ));
+                            parameters.push(ast_types::Expression::default());
                             continue;
                         }
                     )
@@ -1908,15 +1884,13 @@ where
                             },
                             GrazeMessageSetting::Warnings,
                         );
-                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                        ast_types::Expression::default()
                     }),
                 );
             }
             ArgumentKind::Input => {
                 let Some(input) = block.inputs.get(argument_name.as_str()) else {
-                    parameters.push(ast_types::Expression::Literal(
-                        ast_types::Literal::EmptyExpression,
-                    ));
+                    parameters.push(ast_types::Expression::default());
                     // ArgumentKind::Input is only for possibly empty inputs
                     continue;
                 };
@@ -1936,9 +1910,7 @@ where
                             }),
                             context,
                             {
-                                parameters.push(ast_types::Expression::Literal(
-                                    ast_types::Literal::EmptyExpression,
-                                ));
+                                parameters.push(ast_types::Expression::default());
                                 continue;
                             }
                         ),
@@ -1950,12 +1922,10 @@ where
                     project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
                         convert_primitive_reporter_block(block, context, target_idx),
                         context,
-                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                        ast_types::Expression::default()
                     ),
                     project_json::Sb3InputRepr::Missing => {
-                        parameters.push(ast_types::Expression::Literal(
-                            ast_types::Literal::EmptyExpression,
-                        ));
+                        parameters.push(ast_types::Expression::default());
                         // ArgumentKind::Input is only for possibly empty inputs
                         continue;
                     }
@@ -1963,9 +1933,7 @@ where
             }
             ArgumentKind::StackInput => {
                 let Some(input) = block.inputs.get(argument_name.as_str()) else {
-                    stack_params.push(ast_types::CodeBlock {
-                        statements: Vec::new(),
-                    });
+                    stack_params.push(ast_types::CodeBlock::default());
                     continue;
                 };
                 let (project_json::Sb3InputValue::Shadow(input_repr)
@@ -1984,9 +1952,7 @@ where
                             }),
                             context,
                             {
-                                stack_params.push(ast_types::CodeBlock {
-                                    statements: Vec::new(),
-                                });
+                                stack_params.push(ast_types::CodeBlock::default());
                                 continue;
                             }
                         ),
@@ -2003,14 +1969,10 @@ where
                             },
                             context
                         );
-                        ast_types::CodeBlock {
-                            statements: Vec::new(),
-                        }
+                        ast_types::CodeBlock::default()
                     }
                     project_json::Sb3InputRepr::Missing => {
-                        stack_params.push(ast_types::CodeBlock {
-                            statements: Vec::new(),
-                        });
+                        stack_params.push(ast_types::CodeBlock::default());
                         continue;
                     }
                 });
@@ -2021,9 +1983,7 @@ where
                 menu_field,
             } => {
                 let Some(input) = block.inputs.get(argument_name.as_str()) else {
-                    parameters.push(ast_types::Expression::Literal(
-                        ast_types::Literal::EmptyExpression,
-                    ));
+                    parameters.push(ast_types::Expression::default());
                     emit_message(
                         context,
                         || {
@@ -2053,9 +2013,7 @@ where
                             }),
                             context,
                             {
-                                parameters.push(ast_types::Expression::Literal(
-                                    ast_types::Literal::EmptyExpression,
-                                ));
+                                parameters.push(ast_types::Expression::default());
                                 continue;
                             }
                         );
@@ -2113,17 +2071,13 @@ where
                                         ),
                                         context,
                                         {
-                                            parameters.push(ast_types::Expression::Literal(
-                                                ast_types::Literal::EmptyExpression,
-                                            ));
+                                            parameters.push(ast_types::Expression::default());
                                             continue;
                                         }
                                     )
                                 }
                             } else {
-                                parameters.push(ast_types::Expression::Literal(
-                                    ast_types::Literal::EmptyExpression,
-                                ));
+                                parameters.push(ast_types::Expression::default());
                                 emit_message(
                                     context,
                                     || {
@@ -2150,12 +2104,10 @@ where
                     project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
                         convert_primitive_reporter_block(block, context, target_idx),
                         context,
-                        ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                        ast_types::Expression::default()
                     ),
                     project_json::Sb3InputRepr::Missing => {
-                        parameters.push(ast_types::Expression::Literal(
-                            ast_types::Literal::EmptyExpression,
-                        ));
+                        parameters.push(ast_types::Expression::default());
                         emit_message(
                             context,
                             || {
@@ -2250,20 +2202,16 @@ pub fn convert_special_reporter_block(
                         convert_reporter_block(block, block_id, blocks, context, target_idx)
                     }),
                 context,
-                Ok(ast_types::Expression::Literal(
-                    ast_types::Literal::EmptyExpression
-                ))
+                Ok(ast_types::Expression::default())
             )?,
             project_json::Sb3InputRepr::PrimitiveBlock(block) => {
                 unwrap_or_emit_message!(
                     convert_primitive_reporter_block(block, context, target_idx),
                     context,
-                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ast_types::Expression::default()
                 )
             }
-            project_json::Sb3InputRepr::Missing => {
-                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
-            }
+            project_json::Sb3InputRepr::Missing => ast_types::Expression::default(),
         })
     }
     Ok(match reporter {
@@ -2278,14 +2226,14 @@ pub fn convert_special_reporter_block(
                     operands_present += 1;
                     convert_operand_input_value(operand, blocks, context, target_idx)?
                 } else {
-                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ast_types::Expression::default()
                 };
             let right_operand_expression =
                 if let Some(operand) = block.inputs.get(right_operand.as_str()) {
                     operands_present += 1;
                     convert_operand_input_value(operand, blocks, context, target_idx)?
                 } else {
-                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ast_types::Expression::default()
                 };
             for key in block.fields.keys() {
                 let arg = key.clone();
@@ -2359,14 +2307,14 @@ pub fn convert_special_reporter_block(
                     inner_operands_present += 1;
                     convert_operand_input_value(operand, blocks, context, target_idx)?
                 } else {
-                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ast_types::Expression::default()
                 };
             let right_operand_expression =
                 if let Some(operand) = inner_block.inputs.get(inner_right_operand.as_str()) {
                     inner_operands_present += 1;
                     convert_operand_input_value(operand, blocks, context, target_idx)?
                 } else {
-                    ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                    ast_types::Expression::default()
                 };
             for key in block.fields.keys() {
                 let arg = key.clone();
@@ -2453,7 +2401,7 @@ pub fn convert_special_reporter_block(
             let operand_expression = if let Some(operand) = block.inputs.get(operand.as_str()) {
                 convert_operand_input_value(operand, blocks, context, target_idx)?
             } else {
-                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                ast_types::Expression::default()
             };
             if let Some(unused_operand) = &unused_operand
                 && block.inputs.contains_key(unused_operand.as_str())
@@ -2810,9 +2758,6 @@ pub fn convert_stack_block(
     context: &mut DetranspilerContext,
     target_idx: usize,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
-    // TODO: Implement if else block and if else chains in detranspiler
-    // Issue: #107
-
     // TODO: Implement list assignment in detranspiler
     // Issue: #106
     let project_json::Sb3Block::Normal(block) = block else {
@@ -2855,9 +2800,7 @@ pub fn convert_stack_block(
                 let mut tracked_args = 0_usize;
                 for argument_id in argument_ids {
                     let Some(input) = block.inputs.get(argument_id) else {
-                        arguments.push(ast_types::Expression::Literal(
-                            ast_types::Literal::EmptyExpression,
-                        ));
+                        arguments.push(ast_types::Expression::default());
                         continue;
                     };
                     tracked_args += 1;
@@ -2877,9 +2820,7 @@ pub fn convert_stack_block(
                                 }),
                                 context,
                                 {
-                                    arguments.push(ast_types::Expression::Literal(
-                                        ast_types::Literal::EmptyExpression,
-                                    ));
+                                    arguments.push(ast_types::Expression::default());
                                     continue;
                                 }
                             ),
@@ -2892,12 +2833,10 @@ pub fn convert_stack_block(
                             unwrap_or_emit_message!(
                                 convert_primitive_reporter_block(block, context, target_idx),
                                 context,
-                                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                                ast_types::Expression::default()
                             )
                         }
-                        project_json::Sb3InputRepr::Missing => {
-                            ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
-                        }
+                        project_json::Sb3InputRepr::Missing => ast_types::Expression::default(),
                     });
                 }
                 if tracked_args != block.inputs.len() {
@@ -2939,6 +2878,364 @@ pub fn convert_stack_block(
                     ast_types::Statement::Call {
                         function: procedure_identifier,
                         arguments,
+                    },
+                    block.next.as_deref().map(Into::into),
+                ));
+            }
+            SpecialStackBlockInfo::IfElse => {
+                type ElseBranch = Option<ast_types::CodeBlock>;
+                type IfBranch = (ast_types::Expression, ast_types::CodeBlock);
+                type OptionalIfBranch = Option<IfBranch>;
+                macro_rules! get_input {
+                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_idx:expr, $tracked_args:ident, $name:expr) as Input) => {
+                        if let Some(input) = $block.inputs.get($name) {
+                            $tracked_args += 1;
+                            let (project_json::Sb3InputValue::Shadow(input_repr)
+                            | project_json::Sb3InputValue::NoShadow(input_repr)
+                            | project_json::Sb3InputValue::ObscuredShadow {
+                                value: input_repr,
+                                shadow: _,
+                            }) = input;
+                            match input_repr {
+                                project_json::Sb3InputRepr::Reference(block_id) => {
+                                    unwrap_or_emit_message!(
+                                        $blocks
+                                            .get(block_id)
+                                            .ok_or_else(|| {
+                                                GrazeDetranspilerError::InvalidBlockReference {
+                                                    block_id: block_id.clone(),
+                                                }
+                                            })
+                                            .map(Some),
+                                        $context,
+                                        None
+                                    )
+                                    .map(|block| {
+                                        convert_reporter_block(
+                                            block,
+                                            block_id,
+                                            $blocks,
+                                            $context,
+                                            $target_idx,
+                                        )
+                                    })
+                                    .transpose()?
+                                }
+                                project_json::Sb3InputRepr::PrimitiveBlock(block) => {
+                                    Some(unwrap_or_emit_message!(
+                                        convert_primitive_reporter_block(
+                                            block,
+                                            $context,
+                                            $target_idx
+                                        ),
+                                        $context,
+                                        ast_types::Expression::default()
+                                    ))
+                                }
+                                project_json::Sb3InputRepr::Missing => {
+                                    Some(ast_types::Expression::default())
+                                }
+                            }
+                        } else {
+                            None
+                        }
+                    };
+                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_idx:expr, $tracked_args:ident, $name:literal) as Stack) => {
+                        if let Some(input) = $block.inputs.get($name) {
+                            $tracked_args += 1;
+                            let (project_json::Sb3InputValue::Shadow(input_repr)
+                            | project_json::Sb3InputValue::NoShadow(input_repr)
+                            | project_json::Sb3InputValue::ObscuredShadow {
+                                value: input_repr,
+                                shadow: _,
+                            }) = input;
+                            match input_repr {
+                                project_json::Sb3InputRepr::Reference(block_id) => {
+                                    unwrap_or_emit_message!(
+                                        $blocks
+                                            .get(block_id)
+                                            .ok_or_else(|| {
+                                                GrazeDetranspilerError::InvalidBlockReference {
+                                                    block_id: block_id.clone(),
+                                                }
+                                            })
+                                            .map(Some),
+                                        $context,
+                                        None
+                                    )
+                                    .map(|block| {
+                                        convert_block_stack(
+                                            block,
+                                            block_id,
+                                            $blocks,
+                                            $context,
+                                            $target_idx,
+                                        )
+                                    })
+                                    .transpose()?
+                                }
+                                project_json::Sb3InputRepr::PrimitiveBlock(_) => {
+                                    emit_error!(
+                                        GrazeDetranspilerError::PrimitiveBlockAsSubstack {
+                                            block_id: $block_id.to_string(),
+                                            input_name: $name.to_string()
+                                        },
+                                        $context
+                                    );
+                                    None
+                                }
+                                project_json::Sb3InputRepr::Missing => None,
+                            }
+                        } else {
+                            None
+                        }
+                    };
+                }
+                fn convert_if(
+                    block: &project_json::Sb3NormalBlock,
+                    block_id: &str,
+                    blocks: &HashMap<String, project_json::Sb3Block>,
+                    context: &mut DetranspilerContext,
+                    target_idx: usize,
+                ) -> DetranspilerResult<IfBranch> {
+                    let mut tracked_args = 0_usize;
+                    let condition = get_input!((
+                        block,
+                        block_id,
+                        blocks,
+                        context,
+                        target_idx,
+                        tracked_args,
+                        "CONDITION"
+                    ) as Input);
+                    let substack = get_input!((
+                        block,
+                        block_id,
+                        blocks,
+                        context,
+                        target_idx,
+                        tracked_args,
+                        "SUBSTACK"
+                    ) as Stack);
+                    if tracked_args != block.inputs.len() {
+                        for key in block.inputs.keys() {
+                            if matches!(key.as_str(), "CONDITION" | "SUBSTACK") {
+                                continue;
+                            }
+                            emit_message(
+                                context,
+                                || {
+                                    GrazeDetranspilerWarning::UnusedInput {
+                                        input: key.clone(),
+                                        block_id: block_id.to_string(),
+                                    }
+                                    .into()
+                                },
+                                GrazeMessageSetting::Warnings,
+                            );
+                        }
+                    }
+                    for key in block.fields.keys() {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnusedField {
+                                    field: key.clone(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                    Ok((condition.unwrap_or_default(), substack.unwrap_or_default()))
+                }
+                /// Result is bubbled
+                fn convert_if_else(
+                    block: &project_json::Sb3NormalBlock,
+                    block_id: &str,
+                    blocks: &HashMap<String, project_json::Sb3Block>,
+                    context: &mut DetranspilerContext,
+                    target_idx: usize,
+                    alternative_branches: &mut Vec<(ast_types::Expression, ast_types::CodeBlock)>,
+                    first_if_branch: bool,
+                ) -> DetranspilerResult<(OptionalIfBranch, ElseBranch)> {
+                    let mut tracked_args = 0_usize;
+                    let condition = get_input!((
+                        block,
+                        block_id,
+                        blocks,
+                        context,
+                        target_idx,
+                        tracked_args,
+                        "CONDITION"
+                    ) as Input);
+                    let substack_1 = get_input!((
+                        block,
+                        block_id,
+                        blocks,
+                        context,
+                        target_idx,
+                        tracked_args,
+                        "SUBSTACK"
+                    ) as Stack);
+                    let (condition, substack_1) = if !first_if_branch {
+                        alternative_branches.push((
+                            condition.unwrap_or_default(),
+                            substack_1.unwrap_or_default(),
+                        ));
+                        (None, None)
+                    } else {
+                        (condition, substack_1)
+                    };
+                    let (else_if_else, substack_2) =
+                        if let Some(input) = block.inputs.get("SUBSTACK2") {
+                            tracked_args += 1;
+                            let (project_json::Sb3InputValue::Shadow(input_repr)
+                            | project_json::Sb3InputValue::NoShadow(input_repr)
+                            | project_json::Sb3InputValue::ObscuredShadow {
+                                value: input_repr,
+                                shadow: _,
+                            }) = input;
+                            match input_repr {
+                                project_json::Sb3InputRepr::Reference(block_id) => {
+                                    if let Some(block) = unwrap_or_emit_message!(
+                                        blocks
+                                            .get(block_id)
+                                            .ok_or_else(|| {
+                                                GrazeDetranspilerError::InvalidBlockReference {
+                                                    block_id: block_id.clone(),
+                                                }
+                                            })
+                                            .map(Some),
+                                        context,
+                                        None
+                                    ) {
+                                        if let project_json::Sb3Block::Normal(block) = block
+                                            && block.opcode.as_str() == "control_if_else"
+                                            && block.next.is_none()
+                                        {
+                                            (
+                                                unwrap_or_emit_message!(
+                                                    convert_if_else(
+                                                        block,
+                                                        block_id,
+                                                        blocks,
+                                                        context,
+                                                        target_idx,
+                                                        alternative_branches,
+                                                        false
+                                                    )
+                                                    .map(Some),
+                                                    context,
+                                                    None
+                                                ),
+                                                None,
+                                            )
+                                        } else if let project_json::Sb3Block::Normal(block) = block
+                                            && block.opcode.as_str() == "control_if"
+                                            && block.next.is_none()
+                                        {
+                                            if let Some(if_branch) = unwrap_or_emit_message!(
+                                                convert_if(
+                                                    block, block_id, blocks, context, target_idx
+                                                )
+                                                .map(Some),
+                                                context,
+                                                None
+                                            ) {
+                                                alternative_branches.push(if_branch);
+                                            }
+                                            (Some((None, None)), None)
+                                        } else {
+                                            (
+                                                None,
+                                                Some(convert_block_stack(
+                                                    block, block_id, blocks, context, target_idx,
+                                                )?),
+                                            )
+                                        }
+                                    } else {
+                                        (None, None)
+                                    }
+                                }
+                                project_json::Sb3InputRepr::PrimitiveBlock(_) => {
+                                    emit_error!(
+                                        GrazeDetranspilerError::PrimitiveBlockAsSubstack {
+                                            block_id: block_id.to_string(),
+                                            input_name: "SUBSTACK2".to_string()
+                                        },
+                                        context
+                                    );
+                                    (None, None)
+                                }
+                                project_json::Sb3InputRepr::Missing => (None, None),
+                            }
+                        } else {
+                            (None, None)
+                        };
+                    if tracked_args != block.inputs.len() {
+                        for key in block.inputs.keys() {
+                            if matches!(key.as_str(), "CONDITION" | "SUBSTACK" | "SUBSTACK2") {
+                                continue;
+                            }
+                            emit_message(
+                                context,
+                                || {
+                                    GrazeDetranspilerWarning::UnusedInput {
+                                        input: key.clone(),
+                                        block_id: block_id.to_string(),
+                                    }
+                                    .into()
+                                },
+                                GrazeMessageSetting::Warnings,
+                            );
+                        }
+                    }
+                    for key in block.fields.keys() {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnusedField {
+                                    field: key.clone(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                    Ok((
+                        if first_if_branch {
+                            Some((
+                                condition.unwrap_or_default(),
+                                substack_1.unwrap_or_default(),
+                            ))
+                        } else {
+                            None
+                        },
+                        if let Some((_, else_branch)) = else_if_else {
+                            else_branch
+                        } else {
+                            Some(substack_2.unwrap_or_default())
+                        },
+                    ))
+                }
+                let mut alternative_branches = Vec::new();
+                let (first_branch, else_branch) = convert_if_else(
+                    block,
+                    block_id,
+                    blocks,
+                    context,
+                    target_idx,
+                    &mut alternative_branches,
+                    true,
+                )?;
+                return Ok((
+                    ast_types::Statement::IfElse {
+                        first_branch: first_branch.unwrap(),
+                        alternative_branches,
+                        else_branch,
                     },
                     block.next.as_deref().map(Into::into),
                 ));

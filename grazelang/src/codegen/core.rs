@@ -10,15 +10,15 @@ use std::{
 
 use arcstr::{ArcStr as IString, literal};
 use grazelang_types::{
-    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID,
-    BindInfo, CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
+    BACKDROP_TARGETS_CATEGORY_ID, BACKDROPS_CATEGORY_ID, BROADCASTS_CATEGORY_ID, BindInfo,
+    CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID,
-    DIRECTIONS_CATEGORY_ID, HasShadow, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID,
-    OBJECTS_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
+    DIRECTIONS_CATEGORY_ID, HasShadow, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID,
+    SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{
-        Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
-        Sb3InputValue, Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3Primitive,
-        Sb3PrimitiveBlock, Sb3PrimitiveOrBool, Sb3Root, Sb3Target, TargetAttachment,
+        Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr, Sb3InputValue,
+        Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3Primitive, Sb3PrimitiveBlock,
+        Sb3PrimitiveOrBool, Sb3Root, Sb3Target, TargetAttachment,
     },
 };
 use rand::SeedableRng;
@@ -43,8 +43,8 @@ use crate::{
     names::CodegenNamespace,
     parser::{
         context::{
-            IdString, KnownBlock, ParseContext,
-            ResolveKnownBlock, Symbol, SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
+            IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable,
+            Target, TargetSymbolDescriptor,
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
@@ -1677,17 +1677,24 @@ macro_rules! extract_data_from_dictionary_value {
 pub mod helpers {
     use std::{
         collections::HashMap,
-        path::{Path, PathBuf}, rc::Rc,
+        path::{Path, PathBuf},
+        rc::Rc,
     };
 
     use super::{
         DataNameUsage, GrazeSb3GeneratorContext, GrazeSb3GeneratorError, Param, emit_message_eager,
     };
     use crate::{
-        eval::cast::{IsValidI128, JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber}, lexer::SourceSpan, messages::types::{GrazeSourceMessage, GrazeSourceWarning, GrazeWarningKind}, parser::{
-            context::{BROADCAST_CATEGORIES, IdString, NO_CATEGORIES, ResolveKnownBlock, Symbol, SymbolId},
+        eval::cast::{IsValidI128, JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
+        lexer::SourceSpan,
+        messages::types::{GrazeSourceMessage, GrazeSourceWarning, GrazeWarningKind},
+        parser::{
+            context::{
+                BROADCAST_CATEGORIES, IdString, NO_CATEGORIES, ResolveKnownBlock, Symbol, SymbolId,
+            },
             cst::{self, GetPos, Identifier},
-        }, settings::GrazeMessageSetting
+        },
+        settings::GrazeMessageSetting,
     };
     use arcstr::ArcStr as IString;
     use grazelang_types::{
@@ -1709,7 +1716,7 @@ pub mod helpers {
             }
         })
     }
-    
+
     pub fn get_known_block<'a>(
         symbol: &'a Symbol,
         identifier: &Identifier,
@@ -4238,7 +4245,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         value: BorrowedStatementIfElse,
         context: &mut GrazeSb3GeneratorContext,
     ) -> Result<(), GrazeSb3GeneratorError> {
-        pub fn make_if_else_recursively(
+        /// `else_ifs` must contain at least one element
+        fn make_if_else_recursively(
             visitor: &GrazeSb3Generator,
             context: &mut GrazeSb3GeneratorContext,
             else_ifs: &[(
@@ -4360,7 +4368,13 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             }
             if use_if_else {
                 context.current_previous_block = None;
-                make_if_else_recursively(self, context, value.1, value.2)?;
+                if value.1.is_empty() {
+                    if let Some(else_branch) = value.2 {
+                        self.visit_code_block(&else_branch.1, context)?;
+                    }
+                } else {
+                    make_if_else_recursively(self, context, value.1, value.2)?;
+                }
                 if let Some(Param::BlockStack(Some(inner_id))) = context.pop_param() {
                     inputs.insert(
                         "SUBSTACK2".to_string(),

@@ -3113,6 +3113,7 @@ pub fn check_special_reporter(
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SpecialStackBlockInfo {
     ProcedureCall,
+    IfElse,
 }
 
 pub fn check_special_stack_block(
@@ -3120,6 +3121,7 @@ pub fn check_special_stack_block(
 ) -> Option<SpecialStackBlockInfo> {
     match block.opcode.as_str() {
         "procedures_call" => Some(SpecialStackBlockInfo::ProcedureCall),
+        "control_if_else" => Some(SpecialStackBlockInfo::IfElse),
         _ => None,
     }
 }

@@ -255,17 +255,17 @@ pub enum SingleDataDeclaration {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct StageCodeBlock {
     pub statements: Vec<StageStatement>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct SpriteCodeBlock {
     pub statements: Vec<SpriteStatement>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct CodeBlock {
     pub statements: Vec<Statement>,
 }
@@ -296,6 +296,12 @@ pub enum Expression {
         expression: Box<Expression>,
         letter: Box<Expression>,
     },
+}
+
+impl Default for Expression {
+    fn default() -> Self {
+        Self::Literal(Default::default())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -344,7 +350,7 @@ pub struct UnOpDescriptor {
     pub default: Option<grazelang_types::project_json::Sb3PrimitiveBlock>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub enum Literal {
     String(IString),
     DecimalInt(IString),
@@ -353,6 +359,7 @@ pub enum Literal {
     OctalInt(IString),
     BinaryInt(IString),
     Bool(bool),
+    #[default]
     EmptyExpression,
 }
 
