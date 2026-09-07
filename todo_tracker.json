@@ -930,7 +930,7 @@
     "123": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L746-L746",
         "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
         "title": "Implement `procedures_call` in detranspiler"
@@ -942,5 +942,13 @@
         "lines": "L744-L744",
         "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
         "title": "Implement extensions in detranspiler"
+    },
+    "126": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L749-L749",
+        "commit": "34be9a948bbc016dca1d521d1d2a3e26087fd790",
+        "title": "Implement pretty detranspiler logging"
     }
 }

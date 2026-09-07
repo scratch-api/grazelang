@@ -747,6 +747,7 @@ pub fn convert_project(
 // Issue: #124
 
 // TODO: Implement pretty detranspiler logging
+// Issue: #126
 
 // TODO: Implement assignments in detranspiler
 // Issue: #122
