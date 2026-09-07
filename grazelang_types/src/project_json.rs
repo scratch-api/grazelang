@@ -1308,8 +1308,15 @@ impl<'de> Deserialize<'de> for Sb3BlockMutation {
                                 })?;
                             }
                             "warp" => {
-                                warp = serde_json::from_str(&map.next_value::<String>()?)
-                                    .map_err(|_| de::Error::custom("warp was not a bool"))?;
+                                warp = Some(
+                                    serde_json::from_str::<Option<bool>>(
+                                        &map.next_value::<String>()?,
+                                    )
+                                    .map_err(|_| {
+                                        de::Error::custom("warp was not an optional bool")
+                                    })?
+                                    .unwrap_or_default(),
+                                );
                             }
                             "argumentnames" => {
                                 argument_names = serde_json::from_str(&map.next_value::<String>()?)
@@ -1435,7 +1442,7 @@ impl<'de> Deserialize<'de> for Sb3BlockMutation {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Sb3Comment {
-    pub block_id: String,
+    pub block_id: Option<String>,
     pub x: f64,
     pub y: f64,
     pub width: f64,
