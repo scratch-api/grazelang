@@ -121,8 +121,8 @@ impl UnparseAST for UnOp {
         f.write_str(match self {
             UnOp::Minus => "-",
             UnOp::Not => "!",
-            UnOp::Exp => "10^",
-            UnOp::Pow => "e^",
+            UnOp::Exp => "e^",
+            UnOp::Pow => "10^",
         })
     }
 }
