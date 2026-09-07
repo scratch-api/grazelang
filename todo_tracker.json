@@ -802,7 +802,7 @@
     "107": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L809-L809",
         "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
         "title": "Implement if else block and if else chains in detranspiler"
