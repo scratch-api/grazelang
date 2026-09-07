@@ -4977,7 +4977,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     .map(|value| value.name.to_string())
                     .unwrap_or_else(|| value.2.value.to_string());
                 (
-                    name.as_str().into(),
+                    value.2.value.as_str().into(),
                     Symbol {
                         known_block: Some(Rc::new(KnownBlock::SingletonReporter {
                             opcode: if matches!(

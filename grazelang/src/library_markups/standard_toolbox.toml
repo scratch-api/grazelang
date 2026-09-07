@@ -2811,6 +2811,7 @@
             kind = "field"
             name = "LIST"
             field_type = "field_variable_getter"
+            option_category = "lists"
 
     [[categories.blocks]]
         type = "data_addtolist"
@@ -2896,6 +2897,7 @@
             kind = "field"
             name = "LIST"
             field_type = "field_variable"
+            option_category = "lists"
 
         [[categories.blocks.args]]
             kind = "input"

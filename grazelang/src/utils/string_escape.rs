@@ -172,7 +172,7 @@ pub fn escape(
 }
 
 pub fn normal_string_escaper(s: &str) -> StringEscaper<'_> {
-    StringEscaper::new(s, true, false, false)
+    StringEscaper::new(s, true, false, true)
 }
 
 pub fn format_string_escaper(s: &str) -> StringEscaper<'_> {

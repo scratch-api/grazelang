@@ -18,7 +18,6 @@ impl IdCounter {
     }
 
     pub fn get_new_id(&mut self) -> <Self as Iterator>::Item {
-        // yea i prematurely optimized it a bit
         let mut n = self.index;
         self.index += 1;
         let mut string = [0u8; 22];
@@ -31,7 +30,11 @@ impl IdCounter {
                 break;
             }
         }
-        str::from_utf8(&string[cursor..]).unwrap().into()
+        let string = str::from_utf8(&string[cursor..]).unwrap();
+        if string == "of" {
+            return self.get_new_id();
+        }
+        string.into()
     }
 }
 

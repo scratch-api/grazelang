@@ -309,7 +309,7 @@ pub fn unescape(
 
 #[inline]
 pub fn unescape_normal_string(s: &str) -> UResult<String> {
-    unescape(s, true, false, false)
+    unescape(s, true, false, true)
 }
 
 #[inline]
