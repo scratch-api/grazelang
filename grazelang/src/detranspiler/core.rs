@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use arcstr::{ArcStr as IString, format as format_istring, literal};
 use grazelang_types::project_json;
@@ -14,7 +14,10 @@ use super::{
 };
 use crate::{
     ast::types::{self as ast_types},
-    detranspiler::into_ast::{data_to_data_declaration, data_to_split_data_declaration},
+    detranspiler::{
+        get_info::{SpecialStackBlockInfo, check_special_stack_block},
+        into_ast::{data_to_data_declaration, data_to_split_data_declaration},
+    },
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
     names::{DetranspilerAssetNamespace, DetranspilerTargetNamespace},
@@ -424,17 +427,16 @@ pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast
     }
 }
 
+pub type DetranspiledProjectData = (
+    ast_types::GrazeProgram,
+    HashMap<AssetPath, OutAssetPath>,
+    Vec<GrazeDetranspilerMessage>,
+);
+
 pub fn convert_project(
     project: &project_json::Sb3Root,
     settings: GrazeDetranspilerSettings,
-) -> Result<
-    (
-        ast_types::GrazeProgram,
-        HashMap<AssetPath, OutAssetPath>,
-        Vec<GrazeDetranspilerMessage>,
-    ),
-    Vec<GrazeDetranspilerMessage>,
-> {
+) -> Result<DetranspiledProjectData, Vec<GrazeDetranspilerMessage>> {
     macro_rules! emit_error_top_level {
         ($context:expr, $err:expr) => {{
             let context = &mut $context;
@@ -744,8 +746,7 @@ pub fn convert_project(
 // TODO: Implement extensions in detranspiler
 // Issue: #124
 
-// TODO: Implement `procedures_call` in detranspiler
-// Issue: #123
+// TODO: Implement pretty detranspiler logging
 
 // TODO: Implement assignments in detranspiler
 // Issue: #122
@@ -1950,6 +1951,13 @@ where
                         context,
                         ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                     ),
+                    project_json::Sb3InputRepr::Missing => {
+                        parameters.push(ast_types::Expression::Literal(
+                            ast_types::Literal::EmptyExpression,
+                        ));
+                        // ArgumentKind::Input is only for possibly empty inputs
+                        continue;
+                    }
                 });
             }
             ArgumentKind::StackInput => {
@@ -1997,6 +2005,12 @@ where
                         ast_types::CodeBlock {
                             statements: Vec::new(),
                         }
+                    }
+                    project_json::Sb3InputRepr::Missing => {
+                        stack_params.push(ast_types::CodeBlock {
+                            statements: Vec::new(),
+                        });
+                        continue;
                     }
                 });
                 on_stack_input(context, argument_name.as_str())?;
@@ -2137,6 +2151,23 @@ where
                         context,
                         ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                     ),
+                    project_json::Sb3InputRepr::Missing => {
+                        parameters.push(ast_types::Expression::Literal(
+                            ast_types::Literal::EmptyExpression,
+                        ));
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnexpectedEmptyInput {
+                                    input: argument_name.to_string(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        continue;
+                    }
                 });
             }
         }
@@ -2228,6 +2259,9 @@ pub fn convert_special_reporter_block(
                     context,
                     ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
                 )
+            }
+            project_json::Sb3InputRepr::Missing => {
+                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
             }
         })
     }
@@ -2785,6 +2819,131 @@ pub fn convert_stack_block(
             block_id: block_id.to_string(),
         });
     };
+    if let Some(special_stack_block_info) = check_special_stack_block(block) {
+        match special_stack_block_info {
+            SpecialStackBlockInfo::ProcedureCall => {
+                let Some(mutation) = &block.mutation else {
+                    return Err(GrazeDetranspilerError::MissingMutation {
+                        block_id: block_id.to_string(),
+                    });
+                };
+                let project_json::Sb3BlockMutation::ProceduresCall {
+                    procedure_code,
+                    argument_ids,
+                    warp: _,
+                } = mutation
+                else {
+                    return Err(GrazeDetranspilerError::IncorrectMutationType {
+                        block_id: block_id.to_string(),
+                    });
+                };
+                let Some(procedure_info) = context
+                    .targets
+                    .get(target_idx)
+                    .unwrap()
+                    .procedures
+                    .get(procedure_code.as_str())
+                else {
+                    return Err(GrazeDetranspilerError::UnknownProccode {
+                        block_id: block_id.to_string(),
+                        proccode: procedure_code.clone(),
+                    });
+                };
+                let procedure_identifier = create_simple_identifier(procedure_info.name.clone());
+                let mut arguments = Vec::with_capacity(argument_ids.len());
+                let mut tracked_args = 0_usize;
+                for argument_id in argument_ids {
+                    let Some(input) = block.inputs.get(argument_id) else {
+                        arguments.push(ast_types::Expression::Literal(
+                            ast_types::Literal::EmptyExpression,
+                        ));
+                        continue;
+                    };
+                    tracked_args += 1;
+                    let (project_json::Sb3InputValue::Shadow(input_repr)
+                    | project_json::Sb3InputValue::NoShadow(input_repr)
+                    | project_json::Sb3InputValue::ObscuredShadow {
+                        value: input_repr,
+                        shadow: _,
+                    }) = input;
+                    arguments.push(match input_repr {
+                        project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
+                            unwrap_or_emit_message!(
+                                blocks.get(block_id).ok_or_else(|| {
+                                    GrazeDetranspilerError::InvalidBlockReference {
+                                        block_id: block_id.clone(),
+                                    }
+                                }),
+                                context,
+                                {
+                                    arguments.push(ast_types::Expression::Literal(
+                                        ast_types::Literal::EmptyExpression,
+                                    ));
+                                    continue;
+                                }
+                            ),
+                            block_id,
+                            blocks,
+                            context,
+                            target_idx,
+                        )?,
+                        project_json::Sb3InputRepr::PrimitiveBlock(block) => {
+                            unwrap_or_emit_message!(
+                                convert_primitive_reporter_block(block, context, target_idx),
+                                context,
+                                ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                            )
+                        }
+                        project_json::Sb3InputRepr::Missing => {
+                            ast_types::Expression::Literal(ast_types::Literal::EmptyExpression)
+                        }
+                    });
+                }
+                if tracked_args != block.inputs.len() {
+                    let mut tracked_args = HashSet::<String>::with_capacity(block.inputs.len());
+                    for key in block.inputs.keys() {
+                        tracked_args.insert(key.clone());
+                    }
+                    for argument_id in argument_ids {
+                        tracked_args.remove(argument_id);
+                    }
+                    for arg in tracked_args {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnusedInput {
+                                    input: arg,
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                }
+                for key in block.fields.keys() {
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: key.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                return Ok((
+                    ast_types::Statement::Call {
+                        function: procedure_identifier,
+                        arguments,
+                    },
+                    block.next.as_deref().map(Into::into),
+                ));
+            }
+        }
+    }
     let mut has_substack = false;
     let (block_kind_info, parameters, stack_params) = convert_block(
         block,

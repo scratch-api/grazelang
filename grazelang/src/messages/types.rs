@@ -567,6 +567,8 @@ pub enum GrazeDetranspilerError {
     UnknownVLBName { name: String },
     #[assoc(internal_lint_id = "unknown_field_value_in_monitor")]
     UnknownFieldValueInMonitor { name: String, value: String },
+    #[assoc(internal_lint_id = "unknown_proccode")]
+    UnknownProccode { block_id: String, proccode: String },
     #[assoc(internal_lint_id = "malformed_block_reference")]
     MalformedBlockReference {
         block_id: Box<project_json::Sb3InputValue>,

@@ -745,6 +745,7 @@ impl<'de> Deserialize<'de> for Sb3InputValue {
 pub enum Sb3InputRepr {
     Reference(String),
     PrimitiveBlock(Sb3PrimitiveBlock),
+    Missing,
 }
 
 impl Serialize for Sb3InputRepr {
@@ -757,6 +758,7 @@ impl Serialize for Sb3InputRepr {
             Sb3InputRepr::PrimitiveBlock(primitive_block) => {
                 serializer.serialize_some(primitive_block)
             }
+            Sb3InputRepr::Missing => serializer.serialize_none(),
         }
     }
 }
@@ -803,6 +805,13 @@ impl<'de> Deserialize<'de> for Sb3InputRepr {
                 D: de::Deserializer<'de>,
             {
                 deserializer.deserialize_any(self)
+            }
+
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Sb3InputRepr::Missing)
             }
         }
         deserializer.deserialize_any(Sb3InputReprVisitor)
