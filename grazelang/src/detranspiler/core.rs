@@ -780,6 +780,7 @@ pub fn convert_project(
 }
 
 // TODO: Add config block to targets in detranspiler
+// Issue: #127
 
 // TODO: Implement pretty detranspiler logging
 // Issue: #126
