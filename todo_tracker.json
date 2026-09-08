@@ -970,7 +970,7 @@
     "130": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L789-L789",
         "commit": "ba652b3a38770c9b071150386ebc798fd6d1252d",
         "title": "Error in transpiler if there is no stage"
