@@ -783,6 +783,8 @@ pub fn convert_project(
 // TODO: Add config block to targets in detranspiler
 // Issue: #127
 
+// TODO: Error in transpiler if there is no stage
+
 // TODO: Implement pretty detranspiler logging
 // Issue: #126
 
@@ -941,23 +943,23 @@ pub fn convert_target(
     }
     let mut config = Vec::new();
     // stage:
-    //   current_costume => backdrop: usize
-    //   volume => volume: f64
+    //   current_costume = 0 => backdrop: usize = 1
+    //   volume => volume: f64 = 100.0
     //   layer_order => layer_order: usize
-    //   text_to_speech_language => text_to_speech_language: Option<String>
-    //   video_transparency => video_transparency: Option<f64>
-    //   video_state => video_state: Option<String>
+    //   text_to_speech_language => text_to_speech_language: Option<String> = None
+    //   video_transparency => video_transparency: Option<f64> = Some(50.0)
+    //   video_state => video_state: Option<String> = Some("on".to_string())
     // sprite:
-    //   current_costume => costume: usize
-    //   x => x_position: Option<f64>
-    //   y => y_position: Option<f64>
-    //   direction => direction: Option<f64>
-    //   size => size: Option<f64>
-    //   volume => volume: f64
-    //   draggable => draggable: Option<bool>
-    //   visible => visible: Option<bool>
+    //   current_costume = 0 => costume: usize = 1
+    //   x => x_position: Option<f64> = Some(0.0)
+    //   y => y_position: Option<f64> = Some(0.0)
+    //   direction => direction: Option<f64> = Some(90.0)
+    //   size => size: Option<f64> = Some(100.0)
+    //   volume => volume: f64 = 100.0
+    //   draggable => draggable: Option<bool> = Some(false)
+    //   visible => visible: Option<bool> = Some(true)
     //   layer_order => layer_order: f64
-    //   rotation_style => rotation_style: Option<String>
+    //   rotation_style => rotation_style: Option<String> = Some("all_around".to_string())
     let mut custom_blocks = HashMap::new();
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(block) = block else {
