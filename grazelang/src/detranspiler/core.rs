@@ -794,6 +794,8 @@ pub fn convert_project(
 // TODO: Implement list methods in detranspiler
 // Issue: #120
 
+// TODO: Ensure that the compiler works with `#[cfg(not(feature = "detranspiler"))]`
+
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
 // A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
