@@ -35,7 +35,7 @@ pub enum GrazeSourceError {
     CLIError(#[from] CLIError),
 }
 
-const EMPTY_SOURCE_SPAN: &SourceSpan = &(((0, 0), (0, 0)), 0);
+pub const EMPTY_SOURCE_SPAN: &SourceSpan = &(((0, 0), (0, 0)), 0);
 
 impl GetPos for GrazeSourceError {
     fn get_source_span(&self) -> &SourceSpan {

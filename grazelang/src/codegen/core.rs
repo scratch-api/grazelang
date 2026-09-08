@@ -37,8 +37,8 @@ use crate::{
     lexer::SourceSpan,
     library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
     messages::types::{
-        ConstantExprEvaluationError, GetLintId, GrazeSourceMessage, GrazeSourceWarning,
-        GrazeWarningKind, LONG_LIST_ASSIGNMENT_MININUM_LENGTH,
+        ConstantExprEvaluationError, EMPTY_SOURCE_SPAN, GetLintId, GrazeSourceMessage,
+        GrazeSourceWarning, GrazeWarningKind, LONG_LIST_ASSIGNMENT_MININUM_LENGTH,
     },
     names::CodegenNamespace,
     parser::{
@@ -71,13 +71,14 @@ use crate::{
         default_visit_expression_get_item, default_visit_expression_get_letter,
         default_visit_expression_identifier, default_visit_expression_literal,
         default_visit_expression_unary_operation, default_visit_formatted_string_content,
-        default_visit_isolated_block, default_visit_isolated_expression,
-        default_visit_monitor_declaration, default_visit_multi_input_hat_statement,
-        default_visit_no_input_hat_statement, default_visit_single_input_hat_statement,
-        default_visit_statement_assignment, default_visit_statement_call,
-        default_visit_statement_forever, default_visit_statement_multi_input_control,
-        default_visit_statement_set_item, default_visit_statement_single_input_control,
-        default_visit_top_level_statement_sprite, default_visit_top_level_statement_stage,
+        default_visit_graze_program, default_visit_isolated_block,
+        default_visit_isolated_expression, default_visit_monitor_declaration,
+        default_visit_multi_input_hat_statement, default_visit_no_input_hat_statement,
+        default_visit_single_input_hat_statement, default_visit_statement_assignment,
+        default_visit_statement_call, default_visit_statement_forever,
+        default_visit_statement_multi_input_control, default_visit_statement_set_item,
+        default_visit_statement_single_input_control, default_visit_top_level_statement_sprite,
+        default_visit_top_level_statement_stage,
     },
 };
 use helpers::*;
@@ -121,6 +122,10 @@ pub enum GrazeSb3GeneratorError {
     #[assoc(get_secondary_message = "stage redeclared here")]
     #[error("cannot declare stage multiple times")]
     RepeatedStageDeclaration { stage_keyword: cst::StageKeyword },
+    #[assoc(internal_lint_id = "missing_stage_declaration")]
+    #[assoc(get_secondary_message = "")]
+    #[error("must declare stage")]
+    MissingStageDeclaration,
     #[assoc(internal_lint_id = "block_not_c_block")]
     #[assoc(get_secondary_message = "not a c block")]
     #[error("tried to call the identifier {identifier:?} as a c block when it was not possible")]
@@ -220,6 +225,9 @@ impl GrazeSb3GeneratorError {
             }
             GrazeSb3GeneratorError::RepeatedStageDeclaration { stage_keyword: _ } => {
                 return Cow::Borrowed("stage is declared multiple times");
+            }
+            GrazeSb3GeneratorError::MissingStageDeclaration => {
+                return Cow::Borrowed("stage is not declared");
             }
             GrazeSb3GeneratorError::BlockNotCBlock { identifier } => {
                 format!("`{identifier}` cannot be used as a c block")
@@ -334,6 +342,7 @@ impl GetPos for GrazeSb3GeneratorError {
                 expression: _,
                 source,
             } => source.get_source_span(),
+            GrazeSb3GeneratorError::MissingStageDeclaration => EMPTY_SOURCE_SPAN,
         }
     }
 }
@@ -4632,6 +4641,18 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         Ok(())
     }
 
+    fn visit_graze_program(
+        &self,
+        value: &cst::GrazeProgram,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        default_visit_graze_program(self, value, context)?;
+        if context.uninitialized_stage.is_some() {
+            emit_error!(GrazeSb3GeneratorError::MissingStageDeclaration, context);
+        }
+        Ok(())
+    }
+
     // Target statements:
 
     fn visit_no_input_hat_statement(
@@ -5384,12 +5405,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
         for (sound, _) in sounds {
             new_sprite.sounds.push(sound);
         }
-        new_sprite.layer_order = context.sb3.targets.len()
-            + if context.uninitialized_stage.is_some() {
-                1
-            } else {
-                0
-            };
+        new_sprite.layer_order =
+            context.sb3.targets.len() + context.uninitialized_stage.is_some() as usize;
         let mut block_counter = IdCounter::new();
         let next_block_id = block_counter.get_new_id();
         context.block_counter = block_counter;

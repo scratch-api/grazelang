@@ -188,6 +188,13 @@ impl GrazeSb3GeneratorError {
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
+        if matches!(self, Self::MissingStageDeclaration) {
+            return Group::with_title(
+                Level::ERROR
+                    .primary_title(self.get_primary_message())
+                    .id(self.get_lint_id()),
+            );
+        }
         let (lint_id, secondary_message, source_span) = match self {
             GrazeSb3GeneratorError::InvalidConstantExpression {
                 expression: _,

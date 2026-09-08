@@ -786,9 +786,6 @@ pub fn convert_project(
     ))
 }
 
-// TODO: Error in transpiler if there is no stage
-// Issue: #130
-
 // TODO: Implement pretty detranspiler logging
 // Issue: #126
 
