@@ -954,7 +954,7 @@
     "127": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L782-L782",
         "commit": "81f5e7bcbbbaf23c733f17233f4defb68adeb416",
         "title": "Add config block to targets in detranspiler"
@@ -966,5 +966,13 @@
         "lines": "L797-L798",
         "commit": "aea5ae2228de9bac401d0339059ec6785d6eee3a",
         "title": "Ensure that `grazelang` compiles with `#[cfg(not(feature = \"detranspiler\"))]`"
+    },
+    "130": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L789-L789",
+        "commit": "ba652b3a38770c9b071150386ebc798fd6d1252d",
+        "title": "Error in transpiler if there is no stage"
     }
 }
