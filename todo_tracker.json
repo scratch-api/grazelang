@@ -958,5 +958,13 @@
         "lines": "L782-L782",
         "commit": "81f5e7bcbbbaf23c733f17233f4defb68adeb416",
         "title": "Add config block to targets in detranspiler"
+    },
+    "128": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L797-L797",
+        "commit": "69178a517960ad2c3855cc5e01b5897690eba2be",
+        "title": "Ensure that the compiler works with `#[cfg(not(feature = \"detranspiler\"))]`"
     }
 }
