@@ -56,6 +56,7 @@ pub struct DetranspilerTarget {
     pub data: HashMap<DataId, DetranspilerVarOrList>,
     pub namespace: DetranspilerTargetNamespace,
     pub monitors: Vec<DetranspilerMonitor>,
+    pub config: Vec<ast_types::DictionaryEntry>,
     pub procedures: HashMap<IString, DetranspilerCustomBlockDescriptor>,
     pub scripts: Vec<DetranspilerTargetBlockStack>,
 }
@@ -610,12 +611,15 @@ pub fn convert_project(
     for (target_idx, target) in context.targets.iter_mut().enumerate() {
         statements.push(if target.is_stage {
             let mut stage_statements = Vec::with_capacity(
-                target.costumes.len()
+                1 + target.costumes.len()
                     + target.sounds.len()
                     + target.data.len()
                     + target.monitors.len()
                     + target.scripts.len(),
             );
+            stage_statements.push(ast_types::StageStatement::ConfigStatement(std::mem::take(
+                &mut target.config,
+            )));
             if context.settings.multi_asset_declarations {
                 if !target.costumes.is_empty() {
                     stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
@@ -689,12 +693,15 @@ pub fn convert_project(
             }
         } else {
             let mut sprite_statements = Vec::with_capacity(
-                target.costumes.len()
+                1 + target.costumes.len()
                     + target.sounds.len()
                     + target.data.len()
                     + target.monitors.len()
                     + target.scripts.len(),
             );
+            sprite_statements.push(ast_types::SpriteStatement::ConfigStatement(std::mem::take(
+                &mut target.config,
+            )));
             if context.settings.multi_asset_declarations {
                 if !target.costumes.is_empty() {
                     sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
@@ -779,8 +786,7 @@ pub fn convert_project(
     ))
 }
 
-// TODO: Add config block to targets in detranspiler
-// Issue: #127
+// TODO: Error in transpiler if there is no stage
 
 // TODO: Implement pretty detranspiler logging
 // Issue: #126
@@ -938,6 +944,181 @@ pub fn convert_target(
             },
         );
     }
+    let mut config = Vec::with_capacity(if target.is_stage {
+        1 + (target.current_costume != 0) as usize
+            + (target.volume != 100.0) as usize
+            + target.text_to_speech_language.is_some() as usize
+            + (target.video_transparency != Some(50.0)) as usize
+            + (!matches!(target.video_state.as_deref(), Some("on"))) as usize
+    } else {
+        1 + (target.current_costume != 0) as usize
+            + (target.x != Some(0.0)) as usize
+            + (target.y != Some(0.0)) as usize
+            + (target.direction != Some(90.0)) as usize
+            + (target.size != Some(100.0)) as usize
+            + (target.volume != 100.0) as usize
+            + (target.draggable != Some(false)) as usize
+            + (target.visible != Some(true)) as usize
+            + (!matches!(target.rotation_style.as_deref(), Some("all_around"))) as usize
+    });
+    if target.is_stage {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier::new(literal!("layer_order")),
+            value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalInt(
+                format_istring!("{}", target.layer_order),
+            )),
+        });
+        if target.current_costume != 0 {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("backdrop")),
+                value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalInt(
+                    format_istring!("{}", target.current_costume + 1),
+                )),
+            });
+        }
+        if target.volume != 100.0 {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("volume")),
+                value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
+                    format_istring!("{}", target.volume),
+                )),
+            });
+        }
+        if let Some(text_to_speech_language) = &target.text_to_speech_language {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("text_to_speech_language")),
+                value: ast_types::DictionaryValue::Primitive(ast_types::Literal::String(
+                    text_to_speech_language.as_str().into(),
+                )),
+            });
+        }
+        if target.video_transparency != Some(50.0) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("video_transparency")),
+                value: ast_types::DictionaryValue::Primitive(
+                    if let Some(video_transparency) = target.video_transparency {
+                        ast_types::Literal::DecimalFloat(format_istring!("{video_transparency}"))
+                    } else {
+                        ast_types::Literal::EmptyExpression
+                    },
+                ),
+            });
+        }
+        if !matches!(target.video_state.as_deref(), Some("on")) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("video_state")),
+                value: ast_types::DictionaryValue::Primitive(
+                    if let Some(video_state) = &target.video_state {
+                        ast_types::Literal::String(video_state.as_str().into())
+                    } else {
+                        ast_types::Literal::EmptyExpression
+                    },
+                ),
+            });
+        }
+    }
+    else {
+        config.push(ast_types::DictionaryEntry {
+            identifier: ast_types::SingleIdentifier::new(literal!("layer_order")),
+            value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalInt(
+                format_istring!("{}", target.layer_order),
+            )),
+        });
+        if target.current_costume != 0 {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("costume")),
+                value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalInt(
+                    format_istring!("{}", target.current_costume + 1),
+                )),
+            });
+        }
+        if target.x != Some(0.0) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("x_position")),
+                value: ast_types::DictionaryValue::Primitive(if let Some(x) = target.x {
+                    ast_types::Literal::DecimalFloat(format_istring!("{x}"))
+                } else {
+                    ast_types::Literal::EmptyExpression
+                }),
+            });
+        }
+        if target.y != Some(0.0) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("y_position")),
+                value: ast_types::DictionaryValue::Primitive(if let Some(y) = target.y {
+                    ast_types::Literal::DecimalFloat(format_istring!("{y}"))
+                } else {
+                    ast_types::Literal::EmptyExpression
+                }),
+            });
+        }
+        if target.direction != Some(90.0) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("direction")),
+                value: ast_types::DictionaryValue::Primitive(
+                    if let Some(direction) = target.direction {
+                        ast_types::Literal::DecimalFloat(format_istring!("{direction}"))
+                    } else {
+                        ast_types::Literal::EmptyExpression
+                    },
+                ),
+            });
+        }
+        if target.size != Some(100.0) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("size")),
+                value: ast_types::DictionaryValue::Primitive(if let Some(size) = target.size {
+                    ast_types::Literal::DecimalFloat(format_istring!("{size}"))
+                } else {
+                    ast_types::Literal::EmptyExpression
+                }),
+            });
+        }
+        if target.volume != 100.0 {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("volume")),
+                value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalFloat(
+                    format_istring!("{}", target.volume),
+                )),
+            });
+        }
+        if target.draggable != Some(false) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("draggable")),
+                value: ast_types::DictionaryValue::Primitive(
+                    if let Some(draggable) = target.draggable {
+                        ast_types::Literal::Bool(draggable)
+                    } else {
+                        ast_types::Literal::EmptyExpression
+                    },
+                ),
+            });
+        }
+        if target.visible != Some(true) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("visible")),
+                value: ast_types::DictionaryValue::Primitive(
+                    if let Some(visible) = target.visible {
+                        ast_types::Literal::Bool(visible)
+                    } else {
+                        ast_types::Literal::EmptyExpression
+                    },
+                ),
+            });
+        }
+        if !matches!(target.rotation_style.as_deref(), Some("all_around")) {
+            config.push(ast_types::DictionaryEntry {
+                identifier: ast_types::SingleIdentifier::new(literal!("rotation_style")),
+                value: ast_types::DictionaryValue::Primitive(
+                    if let Some(rotation_style) = &target.rotation_style {
+                        ast_types::Literal::String(rotation_style.as_str().into())
+                    } else {
+                        ast_types::Literal::EmptyExpression
+                    },
+                ),
+            });
+        }
+    }
     let mut custom_blocks = HashMap::new();
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(block) = block else {
@@ -1004,6 +1185,7 @@ pub fn convert_target(
         data,
         namespace,
         monitors: Vec::new(),
+        config,
         procedures: custom_blocks,
         scripts: Vec::new(),
     })
