@@ -794,7 +794,7 @@ pub fn convert_project(
 // TODO: Implement list methods in detranspiler
 // Issue: #120
 
-// TODO: Ensure that the compiler works with `#[cfg(not(feature = "detranspiler"))]`
+// TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
