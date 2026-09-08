@@ -651,6 +651,8 @@ pub enum GrazeDetranspilerWarning {
     UnknownVLBValue { field: String, block_id: String },
     #[assoc(internal_lint_id = "unknown_vlb_value_in_monitor")]
     UnknownVLBValueInMonitor { monitor_id: String },
+    #[assoc(internal_lint_id = "unknown_extension_error")]
+    UnknownExtension { extension: String },
 }
 
 #[cfg(feature = "detranspiler")]

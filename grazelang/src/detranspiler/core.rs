@@ -567,7 +567,43 @@ pub fn convert_project(
             context
         );
     }
-    let mut statements = Vec::with_capacity(context.broadcasts.len() + context.targets.len());
+    let mut statements = Vec::with_capacity(
+        project.extensions.len() + context.broadcasts.len() + context.targets.len(),
+    );
+    for extension in &project.extensions {
+        match extension.as_str() {
+            "pen" => statements.push(ast_types::TopLevelStatement::UseExtensionStatement(
+                ast_types::UseStatementContent::SingleUse {
+                    identifier: create_simple_identifier(literal!("pen")),
+                    rename: None,
+                },
+            )),
+            "music" => statements.push(ast_types::TopLevelStatement::UseExtensionStatement(
+                ast_types::UseStatementContent::SingleUse {
+                    identifier: create_simple_identifier(literal!("music")),
+                    rename: None,
+                },
+            )),
+            _ => {
+                emit_message(
+                    &mut context,
+                    || {
+                        GrazeDetranspilerWarning::UnknownExtension {
+                            extension: extension.clone(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+                statements.push(ast_types::TopLevelStatement::UseExtensionStatement(
+                    ast_types::UseStatementContent::SingleUse {
+                        identifier: create_simple_identifier(extension.as_str().into()),
+                        rename: None,
+                    },
+                ))
+            }
+        }
+    }
     for broadcast in context.broadcasts.values() {
         statements.push(broadcast.into_ast());
     }
@@ -743,8 +779,7 @@ pub fn convert_project(
     ))
 }
 
-// TODO: Implement extensions in detranspiler
-// Issue: #124
+// TODO: Add config block to targets in detranspiler
 
 // TODO: Implement pretty detranspiler logging
 // Issue: #126
