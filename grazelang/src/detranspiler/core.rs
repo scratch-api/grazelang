@@ -56,6 +56,7 @@ pub struct DetranspilerTarget {
     pub data: HashMap<DataId, DetranspilerVarOrList>,
     pub namespace: DetranspilerTargetNamespace,
     pub monitors: Vec<DetranspilerMonitor>,
+    pub config: Vec<ast_types::DictionaryEntry>,
     pub procedures: HashMap<IString, DetranspilerCustomBlockDescriptor>,
     pub scripts: Vec<DetranspilerTargetBlockStack>,
 }
@@ -938,6 +939,25 @@ pub fn convert_target(
             },
         );
     }
+    let mut config = Vec::new();
+    // stage:
+    //   current_costume => backdrop: usize
+    //   volume => volume: f64
+    //   layer_order => layer_order: usize
+    //   text_to_speech_language => text_to_speech_language: Option<String>
+    //   video_transparency => video_transparency: Option<f64>
+    //   video_state => video_state: Option<String>
+    // sprite:
+    //   current_costume => costume: usize
+    //   x => x_position: Option<f64>
+    //   y => y_position: Option<f64>
+    //   direction => direction: Option<f64>
+    //   size => size: Option<f64>
+    //   volume => volume: f64
+    //   draggable => draggable: Option<bool>
+    //   visible => visible: Option<bool>
+    //   layer_order => layer_order: f64
+    //   rotation_style => rotation_style: Option<String>
     let mut custom_blocks = HashMap::new();
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(block) = block else {
@@ -1004,6 +1024,7 @@ pub fn convert_target(
         data,
         namespace,
         monitors: Vec::new(),
+        config,
         procedures: custom_blocks,
         scripts: Vec::new(),
     })
