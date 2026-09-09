@@ -220,7 +220,7 @@ impl IntoAST<ast_types::SingleDataDeclaration> for &DetranspilerVarOrList {
                         .cloned()
                         .map(ast_types::CanonicalIdentifier::new),
                     identifier: ast_types::SingleIdentifier::new(self.name.clone()),
-                    value: value.iter().map(|value| ast_types::ListEntry::Expression(ast_types::Expression::Literal(value.into()))).collect(),
+                    value: convert_list_value(value.iter()),
                 }
             },
         }
@@ -324,4 +324,59 @@ impl IntoAST<ast_types::SpriteStatement> for DetranspilerTargetBlockStack {
             }
         }
     }
+}
+
+pub fn convert_list_value<'a, I>(iter: I) -> Vec<ast_types::ListEntry>
+where
+    I: Iterator<Item = &'a project_json::Sb3PrimitiveOrBool>,
+{
+    const LENGTH_THRESHOLD: usize = 3;
+    let mut entries = Vec::new();
+    let mut current_string = String::new();
+    let mut current_string_chars = 0;
+    for value in iter {
+        if let project_json::Sb3PrimitiveOrBool::String(value) = value
+            && value
+                .chars()
+                .try_fold(0, |state, _| (state == 0).then_some(1))
+                == Some(1)
+        {
+            current_string.push_str(value);
+            current_string_chars += 1;
+        } else {
+            if current_string_chars >= LENGTH_THRESHOLD {
+                entries.reserve(2);
+                entries.push(ast_types::ListEntry::Unwrap(ast_types::Literal::String(
+                    current_string.as_str().into(),
+                )));
+            } else if current_string_chars > 0 {
+                entries.reserve(current_string_chars + 1);
+                for c in current_string.chars() {
+                    entries.push(ast_types::ListEntry::Expression(
+                        ast_types::Expression::Literal(ast_types::Literal::String(
+                            format_istring!("{c}"),
+                        )),
+                    ));
+                }
+            }
+            current_string.clear();
+            current_string_chars = 0;
+            entries.push(ast_types::ListEntry::Expression(
+                ast_types::Expression::Literal(value.into()),
+            ));
+        }
+    }
+    if current_string_chars >= LENGTH_THRESHOLD {
+        entries.push(ast_types::ListEntry::Unwrap(ast_types::Literal::String(
+            current_string.as_str().into(),
+        )));
+    } else if current_string_chars > 0 {
+        entries.reserve(current_string_chars);
+        for c in current_string.chars() {
+            entries.push(ast_types::ListEntry::Expression(
+                ast_types::Expression::Literal(ast_types::Literal::String(format_istring!("{c}"))),
+            ));
+        }
+    }
+    entries
 }

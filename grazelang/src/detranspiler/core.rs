@@ -792,9 +792,6 @@ pub fn convert_project(
 // TODO: Implement assignments in detranspiler
 // Issue: #122
 
-// TODO: Implement list entries with `..` in detranspiler
-// Issue: #121
-
 // TODO: Implement list methods in detranspiler
 // Issue: #120
 
