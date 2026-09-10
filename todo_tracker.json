@@ -898,7 +898,7 @@
     "119": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2287-L2287",
         "commit": "adbd488f825452d5c8259710bfa8526f2f43568a",
         "title": "Implement normal block primitives in detranspiler"
