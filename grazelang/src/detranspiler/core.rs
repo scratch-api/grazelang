@@ -783,6 +783,8 @@ pub fn convert_project(
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
 
+// TODO: Implement costume, backdrop and sound inputs
+
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
 // A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
@@ -2179,6 +2181,7 @@ where
             ArgumentKind::MenuInput {
                 menu_opcode,
                 menu_field,
+                is_primitive,
             } => {
                 let Some(input) = block.inputs.get(argument_name.as_str()) else {
                     parameters.push(ast_types::Expression::default());
@@ -2259,13 +2262,18 @@ where
                                     ast_types::Expression::Identifier(create_simple_identifier(
                                         value.name.clone(),
                                     ))
+                                } else if let project_json::Sb3FieldValue::Normal(value) =
+                                    field_value
+                                    && *is_primitive
+                                {
+                                    ast_types::Expression::Literal(value.into())
                                 } else {
                                     unwrap_or_emit_message!(
                                         convert_field_value_info(
                                             get_field_value_info(field_value, menu_opcode),
                                             field_value,
                                             target_idx,
-                                            context,
+                                            context
                                         ),
                                         context,
                                         {
@@ -2911,9 +2919,7 @@ pub fn create_simple_identifier(name: IString) -> ast_types::Identifier {
     ast_types::Identifier::new(vec![ast_types::SingleIdentifier::new(name)])
 }
 
-pub fn create_vlb_identifier(
-    broadcast: InternalVLBIdentifier,
-) -> ast_types::Identifier {
+pub fn create_vlb_identifier(broadcast: InternalVLBIdentifier) -> ast_types::Identifier {
     match broadcast {
         InternalVLBIdentifier::Broadcast(value) | InternalVLBIdentifier::VarOrList(value) => {
             create_simple_identifier(value)
