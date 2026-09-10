@@ -413,21 +413,6 @@ pub fn find_var_or_list_by_name<'a>(
         .map(|value| value.1)
 }
 
-pub fn get_literal_from_sb3_primitive(value: &project_json::Sb3Primitive) -> ast_types::Literal {
-    match value {
-        project_json::Sb3Primitive::String(value) => ast_types::Literal::String(value.into()),
-        project_json::Sb3Primitive::Int128(value) => {
-            ast_types::Literal::DecimalInt(arcstr::format!("{value}"))
-        }
-        project_json::Sb3Primitive::Int(value) => {
-            ast_types::Literal::DecimalInt(arcstr::format!("{value}"))
-        }
-        project_json::Sb3Primitive::Float(value) => {
-            ast_types::Literal::DecimalFloat(arcstr::format!("{value}"))
-        }
-    }
-}
-
 pub type DetranspiledProjectData = (
     ast_types::GrazeProgram,
     HashMap<AssetPath, OutAssetPath>,
@@ -1011,8 +996,7 @@ pub fn convert_target(
                 ),
             });
         }
-    }
-    else {
+    } else {
         config.push(ast_types::DictionaryEntry {
             identifier: ast_types::SingleIdentifier::new(literal!("layer_order")),
             value: ast_types::DictionaryValue::Primitive(ast_types::Literal::DecimalInt(
@@ -1166,7 +1150,7 @@ pub fn convert_target(
                 proto_block,
                 proto_block_id,
                 &mut namespace,
-                (!target.is_stage).then_some(&context.global_namespace.used_names)
+                Some(&context.global_namespace.used_names)
             ),
             context,
             continue
@@ -1668,8 +1652,7 @@ pub fn fill_target(
                         },
                         &target.blocks,
                         context,
-                        target_idx,
-                        target.is_stage
+                        target_idx
                     ),
                     context,
                     continue
@@ -1828,7 +1811,6 @@ pub fn convert_procedure_definition(
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
     target_idx: usize,
-    is_stage: bool,
 ) -> DetranspilerResult<DetranspilerTargetBlockStack> {
     let mut parameters = Vec::with_capacity(procedure_info.argument_names.len());
     let mut proccode_chars = procedure_info.proccode.chars();
@@ -1859,7 +1841,7 @@ pub fn convert_procedure_definition(
                 .namespace
                 .introduce_new_name(
                     original_name.clone(),
-                    (!is_stage).then_some(&context.global_namespace.used_names),
+                    Some(&context.global_namespace.used_names),
                 );
             context
                 .current_procedure_parameters
@@ -2076,7 +2058,7 @@ where
                 };
                 parameters.push(
                     unwrap_or_emit_message!(
-                        lookup_broadcast(&name.as_cow_str(), id, context,),
+                        lookup_broadcast(&name.as_cow_str(), id, context),
                         context,
                         {
                             parameters.push(ast_types::Expression::default());
@@ -2431,7 +2413,7 @@ pub fn convert_special_reporter_block(
         })
     }
     Ok(match reporter {
-        crate::detranspiler::get_info::SpecialReporterInfo::BinOp {
+        SpecialReporterInfo::BinOp {
             binop,
             left_operand,
             right_operand,
@@ -2492,7 +2474,7 @@ pub fn convert_special_reporter_block(
                 right_operand: Box::new(right_operand_expression),
             }
         }
-        crate::detranspiler::get_info::SpecialReporterInfo::NegatedBinOp {
+        SpecialReporterInfo::NegatedBinOp {
             binop,
             outer_operand,
             inner_left_operand,
@@ -2606,7 +2588,7 @@ pub fn convert_special_reporter_block(
                 right_operand: Box::new(right_operand_expression),
             }
         }
-        crate::detranspiler::get_info::SpecialReporterInfo::UnOp {
+        SpecialReporterInfo::UnOp {
             unop,
             operand,
             unused_operand,
@@ -2679,9 +2661,8 @@ pub fn convert_special_reporter_block(
                 operand: Box::new(operand_expression),
             }
         }
-        crate::detranspiler::get_info::SpecialReporterInfo::ProcedureArgument { is_bool } => {
-            let project_json::Sb3FieldValue::Normal(name) = block.fields.get("VALUE").unwrap()
-            else {
+        SpecialReporterInfo::ProcedureArgument { is_bool } => {
+            let Some(project_json::Sb3FieldValue::Normal(name)) = block.fields.get("VALUE") else {
                 unreachable!()
             };
             if let project_json::Sb3Primitive::String(name) = name {
@@ -2713,6 +2694,140 @@ pub fn convert_special_reporter_block(
                 arguments: vec![ast_types::Expression::Literal(name.into())],
             }
         }
+        SpecialReporterInfo::PrimitiveValueBlock { field } => {
+            let Some(
+                project_json::Sb3FieldValue::Normal(value)
+                | project_json::Sb3FieldValue::WithId { value, id: _ },
+            ) = block.fields.get(field.as_str())
+            else {
+                emit_error!(
+                    GrazeDetranspilerError::MissingField {
+                        field: field.to_string(),
+                        block_id: block_id.to_string()
+                    },
+                    context
+                );
+                return Ok(ast_types::Expression::Literal(
+                    ast_types::Literal::EmptyExpression,
+                ));
+            };
+            ast_types::Expression::Literal(value.into())
+        }
+        SpecialReporterInfo::Variable => {
+            const FIELD: &str = "VARIABLE";
+            let Some(value) = block.fields.get(FIELD) else {
+                emit_error!(
+                    GrazeDetranspilerError::MissingField {
+                        field: FIELD.to_string(),
+                        block_id: block_id.to_string()
+                    },
+                    context
+                );
+                return Ok(ast_types::Expression::Literal(
+                    ast_types::Literal::EmptyExpression,
+                ));
+            };
+            let (name, id) = match value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    emit_error!(
+                        GrazeDetranspilerError::UnknownVariable {
+                            id: "null".to_string(),
+                            name: name.to_string()
+                        },
+                        context
+                    );
+                    return Ok(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let name = name.as_cow_str();
+            let variable =
+                lookup_var_or_list(&name, id, target_idx, context)?.ok_or_else(|| {
+                    GrazeDetranspilerError::UnknownVariable {
+                        id: id.clone(),
+                        name: name.to_string(),
+                    }
+                })?;
+            ast_types::Expression::Identifier(create_simple_identifier(variable.name.clone()))
+        }
+        SpecialReporterInfo::List => {
+            const FIELD: &str = "LIST";
+            let Some(value) = block.fields.get(FIELD) else {
+                emit_error!(
+                    GrazeDetranspilerError::MissingField {
+                        field: FIELD.to_string(),
+                        block_id: block_id.to_string()
+                    },
+                    context
+                );
+                return Ok(ast_types::Expression::Literal(
+                    ast_types::Literal::EmptyExpression,
+                ));
+            };
+            let (name, id) = match value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    emit_error!(
+                        GrazeDetranspilerError::UnknownList {
+                            id: "null".to_string(),
+                            name: name.to_string()
+                        },
+                        context
+                    );
+                    return Ok(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let name = name.as_cow_str();
+            let list = lookup_var_or_list(&name, id, target_idx, context)?.ok_or_else(|| {
+                GrazeDetranspilerError::UnknownList {
+                    id: id.clone(),
+                    name: name.to_string(),
+                }
+            })?;
+            ast_types::Expression::Identifier(create_simple_identifier(list.name.clone()))
+        }
+        SpecialReporterInfo::Broadcast => {
+            const FIELD: &str = "BROADCAST_OPTION";
+            let Some(value) = block.fields.get(FIELD) else {
+                emit_error!(
+                    GrazeDetranspilerError::MissingField {
+                        field: FIELD.to_string(),
+                        block_id: block_id.to_string()
+                    },
+                    context
+                );
+                return Ok(ast_types::Expression::Literal(
+                    ast_types::Literal::EmptyExpression,
+                ));
+            };
+            let (name, id) = match value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    emit_error!(
+                        GrazeDetranspilerError::UnknownBroadcast {
+                            id: "null".to_string(),
+                            name: name.to_string()
+                        },
+                        context
+                    );
+                    return Ok(ast_types::Expression::Literal(
+                        ast_types::Literal::EmptyExpression,
+                    ));
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let name = name.as_cow_str();
+            let broadcast = lookup_broadcast(&name, id, context)?.ok_or_else(|| {
+                GrazeDetranspilerError::UnknownBroadcast {
+                    id: id.clone(),
+                    name: name.to_string(),
+                }
+            })?;
+            ast_types::Expression::Identifier(create_simple_identifier(broadcast.name.clone()))
+        }
     })
 }
 
@@ -2724,8 +2839,6 @@ pub fn convert_normal_reporter_block(
     context: &mut DetranspilerContext,
     target_idx: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
-    // TODO: Implement normal block primitives in detranspiler
-    // Issue: #119
     if let Some(reporter) = check_special_reporter(block, blocks) {
         return convert_special_reporter_block(
             reporter, block, block_id, blocks, context, target_idx,
@@ -2771,7 +2884,7 @@ pub fn convert_field_value_info(
         }
         None => match field_value {
             project_json::Sb3FieldValue::Normal(value) => {
-                ast_types::Expression::Literal(get_literal_from_sb3_primitive(value))
+                ast_types::Expression::Literal(value.into())
             }
             project_json::Sb3FieldValue::WithId { value, id } => {
                 ast_types::Expression::Identifier({
@@ -2780,7 +2893,7 @@ pub fn convert_field_value_info(
                             id: id.clone(),
                             name: value.to_string(),
                         })?;
-                    create_vlb_identifier(vlb.into(), &context.targets, target_idx)
+                    create_vlb_identifier(vlb.into())
                 })
             }
         },
@@ -2793,27 +2906,6 @@ pub fn convert_field_value_info_for_monitor(
     field_value_info.map(|value| create_simple_identifier(value.field_value_name))
 }
 
-pub fn create_broadcast_identifier(
-    broadcast_name: IString,
-    targets: &[DetranspilerTarget],
-    target_idx: usize,
-) -> ast_types::Identifier {
-    if targets
-        .get(target_idx)
-        .unwrap()
-        .namespace
-        .used_names
-        .contains_key(&broadcast_name)
-    {
-        ast_types::Identifier::new(vec![
-            ast_types::SingleIdentifier::new(literal!("broadcasts")),
-            ast_types::SingleIdentifier::new(broadcast_name),
-        ])
-    } else {
-        create_simple_identifier(broadcast_name)
-    }
-}
-
 #[inline]
 pub fn create_simple_identifier(name: IString) -> ast_types::Identifier {
     ast_types::Identifier::new(vec![ast_types::SingleIdentifier::new(name)])
@@ -2821,14 +2913,11 @@ pub fn create_simple_identifier(name: IString) -> ast_types::Identifier {
 
 pub fn create_vlb_identifier(
     broadcast: InternalVLBIdentifier,
-    targets: &[DetranspilerTarget],
-    target_idx: usize,
 ) -> ast_types::Identifier {
     match broadcast {
-        InternalVLBIdentifier::Broadcast(value) => {
-            create_broadcast_identifier(value, targets, target_idx)
+        InternalVLBIdentifier::Broadcast(value) | InternalVLBIdentifier::VarOrList(value) => {
+            create_simple_identifier(value)
         }
-        InternalVLBIdentifier::VarOrList(value) => create_simple_identifier(value),
     }
 }
 
@@ -2845,21 +2934,19 @@ pub fn convert_primitive_reporter_block(
         | project_json::Sb3PrimitiveBlock::Integer(sb3_primitive)
         | project_json::Sb3PrimitiveBlock::Angle(sb3_primitive)
         | project_json::Sb3PrimitiveBlock::Color(sb3_primitive)
-        | project_json::Sb3PrimitiveBlock::String(sb3_primitive) => Ok(
-            ast_types::Expression::Literal(get_literal_from_sb3_primitive(sb3_primitive)),
-        ),
+        | project_json::Sb3PrimitiveBlock::String(sb3_primitive) => {
+            Ok(ast_types::Expression::Literal(sb3_primitive.into()))
+        }
         project_json::Sb3PrimitiveBlock::Broadcast { name, id } => {
-            let broadcast = context
-                .broadcasts
-                .get(id)
-                .filter(|value| name_matches(name, value.canonical_name.as_ref(), &value.name))
-                .ok_or_else(|| GrazeDetranspilerError::UnknownBroadcast {
+            let broadcast = lookup_broadcast(name, id, context)?.ok_or_else(|| {
+                GrazeDetranspilerError::UnknownBroadcast {
                     id: id.clone(),
                     name: name.clone(),
-                })?;
-            Ok(ast_types::Expression::Identifier(
-                create_broadcast_identifier(broadcast.name.clone(), &context.targets, target_idx),
-            ))
+                }
+            })?;
+            Ok(ast_types::Expression::Identifier(create_simple_identifier(
+                broadcast.name.clone(),
+            )))
         }
         project_json::Sb3PrimitiveBlock::Variable {
             name,
@@ -2873,7 +2960,6 @@ pub fn convert_primitive_reporter_block(
                     name: name.clone(),
                 }
             })?;
-
             Ok(ast_types::Expression::Identifier(create_simple_identifier(
                 variable.name.clone(),
             )))

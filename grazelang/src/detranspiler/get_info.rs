@@ -2917,6 +2917,12 @@ pub enum SpecialReporterInfo {
     ProcedureArgument {
         is_bool: bool,
     },
+    PrimitiveValueBlock {
+        field: IString,
+    },
+    Variable,
+    List,
+    Broadcast,
 }
 
 pub fn check_special_reporter(
@@ -3106,6 +3112,22 @@ pub fn check_special_reporter(
             }
             return None;
         }
+        "math_number"
+        | "math_positive_number"
+        | "math_whole_number"
+        | "math_integer"
+        | "math_angle" => SpecialReporterInfo::PrimitiveValueBlock {
+            field: literal!("NUM"),
+        },
+        "colour_picker" => SpecialReporterInfo::PrimitiveValueBlock {
+            field: literal!("COLOUR"),
+        },
+        "text" => SpecialReporterInfo::PrimitiveValueBlock {
+            field: literal!("TEXT"),
+        },
+        "data_variable" => SpecialReporterInfo::Variable,
+        "data_listcontents" => SpecialReporterInfo::List,
+        "event_broadcast_menu" => SpecialReporterInfo::Broadcast,
         _ => return None,
     })
 }
