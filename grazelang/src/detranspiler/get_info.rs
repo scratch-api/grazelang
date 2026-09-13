@@ -3357,6 +3357,8 @@ pub fn check_special_reporter(
 pub enum SpecialStackBlockInfo {
     ProcedureCall,
     IfElse,
+    ClearList,
+    AddToList,
 }
 
 pub fn check_special_stack_block(
@@ -3365,6 +3367,8 @@ pub fn check_special_stack_block(
     match block.opcode.as_str() {
         "procedures_call" => Some(SpecialStackBlockInfo::ProcedureCall),
         "control_if_else" => Some(SpecialStackBlockInfo::IfElse),
+        "data_deletealloflist" => Some(SpecialStackBlockInfo::ClearList),
+        "data_addtolist" => Some(SpecialStackBlockInfo::AddToList),
         _ => None,
     }
 }

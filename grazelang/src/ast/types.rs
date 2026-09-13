@@ -404,6 +404,16 @@ impl Identifier {
     }
 }
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ast_identifier {
+    ($($values:expr),*) => {
+        $crate::ast::types::Identifier::new(vec![$($crate::ast::types::SingleIdentifier::new($values)),*])
+    };
+}
+
+pub use __ast_identifier as identifier;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SingleIdentifier {
     pub value: IString,

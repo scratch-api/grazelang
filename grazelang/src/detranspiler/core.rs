@@ -792,6 +792,17 @@ pub fn convert_project(
 // Issue: #122
 
 // TODO: Implement list methods in detranspiler
+//  - [x] `clear`
+//  - [x] `push`
+//  - [ ] `remove`
+//  - [ ] `insert`
+//  - [ ] `find`
+//  - [ ] `len`
+//  - [ ] `contains`
+//  - [ ] `show`
+//  - [ ] `hide`
+//  - [ ] `set` as a `Statement::SetItem`
+//  - [ ] `get` as a `Expression::GetItem`
 // Issue: #120
 
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
@@ -2055,7 +2066,7 @@ where
                 };
                 parameters.push(
                     unwrap_or_emit_message!(
-                        lookup_var_or_list(&name.as_cow_str(), id, target_index, context,),
+                        lookup_var_or_list(&name.as_cow_str(), id, target_index, context),
                         context,
                         {
                             parameters.push(ast_types::Expression::default());
@@ -2154,10 +2165,7 @@ where
                         .map(|(_, value)| {
                             ast_types::Expression::Identifier(
                                 if target_index != context.stage_target_index {
-                                    ast_types::Identifier::new(vec![
-                                        ast_types::SingleIdentifier::new(literal!("stage")),
-                                        ast_types::SingleIdentifier::new(value.name.clone()),
-                                    ])
+                                    ast_types::identifier![literal!("stage"), value.name.clone()]
                                 } else {
                                     create_simple_identifier(value.name.clone())
                                 },
@@ -2266,16 +2274,12 @@ where
             } => {
                 let Some(input) = block.inputs.get(argument_name.as_str()) else {
                     parameters.push(ast_types::Expression::default());
-                    emit_message(
-                        context,
-                        || {
-                            GrazeDetranspilerWarning::UnexpectedEmptyInput {
-                                input: argument_name.to_string(),
-                                block_id: block_id.to_string(),
-                            }
-                            .into()
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: argument_name.to_string(),
+                            block_id: block_id.to_string(),
                         },
-                        GrazeMessageSetting::Warnings,
+                        context
                     );
                     continue;
                 };
@@ -2329,9 +2333,6 @@ where
                                 );
                             }
                             if let Some(field_value) = inner_block.fields.get(menu_field.as_str()) {
-                                // Plan for using `dynamic_menu_input_kind`:
-                                // Add an `else if` branch below that triggers if `dynamic_menu_input_kind` is some
-                                // and a new function finds an expression that corresponds to it.
                                 if menu_opcode.as_str() == "event_broadcast_menu"
                                     && let project_json::Sb3FieldValue::WithId { value: name, id } =
                                         field_value
@@ -2374,16 +2375,12 @@ where
                                 }
                             } else {
                                 parameters.push(ast_types::Expression::default());
-                                emit_message(
-                                    context,
-                                    || {
-                                        GrazeDetranspilerWarning::MissingMenuField {
-                                            field: menu_field.to_string(),
-                                            block_id: block_id.clone(),
-                                        }
-                                        .into()
+                                emit_error!(
+                                    GrazeDetranspilerError::MissingMenuField {
+                                        field: menu_field.to_string(),
+                                        block_id: block_id.to_string(),
                                     },
-                                    GrazeMessageSetting::Warnings,
+                                    context
                                 );
                                 continue;
                             }
@@ -2404,16 +2401,12 @@ where
                     ),
                     project_json::Sb3InputRepr::Missing => {
                         parameters.push(ast_types::Expression::default());
-                        emit_message(
-                            context,
-                            || {
-                                GrazeDetranspilerWarning::UnexpectedEmptyInput {
-                                    input: argument_name.to_string(),
-                                    block_id: block_id.to_string(),
-                                }
-                                .into()
+                        emit_error!(
+                            GrazeDetranspilerError::MissingInput {
+                                input: argument_name.to_string(),
+                                block_id: block_id.to_string(),
                             },
-                            GrazeMessageSetting::Warnings,
+                            context
                         );
                         continue;
                     }
@@ -2492,10 +2485,7 @@ pub fn convert_dynamic_menu_input(
                 context.stage_target_index,
             )?;
             ast_types::Expression::Identifier(if target_index != context.stage_target_index {
-                ast_types::Identifier::new(vec![
-                    ast_types::SingleIdentifier::new(literal!("stage")),
-                    ast_types::SingleIdentifier::new(name),
-                ])
+                ast_types::identifier![literal!("stage"), name]
             } else {
                 create_simple_identifier(name)
             })
@@ -3059,7 +3049,7 @@ pub fn convert_field_value_info_for_monitor(
 
 #[inline]
 pub fn create_simple_identifier(name: IString) -> ast_types::Identifier {
-    ast_types::Identifier::new(vec![ast_types::SingleIdentifier::new(name)])
+    ast_types::identifier![name]
 }
 
 pub fn create_vlb_identifier(broadcast: InternalVLBIdentifier) -> ast_types::Identifier {
@@ -3203,103 +3193,262 @@ pub fn convert_block_stack(
 }
 
 /// Result is unbubbled
-pub fn convert_stack_block(
-    block: &project_json::Sb3Block,
+pub fn convert_special_stack_block(
+    stack_block: SpecialStackBlockInfo,
+    block: &project_json::Sb3NormalBlock,
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
-    // TODO: Implement list assignment in detranspiler
-    // Issue: #106
-    let project_json::Sb3Block::Normal(block) = block else {
-        return Err(GrazeDetranspilerError::PrimitiveBlockAsStackBlock {
-            block_id: block_id.to_string(),
-        });
-    };
-    if let Some(special_stack_block_info) = check_special_stack_block(block) {
-        match special_stack_block_info {
-            SpecialStackBlockInfo::ProcedureCall => {
-                let Some(mutation) = &block.mutation else {
-                    return Err(GrazeDetranspilerError::MissingMutation {
-                        block_id: block_id.to_string(),
-                    });
+    const LIST_STR: &str = "LIST";
+    const ITEM_STR: &str = "ITEM";
+    match stack_block {
+        SpecialStackBlockInfo::ProcedureCall => {
+            let Some(mutation) = &block.mutation else {
+                return Err(GrazeDetranspilerError::MissingMutation {
+                    block_id: block_id.to_string(),
+                });
+            };
+            let project_json::Sb3BlockMutation::ProceduresCall {
+                procedure_code,
+                argument_ids,
+                warp: _,
+            } = mutation
+            else {
+                return Err(GrazeDetranspilerError::IncorrectMutationType {
+                    block_id: block_id.to_string(),
+                });
+            };
+            let Some(procedure_info) = context
+                .targets
+                .get(target_index)
+                .unwrap()
+                .procedures
+                .get(procedure_code.as_str())
+            else {
+                return Err(GrazeDetranspilerError::UnknownProccode {
+                    block_id: block_id.to_string(),
+                    proccode: procedure_code.clone(),
+                });
+            };
+            let procedure_identifier = create_simple_identifier(procedure_info.name.clone());
+            let mut arguments = Vec::with_capacity(argument_ids.len());
+            let mut tracked_args = 0_usize;
+            for argument_id in argument_ids {
+                let Some(input) = block.inputs.get(argument_id) else {
+                    arguments.push(ast_types::Expression::default());
+                    continue;
                 };
-                let project_json::Sb3BlockMutation::ProceduresCall {
-                    procedure_code,
-                    argument_ids,
-                    warp: _,
-                } = mutation
-                else {
-                    return Err(GrazeDetranspilerError::IncorrectMutationType {
-                        block_id: block_id.to_string(),
-                    });
-                };
-                let Some(procedure_info) = context
-                    .targets
-                    .get(target_index)
-                    .unwrap()
-                    .procedures
-                    .get(procedure_code.as_str())
-                else {
-                    return Err(GrazeDetranspilerError::UnknownProccode {
-                        block_id: block_id.to_string(),
-                        proccode: procedure_code.clone(),
-                    });
-                };
-                let procedure_identifier = create_simple_identifier(procedure_info.name.clone());
-                let mut arguments = Vec::with_capacity(argument_ids.len());
-                let mut tracked_args = 0_usize;
-                for argument_id in argument_ids {
-                    let Some(input) = block.inputs.get(argument_id) else {
-                        arguments.push(ast_types::Expression::default());
-                        continue;
-                    };
-                    tracked_args += 1;
-                    let input_repr = get_primary_input_repr(input);
-                    arguments.push(match input_repr {
-                        project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
-                            unwrap_or_emit_message!(
-                                blocks.get(block_id).ok_or_else(|| {
-                                    GrazeDetranspilerError::InvalidBlockReference {
-                                        block_id: block_id.clone(),
-                                    }
-                                }),
-                                context,
-                                {
-                                    arguments.push(ast_types::Expression::default());
-                                    continue;
+                tracked_args += 1;
+                let input_repr = get_primary_input_repr(input);
+                arguments.push(match input_repr {
+                    project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
+                        unwrap_or_emit_message!(
+                            blocks.get(block_id).ok_or_else(|| {
+                                GrazeDetranspilerError::InvalidBlockReference {
+                                    block_id: block_id.clone(),
                                 }
-                            ),
-                            block_id,
-                            blocks,
+                            }),
                             context,
-                            target_index,
-                        )?,
-                        project_json::Sb3InputRepr::PrimitiveBlock(block) => {
-                            unwrap_or_emit_message!(
-                                convert_primitive_reporter_block(block, context, target_index),
-                                context,
-                                ast_types::Expression::default()
-                            )
-                        }
-                        project_json::Sb3InputRepr::Missing => ast_types::Expression::default(),
-                    });
+                            {
+                                arguments.push(ast_types::Expression::default());
+                                continue;
+                            }
+                        ),
+                        block_id,
+                        blocks,
+                        context,
+                        target_index,
+                    )?,
+                    project_json::Sb3InputRepr::PrimitiveBlock(block) => {
+                        unwrap_or_emit_message!(
+                            convert_primitive_reporter_block(block, context, target_index),
+                            context,
+                            ast_types::Expression::default()
+                        )
+                    }
+                    project_json::Sb3InputRepr::Missing => ast_types::Expression::default(),
+                });
+            }
+            if tracked_args != block.inputs.len() {
+                let mut tracked_args = HashSet::<String>::with_capacity(block.inputs.len());
+                for key in block.inputs.keys() {
+                    tracked_args.insert(key.clone());
                 }
+                for argument_id in argument_ids {
+                    tracked_args.remove(argument_id);
+                }
+                for arg in tracked_args {
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: arg,
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            for key in block.fields.keys() {
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnusedField {
+                            field: key.clone(),
+                            block_id: block_id.to_string(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            Ok((
+                ast_types::Statement::Call {
+                    function: procedure_identifier,
+                    arguments,
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::IfElse => {
+            type ElseBranch = Option<ast_types::CodeBlock>;
+            type IfBranch = (ast_types::Expression, ast_types::CodeBlock);
+            type OptionalIfBranch = Option<IfBranch>;
+            macro_rules! get_input {
+                (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_index:expr, $tracked_args:ident, $name:expr) as Input) => {
+                    if let Some(input) = $block.inputs.get($name) {
+                        $tracked_args += 1;
+                        let input_repr = get_primary_input_repr(input);
+                        match input_repr {
+                            project_json::Sb3InputRepr::Reference(block_id) => {
+                                unwrap_or_emit_message!(
+                                    $blocks
+                                        .get(block_id)
+                                        .ok_or_else(|| {
+                                            GrazeDetranspilerError::InvalidBlockReference {
+                                                block_id: block_id.clone(),
+                                            }
+                                        })
+                                        .map(Some),
+                                    $context,
+                                    None
+                                )
+                                .map(|block| {
+                                    convert_reporter_block(
+                                        block,
+                                        block_id,
+                                        $blocks,
+                                        $context,
+                                        $target_index,
+                                    )
+                                })
+                                .transpose()?
+                            }
+                            project_json::Sb3InputRepr::PrimitiveBlock(block) => {
+                                Some(unwrap_or_emit_message!(
+                                    convert_primitive_reporter_block(
+                                        block,
+                                        $context,
+                                        $target_index
+                                    ),
+                                    $context,
+                                    ast_types::Expression::default()
+                                ))
+                            }
+                            project_json::Sb3InputRepr::Missing => {
+                                Some(ast_types::Expression::default())
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                };
+                (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_index:expr, $tracked_args:ident, $name:literal) as Stack) => {
+                    if let Some(input) = $block.inputs.get($name) {
+                        $tracked_args += 1;
+                        let input_repr = get_primary_input_repr(input);
+                        match input_repr {
+                            project_json::Sb3InputRepr::Reference(block_id) => {
+                                unwrap_or_emit_message!(
+                                    $blocks
+                                        .get(block_id)
+                                        .ok_or_else(|| {
+                                            GrazeDetranspilerError::InvalidBlockReference {
+                                                block_id: block_id.clone(),
+                                            }
+                                        })
+                                        .map(Some),
+                                    $context,
+                                    None
+                                )
+                                .map(|block| {
+                                    convert_block_stack(
+                                        block,
+                                        block_id,
+                                        $blocks,
+                                        $context,
+                                        $target_index,
+                                    )
+                                })
+                                .transpose()?
+                            }
+                            project_json::Sb3InputRepr::PrimitiveBlock(_) => {
+                                emit_error!(
+                                    GrazeDetranspilerError::PrimitiveBlockAsSubstack {
+                                        block_id: $block_id.to_string(),
+                                        input_name: $name.to_string()
+                                    },
+                                    $context
+                                );
+                                None
+                            }
+                            project_json::Sb3InputRepr::Missing => None,
+                        }
+                    } else {
+                        None
+                    }
+                };
+            }
+            fn convert_if(
+                block: &project_json::Sb3NormalBlock,
+                block_id: &str,
+                blocks: &HashMap<String, project_json::Sb3Block>,
+                context: &mut DetranspilerContext,
+                target_index: usize,
+            ) -> DetranspilerResult<IfBranch> {
+                let mut tracked_args = 0_usize;
+                let condition = get_input!((
+                    block,
+                    block_id,
+                    blocks,
+                    context,
+                    target_index,
+                    tracked_args,
+                    "CONDITION"
+                ) as Input);
+                let substack = get_input!((
+                    block,
+                    block_id,
+                    blocks,
+                    context,
+                    target_index,
+                    tracked_args,
+                    "SUBSTACK"
+                ) as Stack);
                 if tracked_args != block.inputs.len() {
-                    let mut tracked_args = HashSet::<String>::with_capacity(block.inputs.len());
                     for key in block.inputs.keys() {
-                        tracked_args.insert(key.clone());
-                    }
-                    for argument_id in argument_ids {
-                        tracked_args.remove(argument_id);
-                    }
-                    for arg in tracked_args {
+                        if matches!(key.as_str(), "CONDITION" | "SUBSTACK") {
+                            continue;
+                        }
                         emit_message(
                             context,
                             || {
                                 GrazeDetranspilerWarning::UnusedInput {
-                                    input: arg,
+                                    input: key.clone(),
                                     block_id: block_id.to_string(),
                                 }
                                 .into()
@@ -3321,366 +3470,443 @@ pub fn convert_stack_block(
                         GrazeMessageSetting::Warnings,
                     );
                 }
-                return Ok((
-                    ast_types::Statement::Call {
-                        function: procedure_identifier,
-                        arguments,
-                    },
-                    block.next.as_deref().map(Into::into),
-                ));
+                Ok((condition.unwrap_or_default(), substack.unwrap_or_default()))
             }
-            SpecialStackBlockInfo::IfElse => {
-                type ElseBranch = Option<ast_types::CodeBlock>;
-                type IfBranch = (ast_types::Expression, ast_types::CodeBlock);
-                type OptionalIfBranch = Option<IfBranch>;
-                macro_rules! get_input {
-                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_index:expr, $tracked_args:ident, $name:expr) as Input) => {
-                        if let Some(input) = $block.inputs.get($name) {
-                            $tracked_args += 1;
-                            let input_repr = get_primary_input_repr(input);
-                            match input_repr {
-                                project_json::Sb3InputRepr::Reference(block_id) => {
-                                    unwrap_or_emit_message!(
-                                        $blocks
-                                            .get(block_id)
-                                            .ok_or_else(|| {
-                                                GrazeDetranspilerError::InvalidBlockReference {
-                                                    block_id: block_id.clone(),
-                                                }
-                                            })
-                                            .map(Some),
-                                        $context,
-                                        None
-                                    )
-                                    .map(|block| {
-                                        convert_reporter_block(
-                                            block,
-                                            block_id,
-                                            $blocks,
-                                            $context,
-                                            $target_index,
-                                        )
-                                    })
-                                    .transpose()?
-                                }
-                                project_json::Sb3InputRepr::PrimitiveBlock(block) => {
-                                    Some(unwrap_or_emit_message!(
-                                        convert_primitive_reporter_block(
-                                            block,
-                                            $context,
-                                            $target_index
-                                        ),
-                                        $context,
-                                        ast_types::Expression::default()
-                                    ))
-                                }
-                                project_json::Sb3InputRepr::Missing => {
-                                    Some(ast_types::Expression::default())
-                                }
-                            }
-                        } else {
-                            None
-                        }
-                    };
-                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_index:expr, $tracked_args:ident, $name:literal) as Stack) => {
-                        if let Some(input) = $block.inputs.get($name) {
-                            $tracked_args += 1;
-                            let input_repr = get_primary_input_repr(input);
-                            match input_repr {
-                                project_json::Sb3InputRepr::Reference(block_id) => {
-                                    unwrap_or_emit_message!(
-                                        $blocks
-                                            .get(block_id)
-                                            .ok_or_else(|| {
-                                                GrazeDetranspilerError::InvalidBlockReference {
-                                                    block_id: block_id.clone(),
-                                                }
-                                            })
-                                            .map(Some),
-                                        $context,
-                                        None
-                                    )
-                                    .map(|block| {
-                                        convert_block_stack(
-                                            block,
-                                            block_id,
-                                            $blocks,
-                                            $context,
-                                            $target_index,
-                                        )
-                                    })
-                                    .transpose()?
-                                }
-                                project_json::Sb3InputRepr::PrimitiveBlock(_) => {
-                                    emit_error!(
-                                        GrazeDetranspilerError::PrimitiveBlockAsSubstack {
-                                            block_id: $block_id.to_string(),
-                                            input_name: $name.to_string()
-                                        },
-                                        $context
-                                    );
-                                    None
-                                }
-                                project_json::Sb3InputRepr::Missing => None,
-                            }
-                        } else {
-                            None
-                        }
-                    };
-                }
-                fn convert_if(
-                    block: &project_json::Sb3NormalBlock,
-                    block_id: &str,
-                    blocks: &HashMap<String, project_json::Sb3Block>,
-                    context: &mut DetranspilerContext,
-                    target_index: usize,
-                ) -> DetranspilerResult<IfBranch> {
-                    let mut tracked_args = 0_usize;
-                    let condition = get_input!((
-                        block,
-                        block_id,
-                        blocks,
-                        context,
-                        target_index,
-                        tracked_args,
-                        "CONDITION"
-                    ) as Input);
-                    let substack = get_input!((
-                        block,
-                        block_id,
-                        blocks,
-                        context,
-                        target_index,
-                        tracked_args,
-                        "SUBSTACK"
-                    ) as Stack);
-                    if tracked_args != block.inputs.len() {
-                        for key in block.inputs.keys() {
-                            if matches!(key.as_str(), "CONDITION" | "SUBSTACK") {
-                                continue;
-                            }
-                            emit_message(
-                                context,
-                                || {
-                                    GrazeDetranspilerWarning::UnusedInput {
-                                        input: key.clone(),
-                                        block_id: block_id.to_string(),
-                                    }
-                                    .into()
-                                },
-                                GrazeMessageSetting::Warnings,
-                            );
-                        }
-                    }
-                    for key in block.fields.keys() {
-                        emit_message(
-                            context,
-                            || {
-                                GrazeDetranspilerWarning::UnusedField {
-                                    field: key.clone(),
-                                    block_id: block_id.to_string(),
-                                }
-                                .into()
-                            },
-                            GrazeMessageSetting::Warnings,
-                        );
-                    }
-                    Ok((condition.unwrap_or_default(), substack.unwrap_or_default()))
-                }
-                /// Result is bubbled
-                fn convert_if_else(
-                    block: &project_json::Sb3NormalBlock,
-                    block_id: &str,
-                    blocks: &HashMap<String, project_json::Sb3Block>,
-                    context: &mut DetranspilerContext,
-                    target_index: usize,
-                    alternative_branches: &mut Vec<(ast_types::Expression, ast_types::CodeBlock)>,
-                    first_if_branch: bool,
-                ) -> DetranspilerResult<(OptionalIfBranch, ElseBranch)> {
-                    let mut tracked_args = 0_usize;
-                    let condition = get_input!((
-                        block,
-                        block_id,
-                        blocks,
-                        context,
-                        target_index,
-                        tracked_args,
-                        "CONDITION"
-                    ) as Input);
-                    let substack_1 = get_input!((
-                        block,
-                        block_id,
-                        blocks,
-                        context,
-                        target_index,
-                        tracked_args,
-                        "SUBSTACK"
-                    ) as Stack);
-                    let (condition, substack_1) = if !first_if_branch {
-                        alternative_branches.push((
-                            condition.unwrap_or_default(),
-                            substack_1.unwrap_or_default(),
-                        ));
-                        (None, None)
-                    } else {
-                        (condition, substack_1)
-                    };
-                    let (else_if_else, substack_2) =
-                        if let Some(input) = block.inputs.get("SUBSTACK2") {
-                            tracked_args += 1;
-                            let input_repr = get_primary_input_repr(input);
-                            match input_repr {
-                                project_json::Sb3InputRepr::Reference(block_id) => {
-                                    if let Some(block) = unwrap_or_emit_message!(
-                                        blocks
-                                            .get(block_id)
-                                            .ok_or_else(|| {
-                                                GrazeDetranspilerError::InvalidBlockReference {
-                                                    block_id: block_id.clone(),
-                                                }
-                                            })
-                                            .map(Some),
-                                        context,
-                                        None
-                                    ) {
-                                        if let project_json::Sb3Block::Normal(block) = block
-                                            && block.opcode.as_str() == "control_if_else"
-                                            && block.next.is_none()
-                                        {
-                                            (
-                                                unwrap_or_emit_message!(
-                                                    convert_if_else(
-                                                        block,
-                                                        block_id,
-                                                        blocks,
-                                                        context,
-                                                        target_index,
-                                                        alternative_branches,
-                                                        false
-                                                    )
-                                                    .map(Some),
-                                                    context,
-                                                    None
-                                                ),
-                                                None,
-                                            )
-                                        } else if let project_json::Sb3Block::Normal(block) = block
-                                            && block.opcode.as_str() == "control_if"
-                                            && block.next.is_none()
-                                        {
-                                            if let Some(if_branch) = unwrap_or_emit_message!(
-                                                convert_if(
-                                                    block,
-                                                    block_id,
-                                                    blocks,
-                                                    context,
-                                                    target_index
-                                                )
-                                                .map(Some),
-                                                context,
-                                                None
-                                            ) {
-                                                alternative_branches.push(if_branch);
-                                            }
-                                            (Some((None, None)), None)
-                                        } else {
-                                            (
-                                                None,
-                                                Some(convert_block_stack(
-                                                    block,
-                                                    block_id,
-                                                    blocks,
-                                                    context,
-                                                    target_index,
-                                                )?),
-                                            )
-                                        }
-                                    } else {
-                                        (None, None)
-                                    }
-                                }
-                                project_json::Sb3InputRepr::PrimitiveBlock(_) => {
-                                    emit_error!(
-                                        GrazeDetranspilerError::PrimitiveBlockAsSubstack {
-                                            block_id: block_id.to_string(),
-                                            input_name: "SUBSTACK2".to_string()
-                                        },
-                                        context
-                                    );
-                                    (None, None)
-                                }
-                                project_json::Sb3InputRepr::Missing => (None, None),
-                            }
-                        } else {
-                            (None, None)
-                        };
-                    if tracked_args != block.inputs.len() {
-                        for key in block.inputs.keys() {
-                            if matches!(key.as_str(), "CONDITION" | "SUBSTACK" | "SUBSTACK2") {
-                                continue;
-                            }
-                            emit_message(
-                                context,
-                                || {
-                                    GrazeDetranspilerWarning::UnusedInput {
-                                        input: key.clone(),
-                                        block_id: block_id.to_string(),
-                                    }
-                                    .into()
-                                },
-                                GrazeMessageSetting::Warnings,
-                            );
-                        }
-                    }
-                    for key in block.fields.keys() {
-                        emit_message(
-                            context,
-                            || {
-                                GrazeDetranspilerWarning::UnusedField {
-                                    field: key.clone(),
-                                    block_id: block_id.to_string(),
-                                }
-                                .into()
-                            },
-                            GrazeMessageSetting::Warnings,
-                        );
-                    }
-                    Ok((
-                        if first_if_branch {
-                            Some((
-                                condition.unwrap_or_default(),
-                                substack_1.unwrap_or_default(),
-                            ))
-                        } else {
-                            None
-                        },
-                        if let Some((_, else_branch)) = else_if_else {
-                            else_branch
-                        } else {
-                            Some(substack_2.unwrap_or_default())
-                        },
-                    ))
-                }
-                let mut alternative_branches = Vec::new();
-                let (first_branch, else_branch) = convert_if_else(
+            /// Result is bubbled
+            fn convert_if_else(
+                block: &project_json::Sb3NormalBlock,
+                block_id: &str,
+                blocks: &HashMap<String, project_json::Sb3Block>,
+                context: &mut DetranspilerContext,
+                target_index: usize,
+                alternative_branches: &mut Vec<(ast_types::Expression, ast_types::CodeBlock)>,
+                first_if_branch: bool,
+            ) -> DetranspilerResult<(OptionalIfBranch, ElseBranch)> {
+                let mut tracked_args = 0_usize;
+                let condition = get_input!((
                     block,
                     block_id,
                     blocks,
                     context,
                     target_index,
-                    &mut alternative_branches,
-                    true,
-                )?;
-                return Ok((
-                    ast_types::Statement::IfElse {
-                        first_branch: first_branch.unwrap(),
-                        alternative_branches,
-                        else_branch,
+                    tracked_args,
+                    "CONDITION"
+                ) as Input);
+                let substack_1 = get_input!((
+                    block,
+                    block_id,
+                    blocks,
+                    context,
+                    target_index,
+                    tracked_args,
+                    "SUBSTACK"
+                ) as Stack);
+                let (condition, substack_1) = if !first_if_branch {
+                    alternative_branches.push((
+                        condition.unwrap_or_default(),
+                        substack_1.unwrap_or_default(),
+                    ));
+                    (None, None)
+                } else {
+                    (condition, substack_1)
+                };
+                let (else_if_else, substack_2) = if let Some(input) = block.inputs.get("SUBSTACK2")
+                {
+                    tracked_args += 1;
+                    let input_repr = get_primary_input_repr(input);
+                    match input_repr {
+                        project_json::Sb3InputRepr::Reference(block_id) => {
+                            if let Some(block) = unwrap_or_emit_message!(
+                                blocks
+                                    .get(block_id)
+                                    .ok_or_else(|| {
+                                        GrazeDetranspilerError::InvalidBlockReference {
+                                            block_id: block_id.clone(),
+                                        }
+                                    })
+                                    .map(Some),
+                                context,
+                                None
+                            ) {
+                                if let project_json::Sb3Block::Normal(block) = block
+                                    && block.opcode.as_str() == "control_if_else"
+                                    && block.next.is_none()
+                                {
+                                    (
+                                        unwrap_or_emit_message!(
+                                            convert_if_else(
+                                                block,
+                                                block_id,
+                                                blocks,
+                                                context,
+                                                target_index,
+                                                alternative_branches,
+                                                false
+                                            )
+                                            .map(Some),
+                                            context,
+                                            None
+                                        ),
+                                        None,
+                                    )
+                                } else if let project_json::Sb3Block::Normal(block) = block
+                                    && block.opcode.as_str() == "control_if"
+                                    && block.next.is_none()
+                                {
+                                    if let Some(if_branch) = unwrap_or_emit_message!(
+                                        convert_if(block, block_id, blocks, context, target_index)
+                                            .map(Some),
+                                        context,
+                                        None
+                                    ) {
+                                        alternative_branches.push(if_branch);
+                                    }
+                                    (Some((None, None)), None)
+                                } else {
+                                    (
+                                        None,
+                                        Some(convert_block_stack(
+                                            block,
+                                            block_id,
+                                            blocks,
+                                            context,
+                                            target_index,
+                                        )?),
+                                    )
+                                }
+                            } else {
+                                (None, None)
+                            }
+                        }
+                        project_json::Sb3InputRepr::PrimitiveBlock(_) => {
+                            emit_error!(
+                                GrazeDetranspilerError::PrimitiveBlockAsSubstack {
+                                    block_id: block_id.to_string(),
+                                    input_name: "SUBSTACK2".to_string()
+                                },
+                                context
+                            );
+                            (None, None)
+                        }
+                        project_json::Sb3InputRepr::Missing => (None, None),
+                    }
+                } else {
+                    (None, None)
+                };
+                if tracked_args != block.inputs.len() {
+                    for key in block.inputs.keys() {
+                        if matches!(key.as_str(), "CONDITION" | "SUBSTACK" | "SUBSTACK2") {
+                            continue;
+                        }
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnusedInput {
+                                    input: key.clone(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                }
+                for key in block.fields.keys() {
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: key.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                Ok((
+                    if first_if_branch {
+                        Some((
+                            condition.unwrap_or_default(),
+                            substack_1.unwrap_or_default(),
+                        ))
+                    } else {
+                        None
                     },
-                    block.next.as_deref().map(Into::into),
-                ));
+                    if let Some((_, else_branch)) = else_if_else {
+                        else_branch
+                    } else {
+                        Some(substack_2.unwrap_or_default())
+                    },
+                ))
             }
+            let mut alternative_branches = Vec::new();
+            let (first_branch, else_branch) = convert_if_else(
+                block,
+                block_id,
+                blocks,
+                context,
+                target_index,
+                &mut alternative_branches,
+                true,
+            )?;
+            Ok((
+                ast_types::Statement::IfElse {
+                    first_branch: first_branch.unwrap(),
+                    alternative_branches,
+                    else_branch,
+                },
+                block.next.as_deref().map(Into::into),
+            ))
         }
+        SpecialStackBlockInfo::ClearList => {
+            let Some(field_value) = block.fields.get(LIST_STR) else {
+                return Err(GrazeDetranspilerError::MissingField {
+                    field: LIST_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let (name, id) = match field_value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    return Err(GrazeDetranspilerError::UnknownList {
+                        id: "null".to_string(),
+                        name: name.to_string(),
+                    });
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let (list, is_list) =
+                lookup_var_or_list(&name.as_cow_str(), id, target_index, context)?
+                    .map(|value| {
+                        (
+                            Some(value.name.clone()),
+                            matches!(value.kind, DetranspilerVarOrListKind::List { .. }),
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnknownVLBValue {
+                                    field: LIST_STR.to_string(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        (None, false)
+                    });
+            for input in block.inputs.keys() {
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnusedInput {
+                            input: input.clone(),
+                            block_id: block_id.to_string(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            if block.fields.len() != 1 {
+                for field in block.fields.keys() {
+                    if field.as_str() == LIST_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: field.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            Ok((
+                if is_list && let Some(list) = list {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![list, literal!("clear")],
+                        arguments: Vec::new(),
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![literal!("delete_all_of_list")],
+                        arguments: vec![
+                            list.map(|value| {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            })
+                            .unwrap_or_default(),
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::AddToList => {
+            let Some(field_value) = block.fields.get(LIST_STR) else {
+                return Err(GrazeDetranspilerError::MissingField {
+                    field: LIST_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let (name, id) = match field_value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    return Err(GrazeDetranspilerError::UnknownList {
+                        id: "null".to_string(),
+                        name: name.to_string(),
+                    });
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let (list, is_list) =
+                lookup_var_or_list(&name.as_cow_str(), id, target_index, context)?
+                    .map(|value| {
+                        (
+                            Some(value.name.clone()),
+                            matches!(value.kind, DetranspilerVarOrListKind::List { .. }),
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnknownVLBValue {
+                                    field: LIST_STR.to_string(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        (None, false)
+                    });
+            let Some(input) = block.inputs.get(ITEM_STR) else {
+                return Err(GrazeDetranspilerError::MissingInput {
+                    input: ITEM_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let input_repr = get_primary_input_repr(input);
+            let item = match input_repr {
+                project_json::Sb3InputRepr::Reference(block_id) => 'a: {
+                    let inner_block = unwrap_or_emit_message!(
+                        blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        }),
+                        context,
+                        break 'a ast_types::Expression::default()
+                    );
+
+                    convert_reporter_block(inner_block, block_id, blocks, context, target_index)?
+                }
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, context, target_index),
+                    context,
+                    ast_types::Expression::default()
+                ),
+                project_json::Sb3InputRepr::Missing => {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: ITEM_STR.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    ast_types::Expression::default()
+                }
+            };
+            if block.inputs.len() != 1 {
+                for input in block.inputs.keys() {
+                    if input.as_str() == ITEM_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: input.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            if block.fields.len() != 1 {
+                for field in block.fields.keys() {
+                    if field.as_str() == LIST_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: field.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            Ok((
+                if is_list && let Some(list) = list {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![list, literal!("push")],
+                        arguments: vec![item],
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![literal!("add_to_list")],
+                        arguments: vec![
+                            list.map(|value| {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            })
+                            .unwrap_or_default(),
+                            item,
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+    }
+}
+
+/// Result is unbubbled
+pub fn convert_stack_block(
+    block: &project_json::Sb3Block,
+    block_id: &str,
+    blocks: &HashMap<String, project_json::Sb3Block>,
+    context: &mut DetranspilerContext,
+    target_index: usize,
+) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
+    // TODO: Implement list assignment in detranspiler
+    // Issue: #106
+    let project_json::Sb3Block::Normal(block) = block else {
+        return Err(GrazeDetranspilerError::PrimitiveBlockAsStackBlock {
+            block_id: block_id.to_string(),
+        });
+    };
+    if let Some(stack_block) = check_special_stack_block(block) {
+        return convert_special_stack_block(
+            stack_block,
+            block,
+            block_id,
+            blocks,
+            context,
+            target_index,
+        );
     }
     let mut has_substack = false;
     let (block_kind_info, parameters, stack_params) = convert_block(

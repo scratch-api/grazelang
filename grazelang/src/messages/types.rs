@@ -615,6 +615,8 @@ pub enum GrazeDetranspilerError {
     MissingField { field: String, block_id: String },
     #[assoc(internal_lint_id = "missing_field_in_monitor")]
     MissingFieldInMonitor { field: String },
+    #[assoc(internal_lint_id = "missing_menu_field")]
+    MissingMenuField { field: String, block_id: String },
     #[assoc(internal_lint_id = "missing_mutation")]
     MissingMutation { block_id: String },
     #[assoc(internal_lint_id = "incorrect_mutation_type")]
@@ -643,10 +645,6 @@ pub enum GrazeDetranspilerWarning {
     UnusedField { field: String, block_id: String },
     #[assoc(internal_lint_id = "unused_input")]
     UnusedInput { input: String, block_id: String },
-    #[assoc(internal_lint_id = "unexpected_empty_input")]
-    UnexpectedEmptyInput { input: String, block_id: String },
-    #[assoc(internal_lint_id = "missing_menu_field")]
-    MissingMenuField { field: String, block_id: String },
     #[assoc(internal_lint_id = "unknown_vlb_value")]
     UnknownVLBValue { field: String, block_id: String },
     #[assoc(internal_lint_id = "unknown_vlb_value_in_monitor")]
