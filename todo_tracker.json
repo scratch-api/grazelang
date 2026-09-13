@@ -977,10 +977,10 @@
     },
     "131": {
         "filepath": "grazelang/src/detranspiler/core.rs",
-        "text": "",
+        "text": "- [x] Costume, Backdrop and Sound versions of `MenuInput`\n- [x] Target version of `MenuInput`\n- [ ] Backdrop field",
         "status": "open",
-        "lines": "L786-L786",
-        "commit": "371c7aea8f08e483aa8a4d9477094802542964d4",
-        "title": "Implement costume, backdrop and sound inputs"
+        "lines": "L800-L804",
+        "commit": "ea01fbe459387fbc61e475d656cfb8de9640d663",
+        "title": "Implement costume inputs etc in detranspiler"
     }
 }
