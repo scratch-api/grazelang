@@ -797,12 +797,6 @@ pub fn convert_project(
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
 
-// TODO: Implement costume inputs etc in detranspiler
-//  - [x] Costume, Backdrop and Sound versions of `MenuInput`
-//  - [x] Target version of `MenuInput`
-//  - [x] Backdrop field
-// Issue: #131
-
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
 // A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
