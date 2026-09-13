@@ -800,7 +800,7 @@ pub fn convert_project(
 // TODO: Implement costume inputs etc in detranspiler
 //  - [x] Costume, Backdrop and Sound versions of `MenuInput`
 //  - [x] Target version of `MenuInput`
-//  - [ ] Backdrop field
+//  - [x] Backdrop field
 // Issue: #131
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
@@ -1305,6 +1305,7 @@ pub fn add_monitor(
                             | ArgumentKind::MenuInput { .. }
                             | ArgumentKind::StackInput
                             | ArgumentKind::BroadcastField
+                            | ArgumentKind::BackdropField
                     ) {
                         emit_error!(
                             GrazeDetranspilerError::InvalidMonitorOpcode {
@@ -1370,10 +1371,11 @@ pub fn add_monitor(
                             };
                             create_simple_identifier(var_or_list.name.clone())
                         }
-                        ArgumentKind::BroadcastField => unreachable!(),
-                        ArgumentKind::Input => unreachable!(),
-                        ArgumentKind::StackInput => unreachable!(),
-                        ArgumentKind::MenuInput { .. } => unreachable!(),
+                        ArgumentKind::BroadcastField
+                        | ArgumentKind::BackdropField
+                        | ArgumentKind::Input
+                        | ArgumentKind::StackInput
+                        | ArgumentKind::MenuInput { .. } => unreachable!(),
                     });
                 }
                 (
@@ -2133,6 +2135,55 @@ where
                     }),
                 );
             }
+            ArgumentKind::BackdropField => {
+                let Some(field_value) = block.fields.get(argument_name.as_str()) else {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingField {
+                            field: argument_name.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    parameters.push(ast_types::Expression::default());
+                    continue;
+                };
+                let project_json::Sb3FieldValue::Normal(name) = field_value else {
+                    parameters.push(ast_types::Expression::default());
+                    continue;
+                };
+                let target = context.targets.get(context.stage_target_index).unwrap();
+                parameters.push(
+                    target
+                        .costume_indices
+                        .get(&*name.as_cow_str())
+                        .and_then(|value| target.costumes.get(*value))
+                        .map(|(_, value)| {
+                            ast_types::Expression::Identifier(
+                                if target_index != context.stage_target_index {
+                                    ast_types::Identifier::new(vec![
+                                        ast_types::SingleIdentifier::new(literal!("stage")),
+                                        ast_types::SingleIdentifier::new(value.name.clone()),
+                                    ])
+                                } else {
+                                    create_simple_identifier(value.name.clone())
+                                },
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            emit_message(
+                                context,
+                                || {
+                                    GrazeDetranspilerWarning::UnknownBackdrop {
+                                        name: name.to_string(),
+                                    }
+                                    .into()
+                                },
+                                GrazeMessageSetting::Warnings,
+                            );
+                            ast_types::Expression::default()
+                        }),
+                );
+            }
             ArgumentKind::Input => {
                 let Some(input) = block.inputs.get(argument_name.as_str()) else {
                     parameters.push(ast_types::Expression::default());
@@ -2428,20 +2479,32 @@ pub fn convert_dynamic_menu_input(
         field_value: &str,
         context: &DetranspilerContext,
         target_index: usize,
-    ) -> Option<ast_types::Expression> {
+    ) -> Option<IString> {
         let target = context.targets.get(target_index).unwrap();
         let costume_index = *target.costume_indices.get(field_value)?;
         let costume_info = &target.costumes.get(costume_index)?.1;
-        Some(ast_types::Expression::Identifier(create_simple_identifier(
-            costume_info.name.clone(),
-        )))
+        Some(costume_info.name.clone())
     }
     Some(match dynamic_menu_input_kind {
         DynamicMenuInputKind::Costume => {
-            convert_costume_dynamic_input_menu(field_value, context, target_index)?
+            ast_types::Expression::Identifier(create_simple_identifier(
+                convert_costume_dynamic_input_menu(field_value, context, target_index)?,
+            ))
         }
         DynamicMenuInputKind::Backdrop => {
-            convert_costume_dynamic_input_menu(field_value, context, context.stage_target_index)?
+            let name = convert_costume_dynamic_input_menu(
+                field_value,
+                context,
+                context.stage_target_index,
+            )?;
+            ast_types::Expression::Identifier(if target_index != context.stage_target_index {
+                ast_types::Identifier::new(vec![
+                    ast_types::SingleIdentifier::new(literal!("stage")),
+                    ast_types::SingleIdentifier::new(name),
+                ])
+            } else {
+                create_simple_identifier(name)
+            })
         }
         DynamicMenuInputKind::Sound => {
             let target = context.targets.get(target_index).unwrap();

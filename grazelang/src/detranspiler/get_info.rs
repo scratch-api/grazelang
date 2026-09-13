@@ -35,7 +35,7 @@ pub enum ArgumentKind {
     Field,
     VariableOrListField,
     BroadcastField,
-    // BackdropField,
+    BackdropField,
     Input,
     StackInput,
     MenuInput {
@@ -863,7 +863,7 @@ where
         "event_whenbackdropswitchesto" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("BACKDROP"),
-                kind: ArgumentKind::Field,
+                kind: ArgumentKind::BackdropField,
                 ignore: false,
             }],
             block_category: EVENTS_CATEGORY.clone(),
