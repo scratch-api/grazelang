@@ -14,20 +14,23 @@ use super::{
 };
 use crate::{
     ast::types::{self as ast_types},
+    codegen::core::{STAGE_FIELD_VALUE_ISTRING, STAGE_ISTRING},
     detranspiler::{
-        get_info::{SpecialStackBlockInfo, check_special_stack_block},
+        get_info::{DynamicMenuInputKind, SpecialStackBlockInfo, check_special_stack_block},
         into_ast::{data_to_data_declaration, data_to_split_data_declaration},
     },
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
     names::{DetranspilerAssetNamespace, DetranspilerTargetNamespace},
+    parser::cst::EMPTY_ISTRING_REF,
     settings::{GrazeDetranspilerSettings, GrazeMessageSetting},
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DetranspilerContext {
-    pub stage_target_idx: usize,
+    pub stage_target_index: usize,
     pub targets: Vec<DetranspilerTarget>,
+    pub target_indices: HashMap<IString, usize>,
     pub asset_namespace: DetranspilerAssetNamespace,
     pub assets: HashMap<AssetPath, OutAssetPath>,
     pub messages: Vec<GrazeDetranspilerMessage>,
@@ -51,8 +54,11 @@ type ProcedureParameterInternalName = IString;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DetranspilerTarget {
     pub is_stage: bool,
+    pub internal_name: IString,
     pub costumes: Vec<(AssetId, DetranspilerAsset<DetranspilerCostumeUncommonData>)>,
+    pub costume_indices: HashMap<IString, usize>,
     pub sounds: Vec<(AssetId, DetranspilerAsset<DetranspilerSoundUncommonData>)>,
+    pub sound_indices: HashMap<IString, usize>,
     pub data: HashMap<DataId, DetranspilerVarOrList>,
     pub namespace: DetranspilerTargetNamespace,
     pub monitors: Vec<DetranspilerMonitor>,
@@ -296,17 +302,17 @@ where
 pub fn lookup_vlb<'a>(
     name: &str,
     id: &str,
-    target_idx: usize,
+    target_index: usize,
     context: &'a mut DetranspilerContext,
 ) -> DetranspilerResult<Option<BorrowedDetranspilerVLB<'a>>> {
     let result = context
         .targets
-        .get(context.stage_target_idx)
+        .get(context.stage_target_index)
         .and_then(|value| value.data.get(id))
         .or_else(|| {
             context
                 .targets
-                .get(target_idx)
+                .get(target_index)
                 .and_then(|value| value.data.get(id))
         })
         .map(BorrowedDetranspilerVLB::VarOrList)
@@ -359,17 +365,17 @@ pub fn lookup_broadcast<'a>(
 pub fn lookup_var_or_list<'a>(
     name: &str,
     id: &str,
-    target_idx: usize,
+    target_index: usize,
     context: &'a mut DetranspilerContext,
 ) -> DetranspilerResult<Option<&'a DetranspilerVarOrList>> {
     let result = context
         .targets
-        .get(context.stage_target_idx)
+        .get(context.stage_target_index)
         .and_then(|value| value.data.get(id))
         .or_else(|| {
             context
                 .targets
-                .get(target_idx)
+                .get(target_index)
                 .and_then(|value| value.data.get(id))
         });
     if let Some(value) = &result
@@ -390,12 +396,12 @@ pub fn lookup_var_or_list<'a>(
 
 pub fn find_var_or_list_by_name<'a>(
     name: &str,
-    target_idx: usize,
+    target_index: usize,
     context: &'a mut DetranspilerContext,
 ) -> Option<&'a DetranspilerVarOrList> {
     context
         .targets
-        .get(context.stage_target_idx)
+        .get(context.stage_target_index)
         .and_then(|value: &DetranspilerTarget| {
             value
                 .data
@@ -403,7 +409,7 @@ pub fn find_var_or_list_by_name<'a>(
                 .find(|value| value.1.get_original_name().as_str() == name)
         })
         .or_else(|| {
-            context.targets.get(target_idx).and_then(|value| {
+            context.targets.get(target_index).and_then(|value| {
                 value
                     .data
                     .iter()
@@ -457,8 +463,9 @@ pub fn convert_project(
         }};
     }
     let mut context = DetranspilerContext {
-        stage_target_idx: 0,
-        targets: Vec::new(),
+        stage_target_index: 0,
+        targets: Vec::with_capacity(project.targets.len()),
+        target_indices: HashMap::with_capacity(project.targets.len()),
         asset_namespace: DetranspilerAssetNamespace::new(),
         assets: HashMap::new(),
         messages: Vec::new(),
@@ -469,43 +476,45 @@ pub fn convert_project(
         global_namespace: DetranspilerTargetNamespace::new(),
     };
     let mut has_stage = false;
-    let mut target_names = HashMap::with_capacity(project.targets.len());
     let target_internal_names = project
         .targets
         .iter()
         .map(|value| {
-            let canonical_name = IString::from(&value.name);
-            let name = context
-                .global_namespace
-                .introduce_new_name(canonical_name.clone(), None);
-            (canonical_name, name)
-        })
-        .collect::<Vec<_>>();
-    for target in &project.targets {
-        if target.is_stage {
-            if has_stage {
-                emit_error_top_level!(context, GrazeDetranspilerError::MultipleStages);
-            }
-            context.broadcasts.reserve(target.broadcasts.len());
-            for (id, canonical_name) in &target.broadcasts {
-                let canonical_name = IString::from(canonical_name);
+            if value.is_stage {
+                (EMPTY_ISTRING_REF.clone(), EMPTY_ISTRING_REF.clone())
+            } else {
+                let canonical_name = IString::from(&value.name);
                 let name = context
                     .global_namespace
                     .introduce_new_name(canonical_name.clone(), None);
-                context.broadcasts.insert(
-                    id.to_string(),
-                    DetranspilerBroadcast {
-                        canonical_name: (name != canonical_name).then_some(canonical_name),
-                        name,
-                    },
-                );
+                (canonical_name, name)
             }
-            has_stage = true;
-        } else {
+        })
+        .collect::<Vec<_>>();
+    for target in &project.targets {
+        if !target.is_stage {
             continue;
         }
+        if has_stage {
+            emit_error_top_level!(context, GrazeDetranspilerError::MultipleStages);
+        }
+        context.broadcasts.reserve(target.broadcasts.len());
+        for (id, canonical_name) in &target.broadcasts {
+            let canonical_name = IString::from(canonical_name);
+            let name = context
+                .global_namespace
+                .introduce_new_name(canonical_name.clone(), None);
+            context.broadcasts.insert(
+                id.to_string(),
+                DetranspilerBroadcast {
+                    canonical_name: (name != canonical_name).then_some(canonical_name),
+                    name,
+                },
+            );
+        }
+        has_stage = true;
         let target = unwrap_bubbled_result_or!(
-            context => convert_target(target, context),
+            context => convert_target(target, context, STAGE_ISTRING.clone()),
             context
         );
         context.targets.push(target);
@@ -516,40 +525,45 @@ pub fn convert_project(
         }).map(Some),
         context
     );
-    for (idx, target) in project.targets.iter().enumerate() {
+    for (index, target) in project.targets.iter().enumerate() {
         if target.is_stage
             && let Some(stage) = stage.take()
         {
-            context.stage_target_idx = context.targets.len();
+            context.stage_target_index = context.targets.len();
             context.targets.push(stage);
+            context
+                .target_indices
+                .insert(STAGE_FIELD_VALUE_ISTRING.clone(), index);
             continue;
         } else {
-            target_names.insert(target.name.clone(), idx);
+            context
+                .target_indices
+                .insert(target.name.as_str().into(), index);
         }
         let target = unwrap_bubbled_result_or!(
-            context => convert_target(target, context),
+            context => convert_target(target, context, target_internal_names.get(index).unwrap().1.clone()),
             context
         );
         context.targets.push(target);
     }
     for monitor in &project.monitors {
-        let target_idx = monitor
+        let target_index = monitor
             .sprite_name
-            .as_ref()
-            .and_then(|value| target_names.get(value))
+            .as_deref()
+            .and_then(|value| context.target_indices.get(value))
             .copied()
-            .unwrap_or(context.stage_target_idx);
+            .unwrap_or(context.stage_target_index);
         unwrap_bubbled_result_or!(
-            context => add_monitor(monitor, context, target_idx),
+            context => add_monitor(monitor, context, target_index),
             context
         );
     }
     if context.unreturned_failure {
         return Err(context.messages);
     }
-    for (idx, target) in project.targets.iter().enumerate() {
+    for (index, target) in project.targets.iter().enumerate() {
         unwrap_bubbled_result_or!(
-            context => fill_target(target, context, idx),
+            context => fill_target(target, context, index),
             context
         );
     }
@@ -593,7 +607,7 @@ pub fn convert_project(
     for broadcast in context.broadcasts.values() {
         statements.push(broadcast.into_ast());
     }
-    for (target_idx, target) in context.targets.iter_mut().enumerate() {
+    for (target_index, target) in context.targets.iter_mut().enumerate() {
         statements.push(if target.is_stage {
             let mut stage_statements = Vec::with_capacity(
                 1 + target.costumes.len()
@@ -753,7 +767,7 @@ pub fn convert_project(
             std::mem::take(&mut target.scripts)
                 .into_iter()
                 .for_each(|value| sprite_statements.push(value.into_ast()));
-            let (canonical_name, name) = target_internal_names.get(target_idx).unwrap();
+            let (canonical_name, name) = target_internal_names.get(target_index).unwrap();
             ast_types::TopLevelStatement::Sprite {
                 canonical_identifier: (canonical_name != name)
                     .then(|| ast_types::CanonicalIdentifier::new(canonical_name.clone())),
@@ -783,7 +797,10 @@ pub fn convert_project(
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
 
-// TODO: Implement costume, backdrop and sound inputs
+// TODO: Implement costume inputs etc in detranspiler
+//  - [x] Costume, Backdrop and Sound versions of `MenuInput`
+//  - [x] Target version of `MenuInput`
+//  - [ ] Backdrop field
 // Issue: #131
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
@@ -797,6 +814,7 @@ pub fn convert_project(
 pub fn convert_target(
     target: &project_json::Sb3Target,
     context: &mut DetranspilerContext,
+    internal_name: IString,
 ) -> DetranspilerResult<DetranspilerTarget> {
     fn get_asset_path_and_register_asset(
         context: &mut DetranspilerContext,
@@ -833,63 +851,67 @@ pub fn convert_target(
         ((name != canonical_name).then_some(canonical_name), name)
     }
     let mut namespace = DetranspilerTargetNamespace::new();
-    let costumes = target
-        .costumes
-        .iter()
-        .map(|value| {
-            (value.asset_id.clone(), {
-                let (canonical_name, name) = get_canonical_name_and_name(
-                    &mut namespace,
-                    value.name.as_str().into(),
-                    target.is_stage,
+    let mut costumes = Vec::with_capacity(target.costumes.len());
+    let mut costume_indices = HashMap::with_capacity(target.costumes.len());
+    for costume in &target.costumes {
+        let original_name = IString::from(costume.name.as_str());
+        let (canonical_name, name) = get_canonical_name_and_name(
+            &mut namespace,
+            original_name.clone(),
+            target.is_stage,
+            context,
+        );
+        costumes.push((
+            costume.asset_id.clone(),
+            DetranspilerAsset {
+                canonical_name,
+                name,
+                file_extension: costume.data_format.clone(),
+                uncommon_data: DetranspilerCostumeUncommonData {
+                    rotation_center_x: costume.rotation_center_x,
+                    rotation_center_y: costume.rotation_center_y,
+                },
+                asset_path: get_asset_path_and_register_asset(
                     context,
-                );
-                DetranspilerAsset {
-                    canonical_name,
-                    name,
-                    file_extension: value.data_format.clone(),
-                    uncommon_data: DetranspilerCostumeUncommonData {
-                        rotation_center_x: value.rotation_center_x,
-                        rotation_center_y: value.rotation_center_y,
-                    },
-                    asset_path: get_asset_path_and_register_asset(
-                        context,
-                        &value.name,
-                        &value.asset_id,
-                        &value.data_format,
-                        &value.md5ext,
-                    ),
-                }
-            })
-        })
-        .collect();
-    let sounds = target
-        .sounds
-        .iter()
-        .map(|value| {
-            (value.asset_id.clone(), {
-                let (canonical_name, name) = get_canonical_name_and_name(
-                    &mut namespace,
-                    value.name.as_str().into(),
-                    target.is_stage,
+                    &costume.name,
+                    &costume.asset_id,
+                    &costume.data_format,
+                    &costume.md5ext,
+                ),
+            },
+        ));
+        let index = costume_indices.len();
+        costume_indices.insert(original_name, index);
+    }
+    let mut sounds = Vec::with_capacity(target.costumes.len());
+    let mut sound_indices = HashMap::with_capacity(target.costumes.len());
+    for sound in &target.sounds {
+        let original_name = IString::from(sound.name.as_str());
+        let (canonical_name, name) = get_canonical_name_and_name(
+            &mut namespace,
+            original_name.clone(),
+            target.is_stage,
+            context,
+        );
+        sounds.push((
+            sound.asset_id.clone(),
+            DetranspilerAsset {
+                canonical_name,
+                name,
+                file_extension: sound.data_format.clone(),
+                uncommon_data: DetranspilerSoundUncommonData,
+                asset_path: get_asset_path_and_register_asset(
                     context,
-                );
-                DetranspilerAsset {
-                    canonical_name,
-                    name,
-                    file_extension: value.data_format.clone(),
-                    uncommon_data: DetranspilerSoundUncommonData,
-                    asset_path: get_asset_path_and_register_asset(
-                        context,
-                        &value.name,
-                        &value.asset_id,
-                        &value.data_format,
-                        &value.md5ext,
-                    ),
-                }
-            })
-        })
-        .collect();
+                    &sound.name,
+                    &sound.asset_id,
+                    &sound.data_format,
+                    &sound.md5ext,
+                ),
+            },
+        ));
+        let index = sound_indices.len();
+        sound_indices.insert(original_name, index);
+    }
     let mut data = HashMap::with_capacity(target.variables.len() + target.lists.len());
     for (id, variable) in &target.variables {
         let (canonical_name, name) = get_canonical_name_and_name(
@@ -1162,8 +1184,11 @@ pub fn convert_target(
     }
     Ok(DetranspilerTarget {
         is_stage: target.is_stage,
+        internal_name,
         costumes,
+        costume_indices,
         sounds,
+        sound_indices,
         data,
         namespace,
         monitors: Vec::new(),
@@ -1177,7 +1202,7 @@ pub fn convert_target(
 pub fn add_monitor(
     monitor: &project_json::Sb3Monitor,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<()> {
     enum MonitorKind {
         List,
@@ -1194,7 +1219,7 @@ pub fn add_monitor(
                         .map(|value| value.as_cow_str())
                         .unwrap_or_default(),
                     &monitor.id,
-                    target_idx,
+                    target_index,
                     context,
                 ),
                 context,
@@ -1228,7 +1253,7 @@ pub fn add_monitor(
                         .map(|value| value.as_cow_str())
                         .unwrap_or_default(),
                     &monitor.id,
-                    target_idx,
+                    target_index,
                     context,
                 ),
                 context,
@@ -1333,7 +1358,7 @@ pub fn add_monitor(
                                 continue;
                             };
                             let Some(var_or_list) =
-                                find_var_or_list_by_name(&name.as_cow_str(), target_idx, context)
+                                find_var_or_list_by_name(&name.as_cow_str(), target_index, context)
                             else {
                                 emit_error!(
                                     GrazeDetranspilerError::UnknownVLBName {
@@ -1514,7 +1539,7 @@ pub fn add_monitor(
     }
     context
         .targets
-        .get_mut(target_idx)
+        .get_mut(target_index)
         .unwrap()
         .monitors
         .push(DetranspilerMonitor { value, config });
@@ -1525,7 +1550,7 @@ pub fn add_monitor(
 pub fn fill_target(
     target: &project_json::Sb3Target,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<()> {
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(normal_block) = block else {
@@ -1537,7 +1562,13 @@ pub fn fill_target(
         let block_stack = match get_block_shape(&normal_block.opcode) {
             BlockShape::Hat => {
                 let (hat_function, arguments) = unwrap_or_emit_message!(
-                    convert_hat_block(normal_block, block_id, &target.blocks, context, target_idx),
+                    convert_hat_block(
+                        normal_block,
+                        block_id,
+                        &target.blocks,
+                        context,
+                        target_index
+                    ),
                     context,
                     {
                         let block_stack = if let Some(next_block_id) = &normal_block.next
@@ -1551,12 +1582,12 @@ pub fn fill_target(
                                 next_block_id,
                                 &target.blocks,
                                 context,
-                                target_idx,
+                                target_index,
                             )?
                         } else {
                             ast_types::CodeBlock::default()
                         };
-                        context.targets.get_mut(target_idx).unwrap().scripts.push(
+                        context.targets.get_mut(target_index).unwrap().scripts.push(
                             DetranspilerTargetBlockStack::IsolatedStack {
                                 code_block: block_stack,
                             },
@@ -1580,7 +1611,7 @@ pub fn fill_target(
                                 next_block_id,
                                 &target.blocks,
                                 context,
-                                target_idx,
+                                target_index,
                             )?
                         } else {
                             ast_types::CodeBlock::default()
@@ -1632,7 +1663,7 @@ pub fn fill_target(
                 };
                 let Some(procedure) = context
                     .targets
-                    .get(target_idx)
+                    .get(target_index)
                     .unwrap()
                     .procedures
                     .get(proccode.as_str())
@@ -1655,7 +1686,7 @@ pub fn fill_target(
                         },
                         &target.blocks,
                         context,
-                        target_idx
+                        target_index
                     ),
                     context,
                     continue
@@ -1667,7 +1698,7 @@ pub fn fill_target(
                     block_id,
                     &target.blocks,
                     context,
-                    target_idx,
+                    target_index,
                 )?,
             },
             BlockShape::Reporter => DetranspilerTargetBlockStack::IsolatedExpression {
@@ -1676,13 +1707,13 @@ pub fn fill_target(
                     block_id,
                     &target.blocks,
                     context,
-                    target_idx,
+                    target_index,
                 )?,
             },
         };
         context
             .targets
-            .get_mut(target_idx)
+            .get_mut(target_index)
             .unwrap()
             .scripts
             .push(block_stack);
@@ -1751,8 +1782,8 @@ pub fn convert_procedure_prototype_for_namespace(
 pub fn check_proccode_name_eligibility(proccode: &str, arguments: usize) -> Option<&str> {
     let start_pos = proccode.len().checked_sub(arguments * 3)?;
     for i in 0..arguments {
-        let idx = start_pos + i * 3;
-        if !matches!(&proccode.get(idx..idx + 3), Some(" %s" | " %b" | " %n")) {
+        let index = start_pos + i * 3;
+        if !matches!(&proccode.get(index..index + 3), Some(" %s" | " %b" | " %n")) {
             return None;
         }
     }
@@ -1813,7 +1844,7 @@ pub fn convert_procedure_definition(
     procedure_info: ProcedureInfo<'_>,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<DetranspilerTargetBlockStack> {
     let mut parameters = Vec::with_capacity(procedure_info.argument_names.len());
     let mut proccode_chars = procedure_info.proccode.chars();
@@ -1839,7 +1870,7 @@ pub fn convert_procedure_definition(
             let original_name = IString::from(original_name);
             let chosen_name = context
                 .targets
-                .get_mut(target_idx)
+                .get_mut(target_index)
                 .unwrap()
                 .namespace
                 .introduce_new_name(
@@ -1863,11 +1894,11 @@ pub fn convert_procedure_definition(
             context,
             None
         ) {
-        convert_block_stack(next_block, next_block_id, blocks, context, target_idx)?
+        convert_block_stack(next_block, next_block_id, blocks, context, target_index)?
     } else {
         ast_types::CodeBlock::default()
     };
-    let namespace = &mut context.targets.get_mut(target_idx).unwrap().namespace;
+    let namespace = &mut context.targets.get_mut(target_index).unwrap().namespace;
     for (_, _, ast_types::SingleIdentifier { value: name }) in &parameters {
         namespace.used_names.remove(name);
     }
@@ -1904,7 +1935,7 @@ pub fn convert_reporter_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     Ok(try_or_emit_message!(
         match block {
@@ -1914,16 +1945,29 @@ pub fn convert_reporter_block(
                     block_id,
                     blocks,
                     context,
-                    target_idx,
+                    target_index,
                 )
             }
             project_json::Sb3Block::Primitive(sb3_primitive_block) => {
-                convert_primitive_reporter_block(sb3_primitive_block, context, target_idx)
+                convert_primitive_reporter_block(sb3_primitive_block, context, target_index)
             }
         },
         context,
         Ok(ast_types::Expression::default())
     ))
+}
+
+#[inline]
+pub fn get_primary_input_repr(
+    input_value: &project_json::Sb3InputValue,
+) -> &project_json::Sb3InputRepr {
+    let (project_json::Sb3InputValue::Shadow(input_repr)
+    | project_json::Sb3InputValue::NoShadow(input_repr)
+    | project_json::Sb3InputValue::ObscuredShadow {
+        value: input_repr,
+        shadow: _,
+    }) = input_value;
+    input_repr
 }
 
 /// Result is unbubbled
@@ -1932,7 +1976,7 @@ pub fn convert_block<F>(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
     mut on_stack_input: F,
 ) -> DetranspilerResult<(
     BlockKindInfo,
@@ -1987,7 +2031,7 @@ where
                     convert_field_value_info(
                         get_field_value_info(field_value, &block.opcode),
                         field_value,
-                        target_idx,
+                        target_index,
                         context,
                     ),
                     context,
@@ -2015,7 +2059,7 @@ where
                 };
                 parameters.push(
                     unwrap_or_emit_message!(
-                        lookup_var_or_list(&name.as_cow_str(), id, target_idx, context,),
+                        lookup_var_or_list(&name.as_cow_str(), id, target_index, context,),
                         context,
                         {
                             parameters.push(ast_types::Expression::default());
@@ -2095,12 +2139,7 @@ where
                     // ArgumentKind::Input is only for possibly empty inputs
                     continue;
                 };
-                let (project_json::Sb3InputValue::Shadow(input_repr)
-                | project_json::Sb3InputValue::NoShadow(input_repr)
-                | project_json::Sb3InputValue::ObscuredShadow {
-                    value: input_repr,
-                    shadow: _,
-                }) = input;
+                let input_repr = get_primary_input_repr(input);
                 parameters.push(match input_repr {
                     project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
                         unwrap_or_emit_message!(
@@ -2118,10 +2157,10 @@ where
                         block_id,
                         blocks,
                         context,
-                        target_idx,
+                        target_index,
                     )?,
                     project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                        convert_primitive_reporter_block(block, context, target_idx),
+                        convert_primitive_reporter_block(block, context, target_index),
                         context,
                         ast_types::Expression::default()
                     ),
@@ -2137,12 +2176,7 @@ where
                     stack_params.push(ast_types::CodeBlock::default());
                     continue;
                 };
-                let (project_json::Sb3InputValue::Shadow(input_repr)
-                | project_json::Sb3InputValue::NoShadow(input_repr)
-                | project_json::Sb3InputValue::ObscuredShadow {
-                    value: input_repr,
-                    shadow: _,
-                }) = input;
+                let input_repr = get_primary_input_repr(input);
                 stack_params.push(match input_repr {
                     project_json::Sb3InputRepr::Reference(block_id) => convert_block_stack(
                         unwrap_or_emit_message!(
@@ -2160,7 +2194,7 @@ where
                         block_id,
                         blocks,
                         context,
-                        target_idx,
+                        target_index,
                     )?,
                     project_json::Sb3InputRepr::PrimitiveBlock(_) => {
                         emit_error!(
@@ -2183,6 +2217,7 @@ where
                 menu_opcode,
                 menu_field,
                 is_primitive,
+                dynamic_menu_input_kind,
             } => {
                 let Some(input) = block.inputs.get(argument_name.as_str()) else {
                     parameters.push(ast_types::Expression::default());
@@ -2199,12 +2234,7 @@ where
                     );
                     continue;
                 };
-                let (project_json::Sb3InputValue::Shadow(input_repr)
-                | project_json::Sb3InputValue::NoShadow(input_repr)
-                | project_json::Sb3InputValue::ObscuredShadow {
-                    value: input_repr,
-                    shadow: _,
-                }) = input;
+                let input_repr = get_primary_input_repr(input);
                 parameters.push(match input_repr {
                     project_json::Sb3InputRepr::Reference(block_id) => {
                         let inner_block = unwrap_or_emit_message!(
@@ -2254,6 +2284,9 @@ where
                                 );
                             }
                             if let Some(field_value) = inner_block.fields.get(menu_field.as_str()) {
+                                // Plan for using `dynamic_menu_input_kind`:
+                                // Add an `else if` branch below that triggers if `dynamic_menu_input_kind` is some
+                                // and a new function finds an expression that corresponds to it.
                                 if menu_opcode.as_str() == "event_broadcast_menu"
                                     && let project_json::Sb3FieldValue::WithId { value: name, id } =
                                         field_value
@@ -2268,12 +2301,23 @@ where
                                     && *is_primitive
                                 {
                                     ast_types::Expression::Literal(value.into())
+                                } else if let project_json::Sb3FieldValue::Normal(field_value) =
+                                    field_value
+                                    && let Some(dynamic_menu_input_kind) = dynamic_menu_input_kind
+                                    && let Some(expression) = convert_dynamic_menu_input(
+                                        &field_value.as_cow_str(),
+                                        context,
+                                        target_index,
+                                        *dynamic_menu_input_kind,
+                                    )
+                                {
+                                    expression
                                 } else {
                                     unwrap_or_emit_message!(
                                         convert_field_value_info(
                                             get_field_value_info(field_value, menu_opcode),
                                             field_value,
-                                            target_idx,
+                                            target_index,
                                             context
                                         ),
                                         context,
@@ -2304,12 +2348,12 @@ where
                                 block_id,
                                 blocks,
                                 context,
-                                target_idx,
+                                target_index,
                             )?
                         }
                     }
                     project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                        convert_primitive_reporter_block(block, context, target_idx),
+                        convert_primitive_reporter_block(block, context, target_index),
                         context,
                         ast_types::Expression::default()
                     ),
@@ -2374,6 +2418,47 @@ where
     Ok((block_kind_info, parameters, stack_params))
 }
 
+pub fn convert_dynamic_menu_input(
+    field_value: &str,
+    context: &mut DetranspilerContext,
+    target_index: usize,
+    dynamic_menu_input_kind: DynamicMenuInputKind,
+) -> Option<ast_types::Expression> {
+    fn convert_costume_dynamic_input_menu(
+        field_value: &str,
+        context: &DetranspilerContext,
+        target_index: usize,
+    ) -> Option<ast_types::Expression> {
+        let target = context.targets.get(target_index).unwrap();
+        let costume_index = *target.costume_indices.get(field_value)?;
+        let costume_info = &target.costumes.get(costume_index)?.1;
+        Some(ast_types::Expression::Identifier(create_simple_identifier(
+            costume_info.name.clone(),
+        )))
+    }
+    Some(match dynamic_menu_input_kind {
+        DynamicMenuInputKind::Costume => {
+            convert_costume_dynamic_input_menu(field_value, context, target_index)?
+        }
+        DynamicMenuInputKind::Backdrop => {
+            convert_costume_dynamic_input_menu(field_value, context, context.stage_target_index)?
+        }
+        DynamicMenuInputKind::Sound => {
+            let target = context.targets.get(target_index).unwrap();
+            let sound_index = *target.sound_indices.get(field_value)?;
+            let sound_info = &target.sounds.get(sound_index)?.1;
+            ast_types::Expression::Identifier(create_simple_identifier(sound_info.name.clone()))
+        }
+        DynamicMenuInputKind::Target => {
+            let target = *context.target_indices.get(field_value)?;
+            let target_info = context.targets.get(target)?;
+            ast_types::Expression::Identifier(create_simple_identifier(
+                target_info.internal_name.clone(),
+            ))
+        }
+    })
+}
+
 /// Result is bubbled
 pub fn convert_special_reporter_block(
     reporter: SpecialReporterInfo,
@@ -2381,21 +2466,16 @@ pub fn convert_special_reporter_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     /// Result is bubbled
     fn convert_operand_input_value(
         operand: &project_json::Sb3InputValue,
         blocks: &HashMap<String, project_json::Sb3Block>,
         context: &mut DetranspilerContext,
-        target_idx: usize,
+        target_index: usize,
     ) -> DetranspilerResult<ast_types::Expression> {
-        let (project_json::Sb3InputValue::Shadow(input_repr)
-        | project_json::Sb3InputValue::NoShadow(input_repr)
-        | project_json::Sb3InputValue::ObscuredShadow {
-            value: input_repr,
-            shadow: _,
-        }) = operand;
+        let input_repr = get_primary_input_repr(operand);
         Ok(match input_repr {
             project_json::Sb3InputRepr::Reference(block_id) => unwrap_or_emit_message!(
                 blocks
@@ -2406,14 +2486,14 @@ pub fn convert_special_reporter_block(
                         }
                     })
                     .map(|block| {
-                        convert_reporter_block(block, block_id, blocks, context, target_idx)
+                        convert_reporter_block(block, block_id, blocks, context, target_index)
                     }),
                 context,
                 Ok(ast_types::Expression::default())
             )?,
             project_json::Sb3InputRepr::PrimitiveBlock(block) => {
                 unwrap_or_emit_message!(
-                    convert_primitive_reporter_block(block, context, target_idx),
+                    convert_primitive_reporter_block(block, context, target_index),
                     context,
                     ast_types::Expression::default()
                 )
@@ -2431,14 +2511,14 @@ pub fn convert_special_reporter_block(
             let left_operand_expression =
                 if let Some(operand) = block.inputs.get(left_operand.as_str()) {
                     operands_present += 1;
-                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                    convert_operand_input_value(operand, blocks, context, target_index)?
                 } else {
                     ast_types::Expression::default()
                 };
             let right_operand_expression =
                 if let Some(operand) = block.inputs.get(right_operand.as_str()) {
                     operands_present += 1;
-                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                    convert_operand_input_value(operand, blocks, context, target_index)?
                 } else {
                     ast_types::Expression::default()
                 };
@@ -2512,14 +2592,14 @@ pub fn convert_special_reporter_block(
             let left_operand_expression =
                 if let Some(operand) = inner_block.inputs.get(inner_left_operand.as_str()) {
                     inner_operands_present += 1;
-                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                    convert_operand_input_value(operand, blocks, context, target_index)?
                 } else {
                     ast_types::Expression::default()
                 };
             let right_operand_expression =
                 if let Some(operand) = inner_block.inputs.get(inner_right_operand.as_str()) {
                     inner_operands_present += 1;
-                    convert_operand_input_value(operand, blocks, context, target_idx)?
+                    convert_operand_input_value(operand, blocks, context, target_index)?
                 } else {
                     ast_types::Expression::default()
                 };
@@ -2606,7 +2686,7 @@ pub fn convert_special_reporter_block(
             let mut operands_present = 0;
             let mut unused_field_present = 0;
             let operand_expression = if let Some(operand) = block.inputs.get(operand.as_str()) {
-                convert_operand_input_value(operand, blocks, context, target_idx)?
+                convert_operand_input_value(operand, blocks, context, target_index)?
             } else {
                 ast_types::Expression::default()
             };
@@ -2753,7 +2833,7 @@ pub fn convert_special_reporter_block(
             };
             let name = name.as_cow_str();
             let variable =
-                lookup_var_or_list(&name, id, target_idx, context)?.ok_or_else(|| {
+                lookup_var_or_list(&name, id, target_index, context)?.ok_or_else(|| {
                     GrazeDetranspilerError::UnknownVariable {
                         id: id.clone(),
                         name: name.to_string(),
@@ -2791,7 +2871,7 @@ pub fn convert_special_reporter_block(
                 project_json::Sb3FieldValue::WithId { value, id } => (value, id),
             };
             let name = name.as_cow_str();
-            let list = lookup_var_or_list(&name, id, target_idx, context)?.ok_or_else(|| {
+            let list = lookup_var_or_list(&name, id, target_index, context)?.ok_or_else(|| {
                 GrazeDetranspilerError::UnknownList {
                     id: id.clone(),
                     name: name.to_string(),
@@ -2846,11 +2926,16 @@ pub fn convert_normal_reporter_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     if let Some(reporter) = check_special_reporter(block, blocks) {
         return convert_special_reporter_block(
-            reporter, block, block_id, blocks, context, target_idx,
+            reporter,
+            block,
+            block_id,
+            blocks,
+            context,
+            target_index,
         );
     }
     let (block_kind_info, parameters, _) = convert_block(
@@ -2858,7 +2943,7 @@ pub fn convert_normal_reporter_block(
         block_id,
         blocks,
         context,
-        target_idx,
+        target_index,
         |context, input_name| {
             emit_error!(
                 GrazeDetranspilerError::SubstackInReporter {
@@ -2884,7 +2969,7 @@ pub fn convert_normal_reporter_block(
 pub fn convert_field_value_info(
     field_value_info: Option<FieldValueInfo>,
     field_value: &project_json::Sb3FieldValue,
-    target_idx: usize,
+    target_index: usize,
     context: &mut DetranspilerContext,
 ) -> DetranspilerResult<ast_types::Expression> {
     Ok(match field_value_info {
@@ -2897,7 +2982,7 @@ pub fn convert_field_value_info(
             }
             project_json::Sb3FieldValue::WithId { value, id } => {
                 ast_types::Expression::Identifier({
-                    let vlb = lookup_vlb(&value.as_cow_str(), id, target_idx, context)?
+                    let vlb = lookup_vlb(&value.as_cow_str(), id, target_index, context)?
                         .ok_or_else(|| GrazeDetranspilerError::UnknownVariable {
                             id: id.clone(),
                             name: value.to_string(),
@@ -2932,7 +3017,7 @@ pub fn create_vlb_identifier(broadcast: InternalVLBIdentifier) -> ast_types::Ide
 pub fn convert_primitive_reporter_block(
     block: &project_json::Sb3PrimitiveBlock,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
     match block {
         project_json::Sb3PrimitiveBlock::Number(sb3_primitive)
@@ -2961,12 +3046,13 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            let variable = lookup_var_or_list(name, id, target_idx, context)?.ok_or_else(|| {
-                GrazeDetranspilerError::UnknownVariable {
-                    id: id.clone(),
-                    name: name.clone(),
-                }
-            })?;
+            let variable =
+                lookup_var_or_list(name, id, target_index, context)?.ok_or_else(|| {
+                    GrazeDetranspilerError::UnknownVariable {
+                        id: id.clone(),
+                        name: name.clone(),
+                    }
+                })?;
             Ok(ast_types::Expression::Identifier(create_simple_identifier(
                 variable.name.clone(),
             )))
@@ -2977,7 +3063,7 @@ pub fn convert_primitive_reporter_block(
             x: _,
             y: _,
         } => {
-            let list = lookup_var_or_list(name, id, target_idx, context)?.ok_or_else(|| {
+            let list = lookup_var_or_list(name, id, target_index, context)?.ok_or_else(|| {
                 GrazeDetranspilerError::UnknownVariable {
                     id: id.clone(),
                     name: name.clone(),
@@ -2996,14 +3082,14 @@ pub fn convert_hat_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<(ast_types::Identifier, Vec<ast_types::Expression>)> {
     let (block_kind_info, parameters, _) = convert_block(
         block,
         block_id,
         blocks,
         context,
-        target_idx,
+        target_index,
         |context, input_name| {
             emit_error!(
                 GrazeDetranspilerError::SubstackInHatBlock {
@@ -3028,7 +3114,7 @@ pub fn convert_block_stack(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<ast_types::CodeBlock> {
     // TODO: Implement cycle detection in block conversions
     // Issue: #109
@@ -3042,7 +3128,7 @@ pub fn convert_block_stack(
                 &current_block_id,
                 blocks,
                 context,
-                target_idx
+                target_index
             ),
             context,
             break
@@ -3065,7 +3151,7 @@ pub fn convert_stack_block(
     block_id: &str,
     blocks: &HashMap<String, project_json::Sb3Block>,
     context: &mut DetranspilerContext,
-    target_idx: usize,
+    target_index: usize,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
     // TODO: Implement list assignment in detranspiler
     // Issue: #106
@@ -3094,7 +3180,7 @@ pub fn convert_stack_block(
                 };
                 let Some(procedure_info) = context
                     .targets
-                    .get(target_idx)
+                    .get(target_index)
                     .unwrap()
                     .procedures
                     .get(procedure_code.as_str())
@@ -3113,12 +3199,7 @@ pub fn convert_stack_block(
                         continue;
                     };
                     tracked_args += 1;
-                    let (project_json::Sb3InputValue::Shadow(input_repr)
-                    | project_json::Sb3InputValue::NoShadow(input_repr)
-                    | project_json::Sb3InputValue::ObscuredShadow {
-                        value: input_repr,
-                        shadow: _,
-                    }) = input;
+                    let input_repr = get_primary_input_repr(input);
                     arguments.push(match input_repr {
                         project_json::Sb3InputRepr::Reference(block_id) => convert_reporter_block(
                             unwrap_or_emit_message!(
@@ -3136,11 +3217,11 @@ pub fn convert_stack_block(
                             block_id,
                             blocks,
                             context,
-                            target_idx,
+                            target_index,
                         )?,
                         project_json::Sb3InputRepr::PrimitiveBlock(block) => {
                             unwrap_or_emit_message!(
-                                convert_primitive_reporter_block(block, context, target_idx),
+                                convert_primitive_reporter_block(block, context, target_index),
                                 context,
                                 ast_types::Expression::default()
                             )
@@ -3196,15 +3277,10 @@ pub fn convert_stack_block(
                 type IfBranch = (ast_types::Expression, ast_types::CodeBlock);
                 type OptionalIfBranch = Option<IfBranch>;
                 macro_rules! get_input {
-                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_idx:expr, $tracked_args:ident, $name:expr) as Input) => {
+                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_index:expr, $tracked_args:ident, $name:expr) as Input) => {
                         if let Some(input) = $block.inputs.get($name) {
                             $tracked_args += 1;
-                            let (project_json::Sb3InputValue::Shadow(input_repr)
-                            | project_json::Sb3InputValue::NoShadow(input_repr)
-                            | project_json::Sb3InputValue::ObscuredShadow {
-                                value: input_repr,
-                                shadow: _,
-                            }) = input;
+                            let input_repr = get_primary_input_repr(input);
                             match input_repr {
                                 project_json::Sb3InputRepr::Reference(block_id) => {
                                     unwrap_or_emit_message!(
@@ -3225,7 +3301,7 @@ pub fn convert_stack_block(
                                             block_id,
                                             $blocks,
                                             $context,
-                                            $target_idx,
+                                            $target_index,
                                         )
                                     })
                                     .transpose()?
@@ -3235,7 +3311,7 @@ pub fn convert_stack_block(
                                         convert_primitive_reporter_block(
                                             block,
                                             $context,
-                                            $target_idx
+                                            $target_index
                                         ),
                                         $context,
                                         ast_types::Expression::default()
@@ -3249,15 +3325,10 @@ pub fn convert_stack_block(
                             None
                         }
                     };
-                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_idx:expr, $tracked_args:ident, $name:literal) as Stack) => {
+                    (($block:expr, $block_id:expr, $blocks:expr, $context:expr, $target_index:expr, $tracked_args:ident, $name:literal) as Stack) => {
                         if let Some(input) = $block.inputs.get($name) {
                             $tracked_args += 1;
-                            let (project_json::Sb3InputValue::Shadow(input_repr)
-                            | project_json::Sb3InputValue::NoShadow(input_repr)
-                            | project_json::Sb3InputValue::ObscuredShadow {
-                                value: input_repr,
-                                shadow: _,
-                            }) = input;
+                            let input_repr = get_primary_input_repr(input);
                             match input_repr {
                                 project_json::Sb3InputRepr::Reference(block_id) => {
                                     unwrap_or_emit_message!(
@@ -3278,7 +3349,7 @@ pub fn convert_stack_block(
                                             block_id,
                                             $blocks,
                                             $context,
-                                            $target_idx,
+                                            $target_index,
                                         )
                                     })
                                     .transpose()?
@@ -3305,7 +3376,7 @@ pub fn convert_stack_block(
                     block_id: &str,
                     blocks: &HashMap<String, project_json::Sb3Block>,
                     context: &mut DetranspilerContext,
-                    target_idx: usize,
+                    target_index: usize,
                 ) -> DetranspilerResult<IfBranch> {
                     let mut tracked_args = 0_usize;
                     let condition = get_input!((
@@ -3313,7 +3384,7 @@ pub fn convert_stack_block(
                         block_id,
                         blocks,
                         context,
-                        target_idx,
+                        target_index,
                         tracked_args,
                         "CONDITION"
                     ) as Input);
@@ -3322,7 +3393,7 @@ pub fn convert_stack_block(
                         block_id,
                         blocks,
                         context,
-                        target_idx,
+                        target_index,
                         tracked_args,
                         "SUBSTACK"
                     ) as Stack);
@@ -3365,7 +3436,7 @@ pub fn convert_stack_block(
                     block_id: &str,
                     blocks: &HashMap<String, project_json::Sb3Block>,
                     context: &mut DetranspilerContext,
-                    target_idx: usize,
+                    target_index: usize,
                     alternative_branches: &mut Vec<(ast_types::Expression, ast_types::CodeBlock)>,
                     first_if_branch: bool,
                 ) -> DetranspilerResult<(OptionalIfBranch, ElseBranch)> {
@@ -3375,7 +3446,7 @@ pub fn convert_stack_block(
                         block_id,
                         blocks,
                         context,
-                        target_idx,
+                        target_index,
                         tracked_args,
                         "CONDITION"
                     ) as Input);
@@ -3384,7 +3455,7 @@ pub fn convert_stack_block(
                         block_id,
                         blocks,
                         context,
-                        target_idx,
+                        target_index,
                         tracked_args,
                         "SUBSTACK"
                     ) as Stack);
@@ -3400,12 +3471,7 @@ pub fn convert_stack_block(
                     let (else_if_else, substack_2) =
                         if let Some(input) = block.inputs.get("SUBSTACK2") {
                             tracked_args += 1;
-                            let (project_json::Sb3InputValue::Shadow(input_repr)
-                            | project_json::Sb3InputValue::NoShadow(input_repr)
-                            | project_json::Sb3InputValue::ObscuredShadow {
-                                value: input_repr,
-                                shadow: _,
-                            }) = input;
+                            let input_repr = get_primary_input_repr(input);
                             match input_repr {
                                 project_json::Sb3InputRepr::Reference(block_id) => {
                                     if let Some(block) = unwrap_or_emit_message!(
@@ -3431,7 +3497,7 @@ pub fn convert_stack_block(
                                                         block_id,
                                                         blocks,
                                                         context,
-                                                        target_idx,
+                                                        target_index,
                                                         alternative_branches,
                                                         false
                                                     )
@@ -3447,7 +3513,11 @@ pub fn convert_stack_block(
                                         {
                                             if let Some(if_branch) = unwrap_or_emit_message!(
                                                 convert_if(
-                                                    block, block_id, blocks, context, target_idx
+                                                    block,
+                                                    block_id,
+                                                    blocks,
+                                                    context,
+                                                    target_index
                                                 )
                                                 .map(Some),
                                                 context,
@@ -3460,7 +3530,11 @@ pub fn convert_stack_block(
                                             (
                                                 None,
                                                 Some(convert_block_stack(
-                                                    block, block_id, blocks, context, target_idx,
+                                                    block,
+                                                    block_id,
+                                                    blocks,
+                                                    context,
+                                                    target_index,
                                                 )?),
                                             )
                                         }
@@ -3536,7 +3610,7 @@ pub fn convert_stack_block(
                     block_id,
                     blocks,
                     context,
-                    target_idx,
+                    target_index,
                     &mut alternative_branches,
                     true,
                 )?;
@@ -3557,7 +3631,7 @@ pub fn convert_stack_block(
         block_id,
         blocks,
         context,
-        target_idx,
+        target_index,
         |context, input_name| {
             if has_substack {
                 emit_error!(
