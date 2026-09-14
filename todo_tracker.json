@@ -982,5 +982,37 @@
         "lines": "L800-L804",
         "commit": "f8e0bdeff6b06cfd5e5e830b1c48e8381a2a6760",
         "title": "Implement costume inputs etc in detranspiler"
+    },
+    "132": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L815-L815",
+        "commit": "2414527f859a2b0342381d22170001abbb8e2294",
+        "title": "Allow detranspiler to use a single file per target"
+    },
+    "133": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L813-L813",
+        "commit": "2414527f859a2b0342381d22170001abbb8e2294",
+        "title": "Sort blocks by content for better git diffs between automatically generated graze files"
+    },
+    "134": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L811-L811",
+        "commit": "2414527f859a2b0342381d22170001abbb8e2294",
+        "title": "Add option to configure formatting after detranspilation"
+    },
+    "135": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "Instead of e.g. `property_of_object(\"volume\", stage)`, `stage.volume` should be used",
+        "status": "open",
+        "lines": "L808-L809",
+        "commit": "2414527f859a2b0342381d22170001abbb8e2294",
+        "title": "Convert `property_of_object` idiomatically in detranspiler"
     }
 }
