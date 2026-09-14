@@ -805,6 +805,15 @@ pub fn convert_project(
 //  - [ ] `get` as a `Expression::GetItem`
 // Issue: #120
 
+// TODO: Convert `property_of_object` idiomatically in detranspiler
+// Instead of e.g. `property_of_object("volume", stage)`, `stage.volume` should be used
+
+// TODO: Add option to configure formatting after detranspilation
+
+// TODO: Sort blocks by content for better git diffs between automatically generated graze files
+
+// TODO: Allow detranspiler to use a single file per target
+
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
 
