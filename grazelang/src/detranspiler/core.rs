@@ -3728,6 +3728,105 @@ pub fn convert_special_stack_block(
                     );
                 }
             }
+            let next_block_id = block.next.as_deref().map(IString::from);
+            if is_list && let Some(list) = &list {
+                const LENGTH_THRESHOLD: usize = 3;
+                let mut current_string_values = Vec::new();
+                let mut current_string = String::new();
+                let mut current_string_chars = 0;
+                let mut next_block_id = next_block_id.clone();
+                let mut entries = Vec::new();
+                while let Some(next_block_id_non_null) = &next_block_id
+                    && let Some(project_json::Sb3Block::Normal(next_block)) =
+                        blocks.get(next_block_id_non_null.as_str())
+                    && let Some(SpecialStackBlockInfo::AddToList) =
+                        check_special_stack_block(next_block)
+                    && matches!(
+                        next_block.fields.get(LIST_STR),
+                        Some(project_json::Sb3FieldValue::WithId { value: next_block_value, id: next_block_id }) if next_block_value == name && next_block_id == id
+                    )
+                {
+                    let (expression, new_block_id) = unwrap_or_emit_message!(
+                        convert_special_stack_block(
+                            SpecialStackBlockInfo::AddToList,
+                            next_block,
+                            next_block_id_non_null,
+                            blocks,
+                            context,
+                            target_index,
+                        )
+                        .map(|(statement, next_block_id)| {
+                            (
+                                match statement {
+                                    ast_types::Statement::Call {
+                                        function: _,
+                                        arguments,
+                                    } => arguments.into_iter().next_back(),
+                                    _ => None,
+                                },
+                                next_block_id,
+                            )
+                        }),
+                        context,
+                        (None, next_block.next.as_deref().map(Into::into))
+                    );
+                    if let Some(ast_types::Expression::Literal(ast_types::Literal::String(value))) =
+                        &expression
+                        && value
+                            .chars()
+                            .try_fold(0, |state, _| (state == 0).then_some(1))
+                            == Some(1)
+                    {
+                        current_string_values.push(value.clone());
+                        current_string.push_str(value);
+                        current_string_chars += 1;
+                    } else {
+                        if current_string_chars >= LENGTH_THRESHOLD {
+                            entries.reserve(2);
+                            entries.push(ast_types::ListEntry::Unwrap(ast_types::Literal::String(
+                                current_string.as_str().into(),
+                            )));
+                        } else if current_string_chars > 0 {
+                            entries.reserve(current_string_chars + 1);
+                            for c in &current_string_values {
+                                entries.push(ast_types::ListEntry::Expression(
+                                    ast_types::Expression::Literal(ast_types::Literal::String(
+                                        c.clone(),
+                                    )),
+                                ));
+                            }
+                        }
+                        current_string_values.clear();
+                        current_string.clear();
+                        current_string_chars = 0;
+                        entries.push(ast_types::ListEntry::Expression(
+                            expression.unwrap_or_default(),
+                        ));
+                    }
+                    next_block_id = new_block_id;
+                }
+                if current_string_chars >= LENGTH_THRESHOLD {
+                    entries.push(ast_types::ListEntry::Unwrap(ast_types::Literal::String(
+                        current_string.as_str().into(),
+                    )));
+                } else if current_string_chars > 0 {
+                    entries.reserve(current_string_chars);
+                    for c in &current_string_values {
+                        entries.push(ast_types::ListEntry::Expression(
+                            ast_types::Expression::Literal(ast_types::Literal::String(c.clone())),
+                        ));
+                    }
+                }
+                if !entries.is_empty() {
+                    return Ok((
+                        ast_types::Statement::ListAssignment {
+                            target: create_simple_identifier(list.clone()),
+                            value: entries,
+                        },
+                        next_block_id,
+                    ));
+                }
+            }
             Ok((
                 if is_list && let Some(list) = list {
                     ast_types::Statement::Call {
@@ -3745,7 +3844,7 @@ pub fn convert_special_stack_block(
                         ],
                     }
                 },
-                block.next.as_deref().map(Into::into),
+                next_block_id,
             ))
         }
         SpecialStackBlockInfo::AddToList => {
@@ -3804,7 +3903,6 @@ pub fn convert_special_stack_block(
                         context,
                         break 'a ast_types::Expression::default()
                     );
-
                     convert_reporter_block(inner_block, block_id, blocks, context, target_index)?
                 }
                 project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
@@ -3891,8 +3989,6 @@ pub fn convert_stack_block(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
-    // TODO: Implement list assignment in detranspiler
-    // Issue: #106
     let project_json::Sb3Block::Normal(block) = block else {
         return Err(GrazeDetranspilerError::PrimitiveBlockAsStackBlock {
             block_id: block_id.to_string(),
