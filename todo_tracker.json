@@ -794,7 +794,7 @@
     "106": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L811-L811",
         "commit": "16d3eacf9d3748448b0d19158504567c8e7f53f5",
         "title": "Implement list assignment in detranspiler"
