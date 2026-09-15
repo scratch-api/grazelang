@@ -494,7 +494,6 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
             KnownBlock::Variable {
                 bind_info,
                 canonical_name,
-                id,
                 ..
             } => {
                 bind_info.replace(BindInfo {
@@ -509,10 +508,9 @@ pub fn add_bind_info(symbol: &mut Symbol, parent_target: &IString) {
                                 name: literal!("PROPERTY"),
                             },
                             KnownBlock::FieldValue {
-                                value: Sb3FieldValue::WithId {
-                                    value: Sb3Primitive::String(canonical_name.to_string()),
-                                    id: id.to_string(),
-                                },
+                                value: Sb3FieldValue::Normal(Sb3Primitive::String(
+                                    canonical_name.to_string(),
+                                )),
                                 categories: HashSet::from([NO_CATEGORY_ID]),
                             },
                         ),
@@ -1708,7 +1706,7 @@ pub mod helpers {
     use arcstr::ArcStr as IString;
     use grazelang_types::{
         ANY_CATEGORY_ID, CallBlockParam, CallBlockParamKind, CallableKnownBlockSignature,
-        HasShadow, INTEGERS_CATEGORY_ID, KnownBlock,
+        HasShadow, INTEGERS_CATEGORY_ID, KnownBlock, PROPERTIES_CATEGORY_ID,
         project_json::{
             IsShadow, Sb3Block, Sb3BlockMutation, Sb3FieldValue, Sb3InputRepr, Sb3InputValue,
             Sb3NormalBlock, Sb3PrimitiveBlock, Sb3PrimitiveOrBool,
@@ -1929,7 +1927,13 @@ pub mod helpers {
                             GrazeMessageSetting::Warnings,
                         );
                     }
-                    field_value
+                    if *category == PROPERTIES_CATEGORY_ID
+                        && let Sb3FieldValue::WithId { value, id: _ } = field_value
+                    {
+                        Sb3FieldValue::Normal(value)
+                    } else {
+                        field_value
+                    }
                 });
             }
             CallBlockParamKind::MenuInput {
