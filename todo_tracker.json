@@ -1014,5 +1014,13 @@
         "lines": "L808-L809",
         "commit": "2414527f859a2b0342381d22170001abbb8e2294",
         "title": "Convert `property_of_object` idiomatically in detranspiler"
+    },
+    "136": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L824-L824",
+        "commit": "b0da5cf2f8cf6fe3496d7b5fad4061c88c3f4a5a",
+        "title": "Implement formatted strings in detranspiler"
     }
 }
