@@ -3144,6 +3144,7 @@ pub enum SpecialReporterInfo {
     Variable,
     List,
     Broadcast,
+    Join,
 }
 
 pub fn check_special_reporter(
@@ -3223,11 +3224,7 @@ pub fn check_special_reporter(
             left_operand: NUM1.clone(),
             right_operand: NUM2.clone(),
         },
-        "operator_join" => SpecialReporterInfo::BinOp {
-            binop: ast_types::BinOp::Join,
-            left_operand: STRING1.clone(),
-            right_operand: STRING2.clone(),
-        },
+        "operator_join" => SpecialReporterInfo::Join,
         "operator_contains" => SpecialReporterInfo::BinOp {
             binop: ast_types::BinOp::Contains,
             left_operand: STRING1.clone(),

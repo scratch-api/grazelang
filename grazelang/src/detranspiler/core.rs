@@ -821,9 +821,6 @@ pub fn convert_project(
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
 
-// TODO: Implement formatted strings in detranspiler
-// Issue: #136
-
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
 // A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
@@ -2979,6 +2976,209 @@ pub fn convert_special_reporter_block(
                 }
             })?;
             ast_types::Expression::Identifier(create_simple_identifier(broadcast.name.clone()))
+        }
+        SpecialReporterInfo::Join => {
+            const JOIN_OPCODE: &str = "operator_join";
+            const LEFT_OPERAND: &str = "STRING1";
+            const RIGHT_OPERAND: &str = "STRING2";
+            let mut operands_present = 0;
+            /// Result is bubbled
+            fn recursively_convert_formatted_string(
+                block: &project_json::Sb3NormalBlock,
+                block_id: &str,
+                blocks: &HashMap<String, project_json::Sb3Block>,
+                context: &mut DetranspilerContext,
+                target_index: usize,
+                formatted_string_content: &mut Vec<ast_types::FormattedStringContent>,
+            ) -> DetranspilerResult<()> {
+                let mut operands_present = 0;
+                if let Some(left_operand) = block.inputs.get(LEFT_OPERAND) {
+                    operands_present += 1;
+                    if let project_json::Sb3InputRepr::Reference(left_operand_block_id) =
+                        get_primary_input_repr(left_operand)
+                        && let Some(project_json::Sb3Block::Normal(left_operand_block)) =
+                            blocks.get(left_operand_block_id)
+                        && left_operand_block.opcode.as_str() == JOIN_OPCODE
+                    {
+                        recursively_convert_formatted_string(
+                            left_operand_block,
+                            left_operand_block_id,
+                            blocks,
+                            context,
+                            target_index,
+                            formatted_string_content,
+                        )?;
+                    } else {
+                        let value = convert_operand_input_value(
+                            left_operand,
+                            blocks,
+                            context,
+                            target_index,
+                        )?;
+                        formatted_string_content.push(
+                            if let ast_types::Expression::Literal(ast_types::Literal::String(
+                                value,
+                            )) = value
+                            {
+                                ast_types::FormattedStringContent::String(value)
+                            } else {
+                                ast_types::FormattedStringContent::Expression(Box::new(value))
+                            },
+                        );
+                    }
+                }
+                if let Some(right_operand) = block.inputs.get(RIGHT_OPERAND) {
+                    operands_present += 1;
+                    if let project_json::Sb3InputRepr::Reference(right_operand_block_id) =
+                        get_primary_input_repr(right_operand)
+                        && let Some(project_json::Sb3Block::Normal(right_operand_block)) =
+                            blocks.get(right_operand_block_id)
+                        && right_operand_block.opcode.as_str() == JOIN_OPCODE
+                    {
+                        recursively_convert_formatted_string(
+                            right_operand_block,
+                            right_operand_block_id,
+                            blocks,
+                            context,
+                            target_index,
+                            formatted_string_content,
+                        )?;
+                    } else {
+                        let value = convert_operand_input_value(
+                            right_operand,
+                            blocks,
+                            context,
+                            target_index,
+                        )?;
+                        formatted_string_content.push(
+                            if let ast_types::Expression::Literal(ast_types::Literal::String(
+                                value,
+                            )) = value
+                            {
+                                ast_types::FormattedStringContent::String(value)
+                            } else {
+                                ast_types::FormattedStringContent::Expression(Box::new(value))
+                            },
+                        );
+                    }
+                }
+                for key in block.fields.keys() {
+                    let arg = key.clone();
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: arg,
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                if block.inputs.len() != operands_present {
+                    for key in block.inputs.keys() {
+                        if key.as_str() == LEFT_OPERAND || key.as_str() == RIGHT_OPERAND {
+                            continue;
+                        }
+                        let arg = key.clone();
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnusedInput {
+                                    input: arg,
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                    }
+                }
+                Ok(())
+            }
+            if if let Some(left_operand) = block.inputs.get(LEFT_OPERAND)
+                && let project_json::Sb3InputRepr::Reference(left_operand_block_id) =
+                    get_primary_input_repr(left_operand)
+                && let Some(project_json::Sb3Block::Normal(left_operand_block)) =
+                    blocks.get(left_operand_block_id)
+                && left_operand_block.opcode.as_str() == JOIN_OPCODE
+            {
+                true
+            } else if let Some(right_operand) = block.inputs.get(RIGHT_OPERAND)
+                && let project_json::Sb3InputRepr::Reference(right_operand_block_id) =
+                    get_primary_input_repr(right_operand)
+                && let Some(project_json::Sb3Block::Normal(right_operand_block)) =
+                    blocks.get(right_operand_block_id)
+                && right_operand_block.opcode.as_str() == JOIN_OPCODE
+            {
+                true
+            } else {
+                false
+            } {
+                let mut formatted_string_content = Vec::with_capacity(3);
+                recursively_convert_formatted_string(
+                    block,
+                    block_id,
+                    blocks,
+                    context,
+                    target_index,
+                    &mut formatted_string_content,
+                )?;
+                return Ok(ast_types::Expression::FormattedString(
+                    formatted_string_content,
+                ));
+            }
+            let left_operand_expression = if let Some(operand) = block.inputs.get(LEFT_OPERAND) {
+                operands_present += 1;
+                convert_operand_input_value(operand, blocks, context, target_index)?
+            } else {
+                ast_types::Expression::default()
+            };
+            let right_operand_expression = if let Some(operand) = block.inputs.get(RIGHT_OPERAND) {
+                operands_present += 1;
+                convert_operand_input_value(operand, blocks, context, target_index)?
+            } else {
+                ast_types::Expression::default()
+            };
+            for key in block.fields.keys() {
+                let arg = key.clone();
+                emit_message(
+                    context,
+                    || {
+                        GrazeDetranspilerWarning::UnusedField {
+                            field: arg,
+                            block_id: block_id.to_string(),
+                        }
+                        .into()
+                    },
+                    GrazeMessageSetting::Warnings,
+                );
+            }
+            if block.inputs.len() != operands_present {
+                for key in block.inputs.keys() {
+                    if key.as_str() == LEFT_OPERAND || key.as_str() == RIGHT_OPERAND {
+                        continue;
+                    }
+                    let arg = key.clone();
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: arg,
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            ast_types::Expression::BinOp {
+                operator: ast_types::BinOp::Join,
+                left_operand: Box::new(left_operand_expression),
+                right_operand: Box::new(right_operand_expression),
+            }
         }
     })
 }
