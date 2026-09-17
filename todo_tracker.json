@@ -1018,7 +1018,7 @@
     "136": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L824-L824",
         "commit": "b0da5cf2f8cf6fe3496d7b5fad4061c88c3f4a5a",
         "title": "Implement formatted strings in detranspiler"
