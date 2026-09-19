@@ -922,7 +922,7 @@
     "122": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L748-L748",
         "commit": "6aa2c906adfedaa16d861b0c7fece1d05c9bd766",
         "title": "Implement assignments in detranspiler"
@@ -1022,5 +1022,13 @@
         "lines": "L824-L824",
         "commit": "b0da5cf2f8cf6fe3496d7b5fad4061c88c3f4a5a",
         "title": "Implement formatted strings in detranspiler"
+    },
+    "137": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L791-L791",
+        "commit": "0b2740edf8ed632c3b150da735daacde87ae0043",
+        "title": "Improve error handling in order to allow emitting more messages at once"
     }
 }
