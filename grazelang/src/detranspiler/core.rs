@@ -788,8 +788,7 @@ pub fn convert_project(
 // TODO: Implement pretty detranspiler logging
 // Issue: #126
 
-// TODO: Implement assignments in detranspiler
-// Issue: #122
+// TODO: Improve error handling in order to allow emitting more messages at once
 
 // TODO: Implement list methods in detranspiler
 //  - [x] `clear`
@@ -1574,6 +1573,35 @@ pub fn fill_target(
 ) -> DetranspilerResult<()> {
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(normal_block) = block else {
+            match block {
+                project_json::Sb3Block::Primitive(project_json::Sb3PrimitiveBlock::Variable {
+                    x: Some(_),
+                    y: Some(_),
+                    ..
+                })
+                | project_json::Sb3Block::Primitive(project_json::Sb3PrimitiveBlock::List {
+                    x: Some(_),
+                    y: Some(_),
+                    ..
+                }) => {
+                    let block_stack = DetranspilerTargetBlockStack::IsolatedExpression {
+                        expression: convert_reporter_block(
+                            block,
+                            block_id,
+                            &target.blocks,
+                            context,
+                            target_index,
+                        )?,
+                    };
+                    context
+                        .targets
+                        .get_mut(target_index)
+                        .unwrap()
+                        .scripts
+                        .push(block_stack);
+                }
+                _ => (),
+            }
             continue;
         };
         if !normal_block.top_level {
@@ -4181,12 +4209,359 @@ pub fn convert_special_stack_block(
                     }
                 } else {
                     ast_types::Statement::Call {
-                        function: ast_types::identifier![literal!("add_to_list")],
+                        function: create_simple_identifier(literal!("add_to_list")),
                         arguments: vec![
                             list.map(|value| {
                                 ast_types::Expression::Identifier(create_simple_identifier(value))
                             })
                             .unwrap_or_default(),
+                            item,
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::Assignment { kind, input_name } => {
+            let Some(input) = block.inputs.get(input_name.as_str()) else {
+                return Err(GrazeDetranspilerError::MissingInput {
+                    input: input_name.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let input_repr = get_primary_input_repr(input);
+            let value = match input_repr {
+                project_json::Sb3InputRepr::Reference(block_id) => 'a: {
+                    let inner_block = unwrap_or_emit_message!(
+                        blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        }),
+                        context,
+                        break 'a ast_types::Expression::default()
+                    );
+                    convert_reporter_block(inner_block, block_id, blocks, context, target_index)?
+                }
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, context, target_index),
+                    context,
+                    ast_types::Expression::default()
+                ),
+                project_json::Sb3InputRepr::Missing => {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: input_name.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    ast_types::Expression::default()
+                }
+            };
+            Ok((
+                ast_types::Statement::Assignment {
+                    target: create_simple_identifier(kind.get_identifier()),
+                    value,
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::AssignVariable => {
+            const VARIABLE_STR: &str = "VARIABLE";
+            const VALUE_STR: &str = "VALUE";
+            let Some(value_input) = block.inputs.get(VALUE_STR) else {
+                return Err(GrazeDetranspilerError::MissingInput {
+                    input: VALUE_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let value_input_repr = get_primary_input_repr(value_input);
+            let value = match value_input_repr {
+                project_json::Sb3InputRepr::Reference(block_id) => 'a: {
+                    let inner_block = unwrap_or_emit_message!(
+                        blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        }),
+                        context,
+                        break 'a ast_types::Expression::default()
+                    );
+                    convert_reporter_block(inner_block, block_id, blocks, context, target_index)?
+                }
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, context, target_index),
+                    context,
+                    ast_types::Expression::default()
+                ),
+                project_json::Sb3InputRepr::Missing => {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: VALUE_STR.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    ast_types::Expression::default()
+                }
+            };
+            let Some(field_value) = block.fields.get(VARIABLE_STR) else {
+                return Err(GrazeDetranspilerError::MissingField {
+                    field: VARIABLE_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let (name, id) = match field_value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    return Err(GrazeDetranspilerError::UnknownVariable {
+                        id: "null".to_string(),
+                        name: name.to_string(),
+                    });
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let (var, is_var) = lookup_var_or_list(&name.as_cow_str(), id, target_index, context)?
+                .map(|value| {
+                    (
+                        Some(value.name.clone()),
+                        matches!(value.kind, DetranspilerVarOrListKind::Variable { .. }),
+                    )
+                })
+                .unwrap_or_else(|| {
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnknownVLBValue {
+                                field: VARIABLE_STR.to_string(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                    (None, false)
+                });
+            if block.inputs.len() != 1 {
+                for input in block.inputs.keys() {
+                    if input.as_str() == VALUE_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: input.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            if block.fields.len() != 1 {
+                for field in block.fields.keys() {
+                    if field.as_str() == VARIABLE_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: field.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            Ok((
+                if is_var && let Some(var) = var {
+                    ast_types::Statement::Assignment {
+                        target: create_simple_identifier(var),
+                        value,
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: create_simple_identifier(literal!("set_variable_to")),
+                        arguments: vec![
+                            var.map(|value| {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            })
+                            .unwrap_or_default(),
+                            value,
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::SetItem => {
+            const INDEX_STR: &str = "INDEX";
+            let Some(field_value) = block.fields.get(LIST_STR) else {
+                return Err(GrazeDetranspilerError::MissingField {
+                    field: LIST_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let (name, id) = match field_value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    return Err(GrazeDetranspilerError::UnknownList {
+                        id: "null".to_string(),
+                        name: name.to_string(),
+                    });
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let (list, is_list) =
+                lookup_var_or_list(&name.as_cow_str(), id, target_index, context)?
+                    .map(|value| {
+                        (
+                            Some(value.name.clone()),
+                            matches!(value.kind, DetranspilerVarOrListKind::List { .. }),
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnknownVLBValue {
+                                    field: LIST_STR.to_string(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        (None, false)
+                    });
+            let Some(item_input) = block.inputs.get(ITEM_STR) else {
+                return Err(GrazeDetranspilerError::MissingInput {
+                    input: ITEM_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let item_input_repr = get_primary_input_repr(item_input);
+            let item = match item_input_repr {
+                project_json::Sb3InputRepr::Reference(block_id) => 'a: {
+                    let inner_block = unwrap_or_emit_message!(
+                        blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        }),
+                        context,
+                        break 'a ast_types::Expression::default()
+                    );
+                    convert_reporter_block(inner_block, block_id, blocks, context, target_index)?
+                }
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, context, target_index),
+                    context,
+                    ast_types::Expression::default()
+                ),
+                project_json::Sb3InputRepr::Missing => {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: ITEM_STR.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    ast_types::Expression::default()
+                }
+            };
+            let Some(index_input) = block.inputs.get(INDEX_STR) else {
+                return Err(GrazeDetranspilerError::MissingInput {
+                    input: INDEX_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let index_input_repr = get_primary_input_repr(index_input);
+            let index = match index_input_repr {
+                project_json::Sb3InputRepr::Reference(block_id) => 'a: {
+                    let inner_block = unwrap_or_emit_message!(
+                        blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        }),
+                        context,
+                        break 'a ast_types::Expression::default()
+                    );
+                    convert_reporter_block(inner_block, block_id, blocks, context, target_index)?
+                }
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, context, target_index),
+                    context,
+                    ast_types::Expression::default()
+                ),
+                project_json::Sb3InputRepr::Missing => {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: INDEX_STR.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    ast_types::Expression::default()
+                }
+            };
+            if block.inputs.len() != 2 {
+                for input in block.inputs.keys() {
+                    if input.as_str() == ITEM_STR || input.as_str() == INDEX_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: input.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            if block.fields.len() != 1 {
+                for field in block.fields.keys() {
+                    if field.as_str() == LIST_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: field.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            Ok((
+                if is_list && let Some(list) = list {
+                    ast_types::Statement::SetItem {
+                        list: create_simple_identifier(list),
+                        item: index,
+                        value: item,
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: create_simple_identifier(literal!("replace_item_of_list")),
+                        arguments: vec![
+                            list.map(|value| {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            })
+                            .unwrap_or_default(),
+                            index,
                             item,
                         ],
                     }

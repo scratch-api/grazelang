@@ -3356,6 +3356,35 @@ pub enum SpecialStackBlockInfo {
     IfElse,
     ClearList,
     AddToList,
+    Assignment {
+        kind: AssignmentKind,
+        input_name: IString,
+    },
+    AssignVariable,
+    SetItem,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum AssignmentKind {
+    XPosition,
+    YPosition,
+    Direction,
+    Size,
+    Volume,
+    Tempo,
+}
+
+impl AssignmentKind {
+    pub fn get_identifier(self) -> IString {
+        match self {
+            AssignmentKind::XPosition => literal!("x_position"),
+            AssignmentKind::YPosition => literal!("y_position"),
+            AssignmentKind::Direction => literal!("direction"),
+            AssignmentKind::Size => literal!("size"),
+            AssignmentKind::Volume => literal!("volume"),
+            AssignmentKind::Tempo => literal!("tempo"),
+        }
+    }
 }
 
 pub fn check_special_stack_block(
@@ -3366,6 +3395,32 @@ pub fn check_special_stack_block(
         "control_if_else" => Some(SpecialStackBlockInfo::IfElse),
         "data_deletealloflist" => Some(SpecialStackBlockInfo::ClearList),
         "data_addtolist" => Some(SpecialStackBlockInfo::AddToList),
+        "motion_setx" => Some(SpecialStackBlockInfo::Assignment {
+            kind: AssignmentKind::XPosition,
+            input_name: literal!("X"),
+        }),
+        "motion_sety" => Some(SpecialStackBlockInfo::Assignment {
+            kind: AssignmentKind::YPosition,
+            input_name: literal!("Y"),
+        }),
+        "motion_pointindirection" => Some(SpecialStackBlockInfo::Assignment {
+            kind: AssignmentKind::Direction,
+            input_name: literal!("DIRECTION"),
+        }),
+        "looks_setsizeto" => Some(SpecialStackBlockInfo::Assignment {
+            kind: AssignmentKind::Size,
+            input_name: literal!("SIZE"),
+        }),
+        "sound_setvolumeto" => Some(SpecialStackBlockInfo::Assignment {
+            kind: AssignmentKind::Volume,
+            input_name: literal!("VOLUME"),
+        }),
+        "music_setTempo" => Some(SpecialStackBlockInfo::Assignment {
+            kind: AssignmentKind::Tempo,
+            input_name: literal!("TEMPO"),
+        }),
+        "data_setvariableto" => Some(SpecialStackBlockInfo::AssignVariable),
+        "data_replaceitemoflist" => Some(SpecialStackBlockInfo::SetItem),
         _ => None,
     }
 }

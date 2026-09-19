@@ -369,7 +369,9 @@ impl From<&Sb3Primitive> for Literal {
             Sb3Primitive::String(value) => Literal::String(value.as_str().into()),
             Sb3Primitive::Int128(value) => Literal::DecimalInt(format_istring!("{value}")),
             Sb3Primitive::Int(value) => Literal::DecimalInt(format_istring!("{value}")),
-            Sb3Primitive::Float(value) => Literal::DecimalFloat(format_istring!("{value}")),
+            Sb3Primitive::Float(value) => {
+                Literal::DecimalFloat(ryu_js::Buffer::new().format(*value).into())
+            }
         }
     }
 }
@@ -380,7 +382,9 @@ impl From<&Sb3PrimitiveOrBool> for Literal {
             Sb3PrimitiveOrBool::String(value) => Literal::String(value.as_str().into()),
             Sb3PrimitiveOrBool::Int128(value) => Literal::DecimalInt(format_istring!("{value}")),
             Sb3PrimitiveOrBool::Int(value) => Literal::DecimalInt(format_istring!("{value}")),
-            Sb3PrimitiveOrBool::Float(value) => Literal::DecimalFloat(format_istring!("{value}")),
+            Sb3PrimitiveOrBool::Float(value) => {
+                Literal::DecimalFloat(ryu_js::Buffer::new().format(*value).into())
+            }
             Sb3PrimitiveOrBool::Bool(value) => Literal::Bool(*value),
         }
     }
