@@ -994,7 +994,7 @@
     "133": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L813-L813",
         "commit": "2414527f859a2b0342381d22170001abbb8e2294",
         "title": "Sort blocks by content for better git diffs between automatically generated graze files"
