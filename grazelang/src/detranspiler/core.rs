@@ -64,7 +64,7 @@ pub struct DetranspilerTarget {
     pub monitors: Vec<DetranspilerMonitor>,
     pub config: Vec<ast_types::DictionaryEntry>,
     pub procedures: HashMap<IString, DetranspilerCustomBlockDescriptor>,
-    pub scripts: Vec<DetranspilerTargetBlockStack>,
+    pub scripts: Vec<(String, DetranspilerTargetBlockStack)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -684,7 +684,7 @@ pub fn convert_project(
                 .for_each(|value| stage_statements.push(value.into_ast()));
             std::mem::take(&mut target.scripts)
                 .into_iter()
-                .for_each(|value| stage_statements.push(value.into_ast()));
+                .for_each(|(_, value)| stage_statements.push(value.into_ast()));
             ast_types::TopLevelStatement::Stage {
                 code_block: ast_types::StageCodeBlock {
                     statements: stage_statements,
@@ -766,7 +766,7 @@ pub fn convert_project(
                 .for_each(|value| sprite_statements.push(value.into_ast()));
             std::mem::take(&mut target.scripts)
                 .into_iter()
-                .for_each(|value| sprite_statements.push(value.into_ast()));
+                .for_each(|(_, value)| sprite_statements.push(value.into_ast()));
             let (canonical_name, name) = target_internal_names.get(target_index).unwrap();
             ast_types::TopLevelStatement::Sprite {
                 canonical_identifier: (canonical_name != name)
@@ -811,9 +811,6 @@ pub fn convert_project(
 
 // TODO: Add option to configure formatting after detranspilation
 // Issue: #134
-
-// TODO: Sort blocks by content for better git diffs between automatically generated graze files
-// Issue: #133
 
 // TODO: Allow detranspiler to use a single file per target
 // Issue: #132
@@ -1599,7 +1596,7 @@ pub fn fill_target(
                         .get_mut(target_index)
                         .unwrap()
                         .scripts
-                        .push(block_stack);
+                        .push((block_id.clone(), block_stack));
                 }
                 _ => (),
             }
@@ -1636,11 +1633,17 @@ pub fn fill_target(
                         } else {
                             ast_types::CodeBlock::default()
                         };
-                        context.targets.get_mut(target_index).unwrap().scripts.push(
-                            DetranspilerTargetBlockStack::IsolatedStack {
-                                code_block: block_stack,
-                            },
-                        );
+                        context
+                            .targets
+                            .get_mut(target_index)
+                            .unwrap()
+                            .scripts
+                            .push((
+                                block_id.clone(),
+                                DetranspilerTargetBlockStack::IsolatedStack {
+                                    code_block: block_stack,
+                                },
+                            ));
                         continue;
                     }
                 );
@@ -1765,8 +1768,14 @@ pub fn fill_target(
             .get_mut(target_index)
             .unwrap()
             .scripts
-            .push(block_stack);
+            .push((block_id.clone(), block_stack));
     }
+    context
+        .targets
+        .get_mut(target_index)
+        .unwrap()
+        .scripts
+        .sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
     Ok(())
 }
 
