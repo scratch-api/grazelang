@@ -3145,6 +3145,7 @@ pub enum SpecialReporterInfo {
     List,
     Broadcast,
     Join,
+    GetItem,
 }
 
 pub fn check_special_reporter(
@@ -3346,6 +3347,7 @@ pub fn check_special_reporter(
         "data_variable" => SpecialReporterInfo::Variable,
         "data_listcontents" => SpecialReporterInfo::List,
         "event_broadcast_menu" => SpecialReporterInfo::Broadcast,
+        "data_itemoflist" => SpecialReporterInfo::GetItem,
         _ => return None,
     })
 }

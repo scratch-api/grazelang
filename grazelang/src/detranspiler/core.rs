@@ -801,8 +801,8 @@ pub fn convert_project(
 //  - [ ] `contains`
 //  - [ ] `show`
 //  - [ ] `hide`
-//  - [ ] `set` as a `Statement::SetItem`
-//  - [ ] `get` as a `Expression::GetItem`
+//  - [x] `set` as a `Statement::SetItem`
+//  - [x] `get` as a `Expression::GetItem`
 // Issue: #120
 
 // TODO: Convert `property_of_object` idiomatically in detranspiler
@@ -2548,6 +2548,9 @@ pub fn convert_dynamic_menu_input(
     })
 }
 
+const INDEX_STR: &str = "INDEX";
+const LIST_STR: &str = "LIST";
+
 /// Result is bubbled
 pub fn convert_special_reporter_block(
     reporter: SpecialReporterInfo,
@@ -3209,6 +3212,134 @@ pub fn convert_special_reporter_block(
                 right_operand: Box::new(right_operand_expression),
             }
         }
+        SpecialReporterInfo::GetItem => {
+            let Some(field_value) = block.fields.get(LIST_STR) else {
+                return Err(GrazeDetranspilerError::MissingField {
+                    field: LIST_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let (name, id) = match field_value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    return Err(GrazeDetranspilerError::UnknownList {
+                        id: "null".to_string(),
+                        name: name.to_string(),
+                    });
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let (list, is_list) =
+                lookup_var_or_list(&name.as_cow_str(), id, target_index, context)?
+                    .map(|value| {
+                        (
+                            Some(value.name.clone()),
+                            matches!(value.kind, DetranspilerVarOrListKind::List { .. }),
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        emit_message(
+                            context,
+                            || {
+                                GrazeDetranspilerWarning::UnknownVLBValue {
+                                    field: LIST_STR.to_string(),
+                                    block_id: block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        (None, false)
+                    });
+            let Some(index_input) = block.inputs.get(INDEX_STR) else {
+                return Err(GrazeDetranspilerError::MissingInput {
+                    input: INDEX_STR.to_string(),
+                    block_id: block_id.to_string(),
+                });
+            };
+            let index_input_repr = get_primary_input_repr(index_input);
+            let index = match index_input_repr {
+                project_json::Sb3InputRepr::Reference(block_id) => 'a: {
+                    let inner_block = unwrap_or_emit_message!(
+                        blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        }),
+                        context,
+                        break 'a ast_types::Expression::default()
+                    );
+                    convert_reporter_block(inner_block, block_id, blocks, context, target_index)?
+                }
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, context, target_index),
+                    context,
+                    ast_types::Expression::default()
+                ),
+                project_json::Sb3InputRepr::Missing => {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: INDEX_STR.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    ast_types::Expression::default()
+                }
+            };
+            if block.inputs.len() != 1 {
+                for input in block.inputs.keys() {
+                    if input.as_str() == INDEX_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedInput {
+                                input: input.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            if block.fields.len() != 1 {
+                for field in block.fields.keys() {
+                    if field.as_str() == LIST_STR {
+                        continue;
+                    }
+                    emit_message(
+                        context,
+                        || {
+                            GrazeDetranspilerWarning::UnusedField {
+                                field: field.clone(),
+                                block_id: block_id.to_string(),
+                            }
+                            .into()
+                        },
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+            }
+            if is_list && let Some(list) = list {
+                ast_types::Expression::GetItem {
+                    list: create_simple_identifier(list),
+                    item: Box::new(index),
+                }
+            } else {
+                ast_types::Expression::Call {
+                    function: create_simple_identifier(literal!("get_item_of_list")),
+                    arguments: vec![
+                        list.map(|value| {
+                            ast_types::Expression::Identifier(create_simple_identifier(value))
+                        })
+                        .unwrap_or_default(),
+                        index,
+                    ],
+                }
+            }
+        }
     })
 }
 
@@ -3446,7 +3577,6 @@ pub fn convert_special_stack_block(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
-    const LIST_STR: &str = "LIST";
     const ITEM_STR: &str = "ITEM";
     match stack_block {
         SpecialStackBlockInfo::ProcedureCall => {
@@ -4401,7 +4531,6 @@ pub fn convert_special_stack_block(
             ))
         }
         SpecialStackBlockInfo::SetItem => {
-            const INDEX_STR: &str = "INDEX";
             let Some(field_value) = block.fields.get(LIST_STR) else {
                 return Err(GrazeDetranspilerError::MissingField {
                     field: LIST_STR.to_string(),
