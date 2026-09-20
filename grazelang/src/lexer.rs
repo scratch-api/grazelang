@@ -148,19 +148,6 @@ pub enum Token {
 // TODO: Add `+=` etc
 // Issue: #88
 
-// TODO: Soften keywords
-//  - [x] `costume`
-//  - [x] `backdrop`
-//  - [x] `sound`
-//  - [x] `broadcast`
-//  - [x] `stage`
-//  - [x] `vars`
-//  - [x] `lists`
-//  - [x] `extension`
-//  - [x] `contains`
-//  - [x] `join`
-// Issue: #79
-
 impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
