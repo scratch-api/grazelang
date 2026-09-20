@@ -106,10 +106,10 @@ macro_rules! consume_then_never_if {
 }
 
 macro_rules! match_token_or_return_none {
-    ($token_stream:expr, { $($tok:pat => $variant:path),* $(,)? }) => {{
+    ($token_stream:expr, { $($tok:pat $(if $guard:expr)? => $variant:path),* $(,)? }) => {{
         match peek_token!(optional $token_stream) {
             $(
-                $tok => {
+                $tok $(if $guard)? => {
                     skip_token!($token_stream);
                     variant_from_stream_pos!($token_stream => $variant)
                 }
@@ -5055,7 +5055,8 @@ pub mod expression {
             Token::Div => BinOp::Div,
             Token::Mod => BinOp::Mod,
             Token::Join => BinOp::Join,
-            Token::ContainsKeyword => BinOp::Contains,
+            Token::Identifier(value) if value.as_str() == "join" => BinOp::Join,
+            Token::Identifier(value) if value.as_str() == "contains" => BinOp::Contains,
             Token::And => BinOp::And,
             Token::Or => BinOp::Or,
             Token::Equals => BinOp::Equals,

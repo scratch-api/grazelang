@@ -91,10 +91,7 @@ pub enum Token {
     #[token("%")]
     Mod,
     #[token("++")]
-    #[token("join")]
     Join,
-    #[token("contains")]
-    ContainsKeyword,
     #[token("==")]
     Equals,
     #[token("!=")]
@@ -160,8 +157,8 @@ pub enum Token {
 //  - [x] `vars`
 //  - [x] `lists`
 //  - [x] `extension`
-//  - [ ] `contains`
-//  - [ ] `join`
+//  - [x] `contains`
+//  - [x] `join`
 // Issue: #79
 
 impl std::fmt::Debug for Token {
@@ -181,7 +178,6 @@ impl std::fmt::Debug for Token {
             Token::LocalKeyword => write!(f, "\"local\""),
             Token::VarKeyword => write!(f, "\"var\""),
             Token::ListKeyword => write!(f, "\"list\""),
-            Token::ContainsKeyword => write!(f, "\"contains\""),
             Token::LeftBrace => write!(f, "'{{'"),
             Token::RightBrace(_) => write!(f, "'}}'"),
             Token::LeftParens => write!(f, "'('"),
