@@ -1010,7 +1010,7 @@
     "135": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "Instead of e.g. `property_of_object(\"volume\", stage)`, `stage.volume` should be used",
-        "status": "open",
+        "status": "closed",
         "lines": "L808-L809",
         "commit": "2414527f859a2b0342381d22170001abbb8e2294",
         "title": "Convert `property_of_object` idiomatically in detranspiler"
