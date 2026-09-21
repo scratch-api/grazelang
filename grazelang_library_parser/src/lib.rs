@@ -88,6 +88,17 @@ macro_rules! implement_generate_library {
             (ANY_CATEGORY_STRING.clone(), ANY_CATEGORY_ID),
         ]);
         let mut category_entries = HashMap::<u32, HashSet<String>>::new();
+        category_entries.insert(PROPERTIES_CATEGORY_ID, HashSet::from([
+            "volume".to_string(),
+            "backdrop #".to_string(),
+            "backdrop name".to_string(),
+            "costume #".to_string(),
+            "costume name".to_string(),
+            "x position".to_string(),
+            "y position".to_string(),
+            "direction".to_string(),
+            "size".to_string(),
+        ]));
         for namespace in v {
             let (category_name, category, associated_menus) = process_toolbox_category(namespace, &mut category_entries, &mut menu_category_ids);
             for (key, value) in associated_menus {

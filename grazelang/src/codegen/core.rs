@@ -14,7 +14,7 @@ use grazelang_types::{
     CLONABLES_CATEGORY_ID, COLLIDERS_CATEGORY_ID, COSTUMES_CATEGORY_ID, CallBlockParam,
     CallBlockParamKind, CallableKnownBlockSignature, DESTINATIONS_CATEGORY_ID,
     DIRECTIONS_CATEGORY_ID, HasShadow, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID,
-    SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
+    PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{
         Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr, Sb3InputValue,
         Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3Primitive, Sb3PrimitiveBlock,
@@ -679,7 +679,6 @@ impl GrazeSb3GeneratorContext {
         let mut target_attachments = HashMap::with_capacity(targets.len());
         for target in &targets {
             let mut namespace = CodegenNamespace::new();
-
             let is_stage = matches!(target, Target::Stage { .. });
             let symbol_count = target.borrow_symbols().len()
                 // Accounts for the symbols that every target has e.g. volume
@@ -732,6 +731,20 @@ impl GrazeSb3GeneratorContext {
                             .unwrap_or(Path::new(CURRENT_DIRECTORY_STR)),
                     )
                     .map(|(mut symbol, attachment, asset_file)| {
+                        if let Some(KnownBlock::Variable {
+                            canonical_name,
+                            id: _,
+                            assign: _,
+                            bind_info: _,
+                        }) = symbol.known_block.as_deref()
+                        {
+                            add_category_for_field_value(
+                                PROPERTIES_CATEGORY_ID,
+                                canonical_name.as_str().into(),
+                                &mut field_category_entries,
+                                &mut field_entry_categories,
+                            );
+                        }
                         add_bind_info(&mut symbol, target.get_field_value());
                         if let Some(AssetFile {
                             file_name,
@@ -813,7 +826,6 @@ impl GrazeSb3GeneratorContext {
         let stage_symbol = symbol_table
             .get_child(targets_symbol, STAGE_ISTRING)
             .unwrap();
-
         let broadcasts_symbol = symbol_table.new_child_symbol(
             root_symbol,
             literal!("broadcasts"),
@@ -862,6 +874,20 @@ impl GrazeSb3GeneratorContext {
                         }) = asset_file
                         {
                             asset_files.insert(file_name, file_path);
+                        }
+                        if let Some(KnownBlock::Variable {
+                            canonical_name,
+                            id: _,
+                            assign: _,
+                            bind_info: _,
+                        }) = symbol.known_block.as_deref()
+                        {
+                            add_category_for_field_value(
+                                PROPERTIES_CATEGORY_ID,
+                                canonical_name.as_str().into(),
+                                &mut field_category_entries,
+                                &mut field_entry_categories,
+                            );
                         }
                         let mut symbol_for_stage: Symbol = Symbol {
                             known_block: symbol

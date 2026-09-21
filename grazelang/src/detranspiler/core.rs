@@ -429,6 +429,33 @@ pub fn find_var_or_list_by_name<'a>(
         .map(|value| value.1)
 }
 
+pub fn find_property_name(target: &DetranspilerTarget, property: &str) -> Option<IString> {
+    if target.is_stage {
+        match property {
+            "volume" => return Some(literal!("volume")),
+            "backdrop #" => return Some(literal!("backdrop_number")),
+            "backdrop name" => return Some(literal!("backdrop_name")),
+            _ => (),
+        }
+    } else {
+        match property {
+            "volume" => return Some(literal!("volume")),
+            "costume #" => return Some(literal!("costume_number")),
+            "costume name" => return Some(literal!("costume_name")),
+            "x position" => return Some(literal!("x_position")),
+            "y position" => return Some(literal!("y_position")),
+            "direction" => return Some(literal!("direction")),
+            "size" => return Some(literal!("size")),
+            _ => (),
+        }
+    }
+    target
+        .data
+        .iter()
+        .find(|value| value.1.get_original_name().as_str() == property)
+        .map(|(_, value)| value.name.clone())
+}
+
 pub type DetranspiledProjectData = (
     ast_types::GrazeProgram,
     HashMap<AssetPath, OutAssetPath>,
@@ -814,10 +841,6 @@ pub fn convert_project(
 //  - [x] `set` as a `Statement::SetItem`
 //  - [x] `get` as a `Expression::GetItem`
 // Issue: #120
-
-// TODO: Convert `property_of_object` idiomatically in detranspiler
-// Instead of e.g. `property_of_object("volume", stage)`, `stage.volume` should be used
-// Issue: #135
 
 // TODO: Add option to configure formatting after detranspilation
 // Issue: #134
