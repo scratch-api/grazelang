@@ -905,10 +905,10 @@
     },
     "120": {
         "filepath": "grazelang/src/detranspiler/core.rs",
-        "text": "- [x] `clear`\n- [x] `push`\n- [ ] `remove`\n- [ ] `insert`\n- [ ] `find`\n- [ ] `len`\n- [ ] `contains`\n- [ ] `show`\n- [ ] `hide`\n- [x] `set` as a `Statement::SetItem`\n- [x] `get` as a `Expression::GetItem`",
+        "text": "- [x] `clear`\n- [x] `push`\n- [x] `remove`\n- [x] `insert`\n- [x] `find`\n- [x] `len`\n- [x] `contains`\n- [x] `show`\n- [x] `hide`\n- [x] `set` as a `Statement::SetItem`\n- [x] `get` as a `Expression::GetItem`",
         "status": "open",
-        "lines": "L794-L806",
-        "commit": "b3a99d2de1e311eec1924bfb50ec301dcd546bde",
+        "lines": "L831-L843",
+        "commit": "438e153e70bf39f9c7542c0d302dc79be7933415",
         "title": "Implement list methods in detranspiler"
     },
     "121": {
