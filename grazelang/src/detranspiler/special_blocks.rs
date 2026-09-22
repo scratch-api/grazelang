@@ -23,33 +23,9 @@ use crate::{
 };
 
 macro_rules! get_required_input {
-    ($block:expr, $block_id:expr, $input_name:expr, $input_name_key:expr, $blocks:expr, $context:expr, $target_index:expr) => {{
-        let Some(input) = $block.inputs.get($input_name_key) else {
-            return Err(GrazeDetranspilerError::MissingInput {
-                input: $input_name.to_string(),
-                block_id: $block_id.to_string(),
-            });
-        };
-        let input_repr = get_primary_input_repr(input);
-        match input_repr {
-            project_json::Sb3InputRepr::Reference(block_id) => 'a: {
-                let inner_block = unwrap_or_emit_message!(
-                    $blocks.get(block_id).ok_or_else(|| {
-                        GrazeDetranspilerError::InvalidBlockReference {
-                            block_id: block_id.clone(),
-                        }
-                    }),
-                    $context,
-                    break 'a ast_types::Expression::default()
-                );
-                convert_reporter_block(inner_block, block_id, $blocks, $context, $target_index)?
-            }
-            project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                convert_primitive_reporter_block(block, $context, $target_index),
-                $context,
-                ast_types::Expression::default()
-            ),
-            project_json::Sb3InputRepr::Missing => {
+    ($block:expr, $block_id:expr, $input_name:expr, $input_name_key:expr, $blocks:expr, $context:expr, $target_index:expr) => {
+        'a: {
+            let Some(input) = $block.inputs.get($input_name_key) else {
                 emit_error!(
                     GrazeDetranspilerError::MissingInput {
                         input: $input_name.to_string(),
@@ -57,10 +33,40 @@ macro_rules! get_required_input {
                     },
                     $context
                 );
-                ast_types::Expression::default()
+                break 'a ast_types::Expression::default();
+            };
+            let input_repr = get_primary_input_repr(input);
+            match input_repr {
+                project_json::Sb3InputRepr::Reference(block_id) => {
+                    let inner_block = unwrap_or_emit_message!(
+                        $blocks.get(block_id).ok_or_else(|| {
+                            GrazeDetranspilerError::InvalidBlockReference {
+                                block_id: block_id.clone(),
+                            }
+                        }),
+                        $context,
+                        break 'a ast_types::Expression::default()
+                    );
+                    convert_reporter_block(inner_block, block_id, $blocks, $context, $target_index)?
+                }
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
+                    convert_primitive_reporter_block(block, $context, $target_index),
+                    $context,
+                    ast_types::Expression::default()
+                ),
+                project_json::Sb3InputRepr::Missing => {
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: $input_name.to_string(),
+                            block_id: $block_id.to_string(),
+                        },
+                        $context
+                    );
+                    ast_types::Expression::default()
+                }
             }
         }
-    }};
+    };
 }
 
 macro_rules! if_else_expression {
@@ -86,45 +92,63 @@ macro_rules! get_vlb_field {
             false
         )
     };
-    ($block:expr, $block_id:expr, $field_name:expr, $field_name_key:expr, $kind_pat:pat, $error_ty:ident, $context:expr, $target_index:expr, $return_vlb_data:ident) => {{
-        let Some(field_value) = $block.fields.get($field_name_key) else {
-            return Err(GrazeDetranspilerError::MissingField {
-                field: $field_name.to_string(),
-                block_id: $block_id.to_string(),
-            });
-        };
-        let (name, id) = match field_value {
-            project_json::Sb3FieldValue::Normal(name) => {
-                return Err(GrazeDetranspilerError::$error_ty {
-                    id: "null".to_string(),
-                    name: name.to_string(),
-                });
-            }
-            project_json::Sb3FieldValue::WithId { value, id } => (value, id),
-        };
-        let (value, conforms) =
-            lookup_var_or_list(&name.as_cow_str(), id, $target_index, $context)?
-                .map(|value| (Some(value.name.clone()), matches!(value.kind, $kind_pat)))
-                .unwrap_or_else(|| {
-                    emit_message(
-                        $context,
-                        || {
-                            GrazeDetranspilerWarning::UnknownVLBValue {
-                                field: $field_name.to_string(),
-                                block_id: $block_id.to_string(),
-                            }
-                            .into()
-                        },
-                        GrazeMessageSetting::Warnings,
-                    );
+    ($block:expr, $block_id:expr, $field_name:expr, $field_name_key:expr, $kind_pat:pat, $error_ty:ident, $context:expr, $target_index:expr, $return_vlb_data:ident) => {
+        'a: {
+            let Some(field_value) = $block.fields.get($field_name_key) else {
+                emit_error!(
+                    GrazeDetranspilerError::MissingField {
+                        field: $field_name.to_string(),
+                        block_id: $block_id.to_string(),
+                    },
+                    $context
+                );
+                break 'a if_else_expression!(
+                    $return_vlb_data,
+                    (None, false, None, None),
                     (None, false)
-                });
-        if_else_expression!(
-            $return_vlb_data,
-            (value, conforms, name, id),
-            (value, conforms)
-        )
-    }};
+                );
+            };
+            let (name, id) = match field_value {
+                project_json::Sb3FieldValue::Normal(name) => {
+                    emit_error!(
+                        GrazeDetranspilerError::$error_ty {
+                            id: "null".to_string(),
+                            name: name.to_string(),
+                        },
+                        $context
+                    );
+                    break 'a if_else_expression!(
+                        $return_vlb_data,
+                        (None, false, None, None),
+                        (None, false)
+                    );
+                }
+                project_json::Sb3FieldValue::WithId { value, id } => (value, id),
+            };
+            let (value, conforms) =
+                lookup_var_or_list(&name.as_cow_str(), id, $target_index, $context)?
+                    .map(|value| (Some(value.name.clone()), matches!(value.kind, $kind_pat)))
+                    .unwrap_or_else(|| {
+                        emit_message(
+                            $context,
+                            || {
+                                GrazeDetranspilerWarning::UnknownVLBValue {
+                                    field: $field_name.to_string(),
+                                    block_id: $block_id.to_string(),
+                                }
+                                .into()
+                            },
+                            GrazeMessageSetting::Warnings,
+                        );
+                        (None, false)
+                    });
+            if_else_expression!(
+                $return_vlb_data,
+                (value, conforms, Some(name), Some(id)),
+                (value, conforms)
+            )
+        }
+    };
 }
 
 macro_rules! continue_if {
@@ -775,16 +799,20 @@ pub fn convert_special_reporter_block(
             const MENU_OPCODE: &str = "sensing_of_object_menu";
             const PROPERTY_STR: &str = "PROPERTY";
             const OBJECT_STR: &str = "OBJECT";
-            let (object, target) = {
+            let (object, target) = 'a: {
                 let Some(input) = block.inputs.get(OBJECT_STR) else {
-                    return Err(GrazeDetranspilerError::MissingInput {
-                        input: OBJECT_STR.to_string(),
-                        block_id: block_id.to_string(),
-                    });
+                    emit_error!(
+                        GrazeDetranspilerError::MissingInput {
+                            input: OBJECT_STR.to_string(),
+                            block_id: block_id.to_string(),
+                        },
+                        context
+                    );
+                    break 'a (Some(ast_types::Expression::default()), None);
                 };
                 let input_repr = get_primary_input_repr(input);
                 match input_repr {
-                    project_json::Sb3InputRepr::Reference(block_id) => 'a: {
+                    project_json::Sb3InputRepr::Reference(block_id) => {
                         let inner_block = unwrap_or_emit_message!(
                             blocks.get(block_id).ok_or_else(|| {
                                 GrazeDetranspilerError::InvalidBlockReference {
@@ -902,10 +930,14 @@ pub fn convert_special_reporter_block(
                 }
             };
             let Some(field_value) = block.fields.get(PROPERTY_STR) else {
-                return Err(GrazeDetranspilerError::MissingField {
-                    field: PROPERTY_STR.to_string(),
-                    block_id: block_id.to_string(),
-                });
+                emit_error!(
+                    GrazeDetranspilerError::MissingField {
+                        field: PROPERTY_STR.to_string(),
+                        block_id: block_id.to_string(),
+                    },
+                    context
+                );
+                return Ok(ast_types::Expression::default());
             };
             let (property, property_name, target) =
                 if let project_json::Sb3FieldValue::Normal(value) = field_value
@@ -1445,7 +1477,11 @@ pub fn convert_special_stack_block(
                 target_index
             );
             let next_block_id = block.next.as_deref().map(IString::from);
-            if is_list && let Some(list) = &list {
+            if is_list
+                && let Some(name) = name
+                && let Some(id) = id
+                && let Some(list) = &list
+            {
                 const LENGTH_THRESHOLD: usize = 3;
                 let mut current_string_values = Vec::new();
                 let mut current_string = String::new();
