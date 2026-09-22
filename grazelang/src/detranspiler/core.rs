@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use arcstr::{ArcStr as IString, format as format_istring, literal};
 use grazelang_types::project_json;
@@ -831,13 +831,13 @@ pub fn convert_project(
 // TODO: Implement list methods in detranspiler
 //  - [x] `clear`
 //  - [x] `push`
-//  - [ ] `remove`
-//  - [ ] `insert`
-//  - [ ] `find`
-//  - [ ] `len`
-//  - [ ] `contains`
-//  - [ ] `show`
-//  - [ ] `hide`
+//  - [x] `remove`
+//  - [x] `insert`
+//  - [x] `find`
+//  - [x] `len`
+//  - [x] `contains`
+//  - [x] `show`
+//  - [x] `hide`
 //  - [x] `set` as a `Statement::SetItem`
 //  - [x] `get` as a `Expression::GetItem`
 // Issue: #120
@@ -1808,8 +1808,40 @@ pub fn fill_target(
         .get_mut(target_index)
         .unwrap()
         .scripts
-        .sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
+        .sort_by(|(id_a, _), (id_b, _)| id_cmp(id_a, id_b));
     Ok(())
+}
+
+pub fn id_cmp(a: &str, b: &str) -> Ordering {
+    const SOUP_TABLE: [u8; 256] = [
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 62, 255, 63, 64,
+        65, 255, 255, 66, 67, 68, 69, 70, 71, 72, 73, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 74,
+        75, 255, 76, 255, 77, 78, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
+        42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 79, 255, 80, 81, 82, 83, 0, 1, 2, 3, 4, 5, 6, 7, 8,
+        9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 84, 85, 86, 87, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255,
+    ];
+    let a = a.as_bytes();
+    let b = b.as_bytes();
+    match a.len().cmp(&b.len()) {
+        Ordering::Equal => (),
+        ord => return ord,
+    }
+    for i in 0..a.len() {
+        match SOUP_TABLE[a[i] as usize].cmp(&SOUP_TABLE[b[i] as usize]) {
+            Ordering::Equal => (),
+            ord => return ord,
+        }
+    }
+    Ordering::Equal
 }
 
 /// Result is unbubbled
@@ -2589,9 +2621,6 @@ pub fn convert_dynamic_menu_input(
         }
     })
 }
-
-pub const INDEX_STR: &str = "INDEX";
-pub const LIST_STR: &str = "LIST";
 
 /// Result is unbubbled
 pub fn convert_normal_reporter_block(

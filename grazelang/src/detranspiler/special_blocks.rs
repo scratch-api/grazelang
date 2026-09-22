@@ -5,22 +5,25 @@ use grazelang_types::project_json;
 
 use super::{
     core::{
-        DetranspilerContext, DetranspilerResult, DetranspilerVarOrListKind, INDEX_STR, LIST_STR,
-        NextBlockId, convert_block_stack, convert_field_value_info,
-        convert_primitive_reporter_block, convert_reporter_block, create_simple_identifier,
-        create_vlb_identifier, emit_error, emit_message, emit_message_eager, find_property_name,
-        get_primary_input_repr, lookup_broadcast, lookup_var_or_list, lookup_vlb,
-        unwrap_or_emit_message,
+        DetranspilerContext, DetranspilerResult, DetranspilerVarOrListKind, NextBlockId,
+        convert_block_stack, convert_field_value_info, convert_primitive_reporter_block,
+        convert_reporter_block, create_simple_identifier, create_vlb_identifier, emit_error,
+        emit_message, emit_message_eager, find_property_name, get_primary_input_repr,
+        lookup_broadcast, lookup_var_or_list, lookup_vlb, unwrap_or_emit_message,
     },
     get_info::{
         SpecialReporterInfo, SpecialStackBlockInfo, check_special_stack_block, get_field_value_info,
     },
 };
 use crate::{
-    ast::types::{self as ast_types, identifier},
+    ast::types::{self as ast_types},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerWarning},
     settings::GrazeMessageSetting,
 };
+
+pub const INDEX_STR: &str = "INDEX";
+pub const LIST_STR: &str = "LIST";
+pub const ITEM_STR: &str = "ITEM";
 
 macro_rules! get_required_input {
     ($block:expr, $block_id:expr, $input_name:expr, $input_name_key:expr, $blocks:expr, $context:expr, $target_index:expr) => {
@@ -33,7 +36,7 @@ macro_rules! get_required_input {
                     },
                     $context
                 );
-                break 'a ast_types::Expression::default();
+                break 'a (ast_types::Expression::default(), false);
             };
             let input_repr = get_primary_input_repr(input);
             match input_repr {
@@ -45,14 +48,26 @@ macro_rules! get_required_input {
                             }
                         }),
                         $context,
-                        break 'a ast_types::Expression::default()
+                        break 'a (ast_types::Expression::default(), true)
                     );
-                    convert_reporter_block(inner_block, block_id, $blocks, $context, $target_index)?
+                    (
+                        convert_reporter_block(
+                            inner_block,
+                            block_id,
+                            $blocks,
+                            $context,
+                            $target_index,
+                        )?,
+                        true,
+                    )
                 }
-                project_json::Sb3InputRepr::PrimitiveBlock(block) => unwrap_or_emit_message!(
-                    convert_primitive_reporter_block(block, $context, $target_index),
-                    $context,
-                    ast_types::Expression::default()
+                project_json::Sb3InputRepr::PrimitiveBlock(block) => (
+                    unwrap_or_emit_message!(
+                        convert_primitive_reporter_block(block, $context, $target_index),
+                        $context,
+                        ast_types::Expression::default()
+                    ),
+                    true,
                 ),
                 project_json::Sb3InputRepr::Missing => {
                     emit_error!(
@@ -62,7 +77,7 @@ macro_rules! get_required_input {
                         },
                         $context
                     );
-                    ast_types::Expression::default()
+                    (ast_types::Expression::default(), true)
                 }
             }
         }
@@ -104,8 +119,8 @@ macro_rules! get_vlb_field {
                 );
                 break 'a if_else_expression!(
                     $return_vlb_data,
-                    (None, false, None, None),
-                    (None, false)
+                    (None, false, false, None, None),
+                    (None, false, false)
                 );
             };
             let (name, id) = match field_value {
@@ -119,15 +134,30 @@ macro_rules! get_vlb_field {
                     );
                     break 'a if_else_expression!(
                         $return_vlb_data,
-                        (None, false, None, None),
-                        (None, false)
+                        (
+                            Some(Err(ast_types::Expression::Literal(name.into()))),
+                            false,
+                            true,
+                            None,
+                            None
+                        ),
+                        (
+                            Some(Err(ast_types::Expression::Literal(name.into()))),
+                            false,
+                            true
+                        )
                     );
                 }
                 project_json::Sb3FieldValue::WithId { value, id } => (value, id),
             };
             let (value, conforms) =
                 lookup_var_or_list(&name.as_cow_str(), id, $target_index, $context)?
-                    .map(|value| (Some(value.name.clone()), matches!(value.kind, $kind_pat)))
+                    .map(|value| {
+                        (
+                            Some(Ok(value.name.clone())),
+                            matches!(value.kind, $kind_pat),
+                        )
+                    })
                     .unwrap_or_else(|| {
                         emit_message(
                             $context,
@@ -144,8 +174,8 @@ macro_rules! get_vlb_field {
                     });
             if_else_expression!(
                 $return_vlb_data,
-                (value, conforms, Some(name), Some(id)),
-                (value, conforms)
+                (value, conforms, true, Some(name), Some(id)),
+                (value, conforms, true)
             )
         }
     };
@@ -741,8 +771,50 @@ pub fn convert_special_reporter_block(
                 right_operand: Box::new(right_operand_expression),
             }
         }
+        SpecialReporterInfo::GetLetter => {
+            const LETTER_STR: &str = "LETTER";
+            const STRING_STR: &str = "STRING";
+            let (string, string_present) = get_required_input!(
+                block,
+                block_id,
+                STRING_STR,
+                STRING_STR,
+                blocks,
+                context,
+                target_index
+            );
+            let (letter, letter_present) = get_required_input!(
+                block,
+                block_id,
+                LETTER_STR,
+                LETTER_STR,
+                blocks,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                true,
+                _ => false,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                block.inputs.len() != string_present as usize + letter_present as usize,
+                input => input.as_str() != block_id || input.as_str() != block_id,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            ast_types::Expression::GetLetter {
+                expression: Box::new(string),
+                letter: Box::new(letter),
+            }
+        }
         SpecialReporterInfo::GetItem => {
-            let (list, is_list) = get_vlb_field!(
+            let (list, is_list, list_present) = get_vlb_field!(
                 block,
                 block_id,
                 LIST_STR,
@@ -752,7 +824,7 @@ pub fn convert_special_reporter_block(
                 context,
                 target_index
             );
-            let index = get_required_input!(
+            let (index, index_present): (ast_types::Expression, bool) = get_required_input!(
                 block,
                 block_id,
                 INDEX_STR,
@@ -762,7 +834,7 @@ pub fn convert_special_reporter_block(
                 target_index
             );
             check_unused_fields!(
-                block.fields.len() != 1,
+                block.fields.len() != list_present as usize,
                 field => field.as_str() == LIST_STR,
                 block,
                 block_id,
@@ -770,14 +842,14 @@ pub fn convert_special_reporter_block(
                 target_index
             );
             check_unused_inputs!(
-                block.inputs.len() != 1,
+                block.inputs.len() != index_present as usize,
                 input => input.as_str() == INDEX_STR,
                 block,
                 block_id,
                 context,
                 target_index
             );
-            if is_list && let Some(list) = list {
+            if is_list && let Some(Ok(list)) = list {
                 ast_types::Expression::GetItem {
                     list: create_simple_identifier(list),
                     item: Box::new(index),
@@ -786,11 +858,175 @@ pub fn convert_special_reporter_block(
                 ast_types::Expression::Call {
                     function: create_simple_identifier(literal!("get_item_of_list")),
                     arguments: vec![
-                        list.map(|value| {
-                            ast_types::Expression::Identifier(create_simple_identifier(value))
+                        list.map(|value| match value {
+                            Ok(value) => {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            }
+                            Err(value) => value,
                         })
                         .unwrap_or_default(),
                         index,
+                    ],
+                }
+            }
+        }
+        SpecialReporterInfo::ListIndexOf => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            let (item, item_present): (ast_types::Expression, bool) = get_required_input!(
+                block,
+                block_id,
+                ITEM_STR,
+                ITEM_STR,
+                blocks,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                block.inputs.len() != item_present as usize,
+                input => input.as_str() == ITEM_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            if is_list && let Some(Ok(list)) = list {
+                ast_types::Expression::Call {
+                    function: ast_types::identifier![list, literal!("find")],
+                    arguments: vec![item],
+                }
+            } else {
+                ast_types::Expression::Call {
+                    function: create_simple_identifier(literal!("get_index_of_item_in_list")),
+                    arguments: vec![
+                        list.map(|value| match value {
+                            Ok(value) => {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            }
+                            Err(value) => value,
+                        })
+                        .unwrap_or_default(),
+                        item,
+                    ],
+                }
+            }
+        }
+        SpecialReporterInfo::ListLength => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                true,
+                _ => false,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            if is_list && let Some(Ok(list)) = list {
+                ast_types::Expression::Call {
+                    function: ast_types::identifier![list, literal!("len")],
+                    arguments: Vec::new(),
+                }
+            } else {
+                ast_types::Expression::Call {
+                    function: create_simple_identifier(literal!("get_list_length")),
+                    arguments: vec![
+                        list.map(|value| match value {
+                            Ok(value) => {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            }
+                            Err(value) => value,
+                        })
+                        .unwrap_or_default(),
+                    ],
+                }
+            }
+        }
+        SpecialReporterInfo::ListContains => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            let (item, item_present): (ast_types::Expression, bool) = get_required_input!(
+                block,
+                block_id,
+                ITEM_STR,
+                ITEM_STR,
+                blocks,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                block.inputs.len() != item_present as usize,
+                input => input.as_str() == ITEM_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            if is_list && let Some(Ok(list)) = list {
+                ast_types::Expression::Call {
+                    function: ast_types::identifier![list, literal!("contains")],
+                    arguments: vec![item],
+                }
+            } else {
+                ast_types::Expression::Call {
+                    function: create_simple_identifier(literal!("list_contains_item")),
+                    arguments: vec![
+                        list.map(|value| match value {
+                            Ok(value) => {
+                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            }
+                            Err(value) => value,
+                        })
+                        .unwrap_or_default(),
+                        item,
                     ],
                 }
             }
@@ -992,7 +1228,7 @@ pub fn convert_special_reporter_block(
             if let Some(property_name) = property_name
                 && let Some(target) = target
             {
-                ast_types::Expression::Identifier(identifier![target, property_name])
+                ast_types::Expression::Identifier(ast_types::identifier![target, property_name])
             } else if let Some(object) = object
                 && let Some(property) = property
             {
@@ -1026,7 +1262,6 @@ pub fn convert_special_stack_block(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<(ast_types::Statement, Option<NextBlockId>)> {
-    const ITEM_STR: &str = "ITEM";
     match stack_block {
         SpecialStackBlockInfo::ProcedureCall => {
             let Some(mutation) = &block.mutation else {
@@ -1449,7 +1684,7 @@ pub fn convert_special_stack_block(
             ))
         }
         SpecialStackBlockInfo::ClearList => {
-            let (list, is_list, name, id) = get_vlb_field!(
+            let (list, is_list, list_present, name, id) = get_vlb_field!(
                 block,
                 block_id,
                 LIST_STR,
@@ -1461,7 +1696,7 @@ pub fn convert_special_stack_block(
                 true
             );
             check_unused_fields!(
-                block.fields.len() != 1,
+                block.fields.len() != list_present as usize,
                 field => field.as_str() == LIST_STR,
                 block,
                 block_id,
@@ -1480,7 +1715,7 @@ pub fn convert_special_stack_block(
             if is_list
                 && let Some(name) = name
                 && let Some(id) = id
-                && let Some(list) = &list
+                && let Some(Ok(list)) = &list
             {
                 const LENGTH_THRESHOLD: usize = 3;
                 let mut current_string_values = Vec::new();
@@ -1580,7 +1815,7 @@ pub fn convert_special_stack_block(
                 }
             }
             Ok((
-                if is_list && let Some(list) = list {
+                if is_list && let Some(Ok(list)) = list {
                     ast_types::Statement::Call {
                         function: ast_types::identifier![list, literal!("clear")],
                         arguments: Vec::new(),
@@ -1589,8 +1824,11 @@ pub fn convert_special_stack_block(
                     ast_types::Statement::Call {
                         function: ast_types::identifier![literal!("delete_all_of_list")],
                         arguments: vec![
-                            list.map(|value| {
-                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            list.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
                             })
                             .unwrap_or_default(),
                         ],
@@ -1599,8 +1837,8 @@ pub fn convert_special_stack_block(
                 next_block_id,
             ))
         }
-        SpecialStackBlockInfo::AddToList => {
-            let (list, is_list) = get_vlb_field!(
+        SpecialStackBlockInfo::DeleteListItem => {
+            let (list, is_list, list_present) = get_vlb_field!(
                 block,
                 block_id,
                 LIST_STR,
@@ -1610,7 +1848,138 @@ pub fn convert_special_stack_block(
                 context,
                 target_index
             );
-            let item = get_required_input!(
+            let (index, index_present) = get_required_input!(
+                block,
+                block_id,
+                INDEX_STR,
+                INDEX_STR,
+                blocks,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                block.inputs.len() != index_present as usize,
+                input => input.as_str() == ITEM_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            Ok((
+                if is_list && let Some(Ok(list)) = list {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![list, literal!("remove")],
+                        arguments: vec![index],
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: create_simple_identifier(literal!("delete_item_of_list")),
+                        arguments: vec![
+                            list.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
+                            })
+                            .unwrap_or_default(),
+                            index,
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::SetItem => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            let (item, item_present) = get_required_input!(
+                block,
+                block_id,
+                ITEM_STR,
+                ITEM_STR,
+                blocks,
+                context,
+                target_index
+            );
+            let (index, index_present) = get_required_input!(
+                block,
+                block_id,
+                INDEX_STR,
+                INDEX_STR,
+                blocks,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                block.inputs.len() != item_present as usize + index_present as usize,
+                input => input.as_str() == ITEM_STR || input.as_str() == INDEX_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            Ok((
+                if is_list && let Some(Ok(list)) = list {
+                    ast_types::Statement::SetItem {
+                        list: create_simple_identifier(list),
+                        item: index,
+                        value: item,
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: create_simple_identifier(literal!("replace_item_of_list")),
+                        arguments: vec![
+                            list.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
+                            })
+                            .unwrap_or_default(),
+                            index,
+                            item,
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::AddToList => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            let (item, item_present) = get_required_input!(
                 block,
                 block_id,
                 ITEM_STR,
@@ -1620,7 +1989,7 @@ pub fn convert_special_stack_block(
                 target_index
             );
             check_unused_fields!(
-                block.fields.len() != 1,
+                block.fields.len() != list_present as usize,
                 field => field.as_str() == LIST_STR,
                 block,
                 block_id,
@@ -1628,7 +1997,7 @@ pub fn convert_special_stack_block(
                 target_index
             );
             check_unused_inputs!(
-                block.inputs.len() != 1,
+                block.inputs.len() != item_present as usize,
                 input => input.as_str() == ITEM_STR,
                 block,
                 block_id,
@@ -1636,7 +2005,7 @@ pub fn convert_special_stack_block(
                 target_index
             );
             Ok((
-                if is_list && let Some(list) = list {
+                if is_list && let Some(Ok(list)) = list {
                     ast_types::Statement::Call {
                         function: ast_types::identifier![list, literal!("push")],
                         arguments: vec![item],
@@ -1645,8 +2014,11 @@ pub fn convert_special_stack_block(
                     ast_types::Statement::Call {
                         function: create_simple_identifier(literal!("add_to_list")),
                         arguments: vec![
-                            list.map(|value| {
-                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            list.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
                             })
                             .unwrap_or_default(),
                             item,
@@ -1656,13 +2028,199 @@ pub fn convert_special_stack_block(
                 block.next.as_deref().map(Into::into),
             ))
         }
+        SpecialStackBlockInfo::InsertIntoList => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            let (index, index_present) = get_required_input!(
+                block,
+                block_id,
+                INDEX_STR,
+                INDEX_STR,
+                blocks,
+                context,
+                target_index
+            );
+            let (item, item_present) = get_required_input!(
+                block,
+                block_id,
+                ITEM_STR,
+                ITEM_STR,
+                blocks,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                block.inputs.len() != index_present as usize + item_present as usize,
+                input => input.as_str() == ITEM_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            Ok((
+                if is_list && let Some(Ok(list)) = list {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![list, literal!("insert")],
+                        arguments: vec![index, item],
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: create_simple_identifier(literal!("insert_at_list")),
+                        arguments: vec![
+                            list.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
+                            })
+                            .unwrap_or_default(),
+                            index,
+                            item,
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::ShowList => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                true,
+                _ => false,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            Ok((
+                if is_list && let Some(Ok(list)) = list {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![list, literal!("show")],
+                        arguments: Vec::new(),
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: create_simple_identifier(literal!("show_list")),
+                        arguments: vec![
+                            list.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
+                            })
+                            .unwrap_or_default(),
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
+        SpecialStackBlockInfo::HideList => {
+            let (list, is_list, list_present) = get_vlb_field!(
+                block,
+                block_id,
+                LIST_STR,
+                LIST_STR,
+                DetranspilerVarOrListKind::List { .. },
+                UnknownList,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                block.fields.len() != list_present as usize,
+                field => field.as_str() == LIST_STR,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                true,
+                _ => false,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            Ok((
+                if is_list && let Some(Ok(list)) = list {
+                    ast_types::Statement::Call {
+                        function: ast_types::identifier![list, literal!("hide")],
+                        arguments: Vec::new(),
+                    }
+                } else {
+                    ast_types::Statement::Call {
+                        function: create_simple_identifier(literal!("hide_list")),
+                        arguments: vec![
+                            list.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
+                            })
+                            .unwrap_or_default(),
+                        ],
+                    }
+                },
+                block.next.as_deref().map(Into::into),
+            ))
+        }
         SpecialStackBlockInfo::Assignment { kind, input_name } => {
-            let value = get_required_input!(
+            let (value, value_present) = get_required_input!(
                 block,
                 block_id,
                 input_name,
                 input_name.as_str(),
                 blocks,
+                context,
+                target_index
+            );
+            check_unused_fields!(
+                true,
+                _ => false,
+                block,
+                block_id,
+                context,
+                target_index
+            );
+            check_unused_inputs!(
+                block.inputs.len() != value_present as usize,
+                input => input.as_str() == input_name.as_str(),
+                block,
+                block_id,
                 context,
                 target_index
             );
@@ -1677,7 +2235,7 @@ pub fn convert_special_stack_block(
         SpecialStackBlockInfo::AssignVariable => {
             const VARIABLE_STR: &str = "VARIABLE";
             const VALUE_STR: &str = "VALUE";
-            let value = get_required_input!(
+            let (value, value_present) = get_required_input!(
                 block,
                 block_id,
                 VALUE_STR,
@@ -1686,7 +2244,7 @@ pub fn convert_special_stack_block(
                 context,
                 target_index
             );
-            let (var, is_var) = get_vlb_field!(
+            let (var, is_var, var_present) = get_vlb_field!(
                 block,
                 block_id,
                 VARIABLE_STR,
@@ -1697,7 +2255,7 @@ pub fn convert_special_stack_block(
                 target_index
             );
             check_unused_fields!(
-                block.fields.len() != 1,
+                block.fields.len() != var_present as usize,
                 field => field.as_str() == VARIABLE_STR,
                 block,
                 block_id,
@@ -1705,7 +2263,7 @@ pub fn convert_special_stack_block(
                 target_index
             );
             check_unused_inputs!(
-                block.inputs.len() != 1,
+                block.inputs.len() != value_present as usize,
                 input => input.as_str() == VALUE_STR,
                 block,
                 block_id,
@@ -1713,7 +2271,7 @@ pub fn convert_special_stack_block(
                 target_index
             );
             Ok((
-                if is_var && let Some(var) = var {
+                if is_var && let Some(Ok(var)) = var {
                     ast_types::Statement::Assignment {
                         target: create_simple_identifier(var),
                         value,
@@ -1722,79 +2280,14 @@ pub fn convert_special_stack_block(
                     ast_types::Statement::Call {
                         function: create_simple_identifier(literal!("set_variable_to")),
                         arguments: vec![
-                            var.map(|value| {
-                                ast_types::Expression::Identifier(create_simple_identifier(value))
+                            var.map(|value| match value {
+                                Ok(value) => ast_types::Expression::Identifier(
+                                    create_simple_identifier(value),
+                                ),
+                                Err(value) => value,
                             })
                             .unwrap_or_default(),
                             value,
-                        ],
-                    }
-                },
-                block.next.as_deref().map(Into::into),
-            ))
-        }
-        SpecialStackBlockInfo::SetItem => {
-            let (list, is_list) = get_vlb_field!(
-                block,
-                block_id,
-                LIST_STR,
-                LIST_STR,
-                DetranspilerVarOrListKind::List { .. },
-                UnknownList,
-                context,
-                target_index
-            );
-            let item = get_required_input!(
-                block,
-                block_id,
-                ITEM_STR,
-                ITEM_STR,
-                blocks,
-                context,
-                target_index
-            );
-            let index = get_required_input!(
-                block,
-                block_id,
-                INDEX_STR,
-                INDEX_STR,
-                blocks,
-                context,
-                target_index
-            );
-            check_unused_fields!(
-                block.fields.len() != 1,
-                field => field.as_str() == LIST_STR,
-                block,
-                block_id,
-                context,
-                target_index
-            );
-            check_unused_inputs!(
-                block.inputs.len() != 2,
-                input => input.as_str() == ITEM_STR || input.as_str() == INDEX_STR,
-                block,
-                block_id,
-                context,
-                target_index
-            );
-            Ok((
-                if is_list && let Some(list) = list {
-                    ast_types::Statement::SetItem {
-                        list: create_simple_identifier(list),
-                        item: index,
-                        value: item,
-                    }
-                } else {
-                    ast_types::Statement::Call {
-                        function: create_simple_identifier(literal!("replace_item_of_list")),
-                        arguments: vec![
-                            list.map(|value| {
-                                ast_types::Expression::Identifier(create_simple_identifier(value))
-                            })
-                            .unwrap_or_default(),
-                            index,
-                            item,
                         ],
                     }
                 },

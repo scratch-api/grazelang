@@ -3145,7 +3145,11 @@ pub enum SpecialReporterInfo {
     List,
     Broadcast,
     Join,
+    GetLetter,
     GetItem,
+    ListIndexOf,
+    ListLength,
+    ListContains,
     PropertyOf,
 }
 
@@ -3348,7 +3352,11 @@ pub fn check_special_reporter(
         "data_variable" => SpecialReporterInfo::Variable,
         "data_listcontents" => SpecialReporterInfo::List,
         "event_broadcast_menu" => SpecialReporterInfo::Broadcast,
+        "operator_letter_of" => SpecialReporterInfo::GetLetter,
         "data_itemoflist" => SpecialReporterInfo::GetItem,
+        "data_itemnumoflist" => SpecialReporterInfo::ListIndexOf,
+        "data_lengthoflist" => SpecialReporterInfo::ListLength,
+        "data_listcontainsitem" => SpecialReporterInfo::ListContains,
         "sensing_of" => SpecialReporterInfo::PropertyOf,
         _ => return None,
     })
@@ -3359,13 +3367,17 @@ pub enum SpecialStackBlockInfo {
     ProcedureCall,
     IfElse,
     ClearList,
+    DeleteListItem,
+    SetItem,
     AddToList,
+    InsertIntoList,
+    ShowList,
+    HideList,
     Assignment {
         kind: AssignmentKind,
         input_name: IString,
     },
     AssignVariable,
-    SetItem,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -3398,7 +3410,12 @@ pub fn check_special_stack_block(
         "procedures_call" => Some(SpecialStackBlockInfo::ProcedureCall),
         "control_if_else" => Some(SpecialStackBlockInfo::IfElse),
         "data_deletealloflist" => Some(SpecialStackBlockInfo::ClearList),
+        "data_deleteoflist" => Some(SpecialStackBlockInfo::DeleteListItem),
+        "data_replaceitemoflist" => Some(SpecialStackBlockInfo::SetItem),
         "data_addtolist" => Some(SpecialStackBlockInfo::AddToList),
+        "data_insertatlist" => Some(SpecialStackBlockInfo::InsertIntoList),
+        "data_showlist" => Some(SpecialStackBlockInfo::ShowList),
+        "data_hidelist" => Some(SpecialStackBlockInfo::HideList),
         "motion_setx" => Some(SpecialStackBlockInfo::Assignment {
             kind: AssignmentKind::XPosition,
             input_name: literal!("X"),
@@ -3424,7 +3441,6 @@ pub fn check_special_stack_block(
             input_name: literal!("TEMPO"),
         }),
         "data_setvariableto" => Some(SpecialStackBlockInfo::AssignVariable),
-        "data_replaceitemoflist" => Some(SpecialStackBlockInfo::SetItem),
         _ => None,
     }
 }
