@@ -825,20 +825,6 @@ pub fn convert_project(
 // TODO: Improve error handling in order to allow emitting more messages at once
 // Issue: #137
 
-// TODO: Implement list methods in detranspiler
-//  - [x] `clear`
-//  - [x] `push`
-//  - [x] `remove`
-//  - [x] `insert`
-//  - [x] `find`
-//  - [x] `len`
-//  - [x] `contains`
-//  - [x] `show`
-//  - [x] `hide`
-//  - [x] `set` as a `Statement::SetItem`
-//  - [x] `get` as a `Expression::GetItem`
-// Issue: #120
-
 // TODO: Add option to configure formatting after detranspilation
 // Issue: #134
 
