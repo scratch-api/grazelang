@@ -1026,7 +1026,7 @@
     "137": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L791-L791",
         "commit": "0b2740edf8ed632c3b150da735daacde87ae0043",
         "title": "Improve error handling in order to allow emitting more messages at once"
