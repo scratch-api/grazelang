@@ -822,9 +822,6 @@ pub fn convert_project(
     ))
 }
 
-// TODO: Improve error handling in order to allow emitting more messages at once
-// Issue: #137
-
 // TODO: Add option to configure formatting after detranspilation
 // Issue: #134
 
