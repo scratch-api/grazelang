@@ -158,7 +158,7 @@ impl Annotate for GrazeSourceMessage {
                     let warning_count = *warning_count;
                     let mut error = String::with_capacity(100);
                     if error_count == 0 {
-                        write!(error, "could not complete transpilation due to some error",)
+                        write!(error, "could not complete transpilation due to some error")
                             .unwrap();
                     } else {
                         write!(
@@ -504,12 +504,12 @@ impl Annotate for GrazeDetranspilerMessage {
                     let warning_count = *warning_count;
                     let mut error = String::with_capacity(100);
                     if error_count == 0 {
-                        write!(error, "could not complete transpilation due to some error",)
+                        write!(error, "could not complete detranspilation due to some error")
                             .unwrap();
                     } else {
                         write!(
                             error,
-                            "could not complete transpilation due to {error_count} previous error",
+                            "could not complete detranspilation due to {error_count} previous error",
                         )
                         .unwrap();
                         if error_count != 1 {
