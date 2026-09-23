@@ -12,6 +12,7 @@ use crate::{
     eval::call::ConstantExprValue,
     lexer::SourceSpan,
     parser::cst::{Expression, GetPos, Identifier, ParseError},
+    utils::string_escape::normal_string_escaper,
     zipper::WriteIntoZipError,
 };
 
@@ -108,9 +109,7 @@ pub enum ConstantExprEvaluationError {
     },
     #[assoc(internal_lint_id = "const_identifier_used_super")]
     #[assoc(get_secondary_message = "\"super\" cannot be used here")]
-    #[error(
-        "the identifier {identifier:?} contains \"super\", which is not allowed, maybe try a normalized path to the constant expression symbol"
-    )]
+    #[error("the identifier {identifier:?} contains \"super\", which is not allowed")]
     ConstIdentifierUsedSuper { identifier: Box<Identifier> },
     #[assoc(internal_lint_id = "incorrect_param_count")]
     #[assoc(get_secondary_message = "incorrect parameter count")]
@@ -125,7 +124,7 @@ pub enum ConstantExprEvaluationError {
     #[assoc(internal_lint_id = "const_expr_list_access")]
     #[assoc(get_secondary_message = "cannot access a list item in a constant expression")]
     #[error(
-        "tried to access a list item in constant expression {expression:?}, which is not possible, maybe you meant to access a letter of the value of the identifier using \"@[\" instead of '['"
+        "tried to access a list item in constant expression {expression:?}, which is not possible"
     )]
     ConstExprListAccess { expression: Box<Expression> },
     #[assoc(internal_lint_id = "expected_identifier")]
@@ -251,7 +250,7 @@ pub enum GrazeSourceWarning {
         secondary_message: Option<IString>,
         source_span: SourceSpan,
     },
-    Specific(GrazeWarningKind, SourceSpan),
+    Specific(GrazeSourceWarningKind, SourceSpan),
 }
 
 impl GetLintId for GrazeSourceWarning {
@@ -301,7 +300,7 @@ impl GetPos for GrazeSourceWarning {
 #[func(const fn internal_lint_id(&self) -> &'static str)]
 #[func(pub const fn get_primary_message(&self) -> &'static str)]
 #[func(pub const fn get_secondary_message(&self) -> &'static str)]
-pub enum GrazeWarningKind {
+pub enum GrazeSourceWarningKind {
     #[assoc(get_primary_message = "uncalled callable")]
     #[assoc(get_secondary_message = "should be called")]
     #[assoc(internal_lint_id = "callable_as_input")]
@@ -400,9 +399,7 @@ pub enum GrazeWarningKind {
     #[assoc(get_secondary_message = "repeated canonical name here")]
     #[assoc(internal_lint_id = "repeated_canonical_name")]
     RepeatedCanonicalName,
-    #[assoc(
-        get_primary_message = "assigning a lot of items to a list might not be that efficient, maybe you meant to declare the list with an initial value instead"
-    )]
+    #[assoc(get_primary_message = "assigning a lot of items to a list might not be that efficient")]
     #[assoc(get_secondary_message = "list assignment has a lot of items")]
     #[assoc(internal_lint_id = "long_list_assignment")]
     LongListAssignment,
@@ -416,7 +413,7 @@ pub enum GrazeWarningKind {
 
 pub const LONG_LIST_ASSIGNMENT_MININUM_LENGTH: usize = 16;
 
-impl GetLintId for GrazeWarningKind {
+impl GetLintId for GrazeSourceWarningKind {
     #[inline]
     fn get_lint_id(&self) -> &'static str {
         self.internal_lint_id()
@@ -561,12 +558,18 @@ pub enum GrazeDetranspilerError {
     UnknownVariable { id: String, name: String },
     #[assoc(internal_lint_id = "unknown_list")]
     UnknownList { id: String, name: String },
+    #[assoc(internal_lint_id = "unknown_var_or_list")]
+    UnknownVarOrList { id: String, name: String },
     #[assoc(internal_lint_id = "unknown_broadcast")]
     UnknownBroadcast { id: String, name: String },
     #[assoc(internal_lint_id = "unknown_vlb_name")]
     UnknownVLBName { name: String },
     #[assoc(internal_lint_id = "unknown_field_value_in_monitor")]
-    UnknownFieldValueInMonitor { name: String, value: String },
+    UnknownFieldValueInMonitor {
+        name: String,
+        value: String,
+        monitor_id: String,
+    },
     #[assoc(internal_lint_id = "unknown_proccode")]
     UnknownProccode { block_id: String, proccode: String },
     #[assoc(internal_lint_id = "malformed_block_reference")]
@@ -614,7 +617,7 @@ pub enum GrazeDetranspilerError {
     #[assoc(internal_lint_id = "missing_field")]
     MissingField { field: String, block_id: String },
     #[assoc(internal_lint_id = "missing_field_in_monitor")]
-    MissingFieldInMonitor { field: String },
+    MissingFieldInMonitor { field: String, monitor_id: String },
     #[assoc(internal_lint_id = "missing_menu_field")]
     MissingMenuField { field: String, block_id: String },
     #[assoc(internal_lint_id = "missing_mutation")]
@@ -637,6 +640,236 @@ pub enum GrazeDetranspilerError {
     MissingAsset { md3ext: String },
 }
 
+impl GrazeDetranspilerError {
+    pub fn get_primary_message(&self) -> Cow<'static, str> {
+        Cow::Owned(match self {
+            GrazeDetranspilerError::UnknownOpcode { opcode } => {
+                format!("opcode \"{}\" is unknown", normal_string_escaper(opcode))
+            }
+            GrazeDetranspilerError::UnknownVariable { id, name } => {
+                format!(
+                    "there is no known variable with id \"{}\" and name \"{}\"",
+                    normal_string_escaper(id),
+                    normal_string_escaper(name),
+                )
+            }
+            GrazeDetranspilerError::UnknownList { id, name } => {
+                format!(
+                    "there is no known list with id \"{}\" and name \"{}\"",
+                    normal_string_escaper(id),
+                    normal_string_escaper(name),
+                )
+            }
+            GrazeDetranspilerError::UnknownVarOrList { id, name } => {
+                format!(
+                    "there is no known var or list with id \"{}\" and name \"{}\"",
+                    normal_string_escaper(id),
+                    normal_string_escaper(name),
+                )
+            }
+            GrazeDetranspilerError::UnknownBroadcast { id, name } => {
+                format!(
+                    "there is no known broadcast with id \"{}\" and name \"{}\"",
+                    normal_string_escaper(id),
+                    normal_string_escaper(name),
+                )
+            }
+            GrazeDetranspilerError::UnknownVLBName { name } => {
+                format!(
+                    "there is no known variable, list or broadcast with name \"{}\"",
+                    normal_string_escaper(name),
+                )
+            }
+            GrazeDetranspilerError::UnknownFieldValueInMonitor {
+                name,
+                value,
+                monitor_id,
+            } => {
+                format!(
+                    "unknown field value \"{}\" appeared in monitor field \"{}\" in monitor with id \"{}\"",
+                    normal_string_escaper(value),
+                    normal_string_escaper(name),
+                    normal_string_escaper(monitor_id),
+                )
+            }
+            GrazeDetranspilerError::UnknownProccode { block_id, proccode } => {
+                format!(
+                    "block with id \"{}\" used unknown proccode \"{}\"",
+                    normal_string_escaper(block_id),
+                    normal_string_escaper(proccode),
+                )
+            }
+            GrazeDetranspilerError::MalformedBlockReference { block_id } => {
+                format!(
+                    "expected a block reference but found input value \"{}\"",
+                    normal_string_escaper(&serde_json::to_string(&**block_id).unwrap()),
+                )
+            }
+            GrazeDetranspilerError::InvalidBlockReference { block_id } => {
+                format!(
+                    "could not find a block with id \"{}\"",
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerError::PrimitiveBlockAsSubstack {
+                block_id,
+                input_name,
+            } => {
+                format!(
+                    "input \"{}\" in block with id \"{}\" expected a substack but got a primitive block instead",
+                    normal_string_escaper(input_name),
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerError::PrimitiveBlockAsStackBlock { block_id } => {
+                format!(
+                    "block with id \"{}\" was expected to be a stack block but was a primitive block instead",
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerError::SubstackInReporter {
+                block_id,
+                input_name,
+            } => {
+                format!(
+                    "reporter block with id \"{}\" got a substack as input \"{}\"",
+                    normal_string_escaper(block_id),
+                    normal_string_escaper(input_name),
+                )
+            }
+            GrazeDetranspilerError::SubstackInHatBlock {
+                block_id,
+                input_name,
+            } => {
+                format!(
+                    "hat block with id \"{}\" got a substack as input \"{}\"",
+                    normal_string_escaper(block_id),
+                    normal_string_escaper(input_name),
+                )
+            }
+            GrazeDetranspilerError::TooManySubstacks {
+                block_id,
+                input_name,
+            } => {
+                format!(
+                    "non-if-else stack block with id \"{}\" got a second substack as input \"{}\"",
+                    normal_string_escaper(block_id),
+                    normal_string_escaper(input_name),
+                )
+            }
+            GrazeDetranspilerError::VLBNameIncorrect {
+                id,
+                name,
+                expected_name: _,
+            } => {
+                format!(
+                    "there is no known variable, list or broadcast with id \"{}\" and name \"{}\"",
+                    normal_string_escaper(id),
+                    normal_string_escaper(name),
+                )
+            }
+            GrazeDetranspilerError::MultipleStages => {
+                return Cow::Borrowed("there can only be one stage");
+            }
+            GrazeDetranspilerError::StageMissing => return Cow::Borrowed("there must be a stage"),
+            GrazeDetranspilerError::InvalidMonitorOpcode { opcode } => {
+                format!(
+                    "opcode \"{}\" is not valid for monitors",
+                    normal_string_escaper(opcode),
+                )
+            }
+            GrazeDetranspilerError::MissingInput { input, block_id } => {
+                format!(
+                    "block with id \"{}\" requires input \"{}\"",
+                    normal_string_escaper(block_id),
+                    normal_string_escaper(input),
+                )
+            }
+            GrazeDetranspilerError::MissingField { field, block_id } => {
+                format!(
+                    "block with id \"{}\" requires field \"{}\"",
+                    normal_string_escaper(block_id),
+                    normal_string_escaper(field),
+                )
+            }
+            GrazeDetranspilerError::MissingFieldInMonitor { field, monitor_id } => {
+                format!(
+                    "monitor with id \"{}\" requires field \"{}\"",
+                    normal_string_escaper(monitor_id),
+                    normal_string_escaper(field),
+                )
+            }
+            GrazeDetranspilerError::MissingMenuField { field, block_id } => {
+                format!(
+                    "menu block with id \"{}\" requires field \"{}\"",
+                    normal_string_escaper(block_id),
+                    normal_string_escaper(field),
+                )
+            }
+            GrazeDetranspilerError::MissingMutation { block_id } => {
+                format!(
+                    "block with id \"{}\" requires a mutation",
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerError::IncorrectMutationType { block_id } => {
+                format!(
+                    "block with id \"{}\" received a mutation with the wrong type",
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerError::InvalidMutationValue { block_id } => {
+                format!(
+                    "block with id \"{}\" received a mutation with an invalid value",
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerError::PathIsNotAFile { path } => {
+                format!(
+                    "path \"{}\" does not point to a file",
+                    normal_string_escaper(&path.to_string_lossy()),
+                )
+            }
+            GrazeDetranspilerError::CannotReadFile { path } => {
+                format!(
+                    "cannot read from file at path \"{}\"",
+                    normal_string_escaper(&path.to_string_lossy()),
+                )
+            }
+            GrazeDetranspilerError::InvalidZipFile { path } => {
+                format!(
+                    "zip file at path \"{}\" is invalid",
+                    normal_string_escaper(&path.to_string_lossy()),
+                )
+            }
+            GrazeDetranspilerError::InvalidProjectJson { path } => {
+                format!(
+                    "project json in zip file at path \"{}\" is invalid",
+                    normal_string_escaper(&path.to_string_lossy()),
+                )
+            }
+            GrazeDetranspilerError::CannotWriteFile { path } => {
+                format!(
+                    "cannot write to file at path \"{}\"",
+                    normal_string_escaper(&path.to_string_lossy()),
+                )
+            }
+            GrazeDetranspilerError::MissingAsset { md3ext } => {
+                format!(
+                    "zip file does not contain asset \"{}\"",
+                    normal_string_escaper(md3ext),
+                )
+            }
+        })
+    }
+}
+
+impl GetLintId for GrazeDetranspilerError {
+    fn get_lint_id(&self) -> &'static str {
+        self.internal_lint_id()
+    }
+}
+
 #[cfg(feature = "detranspiler")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, enum_assoc::Assoc)]
 #[func(const fn internal_lint_id(&self) -> &'static str)]
@@ -645,14 +878,49 @@ pub enum GrazeDetranspilerWarning {
     UnusedField { field: String, block_id: String },
     #[assoc(internal_lint_id = "unused_input")]
     UnusedInput { input: String, block_id: String },
-    #[assoc(internal_lint_id = "unknown_vlb_value")]
-    UnknownVLBValue { field: String, block_id: String },
-    #[assoc(internal_lint_id = "unknown_vlb_value_in_monitor")]
-    UnknownVLBValueInMonitor { monitor_id: String },
     #[assoc(internal_lint_id = "unknown_extension_error")]
     UnknownExtension { extension: String },
     #[assoc(internal_lint_id = "unknown_backdrop")]
     UnknownBackdrop { name: String },
+}
+
+impl GrazeDetranspilerWarning {
+    pub fn get_primary_message(&self) -> String {
+        match self {
+            GrazeDetranspilerWarning::UnusedField { field, block_id } => {
+                format!(
+                    "field \"{}\" in block with id \"{}\" went unused",
+                    normal_string_escaper(field),
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerWarning::UnusedInput { input, block_id } => {
+                format!(
+                    "input \"{}\" in block with id \"{}\" went unused",
+                    normal_string_escaper(input),
+                    normal_string_escaper(block_id),
+                )
+            }
+            GrazeDetranspilerWarning::UnknownExtension { extension } => {
+                format!(
+                    "extension \"{}\" is not implemented by graze",
+                    normal_string_escaper(extension),
+                )
+            }
+            GrazeDetranspilerWarning::UnknownBackdrop { name } => {
+                format!(
+                    "there is no known backdrop with name \"{}\"",
+                    normal_string_escaper(name),
+                )
+            }
+        }
+    }
+}
+
+impl GetLintId for GrazeDetranspilerWarning {
+    fn get_lint_id(&self) -> &'static str {
+        self.internal_lint_id()
+    }
 }
 
 #[cfg(feature = "detranspiler")]

@@ -822,9 +822,6 @@ pub fn convert_project(
     ))
 }
 
-// TODO: Implement pretty detranspiler logging
-// Issue: #126
-
 // TODO: Improve error handling in order to allow emitting more messages at once
 // Issue: #137
 
@@ -1273,15 +1270,16 @@ pub fn add_monitor(
                 context,
                 Ok(())
             ) else {
-                emit_message(
-                    context,
-                    || {
-                        GrazeDetranspilerWarning::UnknownVLBValueInMonitor {
-                            monitor_id: monitor.id.clone(),
-                        }
-                        .into()
+                emit_error!(
+                    GrazeDetranspilerError::UnknownVariable {
+                        id: monitor.id.clone(),
+                        name: monitor
+                            .params
+                            .get("VARIABLE")
+                            .map(ToString::to_string)
+                            .unwrap_or_default()
                     },
-                    GrazeMessageSetting::Warnings,
+                    context
                 );
                 return Ok(());
             };
@@ -1307,15 +1305,16 @@ pub fn add_monitor(
                 context,
                 Ok(())
             ) else {
-                emit_message(
-                    context,
-                    || {
-                        GrazeDetranspilerWarning::UnknownVLBValueInMonitor {
-                            monitor_id: monitor.id.clone(),
-                        }
-                        .into()
+                emit_error!(
+                    GrazeDetranspilerError::UnknownList {
+                        id: monitor.id.clone(),
+                        name: monitor
+                            .params
+                            .get("VARIABLE")
+                            .map(ToString::to_string)
+                            .unwrap_or_default()
                     },
-                    GrazeMessageSetting::Warnings,
+                    context
                 );
                 return Ok(());
             };
@@ -1373,6 +1372,7 @@ pub fn add_monitor(
                                 emit_error!(
                                     GrazeDetranspilerError::MissingFieldInMonitor {
                                         field: argument_name.to_string(),
+                                        monitor_id: monitor.id.clone(),
                                     },
                                     context
                                 );
@@ -1389,7 +1389,8 @@ pub fn add_monitor(
                                 emit_error!(
                                     GrazeDetranspilerError::UnknownFieldValueInMonitor {
                                         name: argument_name.to_string(),
-                                        value: field_value.to_string()
+                                        value: field_value.to_string(),
+                                        monitor_id: monitor.id.clone(),
                                     },
                                     context
                                 );
@@ -1401,6 +1402,7 @@ pub fn add_monitor(
                                 emit_error!(
                                     GrazeDetranspilerError::MissingFieldInMonitor {
                                         field: argument_name.to_string(),
+                                        monitor_id: monitor.id.clone(),
                                     },
                                     context
                                 );
@@ -2181,33 +2183,27 @@ where
                     continue;
                 };
                 parameters.push(
-                    unwrap_or_emit_message!(
+                    if let Some(value) = unwrap_or_emit_message!(
                         lookup_var_or_list(&name.as_cow_str(), id, target_index, context),
                         context,
                         {
                             parameters.push(ast_types::Expression::default());
                             continue;
                         }
-                    )
-                    .map(|value| {
+                    ) {
                         ast_types::Expression::Identifier(create_simple_identifier(
                             value.name.clone(),
                         ))
-                    })
-                    .unwrap_or_else(|| {
-                        emit_message(
-                            context,
-                            || {
-                                GrazeDetranspilerWarning::UnknownVLBValue {
-                                    field: argument_name.to_string(),
-                                    block_id: block_id.to_string(),
-                                }
-                                .into()
+                    } else {
+                        emit_error!(
+                            GrazeDetranspilerError::UnknownVarOrList {
+                                id: id.clone(),
+                                name: name.to_string()
                             },
-                            GrazeMessageSetting::Warnings,
+                            context
                         );
                         ast_types::Expression::default()
-                    }),
+                    },
                 );
             }
             ArgumentKind::BroadcastField => {
@@ -2227,33 +2223,27 @@ where
                     continue;
                 };
                 parameters.push(
-                    unwrap_or_emit_message!(
+                    if let Some(value) = unwrap_or_emit_message!(
                         lookup_broadcast(&name.as_cow_str(), id, context),
                         context,
                         {
                             parameters.push(ast_types::Expression::default());
                             continue;
                         }
-                    )
-                    .map(|value| {
+                    ) {
                         ast_types::Expression::Identifier(create_simple_identifier(
                             value.name.clone(),
                         ))
-                    })
-                    .unwrap_or_else(|| {
-                        emit_message(
-                            context,
-                            || {
-                                GrazeDetranspilerWarning::UnknownVLBValue {
-                                    field: argument_name.to_string(),
-                                    block_id: block_id.to_string(),
-                                }
-                                .into()
+                    } else {
+                        emit_error!(
+                            GrazeDetranspilerError::UnknownVarOrList {
+                                id: id.clone(),
+                                name: name.to_string()
                             },
-                            GrazeMessageSetting::Warnings,
+                            context
                         );
                         ast_types::Expression::default()
-                    }),
+                    },
                 );
             }
             ArgumentKind::BackdropField => {

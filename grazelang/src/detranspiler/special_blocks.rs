@@ -150,28 +150,23 @@ macro_rules! get_vlb_field {
                 }
                 project_json::Sb3FieldValue::WithId { value, id } => (value, id),
             };
-            let (value, conforms) =
+            let (value, conforms) = if let Some(value) =
                 lookup_var_or_list(&name.as_cow_str(), id, $target_index, $context)?
-                    .map(|value| {
-                        (
-                            Some(Ok(value.name.clone())),
-                            matches!(value.kind, $kind_pat),
-                        )
-                    })
-                    .unwrap_or_else(|| {
-                        emit_message(
-                            $context,
-                            || {
-                                GrazeDetranspilerWarning::UnknownVLBValue {
-                                    field: $field_name.to_string(),
-                                    block_id: $block_id.to_string(),
-                                }
-                                .into()
-                            },
-                            GrazeMessageSetting::Warnings,
-                        );
-                        (None, false)
-                    });
+            {
+                (
+                    Some(Ok(value.name.clone())),
+                    matches!(value.kind, $kind_pat),
+                )
+            } else {
+                emit_error!(
+                    GrazeDetranspilerError::UnknownVarOrList {
+                        id: id.clone(),
+                        name: name.to_string()
+                    },
+                    $context
+                );
+                (None, false)
+            };
             if_else_expression!(
                 $return_vlb_data,
                 (value, conforms, true, Some(name), Some(id)),

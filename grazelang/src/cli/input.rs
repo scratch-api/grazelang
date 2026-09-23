@@ -274,7 +274,7 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
     ))
 }
 
-pub fn count_errors_and_warnings(messages: &[GrazeSourceMessage]) -> (usize, usize) {
+pub fn count_build_errors_and_warnings(messages: &[GrazeSourceMessage]) -> (usize, usize) {
     let mut errors = 0;
     let mut warnings = 0;
     for message in messages {
@@ -283,6 +283,23 @@ pub fn count_errors_and_warnings(messages: &[GrazeSourceMessage]) -> (usize, usi
                 errors += 1;
             }
             GrazeSourceMessage::Warning(..) => {
+                warnings += 1;
+            }
+            _ => (),
+        }
+    }
+    (errors, warnings)
+}
+
+pub fn count_unbuild_errors_and_warnings(messages: &[GrazeDetranspilerMessage]) -> (usize, usize) {
+    let mut errors = 0;
+    let mut warnings = 0;
+    for message in messages {
+        match message {
+            GrazeDetranspilerMessage::Error(..) => {
+                errors += 1;
+            }
+            GrazeDetranspilerMessage::Warning(..) => {
                 warnings += 1;
             }
             _ => (),
@@ -353,7 +370,7 @@ impl Cli {
         force_error: bool,
     ) -> Successful {
         let renderer = Renderer::styled();
-        let (error_count, warning_count) = count_errors_and_warnings(messages);
+        let (error_count, warning_count) = count_build_errors_and_warnings(messages);
         let error = error_count > 0 || force_error;
         if error {
             messages.push(GrazeSourceMessage::Unsuccessful {
@@ -361,7 +378,7 @@ impl Cli {
                 warning_count,
             });
         }
-        annotations::annotate(
+        annotations::annotate_build(
             messages.iter(),
             |id| source_files.get(&id).unwrap().as_descriptor(),
             |ann, _| {
@@ -545,37 +562,27 @@ impl Cli {
         messages: &mut Vec<GrazeDetranspilerMessage>,
         force_error: bool,
     ) -> Successful {
-        if messages.is_empty() {
-            return if force_error {
-                Successful::No
-            } else {
-                Successful::Yes
-            };
+        let renderer = Renderer::styled();
+        let (error_count, warning_count) = count_unbuild_errors_and_warnings(messages);
+        let error = error_count > 0 || force_error;
+        if error {
+            messages.push(GrazeDetranspilerMessage::Unsuccessful {
+                error_count,
+                warning_count,
+            });
         }
-        dbg!(messages);
-        Successful::Yes
-        // let renderer = Renderer::styled();
-        // let (error_count, warning_count) = count_errors_and_warnings(messages);
-        // let error = error_count > 0 || force_error;
-        // if error {
-        //     messages.push(GrazeSourceMessage::Unsuccessful {
-        //         error_count,
-        //         warning_count,
-        //     });
-        // }
-        // annotations::annotate(
-        //     messages.iter(),
-        //     |id| source_files.get(&id).unwrap().as_descriptor(),
-        //     |ann, _| {
-        //         let rendered = renderer.render(ann);
-        //         anstream::eprintln!("{rendered}");
-        //     },
-        // );
-        // if error {
-        //     Successful::No
-        // } else {
-        //     Successful::Yes
-        // }
+        annotations::annotate_unbuild(
+            messages.iter(),
+            |ann, _| {
+                let rendered = renderer.render(ann);
+                anstream::eprintln!("{rendered}");
+            },
+        );
+        if error {
+            Successful::No
+        } else {
+            Successful::Yes
+        }
     }
 
     #[expect(clippy::too_many_arguments)]

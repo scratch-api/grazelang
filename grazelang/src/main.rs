@@ -3,5 +3,5 @@ use grazelang::cli::input::Cli;
 
 fn main() {
     let cli = Cli::parse();
-    cli.execute();
+    std::process::exit(cli.execute());
 }

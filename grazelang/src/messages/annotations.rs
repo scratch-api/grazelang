@@ -5,8 +5,13 @@ use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Snippet};
 use crate::{
     codegen::core::{GrazeSb3GeneratorCreationError, GrazeSb3GeneratorError},
     lexer::TextSpan,
-    messages::types::{CLIError, GetLintId, GrazeSourceInfo, GrazeSourceWarning},
+    messages::types::{
+        CLIError, ConstantExprEvaluationError, GetLintId, GrazeDetranspilerError,
+        GrazeDetranspilerMessage, GrazeDetranspilerWarning, GrazeSourceInfo, GrazeSourceWarning,
+        GrazeSourceWarningKind,
+    },
     parser::cst::{GetPos, ParseError},
+    utils::string_escape::normal_string_escaper,
     zipper::WriteIntoZipError,
 };
 
@@ -36,14 +41,29 @@ pub struct SourceDescriptor<'a> {
     pub line_starts: &'a [usize],
 }
 
-pub fn annotate<'a, I, S, P>(iter: I, mut source_getter: S, mut printer: P)
+pub fn annotate_build<'a, I, S, P>(iter: I, mut source_getter: S, mut printer: P)
 where
     I: Iterator<Item = &'a GrazeSourceMessage>,
     S: FnMut(u32) -> SourceDescriptor<'a>,
     P: for<'b> FnMut(&'b [Group<'a>], &'b GrazeSourceMessage),
 {
     let mut groups = Vec::with_capacity(4);
-    iter.for_each(move |value| printer(value.annotate(&mut source_getter, &mut groups), value));
+    iter.for_each(move |value| {
+        groups.clear();
+        printer(value.annotate(&mut source_getter, &mut groups), value)
+    });
+}
+
+pub fn annotate_unbuild<'a, I, P>(iter: I, mut printer: P)
+where
+    I: Iterator<Item = &'a GrazeDetranspilerMessage>,
+    P: for<'b> FnMut(&'b [Group<'a>], &'b GrazeDetranspilerMessage),
+{
+    let mut groups = Vec::with_capacity(4);
+    iter.for_each(move |value| {
+        groups.clear();
+        printer(value.annotate(|_| unreachable!(), &mut groups), value)
+    });
 }
 
 pub fn convert_source_span(text_span: TextSpan, line_starts: &[usize]) -> std::ops::Range<usize> {
@@ -53,8 +73,26 @@ pub fn convert_source_span(text_span: TextSpan, line_starts: &[usize]) -> std::o
     a..b
 }
 
-impl GrazeSourceMessage {
-    pub fn annotate<'a, 'b, F>(
+pub fn annotate_single<'a, 'b>(
+    groups: &'b mut Vec<Group<'a>>,
+    value: Group<'a>,
+) -> &'b [Group<'a>] {
+    groups.push(value);
+    &*groups
+}
+
+pub trait Annotate {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>;
+}
+
+impl Annotate for GrazeSourceMessage {
+    fn annotate<'a, 'b, F>(
         &'a self,
         mut source_getter: F,
         groups: &'b mut Vec<Group<'a>>,
@@ -62,8 +100,7 @@ impl GrazeSourceMessage {
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
-        groups.clear();
-        let value = match self {
+        match self {
             GrazeSourceMessage::Error(graze_error, _graze_suggestion) => match graze_error {
                 // TODO: Implement suggestions
                 // Issue: #68
@@ -73,73 +110,86 @@ impl GrazeSourceMessage {
                         path,
                         line_starts,
                     } = source_getter(source_span.1);
-                    Level::ERROR
-                        .primary_title(string.as_str())
-                        .id("custom_error")
-                        .element(
-                            Snippet::<Annotation>::source(content)
-                                .path(path.to_string_lossy())
-                                .annotation(
-                                    AnnotationKind::Primary
-                                        .span(convert_source_span(source_span.0, line_starts))
-                                        .label(string.as_str()),
-                                ),
-                        )
+                    annotate_single(
+                        groups,
+                        Level::ERROR
+                            .primary_title(string.as_str())
+                            .id("custom_error")
+                            .element(
+                                Snippet::<Annotation>::source(content)
+                                    .path(path.to_string_lossy())
+                                    .annotation(
+                                        AnnotationKind::Primary
+                                            .span(convert_source_span(source_span.0, line_starts))
+                                            .label(string.as_str()),
+                                    ),
+                            ),
+                    )
                 }
                 super::types::GrazeSourceError::ParseError(parse_error) => {
-                    parse_error.annotate(source_getter)
+                    parse_error.annotate(source_getter, groups)
                 }
                 super::types::GrazeSourceError::CodegenInitializationError(error) => {
-                    error.annotate(source_getter)
+                    error.annotate(source_getter, groups)
                 }
                 super::types::GrazeSourceError::CodegenError(graze_sb3_generator_error) => {
-                    graze_sb3_generator_error.annotate(source_getter)
+                    graze_sb3_generator_error.annotate(source_getter, groups)
                 }
-                super::types::GrazeSourceError::ZipError(error) => error.annotate(),
-                super::types::GrazeSourceError::CLIError(error) => error.annotate(),
+                super::types::GrazeSourceError::ZipError(error) => {
+                    error.annotate(source_getter, groups)
+                }
+                super::types::GrazeSourceError::CLIError(error) => {
+                    error.annotate(source_getter, groups)
+                }
             },
             GrazeSourceMessage::Warning(graze_warning, _graze_suggestion) => {
-                graze_warning.annotate(source_getter)
+                graze_warning.annotate(source_getter, groups)
             }
             GrazeSourceMessage::Info(graze_info, _graze_suggestion) => {
-                graze_info.annotate(source_getter)
+                graze_info.annotate(source_getter, groups)
             }
             GrazeSourceMessage::Unsuccessful {
                 error_count,
                 warning_count,
-            } => Group::with_title(Level::ERROR.secondary_title({
-                let error_count = *error_count;
-                let warning_count = *warning_count;
-                let mut error = String::with_capacity(100);
-                if error_count == 0 {
-                    write!(error, "could not complete transpilation due to some error",).unwrap();
-                } else {
-                    write!(
-                        error,
-                        "could not complete transpilation due to {error_count} previous error",
-                    )
-                    .unwrap();
-                    if error_count != 1 {
-                        write!(error, "s").unwrap();
+            } => annotate_single(
+                groups,
+                Group::with_title(Level::ERROR.secondary_title({
+                    let error_count = *error_count;
+                    let warning_count = *warning_count;
+                    let mut error = String::with_capacity(100);
+                    if error_count == 0 {
+                        write!(error, "could not complete transpilation due to some error",)
+                            .unwrap();
+                    } else {
+                        write!(
+                            error,
+                            "could not complete transpilation due to {error_count} previous error",
+                        )
+                        .unwrap();
+                        if error_count != 1 {
+                            write!(error, "s").unwrap();
+                        }
                     }
-                }
-                if warning_count > 0 {
-                    write!(error, "; {warning_count} warning").unwrap();
-                    if warning_count != 1 {
-                        write!(error, "s").unwrap();
+                    if warning_count > 0 {
+                        write!(error, "; {warning_count} warning").unwrap();
+                        if warning_count != 1 {
+                            write!(error, "s").unwrap();
+                        }
+                        write!(error, " emitted").unwrap();
                     }
-                    write!(error, " emitted").unwrap();
-                }
-                error
-            })),
-        };
-        groups.push(value);
-        &*groups
+                    error
+                })),
+            ),
+        }
     }
 }
 
-impl ParseError {
-    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
+impl Annotate for ParseError {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        mut source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
@@ -168,7 +218,7 @@ impl ParseError {
             path,
             line_starts,
         } = source_getter(source_span.1);
-        Level::ERROR
+        let main = Level::ERROR
             .primary_title(self.get_primary_message())
             .id(lint_id)
             .element(
@@ -179,20 +229,47 @@ impl ParseError {
                             .span(convert_source_span(source_span.0, line_starts))
                             .label(secondary_message),
                     ),
-            )
+            );
+        let extra = match self {
+            ParseError::InvalidConstantExpression {
+                source: ConstantExprEvaluationError::ConstIdentifierUsedSuper { .. },
+                ..
+            } => Some(Group::with_title(Level::HELP.secondary_title(
+                "try using a normalized path to the constant expression symbol instead",
+            ))),
+            ParseError::InvalidConstantExpression {
+                source: ConstantExprEvaluationError::ConstExprListAccess { .. },
+                ..
+            } => {
+                Some(Group::with_title(Level::HELP.secondary_title("maybe you meant to access a letter of the value of the identifier using \"@[\" instead of '['")))
+            }
+            _ => None,
+        };
+        groups.push(main);
+        if let Some(extra) = extra {
+            groups.push(extra);
+        }
+        &*groups
     }
 }
 
-impl GrazeSb3GeneratorError {
-    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
+impl Annotate for GrazeSb3GeneratorError {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        mut source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
         if matches!(self, Self::MissingStageDeclaration) {
-            return Group::with_title(
-                Level::ERROR
-                    .primary_title(self.get_primary_message())
-                    .id(self.get_lint_id()),
+            return annotate_single(
+                groups,
+                Group::with_title(
+                    Level::ERROR
+                        .primary_title(self.get_primary_message())
+                        .id(self.get_lint_id()),
+                ),
             );
         }
         let (lint_id, secondary_message, source_span) = match self {
@@ -220,85 +297,130 @@ impl GrazeSb3GeneratorError {
             path,
             line_starts,
         } = source_getter(source_span.1);
-        Level::ERROR
-            .primary_title(self.get_primary_message())
-            .id(lint_id)
-            .element(
-                Snippet::source(content)
-                    .path(path.to_string_lossy())
-                    .annotation(
-                        AnnotationKind::Primary
-                            .span(convert_source_span(source_span.0, line_starts))
-                            .label(secondary_message),
-                    ),
-            )
-    }
-}
-
-impl GrazeSourceWarning {
-    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
-    where
-        F: FnMut(u32) -> SourceDescriptor<'a>,
-    {
-        let source_span = *self.get_source_span();
-        let SourceDescriptor {
-            content,
-            path,
-            line_starts,
-        } = source_getter(source_span.1);
-        Level::WARNING
-            .primary_title(self.get_primary_message())
-            .id(self.get_lint_id())
-            .element(
-                Snippet::<Annotation>::source(content)
-                    .path(path.to_string_lossy())
-                    .annotation(
-                        AnnotationKind::Primary
-                            .span(convert_source_span(source_span.0, line_starts))
-                            .label(self.get_secondary_message()),
-                    ),
-            )
-    }
-}
-
-impl GrazeSourceInfo {
-    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
-    where
-        F: FnMut(u32) -> SourceDescriptor<'a>,
-    {
-        let source_span = *self.get_source_span();
-        let SourceDescriptor {
-            content,
-            path,
-            line_starts,
-        } = source_getter(source_span.1);
-        Level::WARNING
-            .primary_title(self.get_primary_message())
-            .id(self.get_lint_id())
-            .element(
-                Snippet::<Annotation>::source(content)
-                    .path(path.to_string_lossy())
-                    .annotation(
-                        AnnotationKind::Primary
-                            .span(convert_source_span(source_span.0, line_starts))
-                            .label(self.get_secondary_message()),
-                    ),
-            )
-    }
-}
-
-impl CLIError {
-    pub fn annotate<'a>(&'a self) -> Group<'a> {
-        Group::with_title(
+        annotate_single(
+            groups,
             Level::ERROR
                 .primary_title(self.get_primary_message())
-                .id(self.get_lint_id()),
+                .id(lint_id)
+                .element(
+                    Snippet::source(content)
+                        .path(path.to_string_lossy())
+                        .annotation(
+                            AnnotationKind::Primary
+                                .span(convert_source_span(source_span.0, line_starts))
+                                .label(secondary_message),
+                        ),
+                ),
         )
     }
 }
 
-impl GrazeSb3GeneratorCreationError {
-    pub fn annotate<'a, F>(&'a self, mut source_getter: F) -> Group<'a>
+impl Annotate for GrazeSourceWarning {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        mut source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        let source_span = *self.get_source_span();
+        let SourceDescriptor {
+            content,
+            path,
+            line_starts,
+        } = source_getter(source_span.1);
+        let main = Level::WARNING
+            .primary_title(self.get_primary_message())
+            .id(self.get_lint_id())
+            .element(
+                Snippet::<Annotation>::source(content)
+                    .path(path.to_string_lossy())
+                    .annotation(
+                        AnnotationKind::Primary
+                            .span(convert_source_span(source_span.0, line_starts))
+                            .label(self.get_secondary_message()),
+                    ),
+            );
+        let extra = if let GrazeSourceWarning::Specific(kind, _) = self {
+            match kind {
+                GrazeSourceWarningKind::LongListAssignment => {
+                    Some(Group::with_title(Level::HELP.secondary_title(
+                        "maybe you meant to declare the list with an initial value instead",
+                    )))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        groups.push(main);
+        if let Some(value) = extra {
+            groups.push(value)
+        }
+        &*groups
+    }
+}
+
+impl Annotate for GrazeSourceInfo {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        mut source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        let source_span = *self.get_source_span();
+        let SourceDescriptor {
+            content,
+            path,
+            line_starts,
+        } = source_getter(source_span.1);
+        annotate_single(
+            groups,
+            Level::WARNING
+                .primary_title(self.get_primary_message())
+                .id(self.get_lint_id())
+                .element(
+                    Snippet::<Annotation>::source(content)
+                        .path(path.to_string_lossy())
+                        .annotation(
+                            AnnotationKind::Primary
+                                .span(convert_source_span(source_span.0, line_starts))
+                                .label(self.get_secondary_message()),
+                        ),
+                ),
+        )
+    }
+}
+
+impl Annotate for CLIError {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        _source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        annotate_single(
+            groups,
+            Group::with_title(
+                Level::ERROR
+                    .primary_title(self.get_primary_message())
+                    .id(self.get_lint_id()),
+            ),
+        )
+    }
+}
+
+impl Annotate for GrazeSb3GeneratorCreationError {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        mut source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
     where
         F: FnMut(u32) -> SourceDescriptor<'a>,
     {
@@ -308,10 +430,13 @@ impl GrazeSb3GeneratorCreationError {
             *self.get_source_span(),
         );
         if let Self::ResourceDirectoryDoesNotExist { .. } = self {
-            return Group::with_title(
-                Level::ERROR
-                    .primary_title(self.get_primary_message())
-                    .id(self.get_lint_id()),
+            return annotate_single(
+                groups,
+                Group::with_title(
+                    Level::ERROR
+                        .primary_title(self.get_primary_message())
+                        .id(self.get_lint_id()),
+                ),
             );
         }
         let SourceDescriptor {
@@ -319,27 +444,152 @@ impl GrazeSb3GeneratorCreationError {
             path,
             line_starts,
         } = source_getter(source_span.1);
-        Level::ERROR
-            .primary_title(self.get_primary_message())
-            .id(lint_id)
-            .element(
-                Snippet::source(content)
-                    .path(path.to_string_lossy())
-                    .annotation(
-                        AnnotationKind::Primary
-                            .span(convert_source_span(source_span.0, line_starts))
-                            .label(secondary_message),
-                    ),
-            )
+        annotate_single(
+            groups,
+            Level::ERROR
+                .primary_title(self.get_primary_message())
+                .id(lint_id)
+                .element(
+                    Snippet::source(content)
+                        .path(path.to_string_lossy())
+                        .annotation(
+                            AnnotationKind::Primary
+                                .span(convert_source_span(source_span.0, line_starts))
+                                .label(secondary_message),
+                        ),
+                ),
+        )
     }
 }
 
-impl WriteIntoZipError {
-    pub fn annotate<'a>(&'a self) -> Group<'a> {
-        Group::with_title(
+impl Annotate for WriteIntoZipError {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        _source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        annotate_single(
+            groups,
+            Group::with_title(
+                Level::ERROR
+                    .primary_title(self.get_primary_message())
+                    .id(self.get_lint_id()),
+            ),
+        )
+    }
+}
+
+impl Annotate for GrazeDetranspilerMessage {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        match self {
+            GrazeDetranspilerMessage::Error(error) => error.annotate(source_getter, groups),
+            GrazeDetranspilerMessage::Warning(warning) => warning.annotate(source_getter, groups),
+            GrazeDetranspilerMessage::Unsuccessful {
+                error_count,
+                warning_count,
+            } => annotate_single(
+                groups,
+                Group::with_title(Level::ERROR.secondary_title({
+                    let error_count = *error_count;
+                    let warning_count = *warning_count;
+                    let mut error = String::with_capacity(100);
+                    if error_count == 0 {
+                        write!(error, "could not complete transpilation due to some error",)
+                            .unwrap();
+                    } else {
+                        write!(
+                            error,
+                            "could not complete transpilation due to {error_count} previous error",
+                        )
+                        .unwrap();
+                        if error_count != 1 {
+                            write!(error, "s").unwrap();
+                        }
+                    }
+                    if warning_count > 0 {
+                        write!(error, "; {warning_count} warning").unwrap();
+                        if warning_count != 1 {
+                            write!(error, "s").unwrap();
+                        }
+                        write!(error, " emitted").unwrap();
+                    }
+                    error
+                })),
+            ),
+        }
+    }
+}
+
+impl Annotate for GrazeDetranspilerError {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        _source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        let value = Group::with_title(
             Level::ERROR
                 .primary_title(self.get_primary_message())
                 .id(self.get_lint_id()),
-        )
+        );
+        let extra = match self {
+            GrazeDetranspilerError::VLBNameIncorrect {
+                id: _,
+                name: _,
+                expected_name,
+            } => Some(Group::with_title(Level::HELP.secondary_title(format!(
+                "there is, however, a variable with that id and name \"{}\"",
+                normal_string_escaper(expected_name)
+            )))),
+            _ => None,
+        };
+        groups.push(value);
+        if let Some(value) = extra {
+            groups.push(value)
+        }
+        &*groups
+    }
+}
+
+impl Annotate for GrazeDetranspilerWarning {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        _source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        let value = Group::with_title(
+            Level::WARNING
+                .primary_title(self.get_primary_message())
+                .id(self.get_lint_id()),
+        );
+        let extra = match self {
+            GrazeDetranspilerWarning::UnknownExtension { extension } => {
+                Some(Group::with_title(Level::HELP.secondary_title(format!(
+                    "maybe try creating a markup file named \"{}.toml\" for the extension yourself",
+                    normal_string_escaper(extension),
+                ))))
+            }
+            _ => None,
+        };
+        groups.push(value);
+        if let Some(value) = extra {
+            groups.push(value)
+        }
+        &*groups
     }
 }
