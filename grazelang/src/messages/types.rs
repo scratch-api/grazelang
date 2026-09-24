@@ -407,7 +407,11 @@ pub enum GrazeSourceWarningKind {
     #[assoc(get_secondary_message = "should be a reporter")]
     #[assoc(internal_lint_id = "stack_block_as_reporter")]
     StackBlockAsReporter,
-    // TODO: Use `GrazeWarningKind::StackBlockAsReporter`
+    #[assoc(get_primary_message = "used a reporter block where a stack block was expected")]
+    #[assoc(get_secondary_message = "should be a stack block")]
+    #[assoc(internal_lint_id = "reporter_as_stack_block")]
+    ReporterAsStackBlock,
+    // TODO: Use `GrazeWarningKind::StackBlockAsReporter` and `GrazeWarningKind::ReporterAsStackBlock`
     // Issue: #111
 }
 
