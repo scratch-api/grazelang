@@ -834,7 +834,7 @@
     "111": {
         "filepath": "grazelang/src/messages/types.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L414-L415",
         "commit": "78268925cc3e7b261ef8490a8c3d8a07350f7022",
         "title": "Use `GrazeWarningKind::StackBlockAsReporter` and `GrazeWarningKind::ReporterAsStackBlock`"
