@@ -35,7 +35,10 @@ use crate::{
         cast::{IsValidI128, JsPrimitive, ScratchVmToNumber},
     },
     lexer::SourceSpan,
-    library::{self, create_sprite_dependent_symbols, create_stage_dependent_symbols},
+    library::{
+        self, BlockShape, create_sprite_dependent_symbols, create_stage_dependent_symbols,
+        get_block_shape,
+    },
     messages::types::{
         ConstantExprEvaluationError, EMPTY_SOURCE_SPAN, GetLintId, GrazeSourceMessage,
         GrazeSourceWarning, GrazeSourceWarningKind, LONG_LIST_ASSIGNMENT_MININUM_LENGTH,
@@ -1720,6 +1723,7 @@ pub mod helpers {
     use crate::{
         eval::cast::{IsValidI128, JsPrimitive, ScratchVmToBoolean, ScratchVmToNumber},
         lexer::SourceSpan,
+        library::{BlockShape, get_block_shape},
         messages::types::{GrazeSourceMessage, GrazeSourceWarning, GrazeSourceWarningKind},
         parser::{
             context::{
@@ -2234,6 +2238,19 @@ pub mod helpers {
             .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                 identifier: identifier.clone(),
             })?;
+        if matches!(get_block_shape(opcode), BlockShape::Reporter) {
+            emit_message_eager(
+                context,
+                GrazeSourceMessage::Warning(
+                    GrazeSourceWarning::Specific(
+                        GrazeSourceWarningKind::ReporterAsStackBlock,
+                        *identifier.get_source_span(),
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
         let mut fields = HashMap::new();
         let mut inputs = HashMap::new();
         add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
@@ -2703,6 +2720,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                     identifier: value.0.clone(),
                 })?;
+            if !matches!(get_block_shape(opcode), BlockShape::Reporter) {
+                emit_message_eager(
+                    context,
+                    GrazeSourceMessage::Warning(
+                        GrazeSourceWarning::Specific(
+                            GrazeSourceWarningKind::StackBlockAsReporter,
+                            *value.0.get_source_span(),
+                        ),
+                        None,
+                    ),
+                    GrazeMessageSetting::Warnings,
+                );
+            }
             let mut fields = HashMap::new();
             let mut inputs = HashMap::new();
             add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
@@ -3206,6 +3236,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                     identifier: value.0.clone(),
                 })?;
+            if matches!(get_block_shape(opcode), BlockShape::Reporter) {
+                emit_message_eager(
+                    context,
+                    GrazeSourceMessage::Warning(
+                        GrazeSourceWarning::Specific(
+                            GrazeSourceWarningKind::ReporterAsStackBlock,
+                            *value.0.get_source_span(),
+                        ),
+                        None,
+                    ),
+                    GrazeMessageSetting::Warnings,
+                );
+            }
             let mut fields = HashMap::new();
             let mut inputs = HashMap::new();
             add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
@@ -4702,6 +4745,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                 identifier: value.0.clone(),
             })?;
+        if matches!(get_block_shape(opcode), BlockShape::Reporter) {
+            emit_message_eager(
+                context,
+                GrazeSourceMessage::Warning(
+                    GrazeSourceWarning::Specific(
+                        GrazeSourceWarningKind::ReporterAsStackBlock,
+                        *value.0.get_source_span(),
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
         add_block(
             context,
             &this_id,
@@ -4754,6 +4810,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                 identifier: value.0.clone(),
             })?;
+        if matches!(get_block_shape(opcode), BlockShape::Reporter) {
+            emit_message_eager(
+                context,
+                GrazeSourceMessage::Warning(
+                    GrazeSourceWarning::Specific(
+                        GrazeSourceWarningKind::ReporterAsStackBlock,
+                        *value.0.get_source_span(),
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
         add_block(
             context,
             &this_id,
@@ -4827,6 +4896,19 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotCallable {
                 identifier: value.0.clone(),
             })?;
+        if matches!(get_block_shape(opcode), BlockShape::Reporter) {
+            emit_message_eager(
+                context,
+                GrazeSourceMessage::Warning(
+                    GrazeSourceWarning::Specific(
+                        GrazeSourceWarningKind::ReporterAsStackBlock,
+                        *value.0.get_source_span(),
+                    ),
+                    None,
+                ),
+                GrazeMessageSetting::Warnings,
+            );
+        }
         add_block(
             context,
             &this_id,
@@ -5299,7 +5381,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(GrazeSourceWarningKind::TargetWithoutCostume, *value.3),
+                    GrazeSourceWarning::Specific(
+                        GrazeSourceWarningKind::TargetWithoutCostume,
+                        *value.3,
+                    ),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
@@ -5421,7 +5506,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(GrazeSourceWarningKind::TargetWithoutCostume, *value.5),
+                    GrazeSourceWarning::Specific(
+                        GrazeSourceWarningKind::TargetWithoutCostume,
+                        *value.5,
+                    ),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,
@@ -5534,7 +5622,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             emit_message_eager(
                 context,
                 GrazeSourceMessage::Warning(
-                    GrazeSourceWarning::Specific(GrazeSourceWarningKind::RepeatedTargetConfig, *value.4),
+                    GrazeSourceWarning::Specific(
+                        GrazeSourceWarningKind::RepeatedTargetConfig,
+                        *value.4,
+                    ),
                     None,
                 ),
                 GrazeMessageSetting::Warnings,

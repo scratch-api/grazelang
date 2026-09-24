@@ -411,8 +411,6 @@ pub enum GrazeSourceWarningKind {
     #[assoc(get_secondary_message = "should be a stack block")]
     #[assoc(internal_lint_id = "reporter_as_stack_block")]
     ReporterAsStackBlock,
-    // TODO: Use `GrazeWarningKind::StackBlockAsReporter` and `GrazeWarningKind::ReporterAsStackBlock`
-    // Issue: #111
 }
 
 pub const LONG_LIST_ASSIGNMENT_MININUM_LENGTH: usize = 16;
