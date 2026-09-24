@@ -835,9 +835,9 @@
         "filepath": "grazelang/src/messages/types.rs",
         "text": "",
         "status": "open",
-        "lines": "L409-L409",
-        "commit": "05bdb64c41770974401141be45b7f7d82a0af500",
-        "title": "Use `GrazeWarningKind::StackBlockAsReporter`"
+        "lines": "L414-L415",
+        "commit": "78268925cc3e7b261ef8490a8c3d8a07350f7022",
+        "title": "Use `GrazeWarningKind::StackBlockAsReporter` and `GrazeWarningKind::ReporterAsStackBlock`"
     },
     "112": {
         "filepath": "grazelang/src/detranspiler/core.rs",
