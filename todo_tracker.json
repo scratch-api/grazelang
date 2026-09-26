@@ -819,9 +819,9 @@
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
         "status": "open",
-        "lines": "L839-L839",
-        "commit": "2ac971e7421ea3ae299a394027fa0539e0822756",
-        "title": "Implement cycle detection in block conversions"
+        "lines": "L2819-L2820",
+        "commit": "bbd7ffd884602b2d480b5cb954139217f3ed61dd",
+        "title": "Implement non-tree detection in block conversions"
     },
     "110": {
         "filepath": "grazelang/src/detranspiler/get_info.rs",
@@ -1030,5 +1030,13 @@
         "lines": "L791-L791",
         "commit": "0b2740edf8ed632c3b150da735daacde87ae0043",
         "title": "Improve error handling in order to allow emitting more messages at once"
+    },
+    "138": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "[ ] Cycle detection\n[ ] Demote non-tree error to warning",
+        "status": "open",
+        "lines": "L2822-L2824",
+        "commit": "bbd7ffd884602b2d480b5cb954139217f3ed61dd",
+        "title": "Implement cycle detection in block conversions"
     }
 }
