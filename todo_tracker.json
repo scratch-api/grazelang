@@ -818,7 +818,7 @@
     "109": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2819-L2820",
         "commit": "bbd7ffd884602b2d480b5cb954139217f3ed61dd",
         "title": "Implement non-tree detection in block conversions"
@@ -1033,10 +1033,10 @@
     },
     "138": {
         "filepath": "grazelang/src/detranspiler/core.rs",
-        "text": "[ ] Cycle detection\n[ ] Demote non-tree error to warning",
+        "text": "- [ ] Cycle detection\n- [ ] Demote non-tree error to warning",
         "status": "open",
-        "lines": "L2822-L2824",
-        "commit": "bbd7ffd884602b2d480b5cb954139217f3ed61dd",
+        "lines": "L2819-L2822",
+        "commit": "fe7a5be913585403d0d2cc31393a3ac0992f02e2",
         "title": "Implement cycle detection in block conversions"
     }
 }
