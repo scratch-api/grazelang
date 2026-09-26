@@ -640,6 +640,8 @@ pub enum GrazeDetranspilerError {
     CannotWriteFile { path: PathBuf },
     #[assoc(internal_lint_id = "missing_asset")]
     MissingAsset { md3ext: String },
+    #[assoc(internal_lint_id = "blocks_must_form_a_tree")]
+    BlocksMustFormATree { block_id: String },
 }
 
 impl GrazeDetranspilerError {
@@ -860,6 +862,12 @@ impl GrazeDetranspilerError {
                 format!(
                     "zip file does not contain asset \"{}\"",
                     normal_string_escaper(md3ext),
+                )
+            }
+            GrazeDetranspilerError::BlocksMustFormATree { block_id } => {
+                format!(
+                    "block with id \"{}\" is referred to multiple times",
+                    normal_string_escaper(block_id)
                 )
             }
         })

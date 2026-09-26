@@ -3903,7 +3903,9 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
                             start_pos,
                         );
                     }
-                    if expressions.values.is_empty() && let Some(tail_value) = expressions.tail_value {
+                    if expressions.values.is_empty()
+                        && let Some(tail_value) = expressions.tail_value
+                    {
                         let source_span = left_parens.span_to(&right_parens);
                         return parse_sprite_rest_of_single_input_control(
                             token_stream,
@@ -4273,7 +4275,9 @@ pub fn parse_stage_statement<T: PeekableTokenStream>(
                             start_pos,
                         );
                     }
-                    if expressions.values.is_empty() && let Some(tail_value) = expressions.tail_value {
+                    if expressions.values.is_empty()
+                        && let Some(tail_value) = expressions.tail_value
+                    {
                         let source_span = left_parens.span_to(&right_parens);
                         return parse_stage_rest_of_single_input_control(
                             token_stream,

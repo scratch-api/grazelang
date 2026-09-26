@@ -571,13 +571,10 @@ impl Cli {
                 warning_count,
             });
         }
-        annotations::annotate_unbuild(
-            messages.iter(),
-            |ann, _| {
-                let rendered = renderer.render(ann);
-                anstream::eprintln!("{rendered}");
-            },
-        );
+        annotations::annotate_unbuild(messages.iter(), |ann, _| {
+            let rendered = renderer.render(ann);
+            anstream::eprintln!("{rendered}");
+        });
         if error {
             Successful::No
         } else {

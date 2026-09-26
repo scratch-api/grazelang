@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 use arcstr::{ArcStr as IString, format as format_istring, literal};
 use grazelang_types::project_json;
@@ -40,6 +43,7 @@ pub struct DetranspilerContext {
     pub current_procedure_parameters:
         HashMap<ProcedureParameterOriginalName, ProcedureParameterInternalName>,
     pub global_namespace: DetranspilerTargetNamespace,
+    pub block_ids_visited: HashSet<IString>,
 }
 
 pub(super) type DetranspilerResult<T> = Result<T, GrazeDetranspilerError>;
@@ -511,6 +515,14 @@ pub fn convert_project(
         broadcasts: HashMap::new(),
         current_procedure_parameters: HashMap::new(),
         global_namespace: DetranspilerTargetNamespace::new(),
+        block_ids_visited: HashSet::with_capacity(
+            project
+                .targets
+                .iter()
+                .map(|value| value.blocks.len())
+                .max()
+                .unwrap_or_default(),
+        ),
     };
     let mut has_stage = false;
     let target_internal_names = project
@@ -1587,6 +1599,7 @@ pub fn fill_target(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<()> {
+    context.block_ids_visited.clear();
     for (block_id, block) in &target.blocks {
         let project_json::Sb3Block::Normal(normal_block) = block else {
             match block {
@@ -2045,6 +2058,12 @@ pub fn convert_reporter_block(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<ast_types::Expression> {
+    if context.block_ids_visited.contains(block_id) {
+        return Err(GrazeDetranspilerError::BlocksMustFormATree {
+            block_id: block_id.to_string(),
+        });
+    }
+    context.block_ids_visited.insert(block_id.into());
     Ok(try_or_emit_message!(
         match block {
             project_json::Sb3Block::Normal(sb3_normal_block) => {
@@ -2759,6 +2778,12 @@ pub fn convert_hat_block(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<(ast_types::Identifier, Vec<ast_types::Expression>)> {
+    if context.block_ids_visited.contains(block_id) {
+        return Err(GrazeDetranspilerError::BlocksMustFormATree {
+            block_id: block_id.to_string(),
+        });
+    }
+    context.block_ids_visited.insert(block_id.into());
     let (block_kind_info, parameters, _) = convert_block(
         block,
         block_id,
@@ -2791,12 +2816,22 @@ pub fn convert_block_stack(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<ast_types::CodeBlock> {
-    // TODO: Implement cycle detection in block conversions
+    // TODO: Implement non-tree detection in block conversions
     // Issue: #109
+
+    // TODO: Implement cycle detection in block conversions
+    //  [ ] Cycle detection
+    //  [ ] Demote non-tree error to warning
     let mut statements = Vec::new();
     let mut current_block = block;
     let mut current_block_id = IString::from(block_id);
     loop {
+        if context.block_ids_visited.contains(&current_block_id) {
+            return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                block_id: current_block_id.to_string(),
+            });
+        }
+        context.block_ids_visited.insert(current_block_id.clone());
         let (statement, next_block_id) = unwrap_or_emit_message!(
             convert_stack_block(
                 current_block,

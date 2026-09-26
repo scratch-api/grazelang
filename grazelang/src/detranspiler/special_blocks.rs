@@ -345,6 +345,14 @@ pub fn convert_special_reporter_block(
             else {
                 unreachable!()
             };
+            if context.block_ids_visited.contains(inner_block_id.as_str()) {
+                return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                    block_id: inner_block_id.to_string(),
+                });
+            }
+            context
+                .block_ids_visited
+                .insert(inner_block_id.as_str().into());
             let mut inner_operands_present = 0;
             let left_operand_expression =
                 if let Some(operand) = inner_block.inputs.get(inner_left_operand.as_str()) {
@@ -620,6 +628,17 @@ pub fn convert_special_reporter_block(
                             blocks.get(left_operand_block_id)
                         && left_operand_block.opcode.as_str() == JOIN_OPCODE
                     {
+                        if context
+                            .block_ids_visited
+                            .contains(left_operand_block_id.as_str())
+                        {
+                            return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                                block_id: left_operand_block_id.clone(),
+                            });
+                        }
+                        context
+                            .block_ids_visited
+                            .insert(left_operand_block_id.as_str().into());
                         recursively_convert_formatted_string(
                             left_operand_block,
                             left_operand_block_id,
@@ -655,6 +674,17 @@ pub fn convert_special_reporter_block(
                             blocks.get(right_operand_block_id)
                         && right_operand_block.opcode.as_str() == JOIN_OPCODE
                     {
+                        if context
+                            .block_ids_visited
+                            .contains(right_operand_block_id.as_str())
+                        {
+                            return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                                block_id: right_operand_block_id.clone(),
+                            });
+                        }
+                        context
+                            .block_ids_visited
+                            .insert(right_operand_block_id.as_str().into());
                         recursively_convert_formatted_string(
                             right_operand_block,
                             right_operand_block_id,
@@ -1056,6 +1086,12 @@ pub fn convert_special_reporter_block(
                         if let project_json::Sb3Block::Normal(inner_block) = inner_block
                             && inner_block.opcode.as_str() == MENU_OPCODE
                         {
+                            if context.block_ids_visited.contains(block_id.as_str()) {
+                                return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                                    block_id: block_id.clone(),
+                                });
+                            }
+                            context.block_ids_visited.insert(block_id.as_str().into());
                             for key in inner_block.fields.keys() {
                                 if key.as_str() == OBJECT_STR {
                                     continue;
@@ -1469,6 +1505,12 @@ pub fn convert_special_stack_block(
                 context: &mut DetranspilerContext,
                 target_index: usize,
             ) -> DetranspilerResult<IfBranch> {
+                if context.block_ids_visited.contains(block_id) {
+                    return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                        block_id: block_id.to_string(),
+                    });
+                }
+                context.block_ids_visited.insert(block_id.into());
                 let mut tracked_args = 0_usize;
                 let condition = get_input!((
                     block,
@@ -1516,6 +1558,14 @@ pub fn convert_special_stack_block(
                 alternative_branches: &mut Vec<(ast_types::Expression, ast_types::CodeBlock)>,
                 first_if_branch: bool,
             ) -> DetranspilerResult<(OptionalIfBranch, ElseBranch)> {
+                if !first_if_branch {
+                    if context.block_ids_visited.contains(block_id) {
+                        return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                            block_id: block_id.to_string(),
+                        });
+                    }
+                    context.block_ids_visited.insert(block_id.into());
+                }
                 let mut tracked_args = 0_usize;
                 let condition = get_input!((
                     block,
@@ -1728,6 +1778,14 @@ pub fn convert_special_stack_block(
                         Some(project_json::Sb3FieldValue::WithId { value: next_block_value, id: next_block_id }) if next_block_value == name && next_block_id == id
                     )
                 {
+                    if context.block_ids_visited.contains(next_block_id_non_null) {
+                        return Err(GrazeDetranspilerError::BlocksMustFormATree {
+                            block_id: next_block_id_non_null.to_string(),
+                        });
+                    }
+                    context
+                        .block_ids_visited
+                        .insert(next_block_id_non_null.clone());
                     let (expression, new_block_id) = unwrap_or_emit_message!(
                         convert_special_stack_block(
                             SpecialStackBlockInfo::AddToList,
