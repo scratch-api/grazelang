@@ -844,6 +844,7 @@ pub fn convert_project(
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
 // A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A Result is bubbled iff it is not unbubbled.
+// Fatal errors like ones caused by cycles in the block tree do not have to be bubbled.
 
 // Bubbling is done to allow the detranspiler to catch as many errors or warnings at once as possible
 
