@@ -986,7 +986,7 @@
     "132": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L815-L815",
         "commit": "2414527f859a2b0342381d22170001abbb8e2294",
         "title": "Allow detranspiler to use a single file per target"
