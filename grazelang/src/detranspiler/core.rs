@@ -2816,9 +2816,6 @@ pub fn convert_block_stack(
     context: &mut DetranspilerContext,
     target_index: usize,
 ) -> DetranspilerResult<ast_types::CodeBlock> {
-    // TODO: Implement non-tree detection in block conversions
-    // Issue: #109
-
     // TODO: Implement cycle detection in block conversions
     //  - [ ] Cycle detection
     //  - [ ] Demote non-tree error to warning
