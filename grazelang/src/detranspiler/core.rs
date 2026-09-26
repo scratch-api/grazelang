@@ -2820,8 +2820,8 @@ pub fn convert_block_stack(
     // Issue: #109
 
     // TODO: Implement cycle detection in block conversions
-    //  [ ] Cycle detection
-    //  [ ] Demote non-tree error to warning
+    //  - [ ] Cycle detection
+    //  - [ ] Demote non-tree error to warning
     // Issue: #138
     let mut statements = Vec::new();
     let mut current_block = block;
