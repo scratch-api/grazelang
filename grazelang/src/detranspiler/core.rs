@@ -837,9 +837,6 @@ pub fn convert_project(
 // TODO: Add option to configure formatting after detranspilation
 // Issue: #134
 
-// TODO: Allow detranspiler to use a single file per target
-// Issue: #132
-
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
 
