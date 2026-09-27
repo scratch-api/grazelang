@@ -518,6 +518,7 @@ pub enum StageStatement {
         LeftBrace,
         CommaSeparated<DictionaryEntry>,
         RightBrace,
+        Option<Semicolon>,
         SourceSpan,
     ),
     MonitorDeclaration(
@@ -526,6 +527,7 @@ pub enum StageStatement {
         LeftBrace,
         CommaSeparated<DictionaryEntry>,
         RightBrace,
+        Option<Semicolon>,
         SourceSpan,
     ),
     UseStatement(
@@ -569,8 +571,8 @@ impl GetPos for StageStatement {
             | StageStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p)
             | StageStatement::IsolatedBlock(_, _, p)
             | StageStatement::IsolatedExpression(_, _, _, _, p)
-            | StageStatement::ConfigStatement(_, _, _, _, p)
-            | StageStatement::MonitorDeclaration(_, _, _, _, _, p)
+            | StageStatement::ConfigStatement(_, _, _, _, _, p)
+            | StageStatement::MonitorDeclaration(_, _, _, _, _, _, p)
             | StageStatement::UseStatement(_, _, _, _, p)
             | StageStatement::Invalid(p) => p,
             StageStatement::EmptyStatement(p) => &p.0,
@@ -592,9 +594,17 @@ impl ConfigStatementFromContent for StageStatement {
         left_brace: LeftBrace,
         items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
+        semicolon: Option<Semicolon>,
         source_span: SourceSpan,
     ) -> Self {
-        Self::ConfigStatement(config_keyword, left_brace, items, right_brace, source_span)
+        Self::ConfigStatement(
+            config_keyword,
+            left_brace,
+            items,
+            right_brace,
+            semicolon,
+            source_span,
+        )
     }
 }
 
@@ -605,6 +615,7 @@ impl MonitorDeclarationFromContent for StageStatement {
         left_brace: LeftBrace,
         items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
+        semicolon: Option<Semicolon>,
         source_span: SourceSpan,
     ) -> Self {
         Self::MonitorDeclaration(
@@ -613,6 +624,7 @@ impl MonitorDeclarationFromContent for StageStatement {
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         )
     }
@@ -665,16 +677,16 @@ pub enum SpriteStatement {
         LeftBrace,
         CommaSeparated<DictionaryEntry>,
         RightBrace,
+        Option<Semicolon>,
         SourceSpan,
     ),
-    // TODO: Add optional semicolon to config statements etc
-    // Issue: #115
     MonitorDeclaration(
         MonitorKeyword,
         MonitorValue,
         LeftBrace,
         CommaSeparated<DictionaryEntry>,
         RightBrace,
+        Option<Semicolon>,
         SourceSpan,
     ),
     UseStatement(
@@ -700,8 +712,8 @@ impl GetPos for SpriteStatement {
             | SpriteStatement::CustomBlockDefinition(_, _, _, _, _, _, _, _, _, p)
             | SpriteStatement::IsolatedBlock(_, _, p)
             | SpriteStatement::IsolatedExpression(_, _, _, _, p)
-            | SpriteStatement::ConfigStatement(_, _, _, _, p)
-            | SpriteStatement::MonitorDeclaration(_, _, _, _, _, p)
+            | SpriteStatement::ConfigStatement(_, _, _, _, _, p)
+            | SpriteStatement::MonitorDeclaration(_, _, _, _, _, _, p)
             | SpriteStatement::UseStatement(_, _, _, _, p)
             | SpriteStatement::Invalid(p) => p,
             SpriteStatement::EmptyStatement(p) => &p.0,
@@ -723,9 +735,17 @@ impl ConfigStatementFromContent for SpriteStatement {
         left_brace: LeftBrace,
         items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
+        semicolon: Option<Semicolon>,
         source_span: SourceSpan,
     ) -> Self {
-        Self::ConfigStatement(config_keyword, left_brace, items, right_brace, source_span)
+        Self::ConfigStatement(
+            config_keyword,
+            left_brace,
+            items,
+            right_brace,
+            semicolon,
+            source_span,
+        )
     }
 }
 
@@ -736,6 +756,7 @@ impl MonitorDeclarationFromContent for SpriteStatement {
         left_brace: LeftBrace,
         items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
+        semicolon: Option<Semicolon>,
         source_span: SourceSpan,
     ) -> Self {
         Self::MonitorDeclaration(
@@ -744,6 +765,7 @@ impl MonitorDeclarationFromContent for SpriteStatement {
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         )
     }
@@ -3103,6 +3125,7 @@ pub trait ConfigStatementFromContent {
         left_brace: LeftBrace,
         items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
+        semicolon: Option<Semicolon>,
         source_span: SourceSpan,
     ) -> Self;
 }
@@ -3114,6 +3137,7 @@ pub trait MonitorDeclarationFromContent {
         left_brace: LeftBrace,
         items: CommaSeparated<DictionaryEntry>,
         right_brace: RightBrace,
+        semicolon: Option<Semicolon>,
         source_span: SourceSpan,
     ) -> Self;
 }

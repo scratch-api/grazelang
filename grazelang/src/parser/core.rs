@@ -2605,12 +2605,14 @@ pub mod statement {
     {
         let config_keyword = expect_token!(token_stream, Token::ConfigKeyword => from_stream_pos::<ConfigKeyword, _>(token_stream), "Expected \"config\".", "\"config\"");
         let (left_brace, items, right_brace, _) = parse_dictionary!(token_stream, context);
+        let semicolon = consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon, _>(token_stream));
         let source_span = config_keyword.span_to(&right_brace);
         Ok(O::config_statement_from_content(
             config_keyword,
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         ))
     }
@@ -2647,6 +2649,7 @@ pub mod statement {
             MonitorValue::Identifier(identifier)
         };
         let (left_brace, items, right_brace, _) = parse_dictionary!(token_stream, context);
+        let semicolon = consume_if!(token_stream, Token::Semicolon => from_stream_pos::<cst::Semicolon, _>(token_stream));
         let source_span = monitor_keyword.span_to(&right_brace);
         Ok(O::monitor_statement_from_content(
             monitor_keyword,
@@ -2654,6 +2657,7 @@ pub mod statement {
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         ))
     }

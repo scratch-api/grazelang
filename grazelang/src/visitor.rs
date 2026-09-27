@@ -139,6 +139,7 @@ pub type BorrowedConfigStatement<'a> = (
     &'a LeftBrace,
     &'a CommaSeparated<DictionaryEntry>,
     &'a RightBrace,
+    Option<&'a Semicolon>,
     &'a SourceSpan,
 );
 
@@ -148,6 +149,7 @@ pub type BorrowedMonitorDeclaration<'a> = (
     &'a LeftBrace,
     &'a CommaSeparated<DictionaryEntry>,
     &'a RightBrace,
+    Option<&'a Semicolon>,
     &'a SourceSpan,
 );
 
@@ -1065,10 +1067,18 @@ where
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         ) => {
             visitor.visit_config_statement(
-                (config_keyword, left_brace, items, right_brace, source_span),
+                (
+                    config_keyword,
+                    left_brace,
+                    items,
+                    right_brace,
+                    semicolon.as_ref(),
+                    source_span,
+                ),
                 context,
             )?;
         }
@@ -1078,6 +1088,7 @@ where
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         ) => {
             visitor.visit_monitor_declaration(
@@ -1087,6 +1098,7 @@ where
                     left_brace,
                     items,
                     right_brace,
+                    semicolon.as_ref(),
                     source_span,
                 ),
                 context,
@@ -1255,10 +1267,18 @@ where
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         ) => {
             visitor.visit_config_statement(
-                (config_keyword, left_brace, items, right_brace, source_span),
+                (
+                    config_keyword,
+                    left_brace,
+                    items,
+                    right_brace,
+                    semicolon.as_ref(),
+                    source_span,
+                ),
                 context,
             )?;
         }
@@ -1268,6 +1288,7 @@ where
             left_brace,
             items,
             right_brace,
+            semicolon,
             source_span,
         ) => {
             visitor.visit_monitor_declaration(
@@ -1277,6 +1298,7 @@ where
                     left_brace,
                     items,
                     right_brace,
+                    semicolon.as_ref(),
                     source_span,
                 ),
                 context,

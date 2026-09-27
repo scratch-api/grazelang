@@ -5624,7 +5624,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
                         GrazeSourceWarningKind::RepeatedTargetConfig,
-                        *value.4,
+                        *value.5,
                     ),
                     None,
                 ),
@@ -6226,7 +6226,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 GrazeSourceMessage::Warning(
                     GrazeSourceWarning::Specific(
                         GrazeSourceWarningKind::SpecifiedMonitorPositionPartially,
-                        *value.5,
+                        *value.6,
                     ),
                     None,
                 ),
