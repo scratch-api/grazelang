@@ -26,9 +26,15 @@ pub enum TopLevelStatement {
     UseExtensionStatement(UseStatementContent),
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct WarpSpecifier {
     pub is_warp: bool,
+}
+
+impl WarpSpecifier {
+    pub fn as_str(self) -> &'static str {
+        if self.is_warp { "warp" } else { "nowarp" }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -43,11 +49,21 @@ pub enum UseStatementContent {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum CustomBlockParamKind {
     Number,
     String,
     Boolean,
+}
+
+impl CustomBlockParamKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CustomBlockParamKind::Number => "num",
+            CustomBlockParamKind::String => "str",
+            CustomBlockParamKind::Boolean => "bool",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -323,6 +339,28 @@ pub enum BinOp {
     GreaterThanOrEqual,
 }
 
+impl BinOp {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BinOp::Plus => "+",
+            BinOp::Minus => "-",
+            BinOp::Times => "*",
+            BinOp::Div => "/",
+            BinOp::Mod => "%",
+            BinOp::Join => "++",
+            BinOp::Contains => "contains",
+            BinOp::And => "&&",
+            BinOp::Or => "||",
+            BinOp::Equals => "==",
+            BinOp::NotEquals => "!=",
+            BinOp::LessThan => "<",
+            BinOp::GreaterThan => ">",
+            BinOp::LessThanOrEqual => "<=",
+            BinOp::GreaterThanOrEqual => ">=",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BinOpDescriptor {
     pub opcode: String,
@@ -339,6 +377,17 @@ pub enum UnOp {
     Not,
     Exp,
     Pow,
+}
+
+impl UnOp {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            UnOp::Minus => "-",
+            UnOp::Not => "!",
+            UnOp::Exp => "e^",
+            UnOp::Pow => "10^",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

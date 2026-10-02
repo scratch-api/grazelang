@@ -834,11 +834,13 @@ pub fn convert_project(
     ))
 }
 
-// TODO: Add option to configure formatting after detranspilation
-// Issue: #134
 
 // TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
 // Issue: #128
+
+// TODO: Always use single declarations if there is only one declaration item
+
+// TODO: Add standalone formatter to cli
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.

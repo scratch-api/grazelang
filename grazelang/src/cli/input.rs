@@ -13,7 +13,11 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{types as ast_types, unparse::UnparseAST},
+    ast::{
+        types as ast_types,
+        unparse::UnparseAST,
+        unparse_formatted::{UnparseASTFormatted, UnparseASTFormattedSettings},
+    },
     codegen, detranspiler, lexer,
     messages::{
         annotations::{self, Source},
@@ -57,7 +61,7 @@ pub enum Commands {
         log_time: bool,
         /// Path for the sb3 file
         #[arg(short, long)]
-        target: Option<PathBuf>,
+        output: Option<PathBuf>,
         // 'r' is reserved for a requirements file
         /// Path for the resources of the project (default: project directory)
         #[arg(short = 'R', long)]
@@ -88,13 +92,19 @@ pub enum Commands {
         multi_data_declarations: MultiDataDeclarationsMode,
         #[arg(long)]
         multi_file_project: bool,
+        #[arg(long)]
+        no_formatting: bool,
+        #[arg(long, default_value = "100")]
+        formatting_width: usize,
+        #[arg(long, default_value = "4")]
+        formatting_indentation: isize,
         #[arg(value_enum, short, long, default_value = "all")]
         logging: GrazeMessageSetting,
         #[arg(long)]
         log_time: bool,
         /// Path for the project
         #[arg(short, long)]
-        target: Option<PathBuf>,
+        output: Option<PathBuf>,
         /// Path for the resources of the project (default: project directory)
         #[arg(short = 'R', long)]
         resources: Option<PathBuf>,
@@ -277,11 +287,13 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
 }
 
 pub fn unparse_into_file<A>(
-    ast: A,
+    ast: &A,
     path: PathBuf,
     messages: &mut Vec<GrazeDetranspilerMessage>,
+    formatting_settings: Option<&UnparseASTFormattedSettings>,
 ) -> Result<(), i32>
 where
+    for<'a> &'a A: UnparseASTFormatted,
     A: UnparseAST,
 {
     let Ok(mut output_file) = std::fs::OpenOptions::new()
@@ -296,7 +308,11 @@ where
         Cli::print_unbuild_errors(messages, true);
         return Err(1);
     };
-    let Ok(()) = ast.unparse_into_io(&mut output_file) else {
+    let Ok(()) = (if let Some(settings) = formatting_settings {
+        ast.unparse_formatted_into_io(&mut output_file, settings)
+    } else {
+        ast.unparse_into_io(&mut output_file)
+    }) else {
         messages.push(GrazeDetranspilerMessage::Error(
             GrazeDetranspilerError::CannotWriteFile { path },
         ));
@@ -309,50 +325,52 @@ where
 pub fn unparse_multi_file(
     ast: ast_types::GrazeProgram,
     path: &Path,
-    target: Option<&Path>,
+    output: Option<&Path>,
     messages: &mut Vec<GrazeDetranspilerMessage>,
+    formatting_settings: Option<&UnparseASTFormattedSettings>,
 ) -> Result<(), i32> {
     let mut stage_top_level_statements = Vec::new();
     for statement in ast.0 {
         if let ast_types::TopLevelStatement::Sprite { identifier, .. } = &statement {
-            let output_path = match target {
-                Some(target) => {
-                    let mut target = target.join(identifier.value.as_str());
-                    target.set_extension("graze");
-                    target
+            let output_path = match output {
+                Some(output) => {
+                    let mut output = output.join(identifier.value.as_str());
+                    output.set_extension("graze");
+                    output
                 }
                 None => {
-                    let mut target = path.to_path_buf();
-                    target.set_file_name(identifier.value.as_str());
-                    target.add_extension("graze");
-                    if path.file_name() == target.file_name() {
-                        target.set_extension("out");
-                        target.add_extension("graze");
+                    let mut output = path.to_path_buf();
+                    output.set_file_name(identifier.value.as_str());
+                    output.add_extension("graze");
+                    if path.file_name() == output.file_name() {
+                        output.set_extension("out");
+                        output.add_extension("graze");
                     }
-                    target
+                    output
                 }
             };
-            unparse_into_file(statement, output_path, messages)?;
+            unparse_into_file(&statement, output_path, messages, formatting_settings)?;
         } else {
             stage_top_level_statements.push(statement);
         }
     }
-    let stage_output_path = match target {
-        Some(target) => target.join("stage.graze"),
+    let stage_output_path = match output {
+        Some(output) => output.join("stage.graze"),
         None => {
-            let mut target = path.to_path_buf();
-            target.set_file_name("stage.graze");
-            if path.file_name() == target.file_name() {
-                target.set_extension("out");
-                target.add_extension("graze");
+            let mut output = path.to_path_buf();
+            output.set_file_name("stage.graze");
+            if path.file_name() == output.file_name() {
+                output.set_extension("out");
+                output.add_extension("graze");
             }
-            target
+            output
         }
     };
     unparse_into_file(
-        ast_types::GrazeProgram(stage_top_level_statements),
+        &ast_types::GrazeProgram(stage_top_level_statements),
         stage_output_path,
         messages,
+        formatting_settings,
     )?;
     Ok(())
 }
@@ -360,12 +378,13 @@ pub fn unparse_multi_file(
 pub fn unparse_single_file(
     ast: ast_types::GrazeProgram,
     path: &Path,
-    target: Option<&Path>,
+    output: Option<&Path>,
     messages: &mut Vec<GrazeDetranspilerMessage>,
+    formatting_settings: Option<&UnparseASTFormattedSettings>,
 ) -> Result<(), i32> {
-    let output_path = match target {
-        Some(target) if target.is_file() || !target.exists() => target.to_path_buf(),
-        Some(target) => target.join("main.graze"),
+    let output_path = match output {
+        Some(output) if output.is_file() || !output.exists() => output.to_path_buf(),
+        Some(output) => output.join("main.graze"),
         None => {
             let mut path = path.to_path_buf();
             if path
@@ -380,7 +399,7 @@ pub fn unparse_single_file(
             path
         }
     };
-    unparse_into_file(ast, output_path, messages)?;
+    unparse_into_file(&ast, output_path, messages, formatting_settings)?;
     Ok(())
 }
 
@@ -430,7 +449,7 @@ impl Cli {
             Commands::Build {
                 shadows,
                 logging,
-                target,
+                output,
                 resources,
                 extensions,
                 use_cached_extensions,
@@ -440,7 +459,7 @@ impl Cli {
             } => Self::build(
                 *shadows,
                 *logging,
-                target.as_deref(),
+                output.as_deref(),
                 resources.as_deref(),
                 extensions.as_deref(),
                 *use_cached_extensions,
@@ -455,9 +474,12 @@ impl Cli {
                 multi_asset_declarations,
                 multi_data_declarations,
                 multi_file_project,
+                no_formatting,
+                formatting_width,
+                formatting_indentation,
                 logging,
                 log_time,
-                target,
+                output,
                 resources,
                 path,
             } => Self::unbuild(
@@ -467,9 +489,12 @@ impl Cli {
                 *multi_asset_declarations,
                 *multi_data_declarations,
                 *multi_file_project,
+                *no_formatting,
+                *formatting_width,
+                *formatting_indentation,
                 *logging,
                 *log_time,
-                target.as_deref(),
+                output.as_deref(),
                 resources.as_deref(),
                 path.as_path(),
             ),
@@ -509,7 +534,7 @@ impl Cli {
     pub fn build(
         shadows: UseShadows,
         logging: GrazeMessageSetting,
-        target: Option<&Path>,
+        output: Option<&Path>,
         resources: Option<&Path>,
         extensions: Option<&Path>,
         use_cached_extensions: bool,
@@ -613,10 +638,10 @@ impl Cli {
             Self::print_build_errors(&mut context.messages, &source_files, true);
             return 1;
         }
-        let (mut output_path, set_extension) = match target {
-            Some(target) if target.is_file() || !target.exists() => (target.to_path_buf(), false),
-            Some(target) => (
-                target.join(
+        let (mut output_path, set_extension) = match output {
+            Some(output) if output.is_file() || !output.exists() => (output.to_path_buf(), false),
+            Some(output) => (
+                output.join(
                     path.file_name()
                         .and_then(OsStr::to_str)
                         .unwrap_or("project"),
@@ -702,9 +727,12 @@ impl Cli {
         multi_asset_declarations: bool,
         multi_data_declarations: MultiDataDeclarationsMode,
         multi_file_project: bool,
+        no_formatting: bool,
+        formatting_width: usize,
+        formatting_indentation: isize,
         logging: GrazeMessageSetting,
         log_time: bool,
-        target: Option<&Path>,
+        output: Option<&Path>,
         resources: Option<&Path>,
         path: &Path,
     ) -> i32 {
@@ -737,7 +765,7 @@ impl Cli {
                 })
             );
         };
-        let Ok(reader) = std::fs::File::open(&path) else {
+        let Ok(reader) = File::open(&path) else {
             single_error!(
                 logging,
                 GrazeDetranspilerMessage::Error(GrazeDetranspilerError::CannotReadFile { path })
@@ -779,6 +807,10 @@ impl Cli {
             multi_asset_declarations,
             multi_data_declarations,
             message_setting: logging,
+            formatting_settings: (!no_formatting).then_some(UnparseASTFormattedSettings {
+                indentation: formatting_indentation,
+                width: formatting_width,
+            }),
         };
         let build_ast_timer = Instant::now();
         let (ast, assets, mut messages) =
@@ -792,9 +824,21 @@ impl Cli {
         let build_ast_time = build_ast_timer.elapsed();
         let unparse_timer = Instant::now();
         if let Err(code) = if multi_file_project {
-            unparse_multi_file(ast, &path, target, &mut messages)
+            unparse_multi_file(
+                ast,
+                &path,
+                output,
+                &mut messages,
+                settings.formatting_settings.as_ref(),
+            )
         } else {
-            unparse_single_file(ast, &path, target, &mut messages)
+            unparse_single_file(
+                ast,
+                &path,
+                output,
+                &mut messages,
+                settings.formatting_settings.as_ref(),
+            )
         } {
             return code;
         }
@@ -802,11 +846,11 @@ impl Cli {
         let unzip_2_timer = Instant::now();
         let resource_path = match resources {
             Some(resource_path) => resource_path,
-            None => match target {
-                Some(target) if target.is_file() || !target.exists() => {
-                    target.parent().unwrap_or(Path::new("/"))
+            None => match output {
+                Some(output) if output.is_file() || !output.exists() => {
+                    output.parent().unwrap_or(Path::new("/"))
                 }
-                Some(target) => target,
+                Some(output) => output,
                 None => path.parent().unwrap_or(Path::new("/")),
             },
         };

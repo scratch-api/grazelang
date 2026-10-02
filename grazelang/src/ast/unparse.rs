@@ -113,53 +113,23 @@ impl UnparseAST for Literal {
     }
 }
 
-impl UnparseAST for UnOp {
-    fn unparse_into<W>(&self, f: &mut W) -> FormatResult
-    where
-        W: Write,
-    {
-        f.write_str(match self {
-            UnOp::Minus => "-",
-            UnOp::Not => "!",
-            UnOp::Exp => "e^",
-            UnOp::Pow => "10^",
-        })
-    }
+macro_rules! simple_impl_unparse_ast {
+    ($t:ty, $s:pat => $e:expr) => {
+        impl UnparseAST for $t {
+            fn unparse_into<W>(&self, f: &mut W) -> FormatResult
+            where
+                W: Write,
+            {
+                let $s = self;
+                f.write_str($e)
+            }
+        }
+    };
 }
 
-impl UnparseAST for BinOp {
-    fn unparse_into<W>(&self, f: &mut W) -> FormatResult
-    where
-        W: Write,
-    {
-        f.write_str(match self {
-            BinOp::Plus => "+",
-            BinOp::Minus => "-",
-            BinOp::Times => "*",
-            BinOp::Div => "/",
-            BinOp::Mod => "%",
-            BinOp::Join => "++",
-            BinOp::Contains => "contains",
-            BinOp::And => "&&",
-            BinOp::Or => "||",
-            BinOp::Equals => "==",
-            BinOp::NotEquals => "!=",
-            BinOp::LessThan => "<",
-            BinOp::GreaterThan => ">",
-            BinOp::LessThanOrEqual => "<=",
-            BinOp::GreaterThanOrEqual => ">=",
-        })
-    }
-}
-
-impl UnparseAST for SingleIdentifier {
-    fn unparse_into<W>(&self, f: &mut W) -> FormatResult
-    where
-        W: Write,
-    {
-        f.write_str(&self.value)
-    }
-}
+simple_impl_unparse_ast!(UnOp, this => this.as_str());
+simple_impl_unparse_ast!(BinOp, this => this.as_str());
+simple_impl_unparse_ast!(SingleIdentifier, this => &this.value);
 
 impl UnparseAST for Identifier {
     fn unparse_into<W>(&self, f: &mut W) -> FormatResult
@@ -188,6 +158,7 @@ impl UnparseAST for CanonicalIdentifier {
 }
 
 impl Expression {
+    #[inline]
     pub fn requires_parentheses_for_unops(&self) -> bool {
         matches!(self, Expression::BinOp { .. })
     }
@@ -938,11 +909,7 @@ impl UnparseAST for WarpSpecifier {
     where
         W: Write,
     {
-        if self.is_warp {
-            f.write_str("warp")
-        } else {
-            f.write_str("nowarp")
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -951,11 +918,7 @@ impl UnparseAST for CustomBlockParamKind {
     where
         W: Write,
     {
-        f.write_str(match self {
-            CustomBlockParamKind::Number => "num",
-            CustomBlockParamKind::String => "str",
-            CustomBlockParamKind::Boolean => "bool",
-        })
+        f.write_str(self.as_str())
     }
 }
 

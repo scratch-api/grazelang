@@ -2,6 +2,9 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "detranspiler")]
+use crate::ast::unparse_formatted::UnparseASTFormattedSettings;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct GrazeBuildSettings {
     pub message_setting: GrazeMessageSetting,
@@ -15,7 +18,7 @@ pub struct GrazeBuildSettings {
 }
 
 #[cfg(feature = "detranspiler")]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub struct GrazeDetranspilerSettings {
     pub message_setting: GrazeMessageSetting,
     pub preserve_monitor_ids: bool,
@@ -23,6 +26,7 @@ pub struct GrazeDetranspilerSettings {
     pub explicitly_typed_string_parameters: bool,
     pub multi_asset_declarations: bool,
     pub multi_data_declarations: MultiDataDeclarationsMode,
+    pub formatting_settings: Option<UnparseASTFormattedSettings>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default, clap::ValueEnum)]
