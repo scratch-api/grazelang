@@ -839,8 +839,10 @@ pub fn convert_project(
 // Issue: #128
 
 // TODO: Always use single declarations if there is only one declaration item
+// Issue: #140
 
 // TODO: Add standalone formatter to cli
+// Issue: #139
 
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.

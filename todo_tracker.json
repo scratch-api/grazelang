@@ -1002,7 +1002,7 @@
     "134": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L811-L811",
         "commit": "2414527f859a2b0342381d22170001abbb8e2294",
         "title": "Add option to configure formatting after detranspilation"
@@ -1038,5 +1038,21 @@
         "lines": "L2819-L2822",
         "commit": "fe7a5be913585403d0d2cc31393a3ac0992f02e2",
         "title": "Implement cycle detection in block conversions"
+    },
+    "139": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L843-L843",
+        "commit": "62a8bd5633e6e2d864cc29ee199f198fb594b5f6",
+        "title": "Add standalone formatter to cli"
+    },
+    "140": {
+        "filepath": "grazelang/src/detranspiler/core.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L841-L841",
+        "commit": "62a8bd5633e6e2d864cc29ee199f198fb594b5f6",
+        "title": "Always use single declarations if there is only one declaration item"
     }
 }
