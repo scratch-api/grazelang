@@ -98,6 +98,9 @@ pub enum Commands {
         formatting_width: usize,
         #[arg(long, default_value = "4")]
         formatting_indentation: isize,
+        /// Forces code blocks to use new lines for inner statements
+        #[arg(long)]
+        formatting_hard_lines_in_code_blocks: bool,
         #[arg(value_enum, short, long, default_value = "all")]
         logging: GrazeMessageSetting,
         #[arg(long)]
@@ -477,6 +480,7 @@ impl Cli {
                 no_formatting,
                 formatting_width,
                 formatting_indentation,
+                formatting_hard_lines_in_code_blocks,
                 logging,
                 log_time,
                 output,
@@ -492,6 +496,7 @@ impl Cli {
                 *no_formatting,
                 *formatting_width,
                 *formatting_indentation,
+                *formatting_hard_lines_in_code_blocks,
                 *logging,
                 *log_time,
                 output.as_deref(),
@@ -730,6 +735,7 @@ impl Cli {
         no_formatting: bool,
         formatting_width: usize,
         formatting_indentation: isize,
+        formatting_hard_lines_in_code_blocks: bool,
         logging: GrazeMessageSetting,
         log_time: bool,
         output: Option<&Path>,
@@ -810,6 +816,7 @@ impl Cli {
             formatting_settings: (!no_formatting).then_some(UnparseASTFormattedSettings {
                 indentation: formatting_indentation,
                 width: formatting_width,
+                hard_lines_in_code_blocks: formatting_hard_lines_in_code_blocks,
             }),
         };
         let build_ast_timer = Instant::now();

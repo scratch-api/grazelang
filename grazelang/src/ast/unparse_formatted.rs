@@ -21,6 +21,7 @@ use crate::{
 pub struct UnparseASTFormattedSettings {
     pub indentation: isize,
     pub width: usize,
+    pub hard_lines_in_code_blocks: bool,
 }
 
 use UnparseASTFormattedSettings as Settings;
@@ -125,21 +126,25 @@ macro_rules! wrap_code_block {
         if $items.is_empty() {
             $allocator.text("{}")
         } else {
+            let line = if $settings.hard_lines_in_code_blocks {
+                $allocator.hardline()
+            } else {
+                $allocator.line()
+            };
             $allocator
                 .text("{")
                 .append(
-                    $allocator
-                        .line()
+                    line.clone()
                         .append(
                             $allocator.intersperse(
                                 $items
                                     .iter()
                                     .map(|value| value.into_pretty_doc($allocator, $settings)),
-                                $allocator.line(),
+                                line.clone(),
                             ),
                         )
                         .nest($settings.indentation)
-                        .append($allocator.line())
+                        .append(line)
                         .group(),
                 )
                 .append("}")
