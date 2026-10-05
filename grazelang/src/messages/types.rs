@@ -12,9 +12,11 @@ use crate::{
     eval::call::ConstantExprValue,
     lexer::SourceSpan,
     parser::cst::{Expression, GetPos, Identifier, ParseError},
-    utils::string_escape::normal_string_escaper,
     zipper::WriteIntoZipError,
 };
+
+#[cfg(feature = "detranspiler")]
+use crate::utils::string_escape::normal_string_escaper;
 
 pub trait GetLintId {
     fn get_lint_id(&self) -> &'static str;
@@ -644,6 +646,7 @@ pub enum GrazeDetranspilerError {
     BlocksMustFormATree { block_id: String },
 }
 
+#[cfg(feature = "detranspiler")]
 impl GrazeDetranspilerError {
     pub fn get_primary_message(&self) -> Cow<'static, str> {
         Cow::Owned(match self {
@@ -874,6 +877,7 @@ impl GrazeDetranspilerError {
     }
 }
 
+#[cfg(feature = "detranspiler")]
 impl GetLintId for GrazeDetranspilerError {
     fn get_lint_id(&self) -> &'static str {
         self.internal_lint_id()
@@ -894,6 +898,7 @@ pub enum GrazeDetranspilerWarning {
     UnknownBackdrop { name: String },
 }
 
+#[cfg(feature = "detranspiler")]
 impl GrazeDetranspilerWarning {
     pub fn get_primary_message(&self) -> String {
         match self {
@@ -927,6 +932,7 @@ impl GrazeDetranspilerWarning {
     }
 }
 
+#[cfg(feature = "detranspiler")]
 impl GetLintId for GrazeDetranspilerWarning {
     fn get_lint_id(&self) -> &'static str {
         self.internal_lint_id()

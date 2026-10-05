@@ -834,10 +834,6 @@ pub fn convert_project(
     ))
 }
 
-
-// TODO: Ensure that `grazelang` compiles with `#[cfg(not(feature = "detranspiler"))]`
-// Issue: #128
-
 // TODO: Always use single declarations if there is only one declaration item
 // Issue: #140
 

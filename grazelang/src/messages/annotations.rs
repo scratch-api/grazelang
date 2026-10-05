@@ -6,13 +6,17 @@ use crate::{
     codegen::core::{GrazeSb3GeneratorCreationError, GrazeSb3GeneratorError},
     lexer::TextSpan,
     messages::types::{
-        CLIError, ConstantExprEvaluationError, GetLintId, GrazeDetranspilerError,
-        GrazeDetranspilerMessage, GrazeDetranspilerWarning, GrazeSourceInfo, GrazeSourceWarning,
+        CLIError, ConstantExprEvaluationError, GetLintId, GrazeSourceInfo, GrazeSourceWarning,
         GrazeSourceWarningKind,
     },
     parser::cst::{GetPos, ParseError},
-    utils::string_escape::normal_string_escaper,
     zipper::WriteIntoZipError,
+};
+
+#[cfg(feature = "detranspiler")]
+use crate::{
+    messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
+    utils::string_escape::normal_string_escaper,
 };
 
 use super::types::GrazeSourceMessage;
@@ -54,6 +58,7 @@ where
     });
 }
 
+#[cfg(feature = "detranspiler")]
 pub fn annotate_unbuild<'a, I, P>(iter: I, mut printer: P)
 where
     I: Iterator<Item = &'a GrazeDetranspilerMessage>,
@@ -482,6 +487,7 @@ impl Annotate for WriteIntoZipError {
     }
 }
 
+#[cfg(feature = "detranspiler")]
 impl Annotate for GrazeDetranspilerMessage {
     fn annotate<'a, 'b, F>(
         &'a self,
@@ -530,6 +536,7 @@ impl Annotate for GrazeDetranspilerMessage {
     }
 }
 
+#[cfg(feature = "detranspiler")]
 impl Annotate for GrazeDetranspilerError {
     fn annotate<'a, 'b, F>(
         &'a self,
@@ -563,6 +570,7 @@ impl Annotate for GrazeDetranspilerError {
     }
 }
 
+#[cfg(feature = "detranspiler")]
 impl Annotate for GrazeDetranspilerWarning {
     fn annotate<'a, 'b, F>(
         &'a self,

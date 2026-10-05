@@ -13,15 +13,10 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{
-        types as ast_types,
-        unparse::UnparseAST,
-        unparse_formatted::{UnparseASTFormatted, UnparseASTFormattedSettings},
-    },
-    codegen, detranspiler, lexer,
+    codegen, lexer,
     messages::{
         annotations::{self, Source},
-        types::{CLIError, GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeSourceMessage},
+        types::{CLIError, GrazeSourceMessage},
     },
     parser::{
         self,
@@ -29,12 +24,21 @@ use crate::{
         core::{PeekableLexer, emit_message_eager as emit_message_eager_parse_context},
         cst::{GrazeProgram, IntoResultWithSourceSpan, ParseError},
     },
-    settings::{
-        GrazeBuildSettings, GrazeDetranspilerSettings, GrazeMessageSetting,
-        MultiDataDeclarationsMode, UseShadows,
-    },
+    settings::{GrazeBuildSettings, GrazeMessageSetting, MultiDataDeclarationsMode, UseShadows},
     visitor::GrazeVisitor,
     zipper,
+};
+
+#[cfg(feature = "detranspiler")]
+use crate::{
+    ast::{
+        types as ast_types,
+        unparse::UnparseAST,
+        unparse_formatted::{UnparseASTFormatted, UnparseASTFormattedSettings},
+    },
+    detranspiler,
+    messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage},
+    settings::GrazeDetranspilerSettings,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -289,6 +293,7 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
     ))
 }
 
+#[cfg(feature = "detranspiler")]
 pub fn unparse_into_file<A>(
     ast: &A,
     path: PathBuf,
@@ -325,6 +330,7 @@ where
     Ok(())
 }
 
+#[cfg(feature = "detranspiler")]
 pub fn unparse_multi_file(
     ast: ast_types::GrazeProgram,
     path: &Path,
@@ -378,6 +384,7 @@ pub fn unparse_multi_file(
     Ok(())
 }
 
+#[cfg(feature = "detranspiler")]
 pub fn unparse_single_file(
     ast: ast_types::GrazeProgram,
     path: &Path,
@@ -423,6 +430,7 @@ pub fn count_build_errors_and_warnings(messages: &[GrazeSourceMessage]) -> (usiz
     (errors, warnings)
 }
 
+#[cfg(feature = "detranspiler")]
 pub fn count_unbuild_errors_and_warnings(messages: &[GrazeDetranspilerMessage]) -> (usize, usize) {
     let mut errors = 0;
     let mut warnings = 0;
@@ -700,6 +708,7 @@ impl Cli {
         0
     }
 
+    #[cfg(feature = "detranspiler")]
     pub fn print_unbuild_errors(
         messages: &mut Vec<GrazeDetranspilerMessage>,
         force_error: bool,
@@ -724,6 +733,7 @@ impl Cli {
         }
     }
 
+    #[cfg(feature = "detranspiler")]
     #[expect(clippy::too_many_arguments)]
     pub fn unbuild(
         preserve_monitor_ids: bool,
@@ -902,5 +912,33 @@ impl Cli {
             println!("Total time: {:?}", total_time.elapsed());
         }
         0
+    }
+
+    #[cfg(not(feature = "detranspiler"))]
+    #[expect(clippy::too_many_arguments)]
+    pub fn unbuild(
+        _preserve_monitor_ids: bool,
+        _preserve_internal_monitor_value: bool,
+        _explicitly_typed_string_parameters: bool,
+        _multi_asset_declarations: bool,
+        _multi_data_declarations: MultiDataDeclarationsMode,
+        _multi_file_project: bool,
+        _no_formatting: bool,
+        _formatting_width: usize,
+        _formatting_indentation: isize,
+        _formatting_hard_lines_in_code_blocks: bool,
+        _logging: GrazeMessageSetting,
+        _log_time: bool,
+        _output: Option<&Path>,
+        _resources: Option<&Path>,
+        _path: &Path,
+    ) -> i32 {
+        let renderer = annotate_snippets::Renderer::styled();
+        let ann = &[annotate_snippets::Group::with_title(
+            annotate_snippets::Level::ERROR.secondary_title("The detranspiler is not included in this build. The corresponding feature is `detranspiler`."),
+        )];
+        let rendered = renderer.render(ann);
+        anstream::eprintln!("{rendered}");
+        1
     }
 }
