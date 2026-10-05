@@ -10,7 +10,7 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 - [x] Command Line interface
 - [x] Extensions
 - [ ] Comments
-- [ ] SB3 detranspiler
+- [x] SB3 detranspiler
 - [ ] Syntax highlighting
 - [ ] Raw blocks
 - [ ] Block position control
@@ -20,4 +20,4 @@ Graze is an upcoming language designed to only very slightly abstract on top of 
 
 ## Credits
 
-Inspired by @aspizu's impressive work on [goboscript](https://github.com/aspizu/goboscript), I began work on graze. While goboscript is a remarkable technical achievement, I wanted to use a different syntax and address goboscript's limitation of not fully mapping to all vanilla Scratch projects. Written in Rust and heavily inspired by its syntax, graze aims for broader compatibility.
+I was inspired by @aspizu's impressive work on [goboscript](https://github.com/aspizu/goboscript), but while goboscript is a remarkable technical achievement, I wanted to use a different syntax and address goboscript's limitation of not fully mapping to all vanilla Scratch projects. Graze's syntax is inspired by Rust's and it aims for broader compatibility.
