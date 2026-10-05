@@ -962,7 +962,7 @@
     "128": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L797-L798",
         "commit": "aea5ae2228de9bac401d0339059ec6785d6eee3a",
         "title": "Ensure that `grazelang` compiles with `#[cfg(not(feature = \"detranspiler\"))]`"
