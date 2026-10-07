@@ -669,12 +669,20 @@ pub fn convert_project(
                 &mut target.config,
             )));
             if context.settings.multi_asset_declarations {
-                if !target.costumes.is_empty() {
+                if let [(_, costume)] = target.costumes.as_slice() {
+                    stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
+                        costume.into_ast(),
+                    ))
+                } else if !target.costumes.is_empty() {
                     stage_statements.push(ast_types::StageStatement::BackdropDeclaration(
                         assets_to_asset_declaration(target.costumes.iter().map(|(_, value)| value)),
                     ));
                 }
-                if !target.sounds.is_empty() {
+                if let [(_, sound)] = target.sounds.as_slice() {
+                    stage_statements.push(ast_types::StageStatement::SoundDeclaration(
+                        sound.into_ast(),
+                    ))
+                } else if !target.sounds.is_empty() {
                     stage_statements.push(ast_types::StageStatement::SoundDeclaration(
                         assets_to_asset_declaration(target.sounds.iter().map(|(_, value)| value)),
                     ));
@@ -700,7 +708,13 @@ pub fn convert_project(
                 }
                 crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
                     let (vars, lists) = data_to_split_data_declaration(target.data.values());
-                    if !vars.is_empty() {
+                    if vars.len() == 1 {
+                        if let Some(var) = vars.into_iter().next() {
+                            stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                                ast_types::DataDeclaration::Single(Box::new(var)),
+                            ));
+                        }
+                    } else if !vars.is_empty() {
                         stage_statements.push(ast_types::StageStatement::DataDeclaration(
                             ast_types::DataDeclaration::Vars {
                                 scope: Default::default(),
@@ -708,7 +722,13 @@ pub fn convert_project(
                             },
                         ));
                     }
-                    if !lists.is_empty() {
+                    if lists.len() == 1 {
+                        if let Some(list) = lists.into_iter().next() {
+                            stage_statements.push(ast_types::StageStatement::DataDeclaration(
+                                ast_types::DataDeclaration::Single(Box::new(list)),
+                            ));
+                        }
+                    } else if !lists.is_empty() {
                         stage_statements.push(ast_types::StageStatement::DataDeclaration(
                             ast_types::DataDeclaration::Lists {
                                 scope: Default::default(),
@@ -718,7 +738,13 @@ pub fn convert_project(
                     }
                 }
                 crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
-                    if !target.data.is_empty() {
+                    if target.data.len() == 1
+                        && let Some((_, value)) = target.data.iter().next()
+                    {
+                        {
+                            stage_statements.push(value.into_ast());
+                        }
+                    } else if !target.data.is_empty() {
                         stage_statements.push(ast_types::StageStatement::DataDeclaration(
                             ast_types::DataDeclaration::Mixed {
                                 scope: Default::default(),
@@ -751,12 +777,20 @@ pub fn convert_project(
                 &mut target.config,
             )));
             if context.settings.multi_asset_declarations {
-                if !target.costumes.is_empty() {
+                if let [(_, costume)] = target.costumes.as_slice() {
+                    sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
+                        costume.into_ast(),
+                    ))
+                } else if !target.costumes.is_empty() {
                     sprite_statements.push(ast_types::SpriteStatement::CostumeDeclaration(
                         assets_to_asset_declaration(target.costumes.iter().map(|(_, value)| value)),
                     ));
                 }
-                if !target.sounds.is_empty() {
+                if let [(_, sound)] = target.sounds.as_slice() {
+                    sprite_statements.push(ast_types::SpriteStatement::SoundDeclaration(
+                        sound.into_ast(),
+                    ))
+                } else if !target.sounds.is_empty() {
                     sprite_statements.push(ast_types::SpriteStatement::SoundDeclaration(
                         assets_to_asset_declaration(target.sounds.iter().map(|(_, value)| value)),
                     ));
@@ -782,7 +816,13 @@ pub fn convert_project(
                 }
                 crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
                     let (vars, lists) = data_to_split_data_declaration(target.data.values());
-                    if !vars.is_empty() {
+                    if vars.len() == 1 {
+                        if let Some(var) = vars.into_iter().next() {
+                            sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
+                                ast_types::DataDeclaration::Single(Box::new(var)),
+                            ));
+                        }
+                    } else if !vars.is_empty() {
                         sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
                             ast_types::DataDeclaration::Vars {
                                 scope: Default::default(),
@@ -790,7 +830,13 @@ pub fn convert_project(
                             },
                         ));
                     }
-                    if !lists.is_empty() {
+                    if lists.len() == 1 {
+                        if let Some(list) = lists.into_iter().next() {
+                            sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
+                                ast_types::DataDeclaration::Single(Box::new(list)),
+                            ));
+                        }
+                    } else if !lists.is_empty() {
                         sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
                             ast_types::DataDeclaration::Lists {
                                 scope: Default::default(),
@@ -800,7 +846,13 @@ pub fn convert_project(
                     }
                 }
                 crate::settings::MultiDataDeclarationsMode::MixedDeclarations => {
-                    if !target.data.is_empty() {
+                    if target.data.len() == 1
+                        && let Some((_, value)) = target.data.iter().next()
+                    {
+                        {
+                            sprite_statements.push(value.into_ast());
+                        }
+                    } else if !target.data.is_empty() {
                         sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
                             ast_types::DataDeclaration::Mixed {
                                 scope: Default::default(),
@@ -833,9 +885,6 @@ pub fn convert_project(
         context.messages,
     ))
 }
-
-// TODO: Always use single declarations if there is only one declaration item
-// Issue: #140
 
 // TODO: Add standalone formatter to cli
 // Issue: #139

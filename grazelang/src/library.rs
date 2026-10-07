@@ -679,6 +679,9 @@ pub fn get_block_shape(opcode: &str) -> BlockShape {
         | "operator_mathop"
         | "data_variable"
         | "data_listcontents"
+        | "data_itemnumoflist"
+        | "data_lengthoflist"
+        | "data_listcontainsitem"
         | "argument_reporter_string_number"
         | "argument_reporter_boolean"
         | "music_getTempo" => BlockShape::Reporter,
