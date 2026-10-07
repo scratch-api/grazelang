@@ -1050,7 +1050,7 @@
     "140": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L841-L841",
         "commit": "62a8bd5633e6e2d864cc29ee199f198fb594b5f6",
         "title": "Always use single declarations if there is only one declaration item"
