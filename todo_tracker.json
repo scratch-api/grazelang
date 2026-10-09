@@ -1054,5 +1054,13 @@
         "lines": "L841-L841",
         "commit": "62a8bd5633e6e2d864cc29ee199f198fb594b5f6",
         "title": "Always use single declarations if there is only one declaration item"
+    },
+    "141": {
+        "filepath": "grazelang/src/parser/cst.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L473-L473",
+        "commit": "1ff3cc268d22fe5a4099a18227c514a7bdafa9ab",
+        "title": "Use `CommaSeparated<T>` for `CustomBlockParams`"
     }
 }
