@@ -470,6 +470,7 @@ type CustomBlockParams = Vec<(
     SingleIdentifier,
     Option<Comma>,
 )>;
+// TODO: Use `CommaSeparated<T>` for `CustomBlockParams`
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StageStatement {

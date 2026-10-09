@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use arcstr::{ArcStr as IString, format as format_istring};
 
-use grazelang_types::project_json::{Sb3Primitive, Sb3PrimitiveBlock, Sb3PrimitiveOrBool};
+use grazelang_types::project_json::{Sb3Primitive, Sb3PrimitiveOrBool};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -184,12 +182,6 @@ pub enum Statement {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum SingleDataDeclarationType {
-    Var,
-    List,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DataDeclaration {
     Mixed {
         scope: DataDeclarationScope,
@@ -225,12 +217,6 @@ pub struct DictionaryEntry {
 pub enum DictionaryValue {
     Primitive(Literal),
     Dictionary(Vec<DictionaryEntry>),
-    List(Vec<DictionaryValue>),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum DictionaryValueLiteralOrList {
-    Literal(Literal),
     List(Vec<DictionaryValue>),
 }
 
@@ -361,16 +347,6 @@ impl BinOp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BinOpDescriptor {
-    pub opcode: String,
-    pub operand_a_input_name: String,
-    pub operand_b_input_name: String,
-    pub operand_a_default: Option<Sb3PrimitiveBlock>,
-    pub operand_b_default: Option<Sb3PrimitiveBlock>,
-    pub is_negated: bool,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UnOp {
     Minus,
@@ -388,15 +364,6 @@ impl UnOp {
             UnOp::Pow => "10^",
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UnOpDescriptor {
-    pub opcode: String,
-    pub operand_input_name: String,
-    pub extra_inputs: HashMap<String, grazelang_types::project_json::Sb3PrimitiveBlock>,
-    pub field_values: HashMap<String, grazelang_types::project_json::Sb3FieldValue>,
-    pub default: Option<grazelang_types::project_json::Sb3PrimitiveBlock>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
