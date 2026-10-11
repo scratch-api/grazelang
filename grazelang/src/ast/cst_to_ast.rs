@@ -1184,7 +1184,9 @@ impl CSTToAST for cst_types::StageStatement {
                         use_statement_content.clone_cst_to_ast()?,
                     )
                 } else {
-                    ast_types::StageStatement::UseStatement(use_statement_content.clone_cst_to_ast()?)
+                    ast_types::StageStatement::UseStatement(
+                        use_statement_content.clone_cst_to_ast()?,
+                    )
                 }
             }
             cst_types::StageStatement::EmptyStatement(_) => return Ok(None),
@@ -1260,14 +1262,8 @@ impl CSTToAST for cst_types::StageStatement {
                     .into_iter()
                     .map(|value| {
                         Ok((
-                            value
-                                .0
-                                .map(|value| value.cst_to_ast())
-                                .transpose()?,
-                            value
-                                .1
-                                .map(|value| value.cst_to_ast())
-                                .transpose()?,
+                            value.0.map(|value| value.cst_to_ast()).transpose()?,
+                            value.1.map(|value| value.cst_to_ast()).transpose()?,
                             value.2.cst_to_ast()?,
                         ))
                     })
@@ -1315,5 +1311,441 @@ impl CSTToAST for cst_types::StageStatement {
             cst_types::StageStatement::EmptyStatement(_) => return Ok(None),
             cst_types::StageStatement::Invalid(_) => return Err(InvalidCST),
         }))
+    }
+}
+
+impl CSTToAST for cst_types::SpriteStatement {
+    type AST = Option<ast_types::SpriteStatement>;
+    type Error = InvalidCST;
+    fn clone_cst_to_ast(&self) -> Result<Self::AST, Self::Error> {
+        Ok(Some(match self {
+            cst_types::SpriteStatement::DataDeclaration(_, data_declaration, _, _) => {
+                ast_types::SpriteStatement::DataDeclaration(data_declaration.clone_cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::CostumeDeclaration(_, value, _, _) => {
+                ast_types::SpriteStatement::CostumeDeclaration(value.clone_cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::SoundDeclaration(_, value, _, _) => {
+                ast_types::SpriteStatement::SoundDeclaration(value.clone_cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::NoInputHatStatement(identifier, code_block, _, _) => {
+                ast_types::SpriteStatement::HatStatement {
+                    hat_function: identifier.clone_cst_to_ast()?,
+                    arguments: Vec::new(),
+                    code_block: code_block.clone_cst_to_ast()?,
+                }
+            }
+            cst_types::SpriteStatement::SingleInputHatStatement(
+                identifier,
+                expression,
+                code_block,
+                _,
+                _,
+            ) => ast_types::SpriteStatement::HatStatement {
+                hat_function: identifier.clone_cst_to_ast()?,
+                arguments: vec![expression.clone_cst_to_ast()?],
+                code_block: code_block.clone_cst_to_ast()?,
+            },
+            cst_types::SpriteStatement::MultiInputHatStatement(
+                identifier,
+                _,
+                value,
+                _,
+                code_block,
+                _,
+                _,
+            ) => ast_types::SpriteStatement::HatStatement {
+                hat_function: identifier.clone_cst_to_ast()?,
+                arguments: value
+                    .iter()
+                    .map(|value| value.clone_cst_to_ast())
+                    .collect::<Result<_, _>>()?,
+                code_block: code_block.clone_cst_to_ast()?,
+            },
+            cst_types::SpriteStatement::CustomBlockDefinition(
+                warp_specifier,
+                _,
+                canonical_identifier,
+                identifier,
+                _,
+                params,
+                _,
+                code_block,
+                _,
+                _,
+            ) => ast_types::SpriteStatement::CustomBlockDefinition {
+                is_warp: warp_specifier
+                    .as_ref()
+                    .map(|value| value.clone_cst_to_ast())
+                    .transpose()?
+                    .unwrap_or(ast_types::WarpSpecifier { is_warp: false }),
+                canonical_identifier: canonical_identifier
+                    .as_ref()
+                    .map(|value| value.clone_cst_to_ast())
+                    .transpose()?,
+                identifier: identifier.clone_cst_to_ast()?,
+                parameters: params
+                    .iter()
+                    .map(|value| {
+                        Ok((
+                            value
+                                .0
+                                .as_ref()
+                                .map(|value| value.clone_cst_to_ast())
+                                .transpose()?,
+                            value
+                                .1
+                                .as_ref()
+                                .map(|value| value.clone_cst_to_ast())
+                                .transpose()?,
+                            value.2.clone_cst_to_ast()?,
+                        ))
+                    })
+                    .collect::<Result<_, InvalidCST>>()?,
+                code_block: code_block.clone_cst_to_ast()?,
+            },
+            cst_types::SpriteStatement::IsolatedBlock(code_block, _, _) => {
+                ast_types::SpriteStatement::IsolatedBlock(code_block.clone_cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::IsolatedExpression(_, expression, _, _, _) => {
+                ast_types::SpriteStatement::IsolatedExpression(expression.clone_cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::ConfigStatement(_, _, value, _, _, _) => {
+                ast_types::SpriteStatement::ConfigStatement(
+                    value
+                        .iter()
+                        .map(|value| value.clone_cst_to_ast())
+                        .collect::<Result<_, _>>()?,
+                )
+            }
+            cst_types::SpriteStatement::MonitorDeclaration(_, value, _, config, _, _, _) => {
+                ast_types::SpriteStatement::MonitorDeclaration {
+                    value: value.clone_cst_to_ast()?,
+                    configuration: config
+                        .iter()
+                        .map(|value| value.clone_cst_to_ast())
+                        .collect::<Result<_, _>>()?,
+                }
+            }
+            cst_types::SpriteStatement::UseStatement(
+                _,
+                extension_keyword,
+                use_statement_content,
+                _,
+                _,
+            ) => {
+                if extension_keyword.is_some() {
+                    ast_types::SpriteStatement::UseExtensionStatement(
+                        use_statement_content.clone_cst_to_ast()?,
+                    )
+                } else {
+                    ast_types::SpriteStatement::UseStatement(
+                        use_statement_content.clone_cst_to_ast()?,
+                    )
+                }
+            }
+            cst_types::SpriteStatement::EmptyStatement(_) => return Ok(None),
+            cst_types::SpriteStatement::Invalid(_) => return Err(InvalidCST),
+        }))
+    }
+    fn cst_to_ast(self) -> Result<Self::AST, Self::Error> {
+        Ok(Some(match self {
+            cst_types::SpriteStatement::DataDeclaration(_, data_declaration, _, _) => {
+                ast_types::SpriteStatement::DataDeclaration(data_declaration.cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::CostumeDeclaration(_, value, _, _) => {
+                ast_types::SpriteStatement::CostumeDeclaration(value.cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::SoundDeclaration(_, value, _, _) => {
+                ast_types::SpriteStatement::SoundDeclaration(value.cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::NoInputHatStatement(identifier, code_block, _, _) => {
+                ast_types::SpriteStatement::HatStatement {
+                    hat_function: identifier.cst_to_ast()?,
+                    arguments: Vec::new(),
+                    code_block: code_block.cst_to_ast()?,
+                }
+            }
+            cst_types::SpriteStatement::SingleInputHatStatement(
+                identifier,
+                expression,
+                code_block,
+                _,
+                _,
+            ) => ast_types::SpriteStatement::HatStatement {
+                hat_function: identifier.cst_to_ast()?,
+                arguments: vec![expression.cst_to_ast()?],
+                code_block: code_block.cst_to_ast()?,
+            },
+            cst_types::SpriteStatement::MultiInputHatStatement(
+                identifier,
+                _,
+                value,
+                _,
+                code_block,
+                _,
+                _,
+            ) => ast_types::SpriteStatement::HatStatement {
+                hat_function: identifier.cst_to_ast()?,
+                arguments: value
+                    .into_iter()
+                    .map(|value| value.cst_to_ast())
+                    .collect::<Result<_, _>>()?,
+                code_block: code_block.cst_to_ast()?,
+            },
+            cst_types::SpriteStatement::CustomBlockDefinition(
+                warp_specifier,
+                _,
+                canonical_identifier,
+                identifier,
+                _,
+                params,
+                _,
+                code_block,
+                _,
+                _,
+            ) => ast_types::SpriteStatement::CustomBlockDefinition {
+                is_warp: warp_specifier
+                    .map(|value| value.cst_to_ast())
+                    .transpose()?
+                    .unwrap_or(ast_types::WarpSpecifier { is_warp: false }),
+                canonical_identifier: canonical_identifier
+                    .map(|value| value.cst_to_ast())
+                    .transpose()?,
+                identifier: identifier.cst_to_ast()?,
+                parameters: params
+                    .into_iter()
+                    .map(|value| {
+                        Ok((
+                            value.0.map(|value| value.cst_to_ast()).transpose()?,
+                            value.1.map(|value| value.cst_to_ast()).transpose()?,
+                            value.2.cst_to_ast()?,
+                        ))
+                    })
+                    .collect::<Result<_, InvalidCST>>()?,
+                code_block: code_block.cst_to_ast()?,
+            },
+            cst_types::SpriteStatement::IsolatedBlock(code_block, _, _) => {
+                ast_types::SpriteStatement::IsolatedBlock(code_block.cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::IsolatedExpression(_, expression, _, _, _) => {
+                ast_types::SpriteStatement::IsolatedExpression(expression.cst_to_ast()?)
+            }
+            cst_types::SpriteStatement::ConfigStatement(_, _, value, _, _, _) => {
+                ast_types::SpriteStatement::ConfigStatement(
+                    value
+                        .into_iter()
+                        .map(|value| value.cst_to_ast())
+                        .collect::<Result<_, _>>()?,
+                )
+            }
+            cst_types::SpriteStatement::MonitorDeclaration(_, value, _, config, _, _, _) => {
+                ast_types::SpriteStatement::MonitorDeclaration {
+                    value: value.clone_cst_to_ast()?,
+                    configuration: config
+                        .into_iter()
+                        .map(|value| value.cst_to_ast())
+                        .collect::<Result<_, _>>()?,
+                }
+            }
+            cst_types::SpriteStatement::UseStatement(
+                _,
+                extension_keyword,
+                use_statement_content,
+                _,
+                _,
+            ) => {
+                if extension_keyword.is_some() {
+                    ast_types::SpriteStatement::UseExtensionStatement(
+                        use_statement_content.cst_to_ast()?,
+                    )
+                } else {
+                    ast_types::SpriteStatement::UseStatement(use_statement_content.cst_to_ast()?)
+                }
+            }
+            cst_types::SpriteStatement::EmptyStatement(_) => return Ok(None),
+            cst_types::SpriteStatement::Invalid(_) => return Err(InvalidCST),
+        }))
+    }
+}
+
+impl CSTToAST for cst_types::StageCodeBlock {
+    type AST = ast_types::StageCodeBlock;
+    type Error = InvalidCST;
+    fn clone_cst_to_ast(&self) -> Result<Self::AST, Self::Error> {
+        Ok(ast_types::StageCodeBlock {
+            statements: self
+                .statements
+                .iter()
+                .filter_map(|value| value.clone_cst_to_ast().transpose())
+                .collect::<Result<_, _>>()?,
+        })
+    }
+    fn cst_to_ast(self) -> Result<Self::AST, Self::Error> {
+        Ok(ast_types::StageCodeBlock {
+            statements: self
+                .statements
+                .into_iter()
+                .filter_map(|value| value.cst_to_ast().transpose())
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+impl CSTToAST for cst_types::SpriteCodeBlock {
+    type AST = ast_types::SpriteCodeBlock;
+    type Error = InvalidCST;
+    fn clone_cst_to_ast(&self) -> Result<Self::AST, Self::Error> {
+        Ok(ast_types::SpriteCodeBlock {
+            statements: self
+                .statements
+                .iter()
+                .filter_map(|value| value.clone_cst_to_ast().transpose())
+                .collect::<Result<_, _>>()?,
+        })
+    }
+    fn cst_to_ast(self) -> Result<Self::AST, Self::Error> {
+        Ok(ast_types::SpriteCodeBlock {
+            statements: self
+                .statements
+                .into_iter()
+                .filter_map(|value| value.cst_to_ast().transpose())
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+impl CSTToAST for cst_types::TopLevelStatement {
+    type AST = Option<ast_types::TopLevelStatement>;
+    type Error = InvalidCST;
+    fn clone_cst_to_ast(&self) -> Result<Self::AST, Self::Error> {
+        Ok(Some(match self {
+            cst_types::TopLevelStatement::Stage(_, code_block, _, _) => {
+                ast_types::TopLevelStatement::Stage {
+                    code_block: code_block.clone_cst_to_ast()?,
+                }
+            }
+            cst_types::TopLevelStatement::Sprite(
+                _,
+                canonical_identifier,
+                identifier,
+                code_block,
+                _,
+                _,
+            ) => ast_types::TopLevelStatement::Sprite {
+                canonical_identifier: canonical_identifier
+                    .as_ref()
+                    .map(|value| value.clone_cst_to_ast())
+                    .transpose()?,
+                identifier: identifier.clone_cst_to_ast()?,
+                code_block: code_block.clone_cst_to_ast()?,
+            },
+            cst_types::TopLevelStatement::BroadcastDeclaration(
+                _,
+                canonical_identifier,
+                identifier,
+                _,
+                _,
+            ) => ast_types::TopLevelStatement::BroadcastDeclaration {
+                canonical_identifier: canonical_identifier
+                    .as_ref()
+                    .map(|value| value.clone_cst_to_ast())
+                    .transpose()?,
+                identifier: identifier.clone_cst_to_ast()?,
+            },
+            cst_types::TopLevelStatement::UseStatement(
+                _,
+                extension_keyword,
+                use_statement_content,
+                _,
+                _,
+            ) => {
+                if extension_keyword.is_some() {
+                    ast_types::TopLevelStatement::UseExtensionStatement(
+                        use_statement_content.clone_cst_to_ast()?,
+                    )
+                } else {
+                    ast_types::TopLevelStatement::UseStatement(
+                        use_statement_content.clone_cst_to_ast()?,
+                    )
+                }
+            }
+            cst_types::TopLevelStatement::EmptyStatement(_) => return Ok(None),
+            cst_types::TopLevelStatement::Invalid(_) => return Err(InvalidCST),
+        }))
+    }
+
+    fn cst_to_ast(self) -> Result<Self::AST, Self::Error> {
+        Ok(Some(match self {
+            cst_types::TopLevelStatement::Stage(_, code_block, _, _) => {
+                ast_types::TopLevelStatement::Stage {
+                    code_block: code_block.cst_to_ast()?,
+                }
+            }
+            cst_types::TopLevelStatement::Sprite(
+                _,
+                canonical_identifier,
+                identifier,
+                code_block,
+                _,
+                _,
+            ) => ast_types::TopLevelStatement::Sprite {
+                canonical_identifier: canonical_identifier
+                    .map(|value| value.cst_to_ast())
+                    .transpose()?,
+                identifier: identifier.cst_to_ast()?,
+                code_block: code_block.cst_to_ast()?,
+            },
+            cst_types::TopLevelStatement::BroadcastDeclaration(
+                _,
+                canonical_identifier,
+                identifier,
+                _,
+                _,
+            ) => ast_types::TopLevelStatement::BroadcastDeclaration {
+                canonical_identifier: canonical_identifier
+                    .map(|value| value.cst_to_ast())
+                    .transpose()?,
+                identifier: identifier.cst_to_ast()?,
+            },
+            cst_types::TopLevelStatement::UseStatement(
+                _,
+                extension_keyword,
+                use_statement_content,
+                _,
+                _,
+            ) => {
+                if extension_keyword.is_some() {
+                    ast_types::TopLevelStatement::UseExtensionStatement(
+                        use_statement_content.cst_to_ast()?,
+                    )
+                } else {
+                    ast_types::TopLevelStatement::UseStatement(use_statement_content.cst_to_ast()?)
+                }
+            }
+            cst_types::TopLevelStatement::EmptyStatement(_) => return Ok(None),
+            cst_types::TopLevelStatement::Invalid(_) => return Err(InvalidCST),
+        }))
+    }
+}
+
+impl CSTToAST for cst_types::GrazeProgram {
+    type AST = ast_types::GrazeProgram;
+    type Error = InvalidCST;
+    fn clone_cst_to_ast(&self) -> Result<Self::AST, Self::Error> {
+        Ok(ast_types::GrazeProgram(
+            self.0
+                .iter()
+                .filter_map(|value| value.clone_cst_to_ast().transpose())
+                .collect::<Result<_, _>>()?,
+        ))
+    }
+    fn cst_to_ast(self) -> Result<Self::AST, Self::Error> {
+        Ok(ast_types::GrazeProgram(
+            self.0
+                .into_iter()
+                .filter_map(|value| value.cst_to_ast().transpose())
+                .collect::<Result<_, _>>()?,
+        ))
     }
 }
