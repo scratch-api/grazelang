@@ -1066,7 +1066,7 @@
     "142": {
         "filepath": "grazelang/src/ast/unparse_cst_formatted.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2448-L2448",
         "commit": "c63db02be3426c2df0060f61b61178d091ee318d",
         "title": "Add pretty token macro for tokens at the start of a group"
