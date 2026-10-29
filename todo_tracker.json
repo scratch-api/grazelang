@@ -1042,7 +1042,7 @@
     "139": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L843-L843",
         "commit": "62a8bd5633e6e2d864cc29ee199f198fb594b5f6",
         "title": "Add standalone formatter to cli"
@@ -1062,5 +1062,13 @@
         "lines": "L473-L473",
         "commit": "1ff3cc268d22fe5a4099a18227c514a7bdafa9ab",
         "title": "Use `CommaSeparated<T>` for `CustomBlockParams`"
+    },
+    "142": {
+        "filepath": "grazelang/src/ast/unparse_cst_formatted.rs",
+        "text": "",
+        "status": "open",
+        "lines": "L2448-L2448",
+        "commit": "c63db02be3426c2df0060f61b61178d091ee318d",
+        "title": "Add pretty token macro for tokens at the start of a group"
     }
 }
