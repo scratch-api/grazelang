@@ -338,8 +338,8 @@ where
                     empty_lines_end = *end;
                     if *count > ONE_NON_ZERO_USIZE {
                         value = value.append(allocator.hardline());
+                        final_newline_after_empty_line = !final_newline;
                         final_newline = true;
-                        final_newline_after_empty_line = true;
                     }
                 }
                 StyleToken::LineComment(comment, (start, _)) => {
@@ -2444,6 +2444,3 @@ impl UnparseCSTFormatted for &GrazeProgram {
             .append(allocator.hardline())
     }
 }
-
-// TODO: Add pretty token macro for tokens at the start of a group
-// Issue: #142
