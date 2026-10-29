@@ -2357,6 +2357,7 @@ pub mod helpers {
         let mut data = HashMap::with_capacity(dictionary.len());
         for entry in dictionary {
             let (ident, _, value, _) = entry
+                .0
                 .to_valid()
                 .expect("You must pass a valid AST to the visitor.");
             let key = map_key(ident.value.clone());
@@ -2543,7 +2544,7 @@ pub mod helpers {
     ) -> Result<(), GrazeSb3GeneratorError> {
         match asset_declaration {
             cst::AssetDeclaration::Multiple(_, comma_separated, _, _) => {
-                for single_asset_declaration in comma_separated {
+                for (single_asset_declaration, _) in comma_separated {
                     visit_single_asset_declaration_for_sb3_generator(
                         context,
                         single_asset_declaration,
@@ -2743,7 +2744,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     source_span: value.0.span_to(value.3),
                 });
             }
-            for (param, (value, expr)) in
+            for (param, (value, (expr, _))) in
                 zip(params.iter(), reversed_args.into_iter().rev().zip(value.2))
             {
                 add_param_to_params(
@@ -3184,7 +3185,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     reversed_args
                         .into_iter()
                         .rev()
-                        .zip(value.2.iter().map(|expr| *expr.get_source_span())),
+                        .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
                     arg_count,
                 ),
                 value.0.span_to(value.3),
@@ -3264,7 +3265,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 reversed_args
                     .into_iter()
                     .rev()
-                    .zip(value.2.iter().map(|expr| *expr.get_source_span())),
+                    .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
             ) {
                 add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
             }
@@ -3408,7 +3409,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 GrazeMessageSetting::Warnings,
             );
         }
-        for item in value.3 {
+        for (item, _) in value.3 {
             match item {
                 ListEntry::Expression(expression) => {
                     wrap_in_statement(context, |context, parent, this_id| {
@@ -3456,7 +3457,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         Ok(())
                     })?;
                 }
-                ListEntry::Unwrap(literal, _) => {
+                ListEntry::Unwrap(_, literal, _) => {
                     for c in literal.get_string_value().chars() {
                         wrap_in_statement(context, |context, parent, this_id| {
                             add_block(
@@ -3512,11 +3513,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             | cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
             | cst::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
                 .iter()
-                .map(|value| {
+                .map(|(value, _)| {
                     Ok(match value {
                         cst::SingleDataDeclaration::Variable(
-                            _,
                             my_scope,
+                            _,
                             canonical_identifier,
                             identifier,
                             _,
@@ -3574,8 +3575,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             SingleAssignment::Var(scope, var, Ok(expression))
                         }
                         cst::SingleDataDeclaration::EmptyVariable(
-                            _,
                             my_scope,
+                            _,
                             canonical_identifier,
                             identifier,
                             _,
@@ -3631,8 +3632,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             SingleAssignment::Var(scope, var, Err("".into()))
                         }
                         cst::SingleDataDeclaration::List(
-                            _,
                             my_scope,
+                            _,
                             canonical_identifier,
                             identifier,
                             _,
@@ -3691,12 +3692,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             );
                             SingleAssignment::List(scope, list, {
                                 let mut values = Vec::with_capacity(items.len());
-                                for value in items {
+                                for (value, _) in items {
                                     match value {
                                         ListEntry::Expression(expression) => {
                                             values.push(Ok(expression));
                                         }
-                                        ListEntry::Unwrap(literal, _) => {
+                                        ListEntry::Unwrap(_, literal, _) => {
                                             for c in literal.get_string_value().chars() {
                                                 values.push(Err(c.to_string().into()));
                                             }
@@ -3707,8 +3708,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             })
                         }
                         cst::SingleDataDeclaration::FileList(
-                            _,
                             my_scope,
+                            _,
                             canonical_identifier,
                             identifier,
                             _,
@@ -3806,8 +3807,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             })
                         }
                         cst::SingleDataDeclaration::EmptyList(
-                            _,
                             my_scope,
+                            _,
                             canonical_identifier,
                             identifier,
                             _,
@@ -3869,8 +3870,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 let single_data_declaration = single_data_declaration.as_ref();
                 let single_assignment = match single_data_declaration {
                     cst::SingleDataDeclaration::Variable(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -3920,8 +3921,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         SingleAssignment::Var(scope, var, Ok(expression))
                     }
                     cst::SingleDataDeclaration::EmptyVariable(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -3969,8 +3970,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         SingleAssignment::Var(scope, var, Err("".into()))
                     }
                     cst::SingleDataDeclaration::List(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4021,12 +4022,12 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         );
                         SingleAssignment::List(scope, list, {
                             let mut values = Vec::with_capacity(items.len());
-                            for value in items {
+                            for (value, _) in items {
                                 match value {
                                     ListEntry::Expression(expression) => {
                                         values.push(Ok(expression));
                                     }
-                                    ListEntry::Unwrap(literal, _) => {
+                                    ListEntry::Unwrap(_, literal, _) => {
                                         for c in literal.get_string_value().chars() {
                                             values.push(Err(c.to_string().into()));
                                         }
@@ -4037,8 +4038,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         })
                     }
                     cst::SingleDataDeclaration::FileList(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4128,8 +4129,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         })
                     }
                     cst::SingleDataDeclaration::EmptyList(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4534,10 +4535,10 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             | cst::DataDeclaration::Vars(parent_scope, _, _, items, _, _)
             | cst::DataDeclaration::Lists(parent_scope, _, _, items, _, _) => items
                 .iter()
-                .map(|value| match value {
+                .map(|(value, _)| match value {
                     cst::SingleDataDeclaration::Variable(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4545,8 +4546,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     )
                     | cst::SingleDataDeclaration::EmptyVariable(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4576,8 +4577,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         );
                     }
                     cst::SingleDataDeclaration::List(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4587,8 +4588,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     )
                     | cst::SingleDataDeclaration::FileList(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4597,8 +4598,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     )
                     | cst::SingleDataDeclaration::EmptyList(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4633,8 +4634,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 let single_data_declaration = single_data_declaration.as_ref();
                 match single_data_declaration {
                     cst::SingleDataDeclaration::Variable(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4642,8 +4643,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     )
                     | cst::SingleDataDeclaration::EmptyVariable(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4665,8 +4666,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         );
                     }
                     cst::SingleDataDeclaration::List(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4676,8 +4677,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     )
                     | cst::SingleDataDeclaration::FileList(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4686,8 +4687,8 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         _,
                     )
                     | cst::SingleDataDeclaration::EmptyList(
-                        _,
                         my_scope,
+                        _,
                         canonical_identifier,
                         identifier,
                         _,
@@ -4943,7 +4944,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             reversed_args
                 .into_iter()
                 .rev()
-                .zip(value.2.iter().map(|expr| *expr.get_source_span())),
+                .zip(value.2.iter().map(|(expr, _)| *expr.get_source_span())),
         ) {
             add_param_to_params(context, param, value, source_span, &mut inputs, &mut fields)?;
         }
@@ -5312,7 +5313,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         size += 1;
                         path.push(value.clone());
                     }
-                    for child in content {
+                    for (child, _) in content {
                         add_symbols(context, path, child)?;
                     }
                     for _ in 0..size {
@@ -5973,7 +5974,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                         source_span: value.0.span_to(value.3),
                     });
                 }
-                for (param, value) in zip(params.iter(), items.iter()) {
+                for (param, (value, _)) in zip(params.iter(), items.iter()) {
                     let symbol_id = get_symbol_id(context, value)?;
                     let symbol = &context.symbol_table[symbol_id];
                     let known_block = get_known_block(symbol, value)?.clone();
@@ -6181,7 +6182,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                     monitor.value = Sb3MonitorValue::List(
                         items
                             .into_iter()
-                            .map(|value| {
+                            .map(|(value, _)| {
                                 Ok(match value.to_literal() {
                                     Ok(value) => {
                                         let value = value;

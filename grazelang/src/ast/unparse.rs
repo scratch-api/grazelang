@@ -543,12 +543,12 @@ impl UnparseAST for (&SingleDataDeclaration, SingleDataDeclarationDefaultKind) {
                 identifier,
                 value,
             } => {
-                if self.1 != SingleDataDeclarationDefaultKind::List {
-                    f.write_str("list ")?;
-                }
                 if scope != &DataDeclarationScope::Unset {
                     scope.unparse_into(f)?;
                     f.write_char(' ')?;
+                }
+                if self.1 != SingleDataDeclarationDefaultKind::List {
+                    f.write_str("list ")?;
                 }
                 if let Some(canonical_identifier) = canonical_identifier {
                     canonical_identifier.unparse_into(f)?;
@@ -571,12 +571,12 @@ impl UnparseAST for (&SingleDataDeclaration, SingleDataDeclarationDefaultKind) {
                 identifier,
                 source,
             } => {
-                if self.1 != SingleDataDeclarationDefaultKind::List {
-                    f.write_str("list ")?;
-                }
                 if scope != &DataDeclarationScope::Unset {
                     scope.unparse_into(f)?;
                     f.write_char(' ')?;
+                }
+                if self.1 != SingleDataDeclarationDefaultKind::List {
+                    f.write_str("list ")?;
                 }
                 if let Some(canonical_identifier) = canonical_identifier {
                     canonical_identifier.unparse_into(f)?;

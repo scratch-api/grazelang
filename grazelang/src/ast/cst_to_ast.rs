@@ -206,7 +206,7 @@ impl CSTToAST for cst_types::Expression {
                     function: function.clone_cst_to_ast()?,
                     arguments: arguments
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -257,7 +257,7 @@ impl CSTToAST for cst_types::Expression {
                     function: function.cst_to_ast()?,
                     arguments: arguments
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -297,14 +297,14 @@ impl CSTToAST for cst_types::DictionaryValue {
                 ast_types::DictionaryValue::Dictionary(
                     value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
             cst_types::DictionaryValue::List(_, value, _, _) => ast_types::DictionaryValue::List(
                 value
                     .iter()
-                    .map(|value| value.clone_cst_to_ast())
+                    .map(|value| value.0.clone_cst_to_ast())
                     .collect::<Result<_, _>>()?,
             ),
             cst_types::DictionaryValue::Invalid(_) => return Err(InvalidCST),
@@ -319,14 +319,14 @@ impl CSTToAST for cst_types::DictionaryValue {
                 ast_types::DictionaryValue::Dictionary(
                     value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
             cst_types::DictionaryValue::List(_, value, _, _) => ast_types::DictionaryValue::List(
                 value
                     .into_iter()
-                    .map(|value| value.cst_to_ast())
+                    .map(|value| value.0.cst_to_ast())
                     .collect::<Result<_, _>>()?,
             ),
             cst_types::DictionaryValue::Invalid(_) => return Err(InvalidCST),
@@ -374,7 +374,7 @@ impl CSTToAST for cst_types::ListEntry {
             cst_types::ListEntry::Expression(value) => {
                 ast_types::ListEntry::Expression(value.clone_cst_to_ast()?)
             }
-            cst_types::ListEntry::Unwrap(value, _) => {
+            cst_types::ListEntry::Unwrap(_, value, _) => {
                 ast_types::ListEntry::Unwrap(value.clone_cst_to_ast()?)
             }
         })
@@ -384,7 +384,7 @@ impl CSTToAST for cst_types::ListEntry {
             cst_types::ListEntry::Expression(value) => {
                 ast_types::ListEntry::Expression(value.cst_to_ast()?)
             }
-            cst_types::ListEntry::Unwrap(value, _) => {
+            cst_types::ListEntry::Unwrap(_, value, _) => {
                 ast_types::ListEntry::Unwrap(value.cst_to_ast()?)
             }
         })
@@ -404,7 +404,7 @@ impl CSTToAST for cst_types::MonitorValue {
                     function: function.clone_cst_to_ast()?,
                     arguments: value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -420,7 +420,7 @@ impl CSTToAST for cst_types::MonitorValue {
                     function: function.cst_to_ast()?,
                     arguments: value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -434,8 +434,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
     fn clone_cst_to_ast(&self) -> Result<Self::AST, Self::Error> {
         Ok(match self {
             cst_types::SingleDataDeclaration::Variable(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -451,8 +451,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 value: Some(value.clone_cst_to_ast()?),
             },
             cst_types::SingleDataDeclaration::EmptyVariable(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -466,8 +466,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 value: None,
             },
             cst_types::SingleDataDeclaration::List(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -484,12 +484,12 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 identifier: identifier.clone_cst_to_ast()?,
                 value: value
                     .iter()
-                    .map(|value| value.clone_cst_to_ast())
+                    .map(|value| value.0.clone_cst_to_ast())
                     .collect::<Result<_, _>>()?,
             },
             cst_types::SingleDataDeclaration::FileList(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -506,8 +506,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 source: value.clone_cst_to_ast()?,
             },
             cst_types::SingleDataDeclaration::EmptyList(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -525,8 +525,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
     fn cst_to_ast(self) -> Result<Self::AST, Self::Error> {
         Ok(match self {
             cst_types::SingleDataDeclaration::Variable(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -541,8 +541,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 value: Some(value.cst_to_ast()?),
             },
             cst_types::SingleDataDeclaration::EmptyVariable(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -555,8 +555,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 value: None,
             },
             cst_types::SingleDataDeclaration::List(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -572,12 +572,12 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 identifier: identifier.cst_to_ast()?,
                 value: value
                     .into_iter()
-                    .map(|value| value.cst_to_ast())
+                    .map(|value| value.0.cst_to_ast())
                     .collect::<Result<_, _>>()?,
             },
             cst_types::SingleDataDeclaration::FileList(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -593,8 +593,8 @@ impl CSTToAST for cst_types::SingleDataDeclaration {
                 source: value.cst_to_ast()?,
             },
             cst_types::SingleDataDeclaration::EmptyList(
-                _,
                 scope,
+                _,
                 canonical_identifier,
                 identifier,
                 _,
@@ -620,7 +620,7 @@ impl CSTToAST for cst_types::DataDeclaration {
                     scope: scope.clone_cst_to_ast()?,
                     declarations: value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -629,7 +629,7 @@ impl CSTToAST for cst_types::DataDeclaration {
                     scope: scope.clone_cst_to_ast()?,
                     declarations: value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -638,7 +638,7 @@ impl CSTToAST for cst_types::DataDeclaration {
                     scope: scope.clone_cst_to_ast()?,
                     declarations: value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -654,7 +654,7 @@ impl CSTToAST for cst_types::DataDeclaration {
                     scope: scope.cst_to_ast()?,
                     declarations: value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -663,7 +663,7 @@ impl CSTToAST for cst_types::DataDeclaration {
                     scope: scope.cst_to_ast()?,
                     declarations: value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -672,7 +672,7 @@ impl CSTToAST for cst_types::DataDeclaration {
                     scope: scope.cst_to_ast()?,
                     declarations: value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -710,7 +710,7 @@ impl CSTToAST for cst_types::UseStatementContent {
                 root: root.clone_cst_to_ast()?,
                 content: content
                     .iter()
-                    .map(|value| value.clone_cst_to_ast())
+                    .map(|value| value.0.clone_cst_to_ast())
                     .collect::<Result<_, _>>()?,
             },
             cst_types::UseStatementContent::Invalid(_) => return Err(InvalidCST),
@@ -737,7 +737,7 @@ impl CSTToAST for cst_types::UseStatementContent {
                 root: root.cst_to_ast()?,
                 content: content
                     .into_iter()
-                    .map(|value| value.cst_to_ast())
+                    .map(|value| value.0.cst_to_ast())
                     .collect::<Result<_, _>>()?,
             },
             cst_types::UseStatementContent::Invalid(_) => return Err(InvalidCST),
@@ -764,7 +764,7 @@ impl CSTToAST for cst_types::Statement {
                     target: identifier.clone_cst_to_ast()?,
                     value: value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -780,7 +780,7 @@ impl CSTToAST for cst_types::Statement {
                     function: identifier.clone_cst_to_ast()?,
                     arguments: value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -796,7 +796,7 @@ impl CSTToAST for cst_types::Statement {
                     control_function: identifier.clone_cst_to_ast()?,
                     arguments: value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                     code_block: code_block.clone_cst_to_ast()?,
                 }
@@ -859,7 +859,7 @@ impl CSTToAST for cst_types::Statement {
                     target: identifier.cst_to_ast()?,
                     value: value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -875,7 +875,7 @@ impl CSTToAST for cst_types::Statement {
                     function: identifier.cst_to_ast()?,
                     arguments: value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -891,7 +891,7 @@ impl CSTToAST for cst_types::Statement {
                     control_function: identifier.cst_to_ast()?,
                     arguments: value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                     code_block: code_block.cst_to_ast()?,
                 }
@@ -967,7 +967,7 @@ impl CSTToAST for cst_types::SingleAssetDeclarationValue {
                 ast_types::SingleAssetDeclarationValue::Dictionary(
                     value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -982,7 +982,7 @@ impl CSTToAST for cst_types::SingleAssetDeclarationValue {
                 ast_types::SingleAssetDeclarationValue::Dictionary(
                     value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -1022,7 +1022,7 @@ impl CSTToAST for cst_types::AssetDeclaration {
                 ast_types::AssetDeclaration::Multiple(
                     value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -1037,7 +1037,7 @@ impl CSTToAST for cst_types::AssetDeclaration {
                 ast_types::AssetDeclaration::Multiple(
                     value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -1103,7 +1103,7 @@ impl CSTToAST for cst_types::StageStatement {
                 hat_function: identifier.clone_cst_to_ast()?,
                 arguments: value
                     .iter()
-                    .map(|value| value.clone_cst_to_ast())
+                    .map(|value| value.0.clone_cst_to_ast())
                     .collect::<Result<_, _>>()?,
                 code_block: code_block.clone_cst_to_ast()?,
             },
@@ -1159,7 +1159,7 @@ impl CSTToAST for cst_types::StageStatement {
                 ast_types::StageStatement::ConfigStatement(
                     value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -1168,7 +1168,7 @@ impl CSTToAST for cst_types::StageStatement {
                     value: value.clone_cst_to_ast()?,
                     configuration: config
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -1234,7 +1234,7 @@ impl CSTToAST for cst_types::StageStatement {
                 hat_function: identifier.cst_to_ast()?,
                 arguments: value
                     .into_iter()
-                    .map(|value| value.cst_to_ast())
+                    .map(|value| value.0.cst_to_ast())
                     .collect::<Result<_, _>>()?,
                 code_block: code_block.cst_to_ast()?,
             },
@@ -1280,7 +1280,7 @@ impl CSTToAST for cst_types::StageStatement {
                 ast_types::StageStatement::ConfigStatement(
                     value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -1289,7 +1289,7 @@ impl CSTToAST for cst_types::StageStatement {
                     value: value.clone_cst_to_ast()?,
                     configuration: config
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -1358,7 +1358,7 @@ impl CSTToAST for cst_types::SpriteStatement {
                 hat_function: identifier.clone_cst_to_ast()?,
                 arguments: value
                     .iter()
-                    .map(|value| value.clone_cst_to_ast())
+                    .map(|value| value.0.clone_cst_to_ast())
                     .collect::<Result<_, _>>()?,
                 code_block: code_block.clone_cst_to_ast()?,
             },
@@ -1414,7 +1414,7 @@ impl CSTToAST for cst_types::SpriteStatement {
                 ast_types::SpriteStatement::ConfigStatement(
                     value
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -1423,7 +1423,7 @@ impl CSTToAST for cst_types::SpriteStatement {
                     value: value.clone_cst_to_ast()?,
                     configuration: config
                         .iter()
-                        .map(|value| value.clone_cst_to_ast())
+                        .map(|value| value.0.clone_cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }
@@ -1489,7 +1489,7 @@ impl CSTToAST for cst_types::SpriteStatement {
                 hat_function: identifier.cst_to_ast()?,
                 arguments: value
                     .into_iter()
-                    .map(|value| value.cst_to_ast())
+                    .map(|value| value.0.cst_to_ast())
                     .collect::<Result<_, _>>()?,
                 code_block: code_block.cst_to_ast()?,
             },
@@ -1535,7 +1535,7 @@ impl CSTToAST for cst_types::SpriteStatement {
                 ast_types::SpriteStatement::ConfigStatement(
                     value
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 )
             }
@@ -1544,7 +1544,7 @@ impl CSTToAST for cst_types::SpriteStatement {
                     value: value.clone_cst_to_ast()?,
                     configuration: config
                         .into_iter()
-                        .map(|value| value.cst_to_ast())
+                        .map(|value| value.0.cst_to_ast())
                         .collect::<Result<_, _>>()?,
                 }
             }

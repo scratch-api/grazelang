@@ -18,13 +18,13 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct UnparseASTFormattedSettings {
+pub struct UnparseFormattedSettings {
     pub indentation: isize,
     pub width: usize,
     pub hard_lines_in_code_blocks: bool,
 }
 
-use UnparseASTFormattedSettings as Settings;
+use UnparseFormattedSettings as Settings;
 
 pub trait UnparseASTFormatted: Sized {
     fn into_pretty_doc<'a, D>(self, allocator: &'a D, settings: &Settings) -> DocBuilder<'a, D, ()>
@@ -38,7 +38,9 @@ pub trait UnparseASTFormatted: Sized {
         F: for<'a> FnOnce(DocBuilder<'a, Arena<'a>, ()>) -> O,
     {
         let allocator = Arena::new();
-        let value = self.into_pretty_doc(&allocator, settings);
+        let value = self
+            .into_pretty_doc(&allocator, settings)
+            .append(allocator.hardline());
         f(value)
     }
 
@@ -791,13 +793,13 @@ impl UnparseASTFormatted for (&SingleDataDeclaration, SingleDataDeclarationDefau
                 value: decl_value,
             } => {
                 let mut value = allocator.nil();
-                if self.1 != SingleDataDeclarationDefaultKind::List {
-                    value = value.append("list ");
-                }
                 if scope != &DataDeclarationScope::Unset {
                     value = value
                         .append(scope.into_pretty_doc(allocator, settings))
                         .append(" ");
+                }
+                if self.1 != SingleDataDeclarationDefaultKind::List {
+                    value = value.append("list ");
                 }
                 if let Some(canonical_identifier) = canonical_identifier {
                     value = value
@@ -822,13 +824,13 @@ impl UnparseASTFormatted for (&SingleDataDeclaration, SingleDataDeclarationDefau
                 source,
             } => {
                 let mut value = allocator.nil();
-                if self.1 != SingleDataDeclarationDefaultKind::List {
-                    value = value.append("list ");
-                }
                 if scope != &DataDeclarationScope::Unset {
                     value = value
                         .append(scope.into_pretty_doc(allocator, settings))
                         .append(" ");
+                }
+                if self.1 != SingleDataDeclarationDefaultKind::List {
+                    value = value.append("list ");
                 }
                 if let Some(canonical_identifier) = canonical_identifier {
                     value = value
@@ -1182,7 +1184,7 @@ impl UnparseASTFormatted for &AssetDeclaration {
     fn into_pretty_doc<'a, D>(
         self,
         allocator: &'a D,
-        settings: &UnparseASTFormattedSettings,
+        settings: &UnparseFormattedSettings,
     ) -> DocBuilder<'a, D, ()>
     where
         Self: 'a,
@@ -1386,25 +1388,4 @@ impl UnparseASTFormatted for &GrazeProgram {
             )
             .append(allocator.hardline())
     }
-}
-
-pub fn test(a: &[&str]) {
-    let arena = Arena::<()>::new();
-    arena
-        .text("{")
-        .append(
-            arena
-                .line_()
-                .append(arena.intersperse(
-                    a.iter().map(|value| arena.text(*value)),
-                    arena.text(",").append(arena.line()),
-                ))
-                .nest(4),
-        )
-        .append(arena.line_())
-        .append("}")
-        .group()
-        .1
-        .render(10, &mut std::io::stdout())
-        .unwrap()
 }

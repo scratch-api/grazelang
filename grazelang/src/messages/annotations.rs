@@ -2,6 +2,8 @@ use std::{ffi::OsStr, fmt::Write, path::PathBuf};
 
 use annotate_snippets::{Annotation, AnnotationKind, Group, Level, Snippet};
 
+#[cfg(feature = "formatter")]
+use crate::messages::types::FormatterUnsuccessful;
 use crate::{
     codegen::core::{GrazeSb3GeneratorCreationError, GrazeSb3GeneratorError},
     lexer::TextSpan,
@@ -63,6 +65,19 @@ pub fn annotate_unbuild<'a, I, P>(iter: I, mut printer: P)
 where
     I: Iterator<Item = &'a GrazeDetranspilerMessage>,
     P: for<'b> FnMut(&'b [Group<'a>], &'b GrazeDetranspilerMessage),
+{
+    let mut groups = Vec::with_capacity(4);
+    iter.for_each(move |value| {
+        groups.clear();
+        printer(value.annotate(|_| unreachable!(), &mut groups), value)
+    });
+}
+
+#[cfg(feature = "formatter")]
+pub fn annotate_format<'a, I, P>(iter: I, mut printer: P)
+where
+    I: Iterator<Item = &'a FormatterUnsuccessful>,
+    P: for<'b> FnMut(&'b [Group<'a>], &'b FormatterUnsuccessful),
 {
     let mut groups = Vec::with_capacity(4);
     iter.for_each(move |value| {
@@ -599,5 +614,46 @@ impl Annotate for GrazeDetranspilerWarning {
             groups.push(value)
         }
         &*groups
+    }
+}
+
+#[cfg(feature = "formatter")]
+impl Annotate for FormatterUnsuccessful {
+    fn annotate<'a, 'b, F>(
+        &'a self,
+        _source_getter: F,
+        groups: &'b mut Vec<Group<'a>>,
+    ) -> &'b [Group<'a>]
+    where
+        F: FnMut(u32) -> SourceDescriptor<'a>,
+    {
+        annotate_single(
+            groups,
+            Group::with_title(Level::ERROR.secondary_title({
+                let error_count = self.error_count;
+                let warning_count = self.warning_count;
+                let mut error = String::with_capacity(100);
+                if self.error_count == 0 {
+                    write!(error, "could not complete formatting due to some error").unwrap();
+                } else {
+                    write!(
+                        error,
+                        "could not complete formatting due to {error_count} previous error",
+                    )
+                    .unwrap();
+                    if error_count != 1 {
+                        write!(error, "s").unwrap();
+                    }
+                }
+                if warning_count > 0 {
+                    write!(error, "; {warning_count} warning").unwrap();
+                    if warning_count != 1 {
+                        write!(error, "s").unwrap();
+                    }
+                    write!(error, " emitted").unwrap();
+                }
+                error
+            })),
+        )
     }
 }

@@ -34,6 +34,7 @@ toml.workspace = true
 pretty = "0.12.5"
 
 [features]
-default = ["detranspiler"]
+default = ["detranspiler", "formatter"]
 include_context_in_parse_errors = []
 detranspiler = []
+formatter = ["detranspiler"]

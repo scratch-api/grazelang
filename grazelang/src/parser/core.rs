@@ -1129,7 +1129,7 @@ pub mod statement {
             ListKeyword, ListsKeyword, MonitorDeclarationFromContent, MonitorKeyword, MonitorValue,
             NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon,
             SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
-            SyntacticElse, SyntacticIf, VarKeyword, VarsKeyword, WarpSpecifier,
+            SyntacticElse, SyntacticIf, Unwrap, VarKeyword, VarsKeyword, WarpSpecifier,
         },
     };
 
@@ -1267,10 +1267,12 @@ pub mod statement {
             (token_stream, context) => match peek_token!(token_stream) {
                 Token::Unwrap => {
                     skip_token!(token_stream);
+                    let unwrap = from_stream_pos::<Unwrap, _>(token_stream);
                     let unwrap_start = get_token_start(token_stream);
                     expect_token!(
                         token_stream,
                         Token::SimpleString(value) => ListEntry::Unwrap(
+                            unwrap,
                             cst::Literal::String(value, get_token_source_span(token_stream)),
                             token_stream.span_from_previous_to_current(unwrap_start),
                         ),
@@ -1595,7 +1597,7 @@ pub mod statement {
                                 match &value {
                                     DeclarationValue::List(_, _, value, _) => {
                                         let mut expressions = Vec::with_capacity(value.len());
-                                        for entry in value {
+                                        for (entry, _) in value {
                                             match entry {
                                                 ListEntry::Expression(expression) => {
                                                     expressions.push(expression.calculate_value().map_err(|source| {
@@ -1605,7 +1607,7 @@ pub mod statement {
                                                         }
                                                     })?);
                                                 }
-                                                ListEntry::Unwrap(literal, _) => literal
+                                                ListEntry::Unwrap(_, literal, _) => literal
                                                     .get_string_value()
                                                     .as_str()
                                                     .chars()
@@ -1686,30 +1688,30 @@ pub mod statement {
                 DeclarationValue::None => match dec_type {
                     SingleDataDeclarationType::Unset => match default_type {
                         DefaultDataDeclarationType::Var => SingleDataDeclaration::EmptyVariable(
-                            None,
                             scope,
+                            None,
                             canonical_identifier,
                             identifier,
                             token_stream.span_from_previous_to_current(start_pos.unwrap()),
                         ),
                         DefaultDataDeclarationType::List => SingleDataDeclaration::EmptyList(
-                            None,
                             scope,
+                            None,
                             canonical_identifier,
                             identifier,
                             token_stream.span_from_previous_to_current(start_pos.unwrap()),
                         ),
                     },
                     SingleDataDeclarationType::Var(p) => SingleDataDeclaration::EmptyVariable(
-                        Some(VarKeyword(p)),
                         scope,
+                        Some(VarKeyword(p)),
                         canonical_identifier,
                         identifier,
                         token_stream.span_from_previous_to_current(start_pos.unwrap()),
                     ),
                     SingleDataDeclarationType::List(p) => SingleDataDeclaration::EmptyList(
-                        Some(ListKeyword(p)),
                         scope,
+                        Some(ListKeyword(p)),
                         canonical_identifier,
                         identifier,
                         token_stream.span_from_previous_to_current(start_pos.unwrap()),
@@ -1717,12 +1719,12 @@ pub mod statement {
                 },
                 DeclarationValue::Var(assignment_operator, literal) => {
                     SingleDataDeclaration::Variable(
+                        scope,
                         match dec_type {
                             SingleDataDeclarationType::Unset => None,
                             SingleDataDeclarationType::Var(p) => Some(VarKeyword(p)),
                             SingleDataDeclarationType::List(_) => None,
                         },
-                        scope,
                         canonical_identifier,
                         identifier,
                         assignment_operator,
@@ -1732,12 +1734,12 @@ pub mod statement {
                 }
                 DeclarationValue::List(assignment_operator, left_brace, items, right_brace) => {
                     SingleDataDeclaration::List(
+                        scope,
                         match dec_type {
                             SingleDataDeclarationType::Unset => None,
                             SingleDataDeclarationType::Var(_) => None,
                             SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
                         },
-                        scope,
                         canonical_identifier,
                         identifier,
                         assignment_operator,
@@ -1749,12 +1751,12 @@ pub mod statement {
                 }
                 DeclarationValue::FileList(assignment_operator, file_keyword, expression) => {
                     SingleDataDeclaration::FileList(
+                        scope,
                         match dec_type {
                             SingleDataDeclarationType::Unset => None,
                             SingleDataDeclarationType::Var(_) => None,
                             SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
                         },
-                        scope,
                         canonical_identifier,
                         identifier,
                         assignment_operator,
@@ -2101,7 +2103,7 @@ pub mod statement {
                                 match &value {
                                     DeclarationValue::List(_, _, value, _) => {
                                         let mut expressions = Vec::with_capacity(value.len());
-                                        for entry in value {
+                                        for (entry, _) in value {
                                             match entry {
                                                 ListEntry::Expression(expression) => {
                                                     expressions.push(expression.calculate_value().map_err(|source| {
@@ -2111,7 +2113,7 @@ pub mod statement {
                                                         }
                                                     })?);
                                                 }
-                                                ListEntry::Unwrap(literal, _) => literal
+                                                ListEntry::Unwrap(_, literal, _) => literal
                                                     .get_string_value()
                                                     .as_str()
                                                     .chars()
@@ -2191,34 +2193,34 @@ pub mod statement {
         let declaration = match value {
             DeclarationValue::None => match dec_type {
                 SingleDataDeclarationType::Unset => SingleDataDeclaration::EmptyVariable(
-                    None,
                     scope,
+                    None,
                     canonical_identifier,
                     identifier,
                     token_stream.span_from_previous_to_current(start_pos.unwrap().0.0),
                 ),
                 SingleDataDeclarationType::Var(p) => SingleDataDeclaration::EmptyVariable(
-                    Some(VarKeyword(p)),
                     scope,
+                    Some(VarKeyword(p)),
                     canonical_identifier,
                     identifier,
                     token_stream.span_from_previous_to_current(start_pos.unwrap().0.0),
                 ),
                 SingleDataDeclarationType::List(p) => SingleDataDeclaration::EmptyList(
-                    Some(ListKeyword(p)),
                     scope,
+                    Some(ListKeyword(p)),
                     canonical_identifier,
                     identifier,
                     token_stream.span_from_previous_to_current(start_pos.unwrap().0.0),
                 ),
             },
             DeclarationValue::Var(assignment_operator, literal) => SingleDataDeclaration::Variable(
+                scope,
                 match dec_type {
                     SingleDataDeclarationType::Unset => None,
                     SingleDataDeclarationType::Var(p) => Some(VarKeyword(p)),
                     SingleDataDeclarationType::List(_) => unreachable!(),
                 },
-                scope,
                 canonical_identifier,
                 identifier,
                 assignment_operator,
@@ -2227,12 +2229,12 @@ pub mod statement {
             ),
             DeclarationValue::List(assignment_operator, left_brace, items, right_brace) => {
                 SingleDataDeclaration::List(
+                    scope,
                     match dec_type {
                         SingleDataDeclarationType::Unset => None,
                         SingleDataDeclarationType::Var(_) => unreachable!(),
                         SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
                     },
-                    scope,
                     canonical_identifier,
                     identifier,
                     assignment_operator,
@@ -2244,12 +2246,12 @@ pub mod statement {
             }
             DeclarationValue::FileList(assignment_operator, file_keyword, expression) => {
                 SingleDataDeclaration::FileList(
+                    scope,
                     match dec_type {
                         SingleDataDeclarationType::Unset => None,
                         SingleDataDeclarationType::Var(_) => None,
                         SingleDataDeclarationType::List(p) => Some(ListKeyword(p)),
                     },
-                    scope,
                     canonical_identifier,
                     identifier,
                     assignment_operator,
@@ -2793,7 +2795,7 @@ pub mod statement {
                             cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                             cst::SingleAssetDeclarationValue::Dictionary(_, items, _, _) => {
                                 let mut data = HashMap::with_capacity(items.len());
-                                for entry in items {
+                                for (entry, _) in items {
                                     let Some((ident, _, value, _)) = entry
                                         .to_valid()
                                     else {
@@ -2952,7 +2954,7 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                         cst::SingleAssetDeclarationValue::Dictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
-                            for entry in items {
+                            for (entry, _) in items {
                                 let Some((ident, _, value, _)) = entry
                                     .to_valid()
                                 else {
@@ -3091,7 +3093,7 @@ pub mod statement {
                         cst::SingleAssetDeclarationValue::Simple(_, path, _, _) => (path.0.clone(), HashMap::new()),
                         cst::SingleAssetDeclarationValue::Dictionary(_, items, _, _) => {
                             let mut data = HashMap::with_capacity(items.len());
-                            for entry in items {
+                            for (entry, _) in items {
                                 let Some((ident, _, value, _)) = entry
                                     .to_valid()
                                 else {

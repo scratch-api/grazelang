@@ -952,3 +952,10 @@ impl From<GrazeDetranspilerWarning> for GrazeDetranspilerMessage {
         Self::Warning(value)
     }
 }
+
+#[cfg(feature = "formatter")]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct FormatterUnsuccessful {
+    pub error_count: usize,
+    pub warning_count: usize,
+}

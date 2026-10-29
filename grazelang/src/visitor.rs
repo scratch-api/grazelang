@@ -258,8 +258,8 @@ pub type BorrowedListsDataDeclaration<'a> = (
 );
 
 pub type BorrowedSingleVariableDeclaration<'a> = (
-    Option<&'a VarKeyword>,
     &'a DataDeclarationScope,
+    Option<&'a VarKeyword>,
     Option<&'a CanonicalIdentifier>,
     &'a SingleIdentifier,
     &'a NormalAssignmentOperator,
@@ -268,16 +268,16 @@ pub type BorrowedSingleVariableDeclaration<'a> = (
 );
 
 pub type BorrowedSingleEmptyVariableDeclaration<'a> = (
-    Option<&'a VarKeyword>,
     &'a DataDeclarationScope,
+    Option<&'a VarKeyword>,
     Option<&'a CanonicalIdentifier>,
     &'a SingleIdentifier,
     &'a SourceSpan,
 );
 
 pub type BorrowedSingleListDeclaration<'a> = (
-    Option<&'a ListKeyword>,
     &'a DataDeclarationScope,
+    Option<&'a ListKeyword>,
     Option<&'a CanonicalIdentifier>,
     &'a SingleIdentifier,
     &'a NormalAssignmentOperator,
@@ -288,8 +288,8 @@ pub type BorrowedSingleListDeclaration<'a> = (
 );
 
 pub type BorrowedSingleFileListDeclaration<'a> = (
-    Option<&'a ListKeyword>,
     &'a DataDeclarationScope,
+    Option<&'a ListKeyword>,
     Option<&'a CanonicalIdentifier>,
     &'a SingleIdentifier,
     &'a NormalAssignmentOperator,
@@ -299,8 +299,8 @@ pub type BorrowedSingleFileListDeclaration<'a> = (
 );
 
 pub type BorrowedSingleEmptyListDeclaration<'a> = (
-    Option<&'a ListKeyword>,
     &'a DataDeclarationScope,
+    Option<&'a ListKeyword>,
     Option<&'a CanonicalIdentifier>,
     &'a SingleIdentifier,
     &'a SourceSpan,
@@ -1397,7 +1397,7 @@ pub fn default_visit_multi_input_hat_statement<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value.2 {
+    for (item, _) in value.2 {
         visitor.visit_expression(item, context)?;
     }
     visitor.visit_code_block(value.4, context)?;
@@ -1732,7 +1732,7 @@ pub fn default_visit_statement_call<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value.2 {
+    for (item, _) in value.2 {
         visitor.visit_expression(item, context)?;
     }
     Ok(())
@@ -1759,7 +1759,7 @@ pub fn default_visit_statement_multi_input_control<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value.2 {
+    for (item, _) in value.2 {
         visitor.visit_expression(item, context)?;
     }
     visitor.visit_code_block(value.4, context)?;
@@ -1882,7 +1882,7 @@ pub fn default_visit_list_content<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value {
+    for (item, _) in value {
         match item {
             ListEntry::Expression(expression) => visitor.visit_expression(expression, context)?,
             ListEntry::Unwrap(..) => (),
@@ -1973,7 +1973,7 @@ pub fn default_visit_mixed_data_declaration<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value.2 {
+    for (item, _) in value.2 {
         visitor.visit_single_data_declaration(item, context)?;
     }
     Ok(())
@@ -1987,7 +1987,7 @@ pub fn default_visit_vars_data_declaration<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value.3 {
+    for (item, _) in value.3 {
         visitor.visit_single_data_declaration(item, context)?;
     }
     Ok(())
@@ -2001,7 +2001,7 @@ pub fn default_visit_lists_data_declaration<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value.3 {
+    for (item, _) in value.3 {
         visitor.visit_single_data_declaration(item, context)?;
     }
     Ok(())
@@ -2017,8 +2017,8 @@ where
 {
     match value {
         SingleDataDeclaration::Variable(
-            var_keyword,
             data_declaration_scope,
+            var_keyword,
             canonical_identifier,
             identifier,
             normal_assignment_operator,
@@ -2027,8 +2027,8 @@ where
         ) => {
             visitor.visit_single_variable_declaration(
                 (
-                    var_keyword.as_ref(),
                     data_declaration_scope,
+                    var_keyword.as_ref(),
                     canonical_identifier.as_ref(),
                     identifier,
                     normal_assignment_operator,
@@ -2039,16 +2039,16 @@ where
             )?;
         }
         SingleDataDeclaration::EmptyVariable(
-            var_keyword,
             data_declaration_scope,
+            var_keyword ,
             canonical_identifier,
             identifier,
             source_span,
         ) => {
             visitor.visit_single_empty_variable_declaration(
                 (
-                    var_keyword.as_ref(),
                     data_declaration_scope,
+                    var_keyword.as_ref(),
                     canonical_identifier.as_ref(),
                     identifier,
                     source_span,
@@ -2057,8 +2057,8 @@ where
             )?;
         }
         SingleDataDeclaration::List(
-            list_keyword,
             data_declaration_scope,
+            list_keyword,
             canonical_identifier,
             identifier,
             normal_assignment_operator,
@@ -2069,8 +2069,8 @@ where
         ) => {
             visitor.visit_single_list_declaration(
                 (
-                    list_keyword.as_ref(),
                     data_declaration_scope,
+                    list_keyword.as_ref(),
                     canonical_identifier.as_ref(),
                     identifier,
                     normal_assignment_operator,
@@ -2083,8 +2083,8 @@ where
             )?;
         }
         SingleDataDeclaration::FileList(
-            list_keyword,
             data_declaration_scope,
+            list_keyword,
             canonical_identifier,
             single_identifier,
             normal_assignment_operator,
@@ -2094,8 +2094,8 @@ where
         ) => {
             visitor.visit_single_file_list_declaration(
                 (
-                    list_keyword.as_ref(),
                     data_declaration_scope,
+                    list_keyword.as_ref(),
                     canonical_identifier.as_ref(),
                     single_identifier,
                     normal_assignment_operator,
@@ -2107,16 +2107,16 @@ where
             )?;
         }
         SingleDataDeclaration::EmptyList(
-            list_keyword,
             data_declaration_scope,
+            list_keyword,
             canonical_identifier,
             identifier,
             source_span,
         ) => {
             visitor.visit_single_empty_list_declaration(
                 (
-                    list_keyword.as_ref(),
                     data_declaration_scope,
+                    list_keyword.as_ref(),
                     canonical_identifier.as_ref(),
                     identifier,
                     source_span,
@@ -2254,7 +2254,7 @@ pub fn default_visit_expression_call<V, C, E>(
 where
     V: GrazeVisitor<C, E> + ?Sized,
 {
-    for item in value.2 {
+    for (item, _) in value.2 {
         visitor.visit_expression(item, context)?;
     }
     Ok(())

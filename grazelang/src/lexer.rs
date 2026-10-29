@@ -1,5 +1,5 @@
-use std::ops::Range;
 use std::sync::OnceLock;
+use std::{num::NonZeroUsize, ops::Range};
 
 use arcstr::ArcStr as IString; // Immutable string
 use logos::{Lexer, Logos};
@@ -10,15 +10,35 @@ use crate::utils::string_unescape::{
     unescape_canonical_name, unescape_format_string, unescape_normal_string,
 };
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LexerExtras<'a> {
+    pub line_starts: Vec<usize>,
+    pub formatting_string_nesting: usize,
+    pub style_tokens: Vec<StyleToken<'a>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StyleToken<'a> {
+    EmptyLines(NonZeroUsize, TextSpan),
+    LineComment(&'a str, TextSpan),
+    MultiLineComment(&'a str, TextSpan),
+}
+
+impl<'a> StyleToken<'a> {
+    pub fn get_text_span(&self) -> TextSpan {
+        match self {
+            StyleToken::EmptyLines(_, value)
+            | StyleToken::LineComment(_, value)
+            | StyleToken::MultiLineComment(_, value) => *value,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, Logos)]
-#[logos(extras = (Vec<usize>, usize))]
-#[logos(skip r"[ \t\f]+")]
-#[logos(skip(r"\n|\r\n?", register_newline))]
-#[logos(skip(r"//[^\n]*", allow_greedy = true))]
-#[logos(skip(
-    r"/\*(?:[^*]|(?:\*[^/]))*?\*/",
-    register_newlines_from_multiline_comment
-))]
+#[logos(extras = LexerExtras<'s>)]
+#[logos(skip(r"[ \t\f\n\r]+", register_newlines::<true>))]
+#[logos(skip(r"//[^\n]*", register_line_comment, allow_greedy = true))]
+#[logos(skip(r"/\*(?:[^*]|(?:\*[^/]))*\*/", register_multi_line_comment))]
 pub enum Token {
     #[token("sprite")]
     SpriteKeyword,
@@ -243,7 +263,7 @@ pub fn parse_number(lex: &mut Lexer<Token>) -> IString {
 }
 
 pub fn parse_left_format_string(lex: &mut Lexer<Token>) -> Option<IString> {
-    lex.extras.1 += 1;
+    lex.extras.formatting_string_nesting += 1;
     let slice = lex.slice();
     unescape_format_string(&slice[1..slice.len() - 2])
         .map(Into::into)
@@ -263,7 +283,7 @@ fn end_regex_continuation() -> &'static Regex {
 }
 
 pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
-    if lex.extras.1 == 0 {
+    if lex.extras.formatting_string_nesting == 0 {
         return Some(LexedRightBrace::Normal);
     }
     let remainder = lex.remainder();
@@ -277,7 +297,7 @@ pub fn handle_right_brace(lex: &mut Lexer<Token>) -> Option<LexedRightBrace> {
     if let Some(mat) = end_regex_continuation().find(remainder) {
         let match_len = mat.end();
         lex.bump(match_len);
-        lex.extras.1 -= 1;
+        lex.extras.formatting_string_nesting -= 1;
         return Some(LexedRightBrace::RightFormattedString(
             parse_right_format_string(mat.as_str())?,
         ));
@@ -297,20 +317,90 @@ pub fn parse_right_format_string(slice: &str) -> Option<IString> {
         .ok()
 }
 
-pub fn register_newline(lex: &mut Lexer<Token>) {
-    lex.extras.0.push(lex.span().end);
-}
-
-pub fn register_newlines_from_multiline_comment(lex: &mut Lexer<Token>) {
+pub fn register_newlines<const W: bool>(lex: &mut Lexer<Token>) {
     let mut extras = Vec::new();
     let slice: &str = lex.slice();
-    let start_offset = lex.span().start;
+    let span = lex.span();
+    let start_offset = span.start;
+    let mut prev_is_return = false;
     for (i, b) in slice.bytes().enumerate() {
-        if b == b'\n' {
+        if match b {
+            b'\r' => {
+                prev_is_return = true;
+                true
+            }
+            b'\n' if !prev_is_return => {
+                prev_is_return = false;
+                true
+            }
+            _ => {
+                prev_is_return = false;
+                false
+            }
+        } {
             extras.push(start_offset + i + 1);
         }
     }
-    lex.extras.0.extend(extras);
+    if W && let Some(lines) = NonZeroUsize::new(extras.len()) {
+        let text_span = (
+            (
+                lex.extras.line_starts.len(),
+                span.start - lex.extras.line_starts.last().copied().unwrap_or_default(),
+            ),
+            (
+                lex.extras.line_starts.len() + extras.len(),
+                span.end
+                    - extras
+                        .last()
+                        .or_else(|| lex.extras.line_starts.last())
+                        .copied()
+                        .unwrap_or_default(),
+            ),
+        );
+        lex.extras
+            .style_tokens
+            .push(StyleToken::EmptyLines(lines, text_span));
+    }
+    lex.extras.line_starts.extend(extras);
+}
+
+pub fn register_multi_line_comment(lex: &mut Lexer<Token>) {
+    let (line_starts_len_before, final_line_start_before) = (
+        lex.extras.line_starts.len(),
+        lex.extras.line_starts.last().copied().unwrap_or_default(),
+    );
+    register_newlines::<false>(lex);
+    let slice = lex.slice();
+    let span = lex.span();
+    let text_span = (
+        (
+            line_starts_len_before,
+            span.start + 2 - final_line_start_before,
+        ),
+        (
+            lex.extras.line_starts.len(),
+            span.end - 2 - lex.extras.line_starts.last().copied().unwrap_or_default(),
+        ),
+    );
+    lex.extras.style_tokens.push(StyleToken::MultiLineComment(
+        &slice[2..slice.len() - 2],
+        text_span,
+    ));
+}
+
+pub fn register_line_comment(lex: &mut Lexer<Token>) {
+    let span = lex.span();
+    let (line_starts_len, final_line_start) = (
+        lex.extras.line_starts.len(),
+        lex.extras.line_starts.last().copied().unwrap_or_default(),
+    );
+    let text_span = (
+        (line_starts_len, span.start + 2 - final_line_start),
+        (line_starts_len, span.end - final_line_start),
+    );
+    lex.extras
+        .style_tokens
+        .push(StyleToken::LineComment(&lex.slice()[2..], text_span));
 }
 
 pub type TextSpan = ((usize, usize), (usize, usize));
@@ -318,16 +408,26 @@ pub type SourceFileId = u32;
 pub type SourceSpan = (TextSpan, SourceFileId);
 
 pub fn get_position(lex: &Lexer<Token>, character_index: usize) -> (usize, usize) {
-    let last_newline_index = *match lex.extras.0.last() {
+    let last_newline_index = *match lex.extras.line_starts.last() {
         Some(value) => value,
         None => return (0, character_index),
     };
     if last_newline_index > character_index {
-        let line = lex.extras.0.partition_point(|&x| x <= character_index);
-        let line_start = if line == 0 { 0 } else { lex.extras.0[line - 1] };
+        let line = lex
+            .extras
+            .line_starts
+            .partition_point(|&x| x <= character_index);
+        let line_start = if line == 0 {
+            0
+        } else {
+            lex.extras.line_starts[line - 1]
+        };
         return (line, character_index - line_start);
     }
-    (lex.extras.0.len(), character_index - last_newline_index)
+    (
+        lex.extras.line_starts.len(),
+        character_index - last_newline_index,
+    )
 }
 
 pub fn get_source_span(lex: &Lexer<Token>, character_range: Range<usize>) -> TextSpan {

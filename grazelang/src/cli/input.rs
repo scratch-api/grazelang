@@ -3,6 +3,7 @@ use std::{
     ffi::OsStr,
     fs::File,
     io::Read,
+    ops::Range,
     path::{Path, PathBuf},
     rc::Rc,
     time::Instant,
@@ -13,7 +14,8 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen, lexer,
+    codegen,
+    lexer,
     messages::{
         annotations::{self, Source},
         types::{CLIError, GrazeSourceMessage},
@@ -29,15 +31,30 @@ use crate::{
     zipper,
 };
 
-#[cfg(feature = "detranspiler")]
+#[cfg(all(feature = "detranspiler", not(feature = "formatter")))]
 use crate::{
     ast::{
         types as ast_types,
         unparse::UnparseAST,
-        unparse_formatted::{UnparseASTFormatted, UnparseASTFormattedSettings},
+        unparse_formatted::{UnparseASTFormatted, UnparseFormattedSettings},
     },
     detranspiler,
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage},
+    settings::GrazeDetranspilerSettings,
+};
+
+#[cfg(all(feature = "detranspiler", feature = "formatter"))]
+use crate::{
+    lexer::StyleToken,
+    ast::{
+        types as ast_types,
+        unparse::UnparseAST,
+        unparse_cst_formatted::{UnparseCSTFormatted, UnparseCSTFormattedContext},
+        unparse_formatted::{UnparseASTFormatted, UnparseFormattedSettings},
+    },
+    parser::cst,
+    detranspiler,
+    messages::types::{FormatterUnsuccessful, GrazeDetranspilerError, GrazeDetranspilerMessage},
     settings::GrazeDetranspilerSettings,
 };
 
@@ -83,6 +100,7 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: PathBuf,
     },
+    /// Detranspile an sb3 file into a single file or a project directory
     Unbuild {
         #[arg(long)]
         preserve_monitor_ids: bool,
@@ -119,6 +137,81 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: PathBuf,
     },
+    /// Format a single file or a project directory
+    Format {
+        #[arg(long, default_value = "100")]
+        width: usize,
+        #[arg(long, default_value = "4")]
+        indentation: isize,
+        /// Force code blocks to use new lines for inner statements
+        #[arg(long)]
+        hard_lines_in_code_blocks: bool,
+        #[arg(value_enum, short, long, default_value = "all")]
+        logging: GrazeMessageSetting,
+        #[arg(long)]
+        log_time: bool,
+        /// Path of the file or project directory
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct StringArena {
+    pub value: String,
+    entries: Vec<Range<usize>>,
+}
+
+impl StringArena {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn allocate_str<'a>(&'a mut self, string: &str) -> (usize, &'a str) {
+        let start = self.value.len();
+        self.value.push_str(string);
+        let end = self.value.len();
+        self.entries.push(start..end);
+        // SAFETY: `String::push_str` was just used to add `string` to `self.value`.
+        // The bounds are determined by the state of `self.value` before and after the `String::push_str` call.
+        let string = unsafe { self.value.get_unchecked(start..end) };
+        (self.entries.len() - 1, string)
+    }
+    pub fn allocate_from_io<'a, R>(&'a mut self, io: &mut R) -> std::io::Result<(usize, &'a str)>
+    where
+        R: std::io::Read,
+    {
+        let start = self.value.len();
+        match io.read_to_string(&mut self.value) {
+            Ok(_) => {
+                let end = self.value.len();
+                self.entries.push(start..end);
+                // SAFETY: `std::io::Read::read_to_string` was just successfully used to read the io to `self.value`.
+                // The bounds are determined by the state of `self.value` before and after the `std::io::Read::read_to_string` call.
+                let string = unsafe { self.value.get_unchecked(start..end) };
+                Ok((self.entries.len() - 1, string))
+            }
+            Err(err) => {
+                self.value.truncate(start);
+                Err(err)
+            }
+        }
+    }
+    pub fn get_str(&self, index: usize) -> Option<&str> {
+        let range = self.entries.get(index)?.clone();
+        // SAFETY: The ranges can only be pushed by internal functions.
+        // These functions also create a `&str` with `self.value.get_unchecked` over the same range.
+        Some(unsafe { self.value.get_unchecked(range) })
+    }
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+    pub fn clear(&mut self) {
+        self.value.clear();
+        self.entries.clear();
+    }
 }
 
 pub type SourceFiles = HashMap<u32, Source>;
@@ -162,24 +255,13 @@ pub fn parse_project_directory(path: &Path, context: &mut ParseContext) -> Conte
         let mut lexer = PeekableLexer::new(lexer, file_id);
         let parsed = parser::parse_graze_program(&mut lexer, context);
         let Ok(parsed) = parsed else {
-            if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
-                source_files.insert(
-                    file_id,
-                    Source {
-                        line_starts: lexer.lexer.extras.0,
-                        content: graze_code,
-                        path: current_file,
-                    },
-                );
-                file_id += 1;
-                continue;
-            } else if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
+            if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
                 std::process::exit(1);
             } else {
                 source_files.insert(
                     file_id,
                     Source {
-                        line_starts: lexer.lexer.extras.0,
+                        line_starts: lexer.lexer.extras.line_starts,
                         content: graze_code,
                         path: current_file,
                     },
@@ -191,7 +273,7 @@ pub fn parse_project_directory(path: &Path, context: &mut ParseContext) -> Conte
         source_files.insert(
             file_id,
             Source {
-                line_starts: lexer.lexer.extras.0,
+                line_starts: lexer.lexer.extras.line_starts,
                 content: graze_code,
                 path: current_file,
             },
@@ -207,6 +289,100 @@ pub fn parse_project_directory(path: &Path, context: &mut ParseContext) -> Conte
         );
     }
     Ok((GrazeProgram(program), source_files))
+}
+
+#[cfg(feature = "formatter")]
+pub type ContextualFormatterParseOut<'a> = Result<
+    (
+        HashMap<PathBuf, (GrazeProgram, Vec<StyleToken<'a>>)>,
+        SourceFiles,
+    ),
+    (ParseError, SourceFiles),
+>;
+
+#[cfg(feature = "formatter")]
+#[expect(clippy::result_large_err)]
+pub fn parse_project_directory_for_formatter<'a>(
+    path: &Path,
+    string_arena: &'a mut StringArena,
+    context: &mut ParseContext,
+) -> ContextualFormatterParseOut<'a> {
+    let mut program = HashMap::new();
+    let mut file_id = 0_u32;
+    let mut source_files = HashMap::from([(
+        0,
+        Source {
+            content: String::new(),
+            path: PathBuf::new(),
+            line_starts: Vec::new(),
+        },
+    )]);
+    string_arena.clear();
+    for i in IntoResultWithSourceSpan::<ParseError>::into_result_with_source_span(
+        path.read_dir(),
+        (Default::default(), file_id),
+    )
+    .map_err(|value| (value, std::mem::take(&mut source_files)))?
+    {
+        let current_file = IntoResultWithSourceSpan::<ParseError>::into_result_with_source_span(
+            i,
+            (Default::default(), file_id),
+        )
+        .map_err(|value| (value, std::mem::take(&mut source_files)))?
+        .path();
+        if current_file.extension().and_then(OsStr::to_str) != Some("graze") {
+            continue;
+        }
+        let (_, graze_code) = {
+            let mut file = IntoResultWithSourceSpan::<ParseError>::into_result_with_source_span(
+                File::open(&current_file),
+                (Default::default(), file_id),
+            )
+            .map_err(|value| (value, std::mem::take(&mut source_files)))?;
+            IntoResultWithSourceSpan::<ParseError>::into_result_with_source_span(
+                string_arena.allocate_from_io(&mut file),
+                (Default::default(), file_id),
+            )
+            .map_err(|value| (value, std::mem::take(&mut source_files)))?
+        };
+        source_files.insert(
+            file_id,
+            Source {
+                content: graze_code.to_string(),
+                path: current_file,
+                line_starts: Vec::new(),
+            },
+        );
+        file_id += 1;
+    }
+    for (
+        index,
+        Source {
+            content: _,
+            path: current_file,
+            line_starts,
+        },
+    ) in &mut source_files
+    {
+        let graze_code = string_arena.get_str(*index as usize).unwrap();
+        let lexer = lexer::create_lexer(graze_code);
+        let mut lexer = PeekableLexer::new(lexer, file_id);
+        let parsed = parser::parse_graze_program(&mut lexer, context);
+        let Ok(parsed) = parsed else {
+            if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
+                std::process::exit(1);
+            } else {
+                *line_starts = lexer.lexer.extras.line_starts;
+                return Err((parsed.unwrap_err(), std::mem::take(&mut source_files)));
+            }
+        };
+        program.insert(
+            current_file.clone(),
+            (cst::GrazeProgram(parsed.0), lexer.lexer.extras.style_tokens),
+        );
+        *line_starts = lexer.lexer.extras.line_starts;
+    }
+    Ok((program, source_files))
 }
 
 #[expect(clippy::result_large_err)]
@@ -252,19 +428,7 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
     let mut lexer = PeekableLexer::new(lexer, 0);
     let parsed = parser::parse_graze_program(&mut lexer, context);
     let Ok(parsed) = parsed else {
-        if context.settings.message_setting == GrazeMessageSetting::ExitOnError {
-            return Ok((
-                GrazeProgram(Vec::new()),
-                HashMap::from([(
-                    0,
-                    Source {
-                        line_starts: lexer.lexer.extras.0,
-                        content: graze_code,
-                        path: path.to_path_buf(),
-                    },
-                )]),
-            ));
-        } else if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
+        if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
             std::process::exit(1);
         } else {
             return Err((
@@ -272,7 +436,7 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
                 HashMap::from([(
                     0,
                     Source {
-                        line_starts: lexer.lexer.extras.0,
+                        line_starts: lexer.lexer.extras.line_starts,
                         content: graze_code,
                         path: path.to_path_buf(),
                     },
@@ -285,7 +449,7 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
         HashMap::from([(
             0,
             Source {
-                line_starts: lexer.lexer.extras.0,
+                line_starts: lexer.lexer.extras.line_starts,
                 content: graze_code,
                 path: path.to_path_buf(),
             },
@@ -293,12 +457,64 @@ pub fn parse_single_file(path: &Path, context: &mut ParseContext) -> ContextualP
     ))
 }
 
+#[cfg(feature = "formatter")]
+#[expect(clippy::result_large_err)]
+pub fn parse_single_file_for_formatter<'a>(
+    path: &Path,
+    string_arena: &'a mut StringArena,
+    context: &mut ParseContext,
+) -> ContextualFormatterParseOut<'a> {
+    let mut source_files = HashMap::new();
+    string_arena.clear();
+    let (_, graze_code) = {
+        let mut file = IntoResultWithSourceSpan::<ParseError>::into_result_with_source_span(
+            File::open(path),
+            Default::default(),
+        )
+        .map_err(|value| (value, std::mem::take(&mut source_files)))?;
+        string_arena
+            .allocate_from_io(&mut file)
+            .into_result_with_source_span(Default::default())
+            .map_err(|value| (value, std::mem::take(&mut source_files)))?
+    };
+    let (path, parsed) = {
+        let Source {
+            content: _,
+            path,
+            line_starts,
+        } = source_files
+            .entry(0)
+            .insert_entry(Source {
+                content: graze_code.to_string(),
+                path: path.to_path_buf(),
+                line_starts: Vec::new(),
+            })
+            .into_mut();
+        let lexer = lexer::create_lexer(graze_code);
+        let mut lexer = PeekableLexer::new(lexer, 0);
+        let parsed = parser::parse_graze_program(&mut lexer, context);
+        *line_starts = lexer.lexer.extras.line_starts;
+        let Ok(parsed) = parsed else {
+            if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
+                std::process::exit(1);
+            } else {
+                return Err((parsed.unwrap_err(), std::mem::take(&mut source_files)));
+            }
+        };
+        (
+            path.to_path_buf(),
+            (parsed, lexer.lexer.extras.style_tokens),
+        )
+    };
+    Ok((HashMap::from([(path, parsed)]), source_files))
+}
+
 #[cfg(feature = "detranspiler")]
 pub fn unparse_into_file<A>(
     ast: &A,
     path: PathBuf,
     messages: &mut Vec<GrazeDetranspilerMessage>,
-    formatting_settings: Option<&UnparseASTFormattedSettings>,
+    formatting_settings: Option<&UnparseFormattedSettings>,
 ) -> Result<(), i32>
 where
     for<'a> &'a A: UnparseASTFormatted,
@@ -330,13 +546,47 @@ where
     Ok(())
 }
 
+#[cfg(feature = "formatter")]
+pub fn unparse_into_file_for_formatter<'a, C>(
+    cst: &'a C,
+    path: PathBuf,
+    messages: &mut Vec<GrazeDetranspilerMessage>,
+    parse_messages: &mut [GrazeSourceMessage],
+    source_files: &HashMap<u32, Source>,
+    formatting_context: &mut UnparseCSTFormattedContext<'a>,
+) -> Result<(), i32>
+where
+    &'a C: UnparseCSTFormatted,
+{
+    let Ok(mut output_file) = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(&path)
+    else {
+        messages.push(GrazeDetranspilerMessage::Error(
+            GrazeDetranspilerError::CannotWriteFile { path },
+        ));
+        Cli::print_formatter_errors(parse_messages, messages, source_files, true);
+        return Err(1);
+    };
+    let Ok(()) = cst.unparse_formatted_into_io(&mut output_file, formatting_context) else {
+        messages.push(GrazeDetranspilerMessage::Error(
+            GrazeDetranspilerError::CannotWriteFile { path },
+        ));
+        Cli::print_formatter_errors(parse_messages, messages, source_files, true);
+        return Err(1);
+    };
+    Ok(())
+}
+
 #[cfg(feature = "detranspiler")]
 pub fn unparse_multi_file(
     ast: ast_types::GrazeProgram,
     path: &Path,
     output: Option<&Path>,
     messages: &mut Vec<GrazeDetranspilerMessage>,
-    formatting_settings: Option<&UnparseASTFormattedSettings>,
+    formatting_settings: Option<&UnparseFormattedSettings>,
 ) -> Result<(), i32> {
     let mut stage_top_level_statements = Vec::new();
     for statement in ast.0 {
@@ -384,13 +634,36 @@ pub fn unparse_multi_file(
     Ok(())
 }
 
+#[cfg(feature = "formatter")]
+pub fn unparse_files_for_formatter(
+    parsed: HashMap<PathBuf, (GrazeProgram, Vec<StyleToken<'_>>)>,
+    messages: &mut Vec<GrazeDetranspilerMessage>,
+    parse_messages: &mut [GrazeSourceMessage],
+    source_files: &HashMap<u32, Source>,
+    formatting_context: &mut UnparseCSTFormattedContext,
+) -> Result<(), i32> {
+    for (output, (program, style_tokens)) in parsed {
+        let mut context = formatting_context.new_reused(&style_tokens);
+        unparse_into_file_for_formatter(
+            &program,
+            output,
+            messages,
+            parse_messages,
+            source_files,
+            &mut context,
+        )?;
+        context.return_resources_to(formatting_context);
+    }
+    Ok(())
+}
+
 #[cfg(feature = "detranspiler")]
 pub fn unparse_single_file(
     ast: ast_types::GrazeProgram,
     path: &Path,
     output: Option<&Path>,
     messages: &mut Vec<GrazeDetranspilerMessage>,
-    formatting_settings: Option<&UnparseASTFormattedSettings>,
+    formatting_settings: Option<&UnparseFormattedSettings>,
 ) -> Result<(), i32> {
     let output_path = match output {
         Some(output) if output.is_file() || !output.exists() => output.to_path_buf(),
@@ -510,6 +783,21 @@ impl Cli {
                 output.as_deref(),
                 resources.as_deref(),
                 path.as_path(),
+            ),
+            Commands::Format {
+                width,
+                indentation,
+                hard_lines_in_code_blocks,
+                logging,
+                log_time,
+                path,
+            } => Self::format(
+                *width,
+                *indentation,
+                *hard_lines_in_code_blocks,
+                *logging,
+                path,
+                *log_time,
             ),
         }
     }
@@ -823,7 +1111,7 @@ impl Cli {
             multi_asset_declarations,
             multi_data_declarations,
             message_setting: logging,
-            formatting_settings: (!no_formatting).then_some(UnparseASTFormattedSettings {
+            formatting_settings: (!no_formatting).then_some(UnparseFormattedSettings {
                 indentation: formatting_indentation,
                 width: formatting_width,
                 hard_lines_in_code_blocks: formatting_hard_lines_in_code_blocks,
@@ -936,6 +1224,171 @@ impl Cli {
         let renderer = annotate_snippets::Renderer::styled();
         let ann = &[annotate_snippets::Group::with_title(
             annotate_snippets::Level::ERROR.secondary_title("The detranspiler is not included in this build. The corresponding feature is `detranspiler`."),
+        )];
+        let rendered = renderer.render(ann);
+        anstream::eprintln!("{rendered}");
+        1
+    }
+
+    #[cfg(feature = "formatter")]
+    pub fn print_formatter_errors(
+        parse_messages: &[GrazeSourceMessage],
+        unparse_messages: &[GrazeDetranspilerMessage],
+        source_files: &HashMap<u32, Source>,
+        force_error: bool,
+    ) -> Successful {
+        let renderer = Renderer::styled();
+        let (parse_error_count, parse_warning_count) =
+            count_build_errors_and_warnings(parse_messages);
+        let (unparse_error_count, unparse_warning_count) =
+            count_unbuild_errors_and_warnings(unparse_messages);
+        let error = unparse_error_count + parse_error_count > 0 || force_error;
+        annotations::annotate_build(
+            parse_messages.iter(),
+            |id| source_files.get(&id).unwrap().as_descriptor(),
+            |ann, _| {
+                let rendered = renderer.render(ann);
+                anstream::eprintln!("{rendered}");
+            },
+        );
+        annotations::annotate_unbuild(unparse_messages.iter(), |ann, _| {
+            let rendered = renderer.render(ann);
+            anstream::eprintln!("{rendered}");
+        });
+        if error {
+            annotations::annotate_format(
+                std::iter::once(&FormatterUnsuccessful {
+                    error_count: parse_error_count + unparse_error_count,
+                    warning_count: parse_warning_count + unparse_warning_count,
+                }),
+                |ann, _| {
+                    let rendered = renderer.render(ann);
+                    anstream::eprintln!("{rendered}");
+                },
+            );
+            Successful::No
+        } else {
+            Successful::Yes
+        }
+    }
+
+    #[cfg(feature = "formatter")]
+    pub fn format(
+        width: usize,
+        indentation: isize,
+        hard_lines_in_code_blocks: bool,
+        logging: GrazeMessageSetting,
+        path: &Path,
+        log_time: bool,
+    ) -> i32 {
+        let total_time = Instant::now();
+        let path_is_file = path.is_file();
+        let mut context = ParseContext::new(
+            GrazeBuildSettings {
+                message_setting: logging,
+                use_shadows: UseShadows::NotEverywhere,
+                resources_path: None,
+                extensions_path: None,
+                use_cached_extensions: false,
+                create_cached_extensions: false,
+            },
+            Default::default(),
+        );
+        let mut unparse_messages = Vec::new();
+        let source_files = HashMap::new();
+        let parse_timer = Instant::now();
+        let Ok(path) = path.canonicalize() else {
+            emit_message_eager_parse_context(
+                &mut context,
+                CLIError::PathDoesNotExist.into(),
+                GrazeMessageSetting::Errors,
+            );
+            Self::print_formatter_errors(&context.messages, &unparse_messages, &source_files, true);
+            std::process::exit(1);
+        };
+        let mut string_arena = StringArena::new();
+        let (parsed, source_files) = if path.is_dir() {
+            match parse_project_directory_for_formatter(&path, &mut string_arena, &mut context) {
+                Ok(value) => value,
+                Err((_, source_files)) => {
+                    Self::print_formatter_errors(
+                        &context.messages,
+                        &unparse_messages,
+                        &source_files,
+                        true,
+                    );
+                    return 1;
+                }
+            }
+        } else if path_is_file {
+            match parse_single_file_for_formatter(&path, &mut string_arena, &mut context) {
+                Ok(value) => value,
+                Err((_, source_files)) => {
+                    Self::print_formatter_errors(
+                        &context.messages,
+                        &unparse_messages,
+                        &source_files,
+                        true,
+                    );
+                    return 1;
+                }
+            }
+        } else {
+            emit_message_eager_parse_context(
+                &mut context,
+                CLIError::PathNeitherFileNorDirectory.into(),
+                GrazeMessageSetting::Errors,
+            );
+            Self::print_formatter_errors(&context.messages, &unparse_messages, &source_files, true);
+            return 1;
+        };
+        let parse_time = parse_timer.elapsed();
+        if !context.successful {
+            Self::print_formatter_errors(&context.messages, &unparse_messages, &source_files, true);
+            return 1;
+        }
+        let formatting_settings = UnparseFormattedSettings {
+            indentation,
+            width,
+            hard_lines_in_code_blocks,
+        };
+        let unparse_timer = Instant::now();
+        let mut formatting_context = UnparseCSTFormattedContext::new(formatting_settings, &[]);
+        if let Err(code) = unparse_files_for_formatter(
+            parsed,
+            &mut unparse_messages,
+            &mut context.messages,
+            &source_files,
+            &mut formatting_context,
+        ) {
+            return code;
+        }
+        let unparse_time = unparse_timer.elapsed();
+        if Self::print_formatter_errors(&context.messages, &unparse_messages, &source_files, false)
+            == Successful::No
+        {
+            return 1;
+        }
+        if log_time {
+            println!("Parsing took: {:?}", parse_time);
+            println!("Unparsing AST took: {:?}", unparse_time);
+            println!("Total time: {:?}", total_time.elapsed());
+        }
+        0
+    }
+
+    #[cfg(not(feature = "formatter"))]
+    pub fn format(
+        width: usize,
+        indentation: isize,
+        hard_lines_in_code_blocks: bool,
+        logging: GrazeMessageSetting,
+        path: &Path,
+        log_time: bool,
+    ) -> i32 {
+        let renderer = annotate_snippets::Renderer::styled();
+        let ann = &[annotate_snippets::Group::with_title(
+            annotate_snippets::Level::ERROR.secondary_title("The formatter is not included in this build. The corresponding feature is `formatter`."),
         )];
         let rendered = renderer.render(ann);
         anstream::eprintln!("{rendered}");

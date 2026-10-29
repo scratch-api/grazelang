@@ -325,18 +325,18 @@ pub struct BorrowedCommaSeparatedIterator<'a, T> {
 }
 
 impl<'a, T> Iterator for BorrowedCommaSeparatedIterator<'a, T> {
-    type Item = &'a T;
+    type Item = (&'a T, Option<&'a Comma>);
     fn next(&mut self) -> Option<Self::Item> {
         let cs_len = self.comma_separated.values.len();
         if self.index < cs_len {
-            let value = &self.comma_separated.values[self.index].0;
+            let (value, comma) = &self.comma_separated.values[self.index];
             self.index += 1;
-            return Some(value);
+            return Some((value, Some(comma)));
         }
         if self.index == cs_len {
             let value = self.comma_separated.tail_value.as_ref().map(Box::as_ref);
             self.index += 1;
-            return value;
+            return value.map(|value| (value, None));
         }
         None
     }
@@ -354,7 +354,7 @@ impl<T> CommaSeparated<T> {
 }
 
 impl<'a, T> IntoIterator for &'a CommaSeparated<T> {
-    type Item = &'a T;
+    type Item = (&'a T, Option<&'a Comma>);
     type IntoIter = BorrowedCommaSeparatedIterator<'a, T>;
     fn into_iter(self) -> Self::IntoIter {
         BorrowedCommaSeparatedIterator {
@@ -370,25 +370,27 @@ pub struct CommaSeparatedIterator<T> {
 }
 
 impl<T> Iterator for CommaSeparatedIterator<T> {
-    type Item = T;
+    type Item = (T, Option<Comma>);
     fn next(&mut self) -> Option<Self::Item> {
         self.values_iterator
             .next()
-            .map(|value| value.0)
-            .or_else(|| self.tail_value.take())
+            .map(|(value, comma)| (value, Some(comma)))
+            .or_else(|| self.tail_value.take().map(|value| (value, None)))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (lower, upper) = self.values_iterator.size_hint();
         (
             lower.saturating_add(self.tail_value.is_some() as usize),
-            upper.map(|value| value.saturating_add(self.tail_value.is_some() as usize)),
+            upper.map(|value| {
+                value.saturating_add(self.tail_value.is_some() as usize)
+            }),
         )
     }
 }
 
 impl<T> IntoIterator for CommaSeparated<T> {
-    type Item = T;
+    type Item = (T, Option<Comma>);
     type IntoIter = CommaSeparatedIterator<T>;
     fn into_iter(self) -> Self::IntoIter {
         CommaSeparatedIterator {
@@ -451,7 +453,7 @@ impl InvalidVariantFromSourceSpan for UseStatementContent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct CustomBlockParamKind {
     pub kind: CustomBlockParamKindValue,
     pub source_span: SourceSpan,
@@ -1373,17 +1375,33 @@ impl GetPos for DoubleColonOrDot {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Unwrap(pub SourceSpan);
+
+impl FromSourceSpan for Unwrap {
+    fn from_source_span(source_span: SourceSpan) -> Self {
+        Self(source_span)
+    }
+}
+
+impl GetPos for Unwrap {
+    #[inline]
+    fn get_source_span(&self) -> &SourceSpan {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ListEntry {
     Expression(Expression),
-    Unwrap(Literal, SourceSpan),
+    Unwrap(Unwrap, Literal, SourceSpan),
 }
 
 impl GetPos for ListEntry {
     fn get_source_span(&self) -> &SourceSpan {
         match self {
             ListEntry::Expression(l) => l.get_source_span(),
-            ListEntry::Unwrap(_, p) => p,
+            ListEntry::Unwrap(_, _, p) => p,
         }
     }
 }
@@ -1391,8 +1409,8 @@ impl GetPos for ListEntry {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SingleDataDeclaration {
     Variable(
-        Option<VarKeyword>,
         DataDeclarationScope,
+        Option<VarKeyword>,
         Option<CanonicalIdentifier>,
         SingleIdentifier,
         NormalAssignmentOperator,
@@ -1400,15 +1418,15 @@ pub enum SingleDataDeclaration {
         SourceSpan,
     ),
     EmptyVariable(
-        Option<VarKeyword>,
         DataDeclarationScope,
+        Option<VarKeyword>,
         Option<CanonicalIdentifier>,
         SingleIdentifier,
         SourceSpan,
     ),
     List(
-        Option<ListKeyword>,
         DataDeclarationScope,
+        Option<ListKeyword>,
         Option<CanonicalIdentifier>,
         SingleIdentifier,
         NormalAssignmentOperator,
@@ -1418,8 +1436,8 @@ pub enum SingleDataDeclaration {
         SourceSpan,
     ),
     FileList(
-        Option<ListKeyword>,
         DataDeclarationScope,
+        Option<ListKeyword>,
         Option<CanonicalIdentifier>,
         SingleIdentifier,
         NormalAssignmentOperator,
@@ -1428,8 +1446,8 @@ pub enum SingleDataDeclaration {
         SourceSpan,
     ),
     EmptyList(
-        Option<ListKeyword>,
         DataDeclarationScope,
+        Option<ListKeyword>,
         Option<CanonicalIdentifier>,
         SingleIdentifier,
         SourceSpan,
@@ -1667,7 +1685,7 @@ impl Expression {
                     });
                 };
 
-                function.apply(exprs.iter(), *source_span)
+                function.apply(exprs.iter().map(|value| value.0), *source_span)
             }
             Expression::Identifier(identifier) => {
                 let value = crate::library::const_expr_lookup(

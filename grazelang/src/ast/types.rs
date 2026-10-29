@@ -1,4 +1,4 @@
-use arcstr::{ArcStr as IString, format as format_istring};
+use arcstr::{format as format_istring, ArcStr as IString};
 
 use grazelang_types::project_json::{Sb3Primitive, Sb3PrimitiveOrBool};
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,11 @@ pub struct WarpSpecifier {
 
 impl WarpSpecifier {
     pub fn as_str(self) -> &'static str {
-        if self.is_warp { "warp" } else { "nowarp" }
+        if self.is_warp {
+            "warp"
+        } else {
+            "nowarp"
+        }
     }
 }
 
