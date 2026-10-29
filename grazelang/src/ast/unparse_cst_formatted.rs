@@ -78,6 +78,7 @@ impl<'a> UnparseCSTFormattedContext<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Whitespace {
+    TopLevelStatementEnd,
     StatementEnd,
     Space,
     Line,
@@ -165,55 +166,44 @@ where
     let mut value = allocator.nil();
     let mut empty_lines_end = (usize::MAX, usize::MAX);
     let mut final_newline = false;
-    loop {
-        if let Some(token) = context.style_tokens.get(context.style_token_index) {
-            match token {
-                StyleToken::EmptyLines(count, (_, end)) => {
-                    empty_lines_end = *end;
-                    if *count > ONE_NON_ZERO_USIZE {
-                        value = value.append(allocator.hardline());
-                        final_newline = true;
-                    }
-                }
-                StyleToken::LineComment(comment, (start, _)) => {
-                    if *start == empty_lines_end {
-                        value = value.append(allocator.hardline());
-                    } else if !final_newline {
-                        value = value.append(" ");
-                    }
-                    value = value
-                        .append("//")
-                        .append(*comment)
-                        .append(allocator.hardline());
-                    final_newline = true;
-                }
-                StyleToken::MultiLineComment(comment, (start, _)) => {
-                    if *start == empty_lines_end {
-                        value = value.append(allocator.hardline());
-                    } else if !final_newline {
-                        value = value.append(" ");
-                    }
-                    value = value
-                        .append("/*")
-                        .append(allocator.intersperse(comment.lines(), allocator.hardline()))
-                        .append("*/")
-                        .append(allocator.hardline());
+    while let Some(token) = context.style_tokens.get(context.style_token_index) {
+        match token {
+            StyleToken::EmptyLines(count, (_, end)) => {
+                empty_lines_end = *end;
+                if *count > ONE_NON_ZERO_USIZE {
+                    value = value.append(allocator.hardline());
                     final_newline = true;
                 }
             }
-        } else {
-            if !final_newline {
-                value = value.append(allocator.hardline());
+            StyleToken::LineComment(comment, (start, _)) => {
+                if *start == empty_lines_end {
+                    value = value.append(allocator.hardline());
+                } else if !final_newline {
+                    value = value.append(" ");
+                }
+                value = value
+                    .append("//")
+                    .append(*comment)
+                    .append(allocator.hardline());
+                final_newline = true;
             }
-            break;
+            StyleToken::MultiLineComment(comment, (start, _)) => {
+                if *start == empty_lines_end {
+                    value = value.append(allocator.hardline());
+                } else if !final_newline {
+                    value = value.append(" ");
+                }
+                value = value
+                    .append("/*")
+                    .append(allocator.intersperse(comment.lines(), allocator.hardline()))
+                    .append("*/")
+                    .append(allocator.hardline());
+                final_newline = true;
+            }
         }
         context.style_token_index += 1;
-        context.current_style_token_span = context
-            .style_tokens
-            .get(context.style_token_index)
-            .map(|value| value.get_text_span())
-            .unwrap_or(((usize::MAX, usize::MAX), (usize::MAX, usize::MAX)));
     }
+    context.current_style_token_span = ((usize::MAX, usize::MAX), (usize::MAX, usize::MAX));
     context.whitespace_queue.clear();
     value
 }
@@ -240,6 +230,12 @@ macro_rules! pretty_token {
     };
 }
 
+macro_rules! flush_before_group {
+    ($pos:expr, $allocator:expr, $context:expr$(,)?) => {
+        flush_whitespace_and_comments($pos.get_source_span().0, $allocator, $context)
+    };
+}
+
 fn flush_whitespace<'a, 'ctx, D>(
     allocator: &'a D,
     context: &mut Context<'ctx>,
@@ -253,6 +249,7 @@ where
     let use_hard_lines = context.hard_lines_in_code_blocks;
     for i in context.whitespace_queue.drain(..) {
         value = value.append(match i {
+            Whitespace::TopLevelStatementEnd => allocator.hardline(),
             Whitespace::StatementEnd => {
                 if use_hard_lines {
                     allocator.hardline()
@@ -268,8 +265,59 @@ where
     value
 }
 
-fn string_into_pretty_doc<'a, 'ctx, D>(
-    string: Cow<'a, str>,
+fn flush_whitespace_and_comments_before_end_of_code_block<'a, 'ctx, D>(
+    text_span: TextSpan,
+    allocator: &'a D,
+    context: &mut Context<'ctx>,
+) -> DocBuilder<'a, D, ()>
+where
+    'ctx: 'a,
+    D: DocAllocator<'a, ()>,
+    D::Doc: Clone,
+{
+    let mut value = allocator.nil();
+    let mut empty_lines_end = (usize::MAX, usize::MAX);
+    while context.current_style_token_span < text_span {
+        if let Some(token) = context.style_tokens.get(context.style_token_index) {
+            match token {
+                StyleToken::EmptyLines(count, (_, end)) => {
+                    empty_lines_end = *end;
+                    if *count > ONE_NON_ZERO_USIZE {
+                        value = value.append(allocator.hardline());
+                    }
+                }
+                StyleToken::LineComment(comment, (start, _)) => {
+                    if (start.0, start.1 - 2) == empty_lines_end {
+                        value = value.append(allocator.hardline());
+                    } else {
+                        value = value.append(" ");
+                    }
+                    value = value.append("//").append(*comment);
+                }
+                StyleToken::MultiLineComment(comment, (start, _)) => {
+                    if (start.0, start.1 - 2) == empty_lines_end {
+                        value = value.append(allocator.hardline());
+                    } else {
+                        value = value.append(" ");
+                    }
+                    value = value
+                        .append("/*")
+                        .append(allocator.intersperse(comment.lines(), allocator.hardline()))
+                        .append("*/");
+                }
+            }
+        }
+        context.style_token_index += 1;
+        context.current_style_token_span = context
+            .style_tokens
+            .get(context.style_token_index)
+            .map(|value| value.get_text_span())
+            .unwrap_or(((usize::MAX, usize::MAX), (usize::MAX, usize::MAX)));
+    }
+    value
+}
+
+fn flush_whitespace_and_comments<'a, 'ctx, D>(
     text_span: TextSpan,
     allocator: &'a D,
     context: &mut Context<'ctx>,
@@ -295,7 +343,7 @@ where
                     }
                 }
                 StyleToken::LineComment(comment, (start, _)) => {
-                    if *start == empty_lines_end {
+                    if (start.0, start.1 - 2) == empty_lines_end {
                         value = value.append(allocator.hardline());
                     } else if !final_newline {
                         value = value.append(" ");
@@ -308,7 +356,7 @@ where
                     final_newline_after_empty_line = false;
                 }
                 StyleToken::MultiLineComment(comment, (start, _)) => {
-                    if *start == empty_lines_end {
+                    if (start.0, start.1 - 2) == empty_lines_end {
                         value = value.append(allocator.hardline());
                     } else if !final_newline {
                         value = value.append(" ");
@@ -339,6 +387,7 @@ where
     }
     for i in context.whitespace_queue.drain(..) {
         value = value.append(match i {
+            Whitespace::TopLevelStatementEnd => allocator.hardline(),
             Whitespace::StatementEnd => {
                 if use_hard_lines {
                     allocator.hardline()
@@ -351,7 +400,22 @@ where
             Whitespace::Line_ => allocator.line_(),
         });
     }
-    value.append(string)
+    value
+}
+
+#[inline]
+fn string_into_pretty_doc<'a, 'ctx, D>(
+    string: Cow<'a, str>,
+    text_span: TextSpan,
+    allocator: &'a D,
+    context: &mut Context<'ctx>,
+) -> DocBuilder<'a, D, ()>
+where
+    'ctx: 'a,
+    D: DocAllocator<'a, ()>,
+    D::Doc: Clone,
+{
+    flush_whitespace_and_comments(text_span, allocator, context).append(string)
 }
 
 macro_rules! pretty_token_span {
@@ -423,6 +487,32 @@ where
     value
 }
 
+pub fn intersperse_top_level_statement_end<'a, 'ctx, D, I, V>(
+    mut items: I,
+    allocator: &'a D,
+    context: &mut Context<'ctx>,
+) -> DocBuilder<'a, D, ()>
+where
+    'ctx: 'a,
+    I: Iterator<Item = V>,
+    V: UnparseCSTFormatted + 'a,
+    D: DocAllocator<'a, ()>,
+    D::Doc: Clone,
+{
+    let Some(mut value) = items
+        .next()
+        .map(|value| value.into_pretty_doc(allocator, context))
+    else {
+        return allocator.nil();
+    };
+    for item in items {
+        value = value
+            .append(ws(Whitespace::TopLevelStatementEnd, allocator, context))
+            .append(item.into_pretty_doc(allocator, context));
+    }
+    value
+}
+
 macro_rules! wrap_csv {
     ($items:expr, $start_token:expr, $end_token:expr, $start:expr, $end:expr, $line_type:ident, $allocator:expr, $context:expr) => {
         if $items.is_empty() {
@@ -434,6 +524,7 @@ macro_rules! wrap_csv {
                     ws(Whitespace::$line_type, $allocator, $context)
                         .append(intersperse_csv($items.iter(), $allocator, $context))
                         .append(ws(Whitespace::$line_type, $allocator, $context))
+                        .append(flush_whitespace($allocator, $context))
                         .group(),
                 )
                 .append(pretty_token!($end, $end_token, $allocator, $context))
@@ -492,6 +583,11 @@ macro_rules! wrap_code_block {
                     ws(Whitespace::StatementEnd, $allocator, $context)
                         .append(intersperse_statement_end(
                             $items.iter(),
+                            $allocator,
+                            $context,
+                        ))
+                        .append(flush_whitespace_and_comments_before_end_of_code_block(
+                            $right_brace.get_source_span().0,
                             $allocator,
                             $context,
                         ))
@@ -741,6 +837,7 @@ impl UnparseCSTFormatted for &Expression {
                         return expression.into_pretty_doc(allocator, context);
                     };
                     let (inner_precedence, _) = operator.get_precedence();
+                    let flushed = flush_before_group!(left_operand, allocator, context);
                     let value =
                         unparse_binop_chain(left_operand, inner_precedence, allocator, context)
                             .append(ws(Whitespace::Line, allocator, context))
@@ -752,25 +849,27 @@ impl UnparseCSTFormatted for &Expression {
                                 allocator,
                                 context,
                             ));
-                    if inner_precedence != precedence {
+                    flushed.append(if inner_precedence != precedence {
                         value.group()
                     } else {
                         value
-                    }
+                    })
                 }
                 let (precedence, _) = operator.get_precedence();
-                unparse_binop_chain(left_operand, precedence, allocator, context)
-                    .append(ws(Whitespace::Line, allocator, context))
-                    .append(operator.into_pretty_doc(allocator, context))
-                    .append(ws(Whitespace::Space, allocator, context))
-                    .append(unparse_binop_chain(
-                        right_operand,
-                        precedence,
-                        allocator,
-                        context,
-                    ))
-                    .nest(context.indentation)
-                    .group()
+                flush_before_group!(left_operand, allocator, context).append(
+                    unparse_binop_chain(left_operand, precedence, allocator, context)
+                        .append(ws(Whitespace::Line, allocator, context))
+                        .append(operator.into_pretty_doc(allocator, context))
+                        .append(ws(Whitespace::Space, allocator, context))
+                        .append(unparse_binop_chain(
+                            right_operand,
+                            precedence,
+                            allocator,
+                            context,
+                        ))
+                        .nest(context.indentation)
+                        .group(),
+                )
             }
             Expression::UnOp(operator, operand, _) => operator
                 .into_pretty_doc(allocator, context)
@@ -811,16 +910,18 @@ impl UnparseCSTFormatted for &Expression {
                 )
                 .append(pretty_token!("]", right_bracket, allocator, context)),
             Expression::Parentheses(left_parens, expression, right_parens, _) => {
-                pretty_token!("(", left_parens, allocator, context)
-                    .append(
-                        ws(Whitespace::Line_, allocator, context)
-                            .append(expression.into_pretty_doc(allocator, context))
-                            .nest(context.indentation),
-                    )
-                    .append(ws(Whitespace::Line_, allocator, context))
-                    .append(flush_whitespace(allocator, context))
-                    .group()
-                    .append(pretty_token!(")", right_parens, allocator, context))
+                flush_before_group!(left_parens, allocator, context).append(
+                    pretty_token!("(", left_parens, allocator, context)
+                        .append(
+                            ws(Whitespace::Line_, allocator, context)
+                                .append(expression.into_pretty_doc(allocator, context))
+                                .nest(context.indentation),
+                        )
+                        .append(ws(Whitespace::Line_, allocator, context))
+                        .append(flush_whitespace(allocator, context))
+                        .group()
+                        .append(pretty_token!(")", right_parens, allocator, context)),
+                )
             }
         }
     }
@@ -845,15 +946,19 @@ impl UnparseCSTFormatted for &Statement {
                     .append(data_declaration.into_pretty_doc(allocator, context))
                     .append(pretty_token!(";", semicolon, allocator, context))
             }
-            Statement::Assignment(target, assignment, value, semicolon, _) => target
-                .into_pretty_doc(allocator, context)
-                .append(ws(Whitespace::Space, allocator, context))
-                .append(pretty_token!("=", assignment, allocator, context))
-                .append(ws(Whitespace::Line, allocator, context))
-                .append(value.into_pretty_doc(allocator, context))
-                .append(pretty_token!(";", semicolon, allocator, context))
-                .nest(context.indentation)
-                .group(),
+            Statement::Assignment(target, assignment, value, semicolon, _) => {
+                flush_before_group!(target, allocator, context).append(
+                    target
+                        .into_pretty_doc(allocator, context)
+                        .append(ws(Whitespace::Space, allocator, context))
+                        .append(pretty_token!("=", assignment, allocator, context))
+                        .append(ws(Whitespace::Line, allocator, context))
+                        .append(value.into_pretty_doc(allocator, context))
+                        .append(pretty_token!(";", semicolon, allocator, context))
+                        .nest(context.indentation)
+                        .group(),
+                )
+            }
             Statement::ListAssignment(
                 target,
                 assignment,
@@ -862,24 +967,26 @@ impl UnparseCSTFormatted for &Statement {
                 right_bracket,
                 semicolon,
                 _,
-            ) => target
-                .into_pretty_doc(allocator, context)
-                .append(ws(Whitespace::Space, allocator, context))
-                .append(pretty_token!("=", assignment, allocator, context))
-                .append(ws(Whitespace::Line, allocator, context))
-                .append({
-                    wrap_csv!(
-                        value,
-                        left_bracket,
-                        right_bracket,
-                        BRACKETS,
-                        allocator,
-                        context
-                    )
-                    .append(pretty_token!(";", semicolon, allocator, context))
-                })
-                .nest(context.indentation)
-                .group(),
+            ) => flush_before_group!(target, allocator, context).append(
+                target
+                    .into_pretty_doc(allocator, context)
+                    .append(ws(Whitespace::Space, allocator, context))
+                    .append(pretty_token!("=", assignment, allocator, context))
+                    .append(ws(Whitespace::Line, allocator, context))
+                    .append({
+                        wrap_csv!(
+                            value,
+                            left_bracket,
+                            right_bracket,
+                            BRACKETS,
+                            allocator,
+                            context
+                        )
+                        .append(pretty_token!(";", semicolon, allocator, context))
+                    })
+                    .nest(context.indentation)
+                    .group(),
+            ),
             Statement::SetItem(
                 list,
                 left_bracket,
@@ -889,25 +996,26 @@ impl UnparseCSTFormatted for &Statement {
                 value,
                 semicolon,
                 _,
-            ) => list
-                .into_pretty_doc(allocator, context)
-                .append(pretty_token!("[", left_bracket, allocator, context))
-                .append(
-                    ws(Whitespace::Line_, allocator, context)
-                        .append(item.into_pretty_doc(allocator, context))
-                        .nest(context.indentation)
-                        .append(ws(Whitespace::Line_, allocator, context))
-                        .append(flush_whitespace(allocator, context))
-                        .group(),
-                )
-                .append(pretty_token!("]", right_bracket, allocator, context))
-                .append(ws(Whitespace::Space, allocator, context))
-                .append(pretty_token!("=", assignment, allocator, context))
-                .append(ws(Whitespace::Line, allocator, context))
-                .append(value.into_pretty_doc(allocator, context))
-                .append(pretty_token!(";", semicolon, allocator, context))
-                .nest(context.indentation)
-                .group(),
+            ) => flush_before_group!(list, allocator, context).append(
+                list.into_pretty_doc(allocator, context)
+                    .append(pretty_token!("[", left_bracket, allocator, context))
+                    .append(
+                        ws(Whitespace::Line_, allocator, context)
+                            .append(item.into_pretty_doc(allocator, context))
+                            .nest(context.indentation)
+                            .append(ws(Whitespace::Line_, allocator, context))
+                            .append(flush_whitespace(allocator, context))
+                            .group(),
+                    )
+                    .append(pretty_token!("]", right_bracket, allocator, context))
+                    .append(ws(Whitespace::Space, allocator, context))
+                    .append(pretty_token!("=", assignment, allocator, context))
+                    .append(ws(Whitespace::Line, allocator, context))
+                    .append(value.into_pretty_doc(allocator, context))
+                    .append(pretty_token!(";", semicolon, allocator, context))
+                    .nest(context.indentation)
+                    .group(),
+            ),
             Statement::Call(function, left_parens, arguments, right_parens, semicolon, _) => {
                 function
                     .into_pretty_doc(allocator, context)
@@ -942,6 +1050,7 @@ impl UnparseCSTFormatted for &Statement {
                 _,
                 _,
             ) => {
+                let flushed = flush_before_group!(control_function, allocator, context);
                 let mut value = control_function
                     .into_pretty_doc(allocator, context)
                     .append(ws(Whitespace::Space, allocator, context))
@@ -973,7 +1082,7 @@ impl UnparseCSTFormatted for &Statement {
                         )
                         .group();
                 }
-                value
+                flushed.append(value)
             }
             Statement::IfElse(
                 (syntactic_if, if_condition, if_branch),
@@ -1261,14 +1370,16 @@ impl UnparseCSTFormatted for &SingleDataDeclaration {
                         .append(canonical_identifier.into_pretty_doc(allocator, context))
                         .append(ws(Whitespace::Space, allocator, context));
                 }
-                value = value.append(identifier.into_pretty_doc(allocator, context));
                 value
-                    .append(ws(Whitespace::Space, allocator, context))
-                    .append(pretty_token!("=", assignment, allocator, context))
-                    .append(ws(Whitespace::Line, allocator, context))
-                    .append(decl_value.into_pretty_doc(allocator, context))
-                    .nest(context.indentation)
-                    .group()
+                    .append(identifier.into_pretty_doc(allocator, context))
+                    .append(
+                        ws(Whitespace::Space, allocator, context)
+                            .append(pretty_token!("=", assignment, allocator, context))
+                            .append(ws(Whitespace::Line, allocator, context))
+                            .append(decl_value.into_pretty_doc(allocator, context))
+                            .nest(context.indentation)
+                            .group(),
+                    )
             }
             SingleDataDeclaration::EmptyVariable(
                 scope,
@@ -1322,21 +1433,23 @@ impl UnparseCSTFormatted for &SingleDataDeclaration {
                         .append(canonical_identifier.into_pretty_doc(allocator, context))
                         .append(ws(Whitespace::Space, allocator, context));
                 }
-                value = value.append(identifier.into_pretty_doc(allocator, context));
                 value
-                    .append(ws(Whitespace::Space, allocator, context))
-                    .append(pretty_token!("=", assignment, allocator, context))
-                    .append(ws(Whitespace::Line, allocator, context))
-                    .append(wrap_csv!(
-                        decl_value,
-                        left_bracket,
-                        right_bracket,
-                        BRACKETS,
-                        allocator,
-                        context
-                    ))
-                    .nest(context.indentation)
-                    .group()
+                    .append(identifier.into_pretty_doc(allocator, context))
+                    .append(
+                        ws(Whitespace::Space, allocator, context)
+                            .append(pretty_token!("=", assignment, allocator, context))
+                            .append(ws(Whitespace::Line, allocator, context))
+                            .append(wrap_csv!(
+                                decl_value,
+                                left_bracket,
+                                right_bracket,
+                                BRACKETS,
+                                allocator,
+                                context
+                            ))
+                            .nest(context.indentation)
+                            .group(),
+                    )
             }
             SingleDataDeclaration::FileList(
                 scope,
@@ -1366,14 +1479,16 @@ impl UnparseCSTFormatted for &SingleDataDeclaration {
                 }
                 value
                     .append(identifier.into_pretty_doc(allocator, context))
-                    .append(ws(Whitespace::Space, allocator, context))
-                    .append(pretty_token!("=", assignment, allocator, context))
-                    .append(ws(Whitespace::Line, allocator, context))
-                    .append(pretty_token!("file", file_keyword, allocator, context))
-                    .append(ws(Whitespace::Space, allocator, context))
-                    .append(source.into_pretty_doc(allocator, context))
-                    .nest(context.indentation)
-                    .group()
+                    .append(
+                        ws(Whitespace::Space, allocator, context)
+                            .append(pretty_token!("=", assignment, allocator, context))
+                            .append(ws(Whitespace::Line, allocator, context))
+                            .append(pretty_token!("file", file_keyword, allocator, context))
+                            .append(ws(Whitespace::Space, allocator, context))
+                            .append(source.into_pretty_doc(allocator, context))
+                            .nest(context.indentation)
+                            .group(),
+                    )
             }
             SingleDataDeclaration::EmptyList(
                 scope,
@@ -1511,6 +1626,7 @@ impl UnparseCSTFormatted for &SpriteStatement {
                 _,
                 _,
             ) => {
+                let flushed = flush_before_group!(hat_function, allocator, context);
                 let mut value = hat_function
                     .into_pretty_doc(allocator, context)
                     .append(ws(Whitespace::Space, allocator, context))
@@ -1542,7 +1658,7 @@ impl UnparseCSTFormatted for &SpriteStatement {
                         )
                         .group();
                 }
-                value
+                flushed.append(value)
             }
             SpriteStatement::CustomBlockDefinition(
                 is_warp,
@@ -1576,8 +1692,7 @@ impl UnparseCSTFormatted for &SpriteStatement {
                     .append(if parameters.is_empty() {
                         allocator.nil()
                     } else {
-                        allocator
-                            .line_()
+                        ws(Whitespace::Line_, allocator, context)
                             .append({
                                 fn convert_param<'a, 'ctx, D>(
                                     param: &'a (
@@ -1621,12 +1736,12 @@ impl UnparseCSTFormatted for &SpriteStatement {
                                     unreachable!();
                                 };
                                 for item in items {
-                                    let (item, new_comma) = convert_param(item, allocator, context);
                                     if let Some(comma) = comma {
                                         value = value
                                             .append(pretty_token!(",", comma, allocator, context))
                                             .append(ws(Whitespace::Line, allocator, context));
                                     }
+                                    let (item, new_comma) = convert_param(item, allocator, context);
                                     value = value.append(item);
                                     comma = new_comma;
                                 }
@@ -1639,8 +1754,6 @@ impl UnparseCSTFormatted for &SpriteStatement {
                                     .nest(context.indentation)
                                     .append(allocator.text(",").flat_alt(allocator.nil()))
                             })
-                            .nest(context.indentation)
-                            .append(allocator.text(",").flat_alt(allocator.nil()))
                             .append(allocator.line_())
                             .group()
                     })
@@ -1783,6 +1896,7 @@ impl UnparseCSTFormatted for &StageStatement {
                 _,
                 _,
             ) => {
+                let flushed = flush_before_group!(hat_function, allocator, context);
                 let mut value = hat_function
                     .into_pretty_doc(allocator, context)
                     .append(ws(Whitespace::Space, allocator, context))
@@ -1814,7 +1928,7 @@ impl UnparseCSTFormatted for &StageStatement {
                         )
                         .group();
                 }
-                value
+                flushed.append(value)
             }
             StageStatement::CustomBlockDefinition(
                 is_warp,
@@ -1848,8 +1962,7 @@ impl UnparseCSTFormatted for &StageStatement {
                     .append(if parameters.is_empty() {
                         allocator.nil()
                     } else {
-                        allocator
-                            .line_()
+                        ws(Whitespace::Line_, allocator, context)
                             .append({
                                 fn convert_param<'a, 'ctx, D>(
                                     param: &'a (
@@ -1893,12 +2006,12 @@ impl UnparseCSTFormatted for &StageStatement {
                                     unreachable!();
                                 };
                                 for item in items {
-                                    let (item, new_comma) = convert_param(item, allocator, context);
                                     if let Some(comma) = comma {
                                         value = value
                                             .append(pretty_token!(",", comma, allocator, context))
                                             .append(ws(Whitespace::Line, allocator, context));
                                     }
+                                    let (item, new_comma) = convert_param(item, allocator, context);
                                     value = value.append(item);
                                     comma = new_comma;
                                 }
@@ -1911,8 +2024,6 @@ impl UnparseCSTFormatted for &StageStatement {
                                     .nest(context.indentation)
                                     .append(allocator.text(",").flat_alt(allocator.nil()))
                             })
-                            .nest(context.indentation)
-                            .append(allocator.text(",").flat_alt(allocator.nil()))
                             .append(allocator.line_())
                             .group()
                     })
@@ -2329,13 +2440,9 @@ impl UnparseCSTFormatted for &GrazeProgram {
         D: DocAllocator<'a, ()>,
         D::Doc: Clone,
     {
-        allocator
-            .intersperse(
-                self.0
-                    .iter()
-                    .map(|value| value.into_pretty_doc(allocator, context)),
-                allocator.hardline(),
-            )
+        intersperse_top_level_statement_end(self.0.iter(), allocator, context)
             .append(allocator.hardline())
     }
 }
+
+// TODO: Add pretty token macro for tokens at the start of a group

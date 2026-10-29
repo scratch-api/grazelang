@@ -14,8 +14,7 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    codegen,
-    lexer,
+    codegen, lexer,
     messages::{
         annotations::{self, Source},
         types::{CLIError, GrazeSourceMessage},
@@ -45,16 +44,16 @@ use crate::{
 
 #[cfg(all(feature = "detranspiler", feature = "formatter"))]
 use crate::{
-    lexer::StyleToken,
     ast::{
         types as ast_types,
         unparse::UnparseAST,
         unparse_cst_formatted::{UnparseCSTFormatted, UnparseCSTFormattedContext},
         unparse_formatted::{UnparseASTFormatted, UnparseFormattedSettings},
     },
-    parser::cst,
     detranspiler,
+    lexer::StyleToken,
     messages::types::{FormatterUnsuccessful, GrazeDetranspilerError, GrazeDetranspilerMessage},
+    parser::cst,
     settings::GrazeDetranspilerSettings,
 };
 
@@ -137,6 +136,7 @@ pub enum Commands {
         #[arg(default_value = ".")]
         path: PathBuf,
     },
+    #[clap(visible_alias("fmt"))]
     /// Format a single file or a project directory
     Format {
         #[arg(long, default_value = "100")]

@@ -886,9 +886,6 @@ pub fn convert_project(
     ))
 }
 
-// TODO: Add standalone formatter to cli
-// Issue: #139
-
 // A function is unbubbled iff it tries (`?`) any unbubbled result or returns a Err at any point without checking if
 // ExitOnError or ExitOnErrorUnlogged is on. A function is bubbled iff it is not unbubbled.
 // A Result is unbubbled iff it results from an unbubbled function or is an Err that is created without checking if
