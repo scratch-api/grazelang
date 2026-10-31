@@ -632,6 +632,8 @@ pub enum GrazeDetranspilerError {
     InvalidMutationValue { block_id: String },
     #[assoc(internal_lint_id = "path_is_not_a_file")]
     PathIsNotAFile { path: PathBuf },
+    #[assoc(internal_lint_id = "output_does_not_exist")]
+    OutputDoesNotExist { path: PathBuf },
     #[assoc(internal_lint_id = "cannot_read_file")]
     CannotReadFile { path: PathBuf },
     #[assoc(internal_lint_id = "invalid_zip_file")]
@@ -834,6 +836,12 @@ impl GrazeDetranspilerError {
             GrazeDetranspilerError::PathIsNotAFile { path } => {
                 format!(
                     "path \"{}\" does not point to a file",
+                    normal_string_escaper(&path.to_string_lossy()),
+                )
+            }
+            GrazeDetranspilerError::OutputDoesNotExist { path } => {
+                format!(
+                    "output \"{}\" does not exist",
                     normal_string_escaper(&path.to_string_lossy()),
                 )
             }

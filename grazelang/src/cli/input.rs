@@ -844,26 +844,12 @@ impl Cli {
         log_time: bool,
     ) -> i32 {
         let total_time = Instant::now();
-        let path_is_file = path.is_file();
         let mut context = ParseContext::new(
             GrazeBuildSettings {
                 message_setting: logging,
                 use_shadows: shadows,
-                resources_path: Some(resources.map(Path::to_path_buf).unwrap_or_else(|| {
-                    if path_is_file {
-                        path.parent().unwrap_or(Path::new("/")).to_path_buf()
-                    } else {
-                        path.to_path_buf()
-                    }
-                })),
-                extensions_path: Some(extensions.map(Path::to_path_buf).unwrap_or_else(|| {
-                    if path_is_file {
-                        path.parent().unwrap_or(Path::new("/"))
-                    } else {
-                        path
-                    }
-                    .join("extensions")
-                })),
+                resources_path: None,
+                extensions_path: None,
                 use_cached_extensions,
                 create_cached_extensions,
             },
@@ -879,6 +865,25 @@ impl Cli {
             Self::print_build_errors(&mut context.messages, &HashMap::new(), true);
             std::process::exit(1);
         };
+        let path_is_file = path.is_file();
+        context.settings.resources_path =
+            Some(resources.map(Path::to_path_buf).unwrap_or_else(|| {
+                if path_is_file {
+                    path.parent().unwrap_or(Path::new("/"))
+                } else {
+                    &path
+                }
+                .to_path_buf()
+            }));
+        context.settings.extensions_path =
+            Some(extensions.map(Path::to_path_buf).unwrap_or_else(|| {
+                if path_is_file {
+                    path.parent().unwrap_or(Path::new("/"))
+                } else {
+                    &path
+                }
+                .join("extensions")
+            }));
         let (parsed, source_files) = if path.is_dir() {
             match parse_project_directory(&path, &mut context) {
                 Ok(value) => value,
@@ -1069,6 +1074,20 @@ impl Cli {
                 })
             );
         };
+        let output = if let Some(output) = output {
+            if let Ok(output) = output.canonicalize() {
+                Some(output)
+            } else {
+                single_error!(
+                    logging,
+                    GrazeDetranspilerMessage::Error(GrazeDetranspilerError::OutputDoesNotExist {
+                        path: output.to_path_buf(),
+                    })
+                );
+            }
+        } else {
+            None
+        };
         let Ok(reader) = File::open(&path) else {
             single_error!(
                 logging,
@@ -1132,7 +1151,7 @@ impl Cli {
             unparse_multi_file(
                 ast,
                 &path,
-                output,
+                output.as_deref(),
                 &mut messages,
                 settings.formatting_settings.as_ref(),
             )
@@ -1140,7 +1159,7 @@ impl Cli {
             unparse_single_file(
                 ast,
                 &path,
-                output,
+                output.as_deref(),
                 &mut messages,
                 settings.formatting_settings.as_ref(),
             )
@@ -1151,7 +1170,7 @@ impl Cli {
         let unzip_2_timer = Instant::now();
         let resource_path = match resources {
             Some(resource_path) => resource_path,
-            None => match output {
+            None => match &output {
                 Some(output) if output.is_file() || !output.exists() => {
                     output.parent().unwrap_or(Path::new("/"))
                 }
