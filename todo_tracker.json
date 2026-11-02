@@ -1058,7 +1058,7 @@
     "141": {
         "filepath": "grazelang/src/parser/cst.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L473-L473",
         "commit": "1ff3cc268d22fe5a4099a18227c514a7bdafa9ab",
         "title": "Use `CommaSeparated<T>` for `CustomBlockParams`"
