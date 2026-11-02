@@ -81,6 +81,7 @@ pub const MATH_NUMBER_ISTRING: &IString = &literal!("math_number");
 pub const MATH_INTEGER_ISTRING: &IString = &literal!("math_integer");
 pub const MATH_POSITIVE_NUMBER_ISTRING: &IString = &literal!("math_positive_number");
 pub const MATH_POSITIVE_INTEGER_ISTRING: &IString = &literal!("math_whole_number");
+pub const LOWERCASE_TEXT_ISTRING: &IString = &literal!("text");
 
 pub const NUM_ISTRING: &IString = &literal!("NUM");
 pub const NUM1_ISTRING: &IString = &literal!("NUM1");
@@ -100,7 +101,7 @@ where
                 name: literal!("STEPS"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("STEPS"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -115,7 +116,7 @@ where
                 name: literal!("DEGREES"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("DEGREES"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -130,7 +131,7 @@ where
                 name: literal!("DEGREES"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("DEGREES"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -161,7 +162,7 @@ where
                     name: literal!("X"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("X"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -171,7 +172,7 @@ where
                     name: literal!("Y"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("Y"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -188,7 +189,7 @@ where
                     name: literal!("SECS"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("SECS"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -215,7 +216,7 @@ where
                     name: literal!("SECS"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("SECS"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -225,7 +226,7 @@ where
                     name: literal!("X"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("X"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -235,7 +236,7 @@ where
                     name: literal!("Y"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("Y"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -281,7 +282,7 @@ where
                 name: literal!("DX"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("DX"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -296,7 +297,7 @@ where
                 name: literal!("X"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("X"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -311,7 +312,7 @@ where
                 name: literal!("DY"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("DY"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -326,7 +327,7 @@ where
                 name: literal!("Y"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("Y"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -376,8 +377,8 @@ where
                 Argument {
                     name: literal!("MESSAGE"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("MESSAGE"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -387,7 +388,7 @@ where
                     name: literal!("SECS"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("SECS"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -402,8 +403,8 @@ where
             arguments: vec![Argument {
                 name: literal!("MESSAGE"),
                 kind: ArgumentKind::MenuInput {
-                    menu_opcode: TEXT_ISTRING.clone(),
-                    menu_field: literal!("MESSAGE"),
+                    menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                    menu_field: TEXT_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -418,8 +419,8 @@ where
                 Argument {
                     name: literal!("MESSAGE"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("MESSAGE"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -429,7 +430,7 @@ where
                     name: literal!("SECS"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("SECS"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -444,8 +445,8 @@ where
             arguments: vec![Argument {
                 name: literal!("MESSAGE"),
                 kind: ArgumentKind::MenuInput {
-                    menu_opcode: TEXT_ISTRING.clone(),
-                    menu_field: literal!("MESSAGE"),
+                    menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                    menu_field: TEXT_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -517,7 +518,7 @@ where
                 name: literal!("CHANGE"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("CHANGE"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -532,7 +533,7 @@ where
                 name: literal!("SIZE"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("SIZE"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -553,7 +554,7 @@ where
                     name: literal!("CHANGE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("CHANGE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -575,7 +576,7 @@ where
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -762,7 +763,7 @@ where
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -784,7 +785,7 @@ where
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -806,7 +807,7 @@ where
                 name: literal!("VOLUME"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("VOLUME"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -821,7 +822,7 @@ where
                 name: literal!("VOLUME"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("VOLUME"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -881,7 +882,7 @@ where
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -938,7 +939,7 @@ where
                 name: literal!("DURATION"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_POSITIVE_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("DURATION"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -954,7 +955,7 @@ where
                     name: literal!("TIMES"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_POSITIVE_INTEGER_ISTRING.clone(),
-                        menu_field: literal!("TIMES"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1172,8 +1173,8 @@ where
             arguments: vec![Argument {
                 name: literal!("QUESTION"),
                 kind: ArgumentKind::MenuInput {
-                    menu_opcode: TEXT_ISTRING.clone(),
-                    menu_field: literal!("QUESTION"),
+                    menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                    menu_field: TEXT_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -1415,7 +1416,7 @@ where
                     name: literal!("FROM"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("FROM"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1425,7 +1426,7 @@ where
                     name: literal!("TO"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("TO"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1441,8 +1442,8 @@ where
                 Argument {
                     name: literal!("OPERAND1"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("OPERAND1"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1451,8 +1452,8 @@ where
                 Argument {
                     name: literal!("OPERAND2"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("OPERAND2"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1468,8 +1469,8 @@ where
                 Argument {
                     name: literal!("OPERAND1"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("OPERAND1"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1478,8 +1479,8 @@ where
                 Argument {
                     name: literal!("OPERAND2"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("OPERAND2"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1495,8 +1496,8 @@ where
                 Argument {
                     name: literal!("OPERAND1"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("OPERAND1"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1505,8 +1506,8 @@ where
                 Argument {
                     name: literal!("OPERAND2"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("OPERAND2"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1566,8 +1567,8 @@ where
                 Argument {
                     name: literal!("STRING1"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("STRING1"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1576,8 +1577,8 @@ where
                 Argument {
                     name: literal!("STRING2"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("STRING2"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1594,7 +1595,7 @@ where
                     name: literal!("LETTER"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_POSITIVE_INTEGER_ISTRING.clone(),
-                        menu_field: literal!("LETTER"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1603,8 +1604,8 @@ where
                 Argument {
                     name: literal!("STRING"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("STRING"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1619,8 +1620,8 @@ where
             arguments: vec![Argument {
                 name: literal!("STRING"),
                 kind: ArgumentKind::MenuInput {
-                    menu_opcode: TEXT_ISTRING.clone(),
-                    menu_field: literal!("STRING"),
+                    menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                    menu_field: TEXT_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -1635,8 +1636,8 @@ where
                 Argument {
                     name: literal!("STRING1"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("STRING1"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1645,8 +1646,8 @@ where
                 Argument {
                     name: literal!("STRING2"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("STRING2"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1792,8 +1793,8 @@ where
                 Argument {
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1815,7 +1816,7 @@ where
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1866,8 +1867,8 @@ where
                 Argument {
                     name: literal!("ITEM"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("ITEM"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1889,7 +1890,7 @@ where
                     name: literal!("INDEX"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_INTEGER_ISTRING.clone(),
-                        menu_field: literal!("INDEX"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1921,7 +1922,7 @@ where
                     name: literal!("INDEX"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_INTEGER_ISTRING.clone(),
-                        menu_field: literal!("INDEX"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1930,8 +1931,8 @@ where
                 Argument {
                     name: literal!("ITEM"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("ITEM"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1953,7 +1954,7 @@ where
                     name: literal!("INDEX"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_INTEGER_ISTRING.clone(),
-                        menu_field: literal!("INDEX"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1962,8 +1963,8 @@ where
                 Argument {
                     name: literal!("ITEM"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("ITEM"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -1985,7 +1986,7 @@ where
                     name: literal!("INDEX"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_INTEGER_ISTRING.clone(),
-                        menu_field: literal!("INDEX"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -2006,8 +2007,8 @@ where
                 Argument {
                     name: literal!("ITEM"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("ITEM"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -2038,8 +2039,8 @@ where
                 Argument {
                     name: literal!("ITEM"),
                     kind: ArgumentKind::MenuInput {
-                        menu_opcode: TEXT_ISTRING.clone(),
-                        menu_field: literal!("ITEM"),
+                        menu_opcode: LOWERCASE_TEXT_ISTRING.clone(),
+                        menu_field: TEXT_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -2126,7 +2127,7 @@ where
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -2153,7 +2154,7 @@ where
                     name: literal!("VALUE"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("VALUE"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -2169,7 +2170,7 @@ where
                 name: literal!("SIZE"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("SIZE"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -2184,7 +2185,7 @@ where
                 name: literal!("SIZE"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("SIZE"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -2211,7 +2212,7 @@ where
                     name: literal!("BEATS"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("BEATS"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -2222,12 +2223,27 @@ where
             block_name: literal!("play_drum_for_beats"),
             is_singleton: false,
         },
+        "music_midiPlayDrumForBeats" => BlockKindInfo {
+            arguments: vec![Argument {
+                name: literal!("DRUM"),
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: NUM_ISTRING.clone(),
+                    is_primitive: true,
+                    dynamic_menu_input_kind: None,
+                },
+                ignore: false,
+            }],
+            block_category: MUSIC_CATEGORY.clone(),
+            block_name: literal!("midi_play_drum_for_beats"),
+            is_singleton: false,
+        },
         "music_restForBeats" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("BEATS"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("BEATS"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -2253,7 +2269,7 @@ where
                     name: literal!("BEATS"),
                     kind: ArgumentKind::MenuInput {
                         menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                        menu_field: literal!("BEATS"),
+                        menu_field: NUM_ISTRING.clone(),
                         is_primitive: true,
                         dynamic_menu_input_kind: None,
                     },
@@ -2279,12 +2295,27 @@ where
             block_name: literal!("set_instrument"),
             is_singleton: false,
         },
+        "music_midiSetInstrument" => BlockKindInfo {
+            arguments: vec![Argument {
+                name: literal!("INSTRUMENT"),
+                kind: ArgumentKind::MenuInput {
+                    menu_opcode: MATH_NUMBER_ISTRING.clone(),
+                    menu_field: NUM_ISTRING.clone(),
+                    is_primitive: true,
+                    dynamic_menu_input_kind: None,
+                },
+                ignore: false,
+            }],
+            block_category: MUSIC_CATEGORY.clone(),
+            block_name: literal!("midi_set_instrument"),
+            is_singleton: false,
+        },
         "music_setTempo" => BlockKindInfo {
             arguments: vec![Argument {
                 name: literal!("TEMPO"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("TEMPO"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
@@ -2299,7 +2330,7 @@ where
                 name: literal!("TEMPO"),
                 kind: ArgumentKind::MenuInput {
                     menu_opcode: MATH_NUMBER_ISTRING.clone(),
-                    menu_field: literal!("TEMPO"),
+                    menu_field: NUM_ISTRING.clone(),
                     is_primitive: true,
                     dynamic_menu_input_kind: None,
                 },
