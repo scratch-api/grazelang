@@ -5063,10 +5063,11 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                                 .iter()
                                 .map(|value| {
                                     value
+                                        .0
                                         .1
                                         .as_ref()
                                         .map(|value| value.name.to_string())
-                                        .unwrap_or_else(|| value.2.value.to_string())
+                                        .unwrap_or_else(|| value.0.2.value.to_string())
                                 })
                                 .collect(),
                             argument_defaults: params
@@ -5106,16 +5107,17 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             .iter()
             .map(|value| {
                 let name = value
+                    .0
                     .1
                     .as_ref()
                     .map(|value| value.name.to_string())
-                    .unwrap_or_else(|| value.2.value.to_string());
+                    .unwrap_or_else(|| value.0.2.value.to_string());
                 (
-                    value.2.value.as_str().into(),
+                    value.0.2.value.as_str().into(),
                     Symbol {
                         known_block: Some(Rc::new(KnownBlock::SingletonReporter {
                             opcode: if matches!(
-                                value.0,
+                                value.0.0,
                                 Some(CustomBlockParamKind {
                                     kind: CustomBlockParamKindValue::Boolean,
                                     source_span: _,

@@ -382,9 +382,7 @@ impl<T> Iterator for CommaSeparatedIterator<T> {
         let (lower, upper) = self.values_iterator.size_hint();
         (
             lower.saturating_add(self.tail_value.is_some() as usize),
-            upper.map(|value| {
-                value.saturating_add(self.tail_value.is_some() as usize)
-            }),
+            upper.map(|value| value.saturating_add(self.tail_value.is_some() as usize)),
         )
     }
 }
@@ -466,14 +464,11 @@ impl GetPos for CustomBlockParamKind {
     }
 }
 
-type CustomBlockParams = Vec<(
+pub(crate) type CustomBlockParams = CommaSeparated<(
     Option<CustomBlockParamKind>,
     Option<CanonicalIdentifier>,
     SingleIdentifier,
-    Option<Comma>,
 )>;
-// TODO: Use `CommaSeparated<T>` for `CustomBlockParams`
-// Issue: #141
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StageStatement {
@@ -551,12 +546,7 @@ pub type CustomBlockDefinition = (
     Option<CanonicalIdentifier>,
     SingleIdentifier,
     LeftParens,
-    Vec<(
-        Option<CustomBlockParamKind>,
-        Option<CanonicalIdentifier>,
-        SingleIdentifier,
-        Option<Comma>,
-    )>,
+    CustomBlockParams,
     RightParens,
     CodeBlock,
     Option<Semicolon>,

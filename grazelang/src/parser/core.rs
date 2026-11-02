@@ -425,7 +425,7 @@ macro_rules! parse_comma_separated {
     ($token_stream:expr, $context:expr, ($token_stream_ident:ident, $context_ident:ident) => $parse:expr, $end:pat, $end_pat_repr:expr) => {{
         let token_stream = &mut *$token_stream;
         let context = &mut *$context;
-        let mut start_pos = None;
+        let start_pos = peek_token_start(token_stream);
         let mut values = Vec::new();
         let tail_value = loop {
             if matches!(peek_token!(token_stream), $end) {
@@ -436,7 +436,6 @@ macro_rules! parse_comma_separated {
                 let $context_ident = &mut *context;
                 $parse
             };
-            start_pos.get_or_insert_with(|| value.get_source_span().0.0);
             let comma = match peek_token!(token_stream) {
                 Token::Comma => {
                     skip_token!(token_stream);
@@ -455,7 +454,11 @@ macro_rules! parse_comma_separated {
             };
             values.push((value, comma));
         };
-        let start_pos = start_pos.unwrap_or_else(|| get_token_end(token_stream));
+        let start_pos = if values.is_empty() {
+            get_token_end(token_stream)
+        } else {
+            start_pos
+        };
         cst::CommaSeparated {
             values,
             tail_value,
@@ -842,6 +845,7 @@ pub trait PeekableTokenStream: Iterator<Item = Result<Token, Self::Error>> {
     fn peek_back(&self) -> Option<Option<&Result<Token, Self::Error>>>;
     fn peek_back_span(&self) -> Option<TextSpan>;
     fn step_back_if_unpeeked(&mut self);
+    #[inline]
     fn span_from_previous_to_current(&mut self, previous: (usize, usize)) -> SourceSpan {
         ((previous, self.span_memoize().1), self.get_source_file_id())
     }
@@ -909,6 +913,7 @@ impl<'a> PeekableLexer<'a> {
 impl<'a> PeekableTokenStream for PeekableLexer<'a> {
     type Error = <Token as Logos<'a>>::Error;
 
+    #[inline]
     fn get_source_file_id(&self) -> SourceFileId {
         self.source_file_id
     }
@@ -923,11 +928,6 @@ impl<'a> PeekableTokenStream for PeekableLexer<'a> {
                 self.lexer.next()
             })
             .as_ref()
-        // if let Some(peeked) = &self.peeked_token {
-        //     return Some(peeked);
-        // }
-        // self.peeked_token = self.lexer.next();
-        // self.peeked_token.as_ref()
     }
 
     fn peek_span(&mut self) -> TextSpan {
@@ -944,6 +944,7 @@ impl<'a> PeekableTokenStream for PeekableLexer<'a> {
         self.previous_token.as_ref().map(Option::as_ref)
     }
 
+    #[inline]
     fn peek_back_span(&self) -> Option<TextSpan> {
         self.previous_span
     }
@@ -3250,9 +3251,7 @@ pub mod statement {
             "Expected '('.",
             "'('"
         );
-        let mut params = Vec::new();
-        let right_parens = loop {
-            consume_then_never_if!(token_stream, Token::RightParens => break from_stream_pos::<cst::RightParens, _>(token_stream));
+        let params = parse_comma_separated!(token_stream, context, (token_stream, context) => {
             let param_kind = if let Token::Identifier(ident) = peek_token!(token_stream) {
                 match ident.as_str() {
                     "str" => Some(CustomBlockParamKindValue::String),
@@ -3273,29 +3272,18 @@ pub mod statement {
             } else {
                 None
             };
-            let canonical_identifier = consume_and_use_if!(token_stream, Token::CanonicalIdentifier(value) => cst::CanonicalIdentifier {
-                name: value,
-                source_span: get_token_source_span(token_stream),
+            let canonical_identifier = consume_and_use_if!(token_stream,Token::CanonicalIdentifier(value) => cst::CanonicalIdentifier {
+                name: value,source_span: get_token_source_span(token_stream),
             });
             let identifier = parse_single_identifier_as_identifier(token_stream, context)?;
-            let comma = match peek_token!(token_stream) {
-                Token::Comma => Some({
-                    skip_token!(token_stream);
-                    from_stream_pos::<cst::Comma, _>(token_stream)
-                }),
-                Token::RightParens => None,
-                _ => {
-                    let token = next_token!(token_stream);
-                    emit_unexpected_token!(
-                        token_stream,
-                        "Expected ',' or ')'.",
-                        "',' or ')'",
-                        token
-                    )
-                }
-            };
-            params.push((param_kind, canonical_identifier, identifier, comma));
-        };
+            (param_kind, canonical_identifier, identifier)
+        }, Token::RightParens, "')'");
+        let right_parens = expect_token!(
+            token_stream,
+            Token::RightParens => from_stream_pos::<cst::RightParens, _>(token_stream),
+            "Expected ')'.",
+            "')'"
+        );
         let code_block = parse_code_block(token_stream, context)?;
         let mut errors = Vec::new();
         with_mut_next_target!(context, target => {
@@ -3322,9 +3310,9 @@ pub mod statement {
                     canonical_name: canonical_identifier.as_ref().map(|value| &value.name).cloned(),
                     args: params.iter().map(|value| {
                         CustomBlockParamDescriptor {
-                            name: value.2.value.clone(),
-                            canonical_name: value.1.as_ref().map(|value| &value.name).cloned(),
-                            kind: value.0.as_ref().map(|value| &value.kind).copied().unwrap_or(CustomBlockParamKindValue::String),
+                            name: value.0.2.value.clone(),
+                            canonical_name: value.0.1.as_ref().map(|value| &value.name).cloned(),
+                            kind: value.0.0.as_ref().map(|value| &value.kind).copied().unwrap_or(CustomBlockParamKindValue::String),
                         }
                     }).collect(),
                     is_warp: warp_specifier.as_ref().map(|value| value.is_warp).unwrap_or(false)

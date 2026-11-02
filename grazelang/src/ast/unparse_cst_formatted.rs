@@ -1571,6 +1571,42 @@ impl_unparse_cst_for_code_block!(CodeBlock);
 impl_unparse_cst_for_code_block!(SpriteCodeBlock);
 impl_unparse_cst_for_code_block!(StageCodeBlock);
 
+type BorrowedCustomBlockParam<'a> = (
+    &'a (
+        Option<CustomBlockParamKind>,
+        Option<CanonicalIdentifier>,
+        SingleIdentifier,
+    ),
+    Option<&'a cst_types::Comma>,
+);
+
+fn convert_param<'a, 'ctx, D>(
+    param: BorrowedCustomBlockParam<'a>,
+    allocator: &'a D,
+    context: &mut Context<'ctx>,
+) -> (DocBuilder<'a, D, ()>, Option<&'a cst_types::Comma>)
+where
+    'ctx: 'a,
+    D: DocAllocator<'a, ()>,
+    D::Doc: Clone,
+{
+    let mut value = allocator.nil();
+    if let Some(param_kind) = &param.0.0 {
+        value = value
+            .append(param_kind.into_pretty_doc(allocator, context))
+            .append(ws(Whitespace::Space, allocator, context));
+    }
+    if let Some(canonical_identifier) = &param.0.1 {
+        value = value
+            .append(canonical_identifier.into_pretty_doc(allocator, context))
+            .append(ws(Whitespace::Space, allocator, context));
+    }
+    (
+        value.append(param.0.2.into_pretty_doc(allocator, context)),
+        param.1,
+    )
+}
+
 impl UnparseCSTFormatted for &SpriteStatement {
     fn into_pretty_doc<'a, 'ctx, D>(
         self,
@@ -1694,40 +1730,6 @@ impl UnparseCSTFormatted for &SpriteStatement {
                     } else {
                         ws(Whitespace::Line_, allocator, context)
                             .append({
-                                fn convert_param<'a, 'ctx, D>(
-                                    param: &'a (
-                                        Option<CustomBlockParamKind>,
-                                        Option<CanonicalIdentifier>,
-                                        SingleIdentifier,
-                                        Option<cst_types::Comma>,
-                                    ),
-                                    allocator: &'a D,
-                                    context: &mut Context<'ctx>,
-                                ) -> (DocBuilder<'a, D, ()>, Option<&'a cst_types::Comma>)
-                                where
-                                    'ctx: 'a,
-                                    D: DocAllocator<'a, ()>,
-                                    D::Doc: Clone,
-                                {
-                                    let mut value = allocator.nil();
-                                    if let Some(param_kind) = &param.0 {
-                                        value = value
-                                            .append(param_kind.into_pretty_doc(allocator, context))
-                                            .append(ws(Whitespace::Space, allocator, context));
-                                    }
-                                    if let Some(canonical_identifier) = &param.1 {
-                                        value = value
-                                            .append(
-                                                canonical_identifier
-                                                    .into_pretty_doc(allocator, context),
-                                            )
-                                            .append(ws(Whitespace::Space, allocator, context));
-                                    }
-                                    (
-                                        value.append(param.2.into_pretty_doc(allocator, context)),
-                                        param.3.as_ref(),
-                                    )
-                                }
                                 let mut items = parameters.iter();
                                 let Some((mut value, mut comma)) = items
                                     .next()
@@ -1964,40 +1966,6 @@ impl UnparseCSTFormatted for &StageStatement {
                     } else {
                         ws(Whitespace::Line_, allocator, context)
                             .append({
-                                fn convert_param<'a, 'ctx, D>(
-                                    param: &'a (
-                                        Option<CustomBlockParamKind>,
-                                        Option<CanonicalIdentifier>,
-                                        SingleIdentifier,
-                                        Option<cst_types::Comma>,
-                                    ),
-                                    allocator: &'a D,
-                                    context: &mut Context<'ctx>,
-                                ) -> (DocBuilder<'a, D, ()>, Option<&'a cst_types::Comma>)
-                                where
-                                    'ctx: 'a,
-                                    D: DocAllocator<'a, ()>,
-                                    D::Doc: Clone,
-                                {
-                                    let mut value = allocator.nil();
-                                    if let Some(param_kind) = &param.0 {
-                                        value = value
-                                            .append(param_kind.into_pretty_doc(allocator, context))
-                                            .append(ws(Whitespace::Space, allocator, context));
-                                    }
-                                    if let Some(canonical_identifier) = &param.1 {
-                                        value = value
-                                            .append(
-                                                canonical_identifier
-                                                    .into_pretty_doc(allocator, context),
-                                            )
-                                            .append(ws(Whitespace::Space, allocator, context));
-                                    }
-                                    (
-                                        value.append(param.2.into_pretty_doc(allocator, context)),
-                                        param.3.as_ref(),
-                                    )
-                                }
                                 let mut items = parameters.iter();
                                 let Some((mut value, mut comma)) = items
                                     .next()

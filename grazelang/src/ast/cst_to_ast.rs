@@ -1135,15 +1135,17 @@ impl CSTToAST for cst_types::StageStatement {
                         Ok((
                             value
                                 .0
+                                .0
                                 .as_ref()
                                 .map(|value| value.clone_cst_to_ast())
                                 .transpose()?,
                             value
+                                .0
                                 .1
                                 .as_ref()
                                 .map(|value| value.clone_cst_to_ast())
                                 .transpose()?,
-                            value.2.clone_cst_to_ast()?,
+                            value.0.2.clone_cst_to_ast()?,
                         ))
                     })
                     .collect::<Result<_, InvalidCST>>()?,
@@ -1262,9 +1264,9 @@ impl CSTToAST for cst_types::StageStatement {
                     .into_iter()
                     .map(|value| {
                         Ok((
-                            value.0.map(|value| value.cst_to_ast()).transpose()?,
-                            value.1.map(|value| value.cst_to_ast()).transpose()?,
-                            value.2.cst_to_ast()?,
+                            value.0.0.map(|value| value.cst_to_ast()).transpose()?,
+                            value.0.1.map(|value| value.cst_to_ast()).transpose()?,
+                            value.0.2.cst_to_ast()?,
                         ))
                     })
                     .collect::<Result<_, InvalidCST>>()?,
@@ -1390,15 +1392,17 @@ impl CSTToAST for cst_types::SpriteStatement {
                         Ok((
                             value
                                 .0
+                                .0
                                 .as_ref()
                                 .map(|value| value.clone_cst_to_ast())
                                 .transpose()?,
                             value
+                                .0
                                 .1
                                 .as_ref()
                                 .map(|value| value.clone_cst_to_ast())
                                 .transpose()?,
-                            value.2.clone_cst_to_ast()?,
+                            value.0.2.clone_cst_to_ast()?,
                         ))
                     })
                     .collect::<Result<_, InvalidCST>>()?,
@@ -1517,9 +1521,9 @@ impl CSTToAST for cst_types::SpriteStatement {
                     .into_iter()
                     .map(|value| {
                         Ok((
-                            value.0.map(|value| value.cst_to_ast()).transpose()?,
-                            value.1.map(|value| value.cst_to_ast()).transpose()?,
-                            value.2.cst_to_ast()?,
+                            value.0.0.map(|value| value.cst_to_ast()).transpose()?,
+                            value.0.1.map(|value| value.cst_to_ast()).transpose()?,
+                            value.0.2.cst_to_ast()?,
                         ))
                     })
                     .collect::<Result<_, InvalidCST>>()?,
