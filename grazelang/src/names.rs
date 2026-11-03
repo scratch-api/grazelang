@@ -93,12 +93,13 @@ impl DetranspilerTargetNamespace {
     }
 
     pub fn is_case_conforming_and_uppercase(name: &str) -> (bool, bool) {
-        name.chars().fold((true, true), |(a, b), c| {
+        let (a, b) = name.chars().fold((true, true), |(a, b), c| {
             (
                 a && (c.is_ascii_alphanumeric() || c == '_'),
                 b && c.is_uppercase(),
             )
-        })
+        });
+        (a && name.chars().next().is_some_and(|c| !c.is_numeric()), b)
     }
 
     pub fn convert_to_snake_case(name: IString) -> IString {
@@ -108,11 +109,14 @@ impl DetranspilerTargetNamespace {
         }
         let mut new_name = String::with_capacity(name.len());
         if uppercase {
-            let mut alphanumeric = name
+            let (mut alphanumeric, numeric) = name
                 .chars()
                 .next()
-                .map(|c| c.is_ascii_alphanumeric())
-                .unwrap_or(true);
+                .map(|c| (c.is_ascii_alphanumeric(), c.is_numeric()))
+                .unwrap_or((true, true));
+            if numeric {
+                new_name.push('_');
+            }
             for c in name.chars() {
                 if c.is_ascii_alphanumeric() {
                     new_name.push(c);
@@ -123,11 +127,20 @@ impl DetranspilerTargetNamespace {
                 }
             }
         } else {
-            let (mut alphanumeric, mut uppercase) = name
+            let (mut alphanumeric, mut uppercase, numeric) = name
                 .chars()
                 .next()
-                .map(|c| (c.is_ascii_alphanumeric(), c.is_ascii_uppercase()))
-                .unwrap_or((true, false));
+                .map(|c| {
+                    (
+                        c.is_ascii_alphanumeric(),
+                        c.is_ascii_uppercase(),
+                        c.is_numeric(),
+                    )
+                })
+                .unwrap_or((true, false, true));
+            if numeric {
+                new_name.push('_');
+            }
             for c in name.chars() {
                 if c.is_ascii_alphanumeric() {
                     if !uppercase && c.is_ascii_uppercase() {
