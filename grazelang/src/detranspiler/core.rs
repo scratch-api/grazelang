@@ -181,6 +181,7 @@ impl DetranspilerVarOrList {
 pub enum DetranspilerVarOrListKind {
     Variable {
         value: project_json::Sb3PrimitiveOrBool,
+        is_cloud: bool,
     },
     List {
         value: Vec<project_json::Sb3PrimitiveOrBool>,
@@ -1011,6 +1012,7 @@ pub fn convert_target(
                 name,
                 kind: DetranspilerVarOrListKind::Variable {
                     value: variable.value.clone(),
+                    is_cloud: variable.is_cloud,
                 },
             },
         );
@@ -2864,6 +2866,8 @@ pub fn convert_block_stack(
     //  - [ ] Cycle detection
     //  - [ ] Demote non-tree error to warning
     // Issue: #138
+
+    // TODO: Implement offloading big lists into files in detranspiler
     let mut statements = Vec::new();
     let mut current_block = block;
     let mut current_block_id = IString::from(block_id);

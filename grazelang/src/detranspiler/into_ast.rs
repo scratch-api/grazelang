@@ -200,9 +200,9 @@ impl IntoAST<ast_types::DataDeclaration> for &DetranspilerVarOrList {
 impl IntoAST<ast_types::SingleDataDeclaration> for &DetranspilerVarOrList {
     fn into_ast(self) -> ast_types::SingleDataDeclaration {
         match &self.kind {
-            DetranspilerVarOrListKind::Variable { value } =>
+            DetranspilerVarOrListKind::Variable { value, is_cloud } =>
                 ast_types::SingleDataDeclaration::Variable {
-                    scope: Default::default(),
+                    scope: is_cloud.then_some(ast_types::DataDeclarationScope::Cloud).unwrap_or_default(),
                     canonical_identifier: self
                         .canonical_name
                         .as_ref()
