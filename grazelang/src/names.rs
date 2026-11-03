@@ -156,6 +156,9 @@ impl DetranspilerTargetNamespace {
                 }
             }
         }
+        if new_name.is_empty() {
+            new_name.push('_');
+        }
         new_name.into()
     }
 
