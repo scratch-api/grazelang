@@ -3937,6 +3937,60 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
                             start_pos
                         )
                     );
+                    if expressions.len() == 1
+                        && expressions.tail_value.is_some()
+                        && let Some(binop) = expression::parse_binary_operation(token_stream, context)?
+                    {
+                        let Some(expression) = expressions.tail_value else {
+                            unreachable!();
+                        };
+                        let source_span = left_parens.span_to(&right_parens);
+                        let mut expressions = VecDeque::from([Expression::Parentheses(
+                            left_parens,
+                            expression,
+                            right_parens,
+                            source_span,
+                        )]);
+                        let mut binops = VecDeque::from([binop]);
+                        loop {
+                            expressions.push_back(expression::parse_expression_without_binops(
+                                token_stream,
+                                context,
+                            )?);
+                            while let Some(left_bracket) = consume_if!(token_stream, Token::LetterAccessLeftBracket => from_stream_pos::<cst::LetterAccessLeftBracket, _>(token_stream))
+                            {
+                                let string_expression = expressions.pop_back().unwrap();
+                                let inner_expression = parse_expression(token_stream, context)?;
+                                let right_bracket = expect_token!(
+                                    token_stream,
+                                    Token::RightBracket => from_stream_pos::<cst::RightBracket, _>(token_stream),
+                                    "Expected ']'.",
+                                    "']'"
+                                );
+                                let source_span = string_expression.span_to_end(get_token_end(token_stream));
+                                expressions.push_back(Expression::GetLetter(
+                                    Box::new(string_expression),
+                                    left_bracket,
+                                    Box::new(inner_expression),
+                                    right_bracket,
+                                    source_span,
+                                ));
+                            }
+                            binops.push_back(
+                                match expression::parse_binary_operation(token_stream, context)? {
+                                    Some(value) => value,
+                                    None => break,
+                                },
+                            );
+                        }
+                        return parse_sprite_rest_of_single_input_control(
+                            token_stream,
+                            context,
+                            identifier,
+                            expression::order_operations(expressions, binops),
+                            start_pos,
+                        );
+                    }
                     if expressions.is_empty() {
                         let source_span = left_parens.span_to(&right_parens);
                         return parse_sprite_rest_of_single_input_control(
@@ -4309,6 +4363,60 @@ pub fn parse_stage_statement<T: PeekableTokenStream>(
                             start_pos
                         )
                     );
+                    if expressions.len() == 1
+                        && expressions.tail_value.is_some()
+                        && let Some(binop) = expression::parse_binary_operation(token_stream, context)?
+                    {
+                        let Some(expression) = expressions.tail_value else {
+                            unreachable!();
+                        };
+                        let source_span = left_parens.span_to(&right_parens);
+                        let mut expressions = VecDeque::from([Expression::Parentheses(
+                            left_parens,
+                            expression,
+                            right_parens,
+                            source_span,
+                        )]);
+                        let mut binops = VecDeque::from([binop]);
+                        loop {
+                            expressions.push_back(expression::parse_expression_without_binops(
+                                token_stream,
+                                context,
+                            )?);
+                            while let Some(left_bracket) = consume_if!(token_stream, Token::LetterAccessLeftBracket => from_stream_pos::<cst::LetterAccessLeftBracket, _>(token_stream))
+                            {
+                                let string_expression = expressions.pop_back().unwrap();
+                                let inner_expression = parse_expression(token_stream, context)?;
+                                let right_bracket = expect_token!(
+                                    token_stream,
+                                    Token::RightBracket => from_stream_pos::<cst::RightBracket, _>(token_stream),
+                                    "Expected ']'.",
+                                    "']'"
+                                );
+                                let source_span = string_expression.span_to_end(get_token_end(token_stream));
+                                expressions.push_back(Expression::GetLetter(
+                                    Box::new(string_expression),
+                                    left_bracket,
+                                    Box::new(inner_expression),
+                                    right_bracket,
+                                    source_span,
+                                ));
+                            }
+                            binops.push_back(
+                                match expression::parse_binary_operation(token_stream, context)? {
+                                    Some(value) => value,
+                                    None => break,
+                                },
+                            );
+                        }
+                        return parse_stage_rest_of_single_input_control(
+                            token_stream,
+                            context,
+                            identifier,
+                            expression::order_operations(expressions, binops),
+                            start_pos,
+                        );
+                    }
                     if expressions.is_empty() {
                         let source_span = left_parens.span_to(&right_parens);
                         return parse_stage_rest_of_single_input_control(
