@@ -366,7 +366,7 @@ pub fn parse_project_directory_for_formatter<'a>(
     {
         let graze_code = string_arena.get_str(*index as usize).unwrap();
         let lexer = lexer::create_lexer(graze_code);
-        let mut lexer = PeekableLexer::new(lexer, file_id);
+        let mut lexer = PeekableLexer::new(lexer, *index);
         let parsed = parser::parse_graze_program(&mut lexer, context);
         let Ok(parsed) = parsed else {
             if context.settings.message_setting == GrazeMessageSetting::ExitOnErrorUnlogged {
