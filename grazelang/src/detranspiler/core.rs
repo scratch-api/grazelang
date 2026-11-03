@@ -2868,6 +2868,7 @@ pub fn convert_block_stack(
     // Issue: #138
 
     // TODO: Implement offloading big lists into files in detranspiler
+    // Issue: #143
     let mut statements = Vec::new();
     let mut current_block = block;
     let mut current_block_id = IString::from(block_id);
