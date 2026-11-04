@@ -113,6 +113,10 @@ pub enum Commands {
         multi_data_declarations: MultiDataDeclarationsMode,
         #[arg(long)]
         multi_file_project: bool,
+        #[arg(long, default_value = "16")]
+        len_threshold_file_lists: usize,
+        #[arg(long, default_value = "48")]
+        item_size_threshold_file_lists: usize,
         #[arg(long)]
         no_formatting: bool,
         #[arg(long, default_value = "100")]
@@ -758,6 +762,8 @@ impl Cli {
                 multi_asset_declarations,
                 multi_data_declarations,
                 multi_file_project,
+                len_threshold_file_lists,
+                item_size_threshold_file_lists,
                 no_formatting,
                 formatting_width,
                 formatting_indentation,
@@ -774,6 +780,8 @@ impl Cli {
                 *multi_asset_declarations,
                 *multi_data_declarations,
                 *multi_file_project,
+                *len_threshold_file_lists,
+                *item_size_threshold_file_lists,
                 *no_formatting,
                 *formatting_width,
                 *formatting_indentation,
@@ -1035,6 +1043,8 @@ impl Cli {
         multi_asset_declarations: bool,
         multi_data_declarations: MultiDataDeclarationsMode,
         multi_file_project: bool,
+        len_threshold_file_lists: usize,
+        item_size_threshold_file_lists: usize,
         no_formatting: bool,
         formatting_width: usize,
         formatting_indentation: isize,
@@ -1135,9 +1145,11 @@ impl Cli {
                 width: formatting_width,
                 hard_lines_in_code_blocks: formatting_hard_lines_in_code_blocks,
             }),
+            len_threshold_file_lists,
+            item_size_threshold_file_lists,
         };
         let build_ast_timer = Instant::now();
-        let (ast, assets, mut messages) =
+        let (ast, assets, file_lists, mut messages) =
             match detranspiler::core::convert_project(&project, settings) {
                 Ok(value) => value,
                 Err(mut errors) => {
@@ -1200,6 +1212,28 @@ impl Cli {
                 return 1;
             };
             let Ok(_) = std::io::copy(&mut asset_file, &mut output_file) else {
+                messages.push(GrazeDetranspilerMessage::Error(
+                    GrazeDetranspilerError::CannotWriteFile { path: output_path },
+                ));
+                Self::print_unbuild_errors(&mut messages, true);
+                return 1;
+            };
+        }
+        for (out_asset, content) in file_lists {
+            let output_path = resource_path.join(out_asset.as_str());
+            let Ok(mut output_file) = std::fs::OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(&output_path)
+            else {
+                messages.push(GrazeDetranspilerMessage::Error(
+                    GrazeDetranspilerError::CannotWriteFile { path: output_path },
+                ));
+                Self::print_unbuild_errors(&mut messages, true);
+                return 1;
+            };
+            let Ok(_) = std::io::Write::write_all(&mut output_file, content.as_bytes()) else {
                 messages.push(GrazeDetranspilerMessage::Error(
                     GrazeDetranspilerError::CannotWriteFile { path: output_path },
                 ));

@@ -22,6 +22,9 @@ use super::{
 use crate::{
     ast::types::{self as ast_types},
     codegen::core::{STAGE_FIELD_VALUE_ISTRING, STAGE_ISTRING},
+    detranspiler::into_ast::{
+        convert_var_or_list_to_sprite_statement, convert_var_or_list_to_stage_statement,
+    },
     library::{BlockShape, get_block_shape},
     messages::types::{GrazeDetranspilerError, GrazeDetranspilerMessage, GrazeDetranspilerWarning},
     names::{DetranspilerAssetNamespace, DetranspilerTargetNamespace},
@@ -36,6 +39,7 @@ pub struct DetranspilerContext {
     pub target_indices: HashMap<IString, usize>,
     pub asset_namespace: DetranspilerAssetNamespace,
     pub assets: HashMap<AssetPath, OutAssetPath>,
+    pub list_files: Vec<(OutAssetPath, String)>,
     pub messages: Vec<GrazeDetranspilerMessage>,
     pub unreturned_failure: bool,
     pub settings: GrazeDetranspilerSettings,
@@ -464,6 +468,7 @@ pub fn find_property_name(target: &DetranspilerTarget, property: &str) -> Option
 pub type DetranspiledProjectData = (
     ast_types::GrazeProgram,
     HashMap<AssetPath, OutAssetPath>,
+    Vec<(OutAssetPath, String)>,
     Vec<GrazeDetranspilerMessage>,
 );
 
@@ -510,6 +515,7 @@ pub fn convert_project(
         target_indices: HashMap::with_capacity(project.targets.len()),
         asset_namespace: DetranspilerAssetNamespace::new(),
         assets: HashMap::new(),
+        list_files: Vec::new(),
         messages: Vec::new(),
         unreturned_failure: false,
         settings,
@@ -702,13 +708,24 @@ pub fn convert_project(
             }
             match context.settings.multi_data_declarations {
                 crate::settings::MultiDataDeclarationsMode::None => {
-                    target
-                        .data
-                        .values()
-                        .for_each(|value| stage_statements.push(value.into_ast()));
+                    target.data.values().for_each(|value| {
+                        stage_statements.push(convert_var_or_list_to_stage_statement(
+                            value,
+                            &mut context.list_files,
+                            &mut context.asset_namespace,
+                            context.settings.len_threshold_file_lists,
+                            context.settings.item_size_threshold_file_lists,
+                        ))
+                    });
                 }
                 crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
-                    let (vars, lists) = data_to_split_data_declaration(target.data.values());
+                    let (vars, lists) = data_to_split_data_declaration(
+                        target.data.values(),
+                        &mut context.list_files,
+                        &mut context.asset_namespace,
+                        context.settings.len_threshold_file_lists,
+                        context.settings.item_size_threshold_file_lists,
+                    );
                     if vars.len() == 1 {
                         if let Some(var) = vars.into_iter().next() {
                             stage_statements.push(ast_types::StageStatement::DataDeclaration(
@@ -743,13 +760,25 @@ pub fn convert_project(
                         && let Some((_, value)) = target.data.iter().next()
                     {
                         {
-                            stage_statements.push(value.into_ast());
+                            stage_statements.push(convert_var_or_list_to_stage_statement(
+                                value,
+                                &mut context.list_files,
+                                &mut context.asset_namespace,
+                                context.settings.len_threshold_file_lists,
+                                context.settings.item_size_threshold_file_lists,
+                            ));
                         }
                     } else if !target.data.is_empty() {
                         stage_statements.push(ast_types::StageStatement::DataDeclaration(
                             ast_types::DataDeclaration::Mixed {
                                 scope: Default::default(),
-                                declarations: data_to_data_declaration(target.data.values()),
+                                declarations: data_to_data_declaration(
+                                    target.data.values(),
+                                    &mut context.list_files,
+                                    &mut context.asset_namespace,
+                                    context.settings.len_threshold_file_lists,
+                                    context.settings.item_size_threshold_file_lists,
+                                ),
                             },
                         ));
                     }
@@ -810,13 +839,24 @@ pub fn convert_project(
             }
             match context.settings.multi_data_declarations {
                 crate::settings::MultiDataDeclarationsMode::None => {
-                    target
-                        .data
-                        .values()
-                        .for_each(|value| sprite_statements.push(value.into_ast()));
+                    target.data.values().for_each(|value| {
+                        sprite_statements.push(convert_var_or_list_to_sprite_statement(
+                            value,
+                            &mut context.list_files,
+                            &mut context.asset_namespace,
+                            context.settings.len_threshold_file_lists,
+                            context.settings.item_size_threshold_file_lists,
+                        ))
+                    });
                 }
                 crate::settings::MultiDataDeclarationsMode::HomogeneousDeclarations => {
-                    let (vars, lists) = data_to_split_data_declaration(target.data.values());
+                    let (vars, lists) = data_to_split_data_declaration(
+                        target.data.values(),
+                        &mut context.list_files,
+                        &mut context.asset_namespace,
+                        context.settings.len_threshold_file_lists,
+                        context.settings.item_size_threshold_file_lists,
+                    );
                     if vars.len() == 1 {
                         if let Some(var) = vars.into_iter().next() {
                             sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
@@ -851,13 +891,25 @@ pub fn convert_project(
                         && let Some((_, value)) = target.data.iter().next()
                     {
                         {
-                            sprite_statements.push(value.into_ast());
+                            sprite_statements.push(convert_var_or_list_to_sprite_statement(
+                                value,
+                                &mut context.list_files,
+                                &mut context.asset_namespace,
+                                context.settings.len_threshold_file_lists,
+                                context.settings.item_size_threshold_file_lists,
+                            ));
                         }
                     } else if !target.data.is_empty() {
                         sprite_statements.push(ast_types::SpriteStatement::DataDeclaration(
                             ast_types::DataDeclaration::Mixed {
                                 scope: Default::default(),
-                                declarations: data_to_data_declaration(target.data.values()),
+                                declarations: data_to_data_declaration(
+                                    target.data.values(),
+                                    &mut context.list_files,
+                                    &mut context.asset_namespace,
+                                    context.settings.len_threshold_file_lists,
+                                    context.settings.item_size_threshold_file_lists,
+                                ),
                             },
                         ));
                     }
@@ -883,6 +935,7 @@ pub fn convert_project(
     Ok((
         ast_types::GrazeProgram(statements),
         context.assets,
+        context.list_files,
         context.messages,
     ))
 }
@@ -2866,9 +2919,6 @@ pub fn convert_block_stack(
     //  - [ ] Cycle detection
     //  - [ ] Demote non-tree error to warning
     // Issue: #138
-
-    // TODO: Implement offloading big lists into files in detranspiler
-    // Issue: #143
     let mut statements = Vec::new();
     let mut current_block = block;
     let mut current_block_id = IString::from(block_id);

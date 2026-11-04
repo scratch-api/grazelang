@@ -236,8 +236,38 @@ impl DetranspilerAssetNamespace {
         if let Some(actual_name) = self.assigned_names.get(name_identifier) {
             return actual_name.clone();
         }
-        if !self.used_names.contains_key(original_name) {
-            let actual_name = original_name.into();
+        if DetranspilerTargetNamespace::is_case_conforming_and_uppercase(original_name).0 {
+            if !self.used_names.contains_key(original_name) {
+                let actual_name = original_name.into();
+                return self
+                    .assign_name(
+                        original_name.to_string(),
+                        name_identifier.to_string(),
+                        actual_name,
+                    )
+                    .clone();
+            }
+            let mut actual_name = String::with_capacity(original_name.len() + 2);
+            let mut i = 2;
+            loop {
+                actual_name.clear();
+                write!(&mut actual_name, "{original_name}_{i}").unwrap();
+                if !self.used_names.contains_key(actual_name.as_str()) {
+                    return self
+                        .assign_name(
+                            original_name.to_string(),
+                            name_identifier.to_string(),
+                            actual_name.into(),
+                        )
+                        .clone();
+                }
+                i += 1;
+            }
+        }
+        let original_name =
+            DetranspilerTargetNamespace::convert_to_snake_case(original_name.into());
+        if !self.used_names.contains_key(&original_name) {
+            let actual_name = original_name.clone();
             return self
                 .assign_name(
                     original_name.to_string(),

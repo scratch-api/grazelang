@@ -27,6 +27,8 @@ pub struct GrazeDetranspilerSettings {
     pub multi_asset_declarations: bool,
     pub multi_data_declarations: MultiDataDeclarationsMode,
     pub formatting_settings: Option<UnparseFormattedSettings>,
+    pub len_threshold_file_lists: usize,
+    pub item_size_threshold_file_lists: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default, clap::ValueEnum)]
