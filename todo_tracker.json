@@ -1074,7 +1074,7 @@
     "143": {
         "filepath": "grazelang/src/detranspiler/core.rs",
         "text": "",
-        "status": "open",
+        "status": "closed",
         "lines": "L2870-L2870",
         "commit": "05a668feab9016368e9d0b44369e990296e05cc6",
         "title": "Implement offloading big lists into files in detranspiler"
