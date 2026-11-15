@@ -5142,6 +5142,7 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                             )],
                             field: None,
                             assign: None,
+                            change_by: None,
                             bind_info: None,
                         })),
                         namespace: HashMap::new(),

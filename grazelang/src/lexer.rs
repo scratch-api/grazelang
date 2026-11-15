@@ -166,6 +166,13 @@ pub enum Token {
 }
 
 // TODO: Add `+=` etc
+//  - [x] `change_by` attribute for `SingletonReporter`s
+//  - [ ] `change_by` data for `SingletonReporter`s in library_markups
+//  - [ ] Assignment operator tokens in lexer
+//  - [ ] Assignment operators in parser
+//  - [ ] Assignment operators in cst & ast
+//  - [ ] Assignment operators in visitor
+//  - [ ] Assignment operator codegen
 // Issue: #88
 
 impl std::fmt::Debug for Token {

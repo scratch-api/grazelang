@@ -38,6 +38,7 @@ pub struct BlockEntry {
     #[serde(default)]
     pub is_singleton: bool,
     pub assign: Option<AssignmentDescriptor>,
+    pub change_by: Option<AssignmentDescriptor>,
     pub field_value: Option<MenuOption>,
     pub field_category: Option<IString>,
     #[serde(default)]
@@ -277,6 +278,7 @@ impl BlockEntry {
             alt_name,
             is_singleton,
             assign,
+            change_by,
             field_value,
             field_category,
             known_params,
@@ -386,6 +388,57 @@ impl BlockEntry {
                                             })
                                             .collect(),
                                     )
+                                },
+                            ),
+                            change_by: change_by.map(
+                                |AssignmentDescriptor {
+                                     opcode,
+                                     value,
+                                     known_params,
+                                 }| {
+                                    Box::new(SimpleCallableKnownBlockSignature(
+                                        opcode.into(),
+                                        convert_block_arg_into_call_block_param(
+                                            value,
+                                            None,
+                                            menu_category_ids,
+                                        ),
+                                        known_params
+                                            .into_iter()
+                                            .map(|KnownParam { param, value }| {
+                                                let category = match &param {
+                                                    BlockArg::Field {
+                                                        name: _,
+                                                        field_type: _,
+                                                        value: _,
+                                                        options: _,
+                                                        option_category,
+                                                    } => get_menu_category_id(
+                                                        menu_category_ids,
+                                                        option_category.as_ref(),
+                                                    ),
+                                                    BlockArg::Input {
+                                                        name: _,
+                                                        menu_field_name: _,
+                                                        input_type: _,
+                                                        check: _,
+                                                        shadow: _,
+                                                    } => NO_CATEGORY_ID,
+                                                };
+                                                (
+                                                    convert_block_arg_into_call_block_param(
+                                                        param,
+                                                        None,
+                                                        menu_category_ids,
+                                                    ),
+                                                    KnownBlock::FieldValue {
+                                                        value,
+                                                        categories: HashSet::from([category]),
+                                                    },
+                                                )
+                                            })
+                                            .collect(),
+                                    ))
                                 },
                             ),
                             bind_info: None,
@@ -612,6 +665,7 @@ impl BlockEntry {
             alt_name,
             is_singleton,
             assign: _,
+            change_by: _,
             field_value: _,
             field_category: _,
             known_params: _,

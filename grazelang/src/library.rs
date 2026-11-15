@@ -345,6 +345,16 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
+                change_by: Some(Box::new(SimpleCallableKnownBlockSignature(
+                    literal!("motion_changexby"),
+                    CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Number("10".into())),
+                        },
+                        name: literal!("DX"),
+                    },
+                    Vec::new(),
+                ))),
                 bind_info: Some(sensing_bind_info(target_name, "x position")),
             },
             target_name,
@@ -365,6 +375,16 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
+                change_by: Some(Box::new(SimpleCallableKnownBlockSignature(
+                    literal!("motion_changeyby"),
+                    CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Number("10".into())),
+                        },
+                        name: literal!("DX"),
+                    },
+                    Vec::new(),
+                ))),
                 bind_info: Some(sensing_bind_info(target_name, "y position")),
             },
             target_name,
@@ -385,6 +405,16 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
+                change_by: Some(Box::new(SimpleCallableKnownBlockSignature(
+                    literal!("motion_turnright"),
+                    CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Number("15".into())),
+                        },
+                        name: literal!("DEGREES"),
+                    },
+                    Vec::new(),
+                ))),
                 bind_info: Some(sensing_bind_info(target_name, "direction")),
             },
             target_name,
@@ -423,6 +453,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
+                change_by: None,
                 bind_info: Some(sensing_bind_info(target_name, "costume #")),
             },
             target_name,
@@ -461,6 +492,7 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
+                change_by: None,
                 bind_info: Some(sensing_bind_info(target_name, "costume name")),
             },
             target_name,
@@ -481,6 +513,16 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
+                change_by: Some(Box::new(SimpleCallableKnownBlockSignature(
+                    literal!("looks_changesizeby"),
+                    CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Number("10".into())),
+                        },
+                        name: literal!("CHANGE"),
+                    },
+                    Vec::new(),
+                ))),
                 bind_info: Some(sensing_bind_info(target_name, "size")),
             },
             target_name,
@@ -501,6 +543,16 @@ pub fn create_sprite_dependent_symbols(target_name: &IString) -> Vec<(IString, S
                     },
                     Vec::new(),
                 )),
+                change_by: Some(Box::new(SimpleCallableKnownBlockSignature(
+                    literal!("sound_changevolumeby"),
+                    CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Number("-10".into())),
+                        },
+                        name: literal!("VOLUME"),
+                    },
+                    Vec::new(),
+                ))),
                 bind_info: Some(sensing_bind_info(target_name, "volume")),
             },
             target_name,
@@ -557,6 +609,7 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
                     },
                     Vec::new(),
                 )),
+                change_by: None,
                 bind_info: Some(sensing_bind_info(target_name, "backdrop #")),
             },
         ),
@@ -594,6 +647,7 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
                     },
                     Vec::new(),
                 )),
+                change_by: None,
                 bind_info: Some(sensing_bind_info(target_name, "backdrop name")),
             },
         ),
@@ -613,6 +667,16 @@ pub fn create_stage_dependent_symbols(target_name: &IString) -> Vec<(IString, Sy
                     },
                     Vec::new(),
                 )),
+                change_by: Some(Box::new(SimpleCallableKnownBlockSignature(
+                    literal!("sound_changevolumeby"),
+                    CallBlockParam {
+                        kind: CallBlockParamKind::Input {
+                            default: Some(Sb3PrimitiveBlock::Number("-10".into())),
+                        },
+                        name: literal!("VOLUME"),
+                    },
+                    Vec::new(),
+                ))),
                 bind_info: Some(sensing_bind_info(target_name, "volume")),
             },
         ),

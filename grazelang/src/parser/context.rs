@@ -238,6 +238,7 @@ impl ResolveKnownBlock for KnownBlock {
                 params,
                 field: _,
                 assign: _,
+                change_by: _,
                 bind_info,
             } => {
                 if let Some(bind_info) = bind_info
@@ -385,6 +386,7 @@ impl ResolveKnownBlock for KnownBlock {
                 params: _,
                 field,
                 assign: _,
+                change_by: _,
                 bind_info: _,
             } => {
                 if let Some(value) = field {
@@ -489,6 +491,7 @@ impl ResolveKnownBlock for KnownBlock {
                 params: _,
                 field: _,
                 assign,
+                change_by: _,
                 bind_info,
             } => {
                 if let Some(bind_info) = bind_info

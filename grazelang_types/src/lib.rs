@@ -97,6 +97,7 @@ pub enum KnownBlock {
         params: Vec<(CallBlockParam, KnownBlock)>,
         field: Option<project_json::Sb3FieldValue>,
         assign: Option<SimpleCallableKnownBlockSignature>,
+        change_by: Option<Box<SimpleCallableKnownBlockSignature>>,
         bind_info: Option<BindInfo>,
     },
     CustomBlock {
@@ -418,12 +419,14 @@ impl ToTokens for KnownBlock {
                 params,
                 field,
                 assign,
+                change_by,
                 bind_info,
             } => {
                 let opcode = opcode.as_str();
                 let (keys, values): (Vec<_>, Vec<_>) = params.iter().map(|(k, v)| (k, v)).unzip();
                 let field = quote_option(field.as_ref());
                 let assign = quote_option(assign.as_ref());
+                let change_by = quote_option(change_by.as_ref());
                 let bind_info = quote_option(bind_info.as_ref());
                 tokens.append_all(quote! {
                     #prefix::SingletonReporter {
@@ -431,6 +434,7 @@ impl ToTokens for KnownBlock {
                         params: ::std::vec![#( (#keys, #values) ),*],
                         field: #field,
                         assign: #assign,
+                        change_by: #change_by,
                         bind_info: #bind_info,
                     }
                 });
