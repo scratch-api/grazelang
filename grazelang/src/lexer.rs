@@ -96,22 +96,34 @@ pub enum Token {
     Colon,
     #[token("+")]
     Plus,
+    #[token("+=")]
+    PlusAssign,
     #[token("-")]
     Minus,
+    #[token("-=")]
+    MinusAssign,
+    #[token("*")]
+    Times,
+    #[token("*=")]
+    TimesAssign,
+    #[token("/")]
+    Div,
+    #[token("/=")]
+    DivAssign,
+    #[token("%")]
+    Mod,
+    #[token("%=")]
+    ModAssign,
+    #[token("++")]
+    Join,
+    #[token("++=")]
+    JoinAssign,
     #[token("!")]
     Not,
     #[regex(r"[eE] *\^")]
     Exp,
     #[regex(r"10 *\^")]
     Pow,
-    #[token("*")]
-    Times,
-    #[token("/")]
-    Div,
-    #[token("%")]
-    Mod,
-    #[token("++")]
-    Join,
     #[token("==")]
     Equals,
     #[token("!=")]
@@ -168,7 +180,7 @@ pub enum Token {
 // TODO: Add `+=` etc
 //  - [x] `change_by` attribute for `SingletonReporter`s
 //  - [x] `change_by` data for `SingletonReporter`s in library_markups
-//  - [ ] Assignment operator tokens in lexer
+//  - [x] Assignment operator tokens in lexer
 //  - [ ] Assignment operators in parser
 //  - [ ] Assignment operators in cst & ast
 //  - [ ] Assignment operators in visitor
@@ -204,18 +216,24 @@ impl std::fmt::Debug for Token {
             Token::Assign => write!(f, "'='"),
             Token::Colon => write!(f, "':'"),
             Token::Plus => write!(f, "'+'"),
+            Token::PlusAssign => write!(f, "\"+=\""),
             Token::Minus => write!(f, "'-'"),
-            Token::Not => write!(f, "'!'"),
+            Token::MinusAssign => write!(f, "\"-=\""),
             Token::Times => write!(f, "'*'"),
+            Token::TimesAssign => write!(f, "\"*=\""),
             Token::Div => write!(f, "'/'"),
+            Token::DivAssign => write!(f, "\"/=\""),
             Token::Mod => write!(f, "'%'"),
+            Token::ModAssign => write!(f, "\"%=\""),
+            Token::Join => write!(f, "\"++\""),
+            Token::JoinAssign => write!(f, "\"++=\""),
+            Token::Not => write!(f, "'!'"),
             Token::LessThan => write!(f, "'<'"),
             Token::GreaterThan => write!(f, "'>'"),
             Token::LetterAccessLeftBracket => write!(f, "\"@[\""),
             Token::DoubleColon => write!(f, "\"::\""),
             Token::Exp => write!(f, "\"e^\""),
             Token::Pow => write!(f, "\"10^\""),
-            Token::Join => write!(f, "\"join\""),
             Token::Equals => write!(f, "\"==\""),
             Token::NotEquals => write!(f, "\"!=\""),
             Token::LessThanOrEqual => write!(f, "\"<=\""),
