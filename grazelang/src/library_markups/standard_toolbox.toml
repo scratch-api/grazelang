@@ -291,6 +291,18 @@
                     type = "math_number"
                     default_value = "0"
 
+        [categories.blocks.change_by]
+            opcode = "motion_changexby"
+
+            [categories.blocks.change_by.value]
+                kind = "input"
+                name = "DX"
+                input_type = "value"
+
+                [categories.blocks.change_by.value.shadow]
+                    type = "math_number"
+                    default_value = "10"
+
         [categories.blocks.field_value]
             label = "x position"
             value = "x position"
@@ -314,6 +326,18 @@
                     type = "math_number"
                     default_value = "0"
 
+        [categories.blocks.change_by]
+            opcode = "motion_changeyby"
+
+            [categories.blocks.change_by.value]
+                kind = "input"
+                name = "DY"
+                input_type = "value"
+
+                [categories.blocks.change_by.value.shadow]
+                    type = "math_number"
+                    default_value = "10"
+
         [categories.blocks.field_value]
             label = "y position"
             value = "y position"
@@ -336,6 +360,18 @@
                 [categories.blocks.assign.value.shadow]
                     type = "math_angle"
                     default_value = "90"
+
+        [categories.blocks.change_by]
+            opcode = "motion_turnright"
+
+            [categories.blocks.change_by.value]
+                kind = "input"
+                name = "DEGREES"
+                input_type = "value"
+
+                [categories.blocks.change_by.value.shadow]
+                    type = "math_number"
+                    default_value = "15"
 
         [categories.blocks.field_value]
             label = "direction"
@@ -739,6 +775,18 @@
                     type = "math_number"
                     default_value = "100"
 
+        [categories.blocks.change_by]
+            opcode = "looks_changesizeby"
+
+            [categories.blocks.change_by.value]
+                kind = "input"
+                name = "CHANGE"
+                input_type = "value"
+
+                [categories.blocks.change_by.value.shadow]
+                    type = "math_number"
+                    default_value = "10"
+
         [categories.blocks.field_value]
             label = "size"
             value = "size"
@@ -985,6 +1033,18 @@
                 [categories.blocks.assign.value.shadow]
                     type = "math_number"
                     default_value = "100"
+
+        [categories.blocks.change_by]
+            opcode = "sound_changevolumeby"
+
+            [categories.blocks.change_by.value]
+                kind = "input"
+                name = "VOLUME"
+                input_type = "value"
+
+                [categories.blocks.change_by.value.shadow]
+                    type = "math_number"
+                    default_value = "-10"
 
 [[categories]]
     category = "%{BKY_CATEGORY_EVENTS}"

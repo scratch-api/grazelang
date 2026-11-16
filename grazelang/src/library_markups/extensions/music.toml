@@ -350,4 +350,16 @@
                     type = "math_number"
                     default_value = "60"
 
+        [categories.blocks.change_by]
+            opcode = "music_changeTempo"
+
+            [categories.blocks.change_by.value]
+                kind = "input"
+                name = "TEMPO"
+                input_type = "value"
+
+                [categories.blocks.change_by.value.shadow]
+                    type = "math_number"
+                    default_value = "20"
+
 required_extensions = ["music"]
