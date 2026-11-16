@@ -426,7 +426,10 @@ impl ToTokens for KnownBlock {
                 let (keys, values): (Vec<_>, Vec<_>) = params.iter().map(|(k, v)| (k, v)).unzip();
                 let field = quote_option(field.as_ref());
                 let assign = quote_option(assign.as_ref());
-                let change_by = quote_option(change_by.as_ref());
+                let change_by = match change_by.as_ref() {
+                    Some(v) => quote!(::std::option::Option::Some(::std::boxed::Box::new(#v))),
+                    None => quote!(::std::option::Option::None),
+                };
                 let bind_info = quote_option(bind_info.as_ref());
                 tokens.append_all(quote! {
                     #prefix::SingletonReporter {
