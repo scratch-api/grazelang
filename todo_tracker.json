@@ -649,10 +649,10 @@
     },
     "88": {
         "filepath": "grazelang/src/lexer.rs",
-        "text": "- [x] `change_by` attribute for `SingletonReporter`s\n- [x] `change_by` data for `SingletonReporter`s in library_markups\n- [ ] Assignment operator tokens in lexer\n- [ ] Assignment operators in parser\n- [ ] Assignment operators in cst & ast\n- [ ] Assignment operators in visitor\n- [ ] Assignment operator codegen",
+        "text": "- [x] `change_by` attribute for `SingletonReporter`s\n- [x] `change_by` data for `SingletonReporter`s in library_markups\n- [x] Assignment operator tokens in lexer\n- [ ] Assignment operators in parser\n- [ ] Assignment operators in cst & ast\n- [ ] Assignment operators in visitor\n- [ ] Assignment operator codegen",
         "status": "open",
-        "lines": "L168-L176",
-        "commit": "8b036214e77643d7aabcee3b18d03bf5616b8fb7",
+        "lines": "L180-L188",
+        "commit": "f24ee7f5cc7a9ea3891390ea25d5eeefa76741e2",
         "title": "Add `+=` etc"
     },
     "89": {
