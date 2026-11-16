@@ -830,6 +830,13 @@ pub enum Statement {
         Semicolon,
         SourceSpan,
     ),
+    SpecialAssignment(
+        Identifier,
+        SpecialAssignmentOperator,
+        Expression,
+        Semicolon,
+        SourceSpan,
+    ),
     ListAssignment(
         Identifier,
         NormalAssignmentOperator,
@@ -845,6 +852,16 @@ pub enum Statement {
         Expression,
         RightBracket,
         NormalAssignmentOperator,
+        Expression,
+        Semicolon,
+        SourceSpan,
+    ),
+    SpecialSetItem(
+        Identifier,
+        LeftBracket,
+        Expression,
+        RightBracket,
+        SpecialAssignmentOperator,
         Expression,
         Semicolon,
         SourceSpan,
@@ -897,8 +914,10 @@ impl GetPos for Statement {
         match self {
             Statement::DataDeclaration(_, _, _, p) => p,
             Statement::Assignment(_, _, _, _, p) => p,
+            Statement::SpecialAssignment(_, _, _, _, p) => p,
             Statement::ListAssignment(_, _, _, _, _, _, p) => p,
             Statement::SetItem(_, _, _, _, _, _, _, p) => p,
+            Statement::SpecialSetItem(_, _, _, _, _, _, _, p) => p,
             Statement::Call(_, _, _, _, _, p) => p,
             Statement::SingleInputControl(_, _, _, _, p) => p,
             Statement::MultiInputControl(_, _, _, _, _, _, p) => p,
@@ -1081,6 +1100,29 @@ impl GetPos for NormalAssignmentOperator {
     #[inline]
     fn get_source_span(&self) -> &SourceSpan {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SpecialAssignmentOperator {
+    PlusAssign(SourceSpan),
+    MinusAssign(SourceSpan),
+    TimesAssign(SourceSpan),
+    DivAssign(SourceSpan),
+    ModAssign(SourceSpan),
+    JoinAssign(SourceSpan),
+}
+
+impl GetPos for SpecialAssignmentOperator {
+    fn get_source_span(&self) -> &SourceSpan {
+        match self {
+            SpecialAssignmentOperator::PlusAssign(source_span)
+            | SpecialAssignmentOperator::MinusAssign(source_span)
+            | SpecialAssignmentOperator::TimesAssign(source_span)
+            | SpecialAssignmentOperator::DivAssign(source_span)
+            | SpecialAssignmentOperator::ModAssign(source_span)
+            | SpecialAssignmentOperator::JoinAssign(source_span) => source_span,
+        }
     }
 }
 

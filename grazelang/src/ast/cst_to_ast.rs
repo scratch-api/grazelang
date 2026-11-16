@@ -54,6 +54,17 @@ cst_to_ast_with_cheap_clone_cst_to_ast!(cst_types::UnOp, ast_types::UnOp, this =
     }
 });
 
+cst_to_ast_with_cheap_clone_cst_to_ast!(cst_types::SpecialAssignmentOperator, ast_types::SpecialAssignmentOperator, this => {
+    match this {
+        cst_types::SpecialAssignmentOperator::PlusAssign(_) => ast_types::SpecialAssignmentOperator::PlusAssign,
+        cst_types::SpecialAssignmentOperator::MinusAssign(_) => ast_types::SpecialAssignmentOperator::MinusAssign,
+        cst_types::SpecialAssignmentOperator::TimesAssign(_) => ast_types::SpecialAssignmentOperator::TimesAssign,
+        cst_types::SpecialAssignmentOperator::DivAssign(_) => ast_types::SpecialAssignmentOperator::DivAssign,
+        cst_types::SpecialAssignmentOperator::ModAssign(_) => ast_types::SpecialAssignmentOperator::ModAssign,
+        cst_types::SpecialAssignmentOperator::JoinAssign(_) => ast_types::SpecialAssignmentOperator::JoinAssign,
+    }
+});
+
 impl CSTToAST for cst_types::Literal {
     type AST = ast_types::Literal;
     type Error = Infallible;
@@ -759,6 +770,13 @@ impl CSTToAST for cst_types::Statement {
                     value: value.clone_cst_to_ast()?,
                 }
             }
+            cst_types::Statement::SpecialAssignment(identifier, operator, value, _, _) => {
+                ast_types::Statement::SpecialAssignment {
+                    target: identifier.clone_cst_to_ast()?,
+                    operator: operator.clone_cst_to_ast()?,
+                    value: value.clone_cst_to_ast()?,
+                }
+            }
             cst_types::Statement::ListAssignment(identifier, _, _, value, _, _, _) => {
                 ast_types::Statement::ListAssignment {
                     target: identifier.clone_cst_to_ast()?,
@@ -772,6 +790,14 @@ impl CSTToAST for cst_types::Statement {
                 ast_types::Statement::SetItem {
                     list: identifier.clone_cst_to_ast()?,
                     item: key.clone_cst_to_ast()?,
+                    value: value.clone_cst_to_ast()?,
+                }
+            }
+            cst_types::Statement::SpecialSetItem(identifier, _, key, _, operator, value, _, _) => {
+                ast_types::Statement::SpecialSetItem {
+                    list: identifier.clone_cst_to_ast()?,
+                    item: key.clone_cst_to_ast()?,
+                    operator: operator.clone_cst_to_ast()?,
                     value: value.clone_cst_to_ast()?,
                 }
             }
@@ -854,6 +880,13 @@ impl CSTToAST for cst_types::Statement {
                     value: value.cst_to_ast()?,
                 }
             }
+            cst_types::Statement::SpecialAssignment(identifier, operator, value, _, _) => {
+                ast_types::Statement::SpecialAssignment {
+                    target: identifier.cst_to_ast()?,
+                    operator: operator.cst_to_ast()?,
+                    value: value.cst_to_ast()?,
+                }
+            }
             cst_types::Statement::ListAssignment(identifier, _, _, value, _, _, _) => {
                 ast_types::Statement::ListAssignment {
                     target: identifier.cst_to_ast()?,
@@ -867,6 +900,14 @@ impl CSTToAST for cst_types::Statement {
                 ast_types::Statement::SetItem {
                     list: identifier.cst_to_ast()?,
                     item: key.cst_to_ast()?,
+                    value: value.cst_to_ast()?,
+                }
+            }
+            cst_types::Statement::SpecialSetItem(identifier, _, key, _, operator, value, _, _) => {
+                ast_types::Statement::SpecialSetItem {
+                    list: identifier.cst_to_ast()?,
+                    item: key.cst_to_ast()?,
+                    operator: operator.cst_to_ast()?,
                     value: value.cst_to_ast()?,
                 }
             }

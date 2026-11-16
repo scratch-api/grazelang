@@ -9,9 +9,9 @@ use crate::{
         AssetDeclaration, BinOp, CanonicalIdentifier, CodeBlock, CustomBlockParamKind,
         DataDeclaration, DataDeclarationScope, DictionaryEntry, DictionaryValue, Expression,
         GrazeProgram, Identifier, ListEntry, Literal, MonitorValue, SingleAssetDeclaration,
-        SingleAssetDeclarationValue, SingleDataDeclaration, SingleIdentifier, SpriteCodeBlock,
-        SpriteStatement, StageCodeBlock, StageStatement, Statement, TopLevelStatement, UnOp,
-        UseStatementContent, WarpSpecifier,
+        SingleAssetDeclarationValue, SingleDataDeclaration, SingleIdentifier,
+        SpecialAssignmentOperator, SpriteCodeBlock, SpriteStatement, StageCodeBlock,
+        StageStatement, Statement, TopLevelStatement, UnOp, UseStatementContent, WarpSpecifier,
     },
     parser::cst::Associativity,
     utils::string_escape::{self, normal_string_escaper},
@@ -221,6 +221,7 @@ impl UnparseASTFormatted for &Literal {
 
 simple_impl_unparse_ast_formatted!(UnOp, this => this.as_str());
 simple_impl_unparse_ast_formatted!(BinOp, this => this.as_str());
+simple_impl_unparse_ast_formatted!(SpecialAssignmentOperator, this => this.as_str());
 simple_impl_unparse_ast_formatted!(SingleIdentifier, this => &this.value);
 
 impl UnparseASTFormatted for &Identifier {
@@ -462,6 +463,19 @@ impl UnparseASTFormatted for &Statement {
                 .append(";")
                 .nest(settings.indentation)
                 .group(),
+            Statement::SpecialAssignment {
+                target,
+                operator,
+                value,
+            } => target
+                .into_pretty_doc(allocator, settings)
+                .append(" ")
+                .append(operator.into_pretty_doc(allocator, settings))
+                .append(allocator.line())
+                .append(value.into_pretty_doc(allocator, settings))
+                .append(";")
+                .nest(settings.indentation)
+                .group(),
             Statement::ListAssignment { target, value } => target
                 .into_pretty_doc(allocator, settings)
                 .append(" =")
@@ -502,6 +516,29 @@ impl UnparseASTFormatted for &Statement {
                         .group(),
                 )
                 .append("] =")
+                .append(allocator.line())
+                .append(value.into_pretty_doc(allocator, settings))
+                .append(";")
+                .nest(settings.indentation)
+                .group(),
+            Statement::SpecialSetItem {
+                list,
+                item,
+                operator,
+                value,
+            } => list
+                .into_pretty_doc(allocator, settings)
+                .append("[")
+                .append(
+                    allocator
+                        .line_()
+                        .append(item.into_pretty_doc(allocator, settings))
+                        .nest(settings.indentation)
+                        .append(allocator.line_())
+                        .group(),
+                )
+                .append("] ")
+                .append(operator.into_pretty_doc(allocator, settings))
                 .append(allocator.line())
                 .append(value.into_pretty_doc(allocator, settings))
                 .append(";")

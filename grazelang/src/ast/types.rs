@@ -1,4 +1,4 @@
-use arcstr::{format as format_istring, ArcStr as IString};
+use arcstr::{ArcStr as IString, format as format_istring};
 
 use grazelang_types::project_json::{Sb3Primitive, Sb3PrimitiveOrBool};
 use serde::{Deserialize, Serialize};
@@ -31,11 +31,7 @@ pub struct WarpSpecifier {
 
 impl WarpSpecifier {
     pub fn as_str(self) -> &'static str {
-        if self.is_warp {
-            "warp"
-        } else {
-            "nowarp"
-        }
+        if self.is_warp { "warp" } else { "nowarp" }
     }
 }
 
@@ -158,6 +154,11 @@ pub enum Statement {
         target: Identifier,
         value: Expression,
     },
+    SpecialAssignment {
+        target: Identifier,
+        operator: SpecialAssignmentOperator,
+        value: Expression,
+    },
     ListAssignment {
         target: Identifier,
         value: Vec<ListEntry>,
@@ -165,6 +166,12 @@ pub enum Statement {
     SetItem {
         list: Identifier,
         item: Expression,
+        value: Expression,
+    },
+    SpecialSetItem {
+        list: Identifier,
+        item: Expression,
+        operator: SpecialAssignmentOperator,
         value: Expression,
     },
     Call {
@@ -366,6 +373,29 @@ impl UnOp {
             UnOp::Not => "!",
             UnOp::Exp => "e^",
             UnOp::Pow => "10^",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum SpecialAssignmentOperator {
+    PlusAssign,
+    MinusAssign,
+    TimesAssign,
+    DivAssign,
+    ModAssign,
+    JoinAssign,
+}
+
+impl SpecialAssignmentOperator {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SpecialAssignmentOperator::PlusAssign => "+=",
+            SpecialAssignmentOperator::MinusAssign => "-=",
+            SpecialAssignmentOperator::TimesAssign => "*=",
+            SpecialAssignmentOperator::DivAssign => "/=",
+            SpecialAssignmentOperator::ModAssign => "%=",
+            SpecialAssignmentOperator::JoinAssign => "++=",
         }
     }
 }

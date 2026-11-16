@@ -10,9 +10,9 @@ use crate::{
         AssetDeclaration, BinOp, CanonicalIdentifier, CodeBlock, CustomBlockParamKind,
         DataDeclaration, DataDeclarationScope, DictionaryEntry, DictionaryValue, Expression,
         GrazeProgram, Identifier, ListEntry, Literal, MonitorValue, SingleAssetDeclaration,
-        SingleAssetDeclarationValue, SingleDataDeclaration, SingleIdentifier, SpriteCodeBlock,
-        SpriteStatement, StageCodeBlock, StageStatement, Statement, TopLevelStatement, UnOp,
-        UseStatementContent, WarpSpecifier,
+        SingleAssetDeclarationValue, SingleDataDeclaration, SingleIdentifier,
+        SpecialAssignmentOperator, SpriteCodeBlock, SpriteStatement, StageCodeBlock,
+        StageStatement, Statement, TopLevelStatement, UnOp, UseStatementContent, WarpSpecifier,
     },
     parser::cst::Associativity,
     utils::string_escape,
@@ -129,6 +129,7 @@ macro_rules! simple_impl_unparse_ast {
 
 simple_impl_unparse_ast!(UnOp, this => this.as_str());
 simple_impl_unparse_ast!(BinOp, this => this.as_str());
+simple_impl_unparse_ast!(SpecialAssignmentOperator, this => this.as_str());
 simple_impl_unparse_ast!(SingleIdentifier, this => &this.value);
 
 impl UnparseAST for Identifier {
@@ -303,6 +304,18 @@ impl UnparseAST for Statement {
                 value.unparse_into(f)?;
                 f.write_char(';')
             }
+            Statement::SpecialAssignment {
+                target,
+                operator,
+                value,
+            } => {
+                target.unparse_into(f)?;
+                f.write_str(" ")?;
+                operator.unparse_into(f)?;
+                f.write_str(" ")?;
+                value.unparse_into(f)?;
+                f.write_char(';')
+            }
             Statement::ListAssignment { target, value } => {
                 target.unparse_into(f)?;
                 f.write_str(" = [")?;
@@ -317,6 +330,21 @@ impl UnparseAST for Statement {
                 f.write_char('[')?;
                 item.unparse_into(f)?;
                 f.write_str("] = ")?;
+                value.unparse_into(f)?;
+                f.write_char(';')
+            }
+            Statement::SpecialSetItem {
+                list,
+                item,
+                operator,
+                value,
+            } => {
+                list.unparse_into(f)?;
+                f.write_char('[')?;
+                item.unparse_into(f)?;
+                f.write_str("] ")?;
+                operator.unparse_into(f)?;
+                f.write_str(" ")?;
                 value.unparse_into(f)?;
                 f.write_char(';')
             }

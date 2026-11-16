@@ -8,9 +8,10 @@ use crate::{
         LetKeyword, LetterAccessLeftBracket, ListEntry, ListKeyword, ListsKeyword, Literal,
         MonitorKeyword, MonitorValue, NormalAssignmentOperator, ProcKeyword, RightBrace,
         RightBracket, RightParens, Semicolon, SingleDataDeclaration, SingleIdentifier,
-        SoundKeyword, SpriteCodeBlock, SpriteKeyword, SpriteStatement, StageCodeBlock,
-        StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf, TopLevelStatement,
-        UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword, WarpSpecifier,
+        SoundKeyword, SpecialAssignmentOperator, SpriteCodeBlock, SpriteKeyword, SpriteStatement,
+        StageCodeBlock, StageKeyword, StageStatement, Statement, SyntacticElse, SyntacticIf,
+        TopLevelStatement, UnOp, UseKeyword, UseStatementContent, VarKeyword, VarsKeyword,
+        WarpSpecifier,
     },
 };
 
@@ -163,6 +164,14 @@ pub type BorrowedStatementAssignment<'a> = (
     &'a SourceSpan,
 );
 
+pub type BorrowedStatementSpecialAssignment<'a> = (
+    &'a Identifier,
+    &'a SpecialAssignmentOperator,
+    &'a Expression,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
 pub type BorrowedStatementListAssignment<'a> = (
     &'a Identifier,
     &'a NormalAssignmentOperator,
@@ -179,6 +188,17 @@ pub type BorrowedStatementSetItem<'a> = (
     &'a Expression,
     &'a RightBracket,
     &'a NormalAssignmentOperator,
+    &'a Expression,
+    &'a Semicolon,
+    &'a SourceSpan,
+);
+
+pub type BorrowedStatementSpecialSetItem<'a> = (
+    &'a Identifier,
+    &'a LeftBracket,
+    &'a Expression,
+    &'a RightBracket,
+    &'a SpecialAssignmentOperator,
     &'a Expression,
     &'a Semicolon,
     &'a SourceSpan,
@@ -524,6 +544,14 @@ pub trait GrazeVisitor<C, E> {
         default_visit_statement_assignment(self, value, context)
     }
 
+    fn visit_statement_special_assignment(
+        &self,
+        value: BorrowedStatementSpecialAssignment,
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_statement_special_assignment(self, value, context)
+    }
+
     fn visit_statement_list_assignment(
         &self,
         value: BorrowedStatementListAssignment,
@@ -538,6 +566,14 @@ pub trait GrazeVisitor<C, E> {
         context: &mut C,
     ) -> Result<(), E> {
         default_visit_statement_set_item(self, value, context)
+    }
+
+    fn visit_statement_special_set_item(
+        &self,
+        value: BorrowedStatementSpecialSetItem,
+        context: &mut C,
+    ) -> Result<(), E> {
+        default_visit_statement_special_set_item(self, value, context)
     }
 
     fn visit_statement_call(&self, value: BorrowedStatementCall, context: &mut C) -> Result<(), E> {
@@ -1527,6 +1563,24 @@ where
                 context,
             )?;
         }
+        Statement::SpecialAssignment(
+            identifier,
+            special_assignment_operator,
+            expression,
+            semicolon,
+            source_span,
+        ) => {
+            visitor.visit_statement_special_assignment(
+                (
+                    identifier,
+                    special_assignment_operator,
+                    expression,
+                    semicolon,
+                    source_span,
+                ),
+                context,
+            )?;
+        }
         Statement::ListAssignment(
             identifier,
             normal_assignment_operator,
@@ -1566,6 +1620,30 @@ where
                     expression,
                     right_bracket,
                     normal_assignment_operator,
+                    expression1,
+                    semicolon,
+                    source_span,
+                ),
+                context,
+            )?;
+        }
+        Statement::SpecialSetItem(
+            identifier,
+            left_bracket,
+            expression,
+            right_bracket,
+            special_assignment_operator,
+            expression1,
+            semicolon,
+            source_span,
+        ) => {
+            visitor.visit_statement_special_set_item(
+                (
+                    identifier,
+                    left_bracket,
+                    expression,
+                    right_bracket,
+                    special_assignment_operator,
                     expression1,
                     semicolon,
                     source_span,
@@ -1694,6 +1772,18 @@ where
     Ok(())
 }
 
+pub fn default_visit_statement_special_assignment<V, C, E>(
+    visitor: &V,
+    value: BorrowedStatementSpecialAssignment,
+    context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    visitor.visit_expression(value.2, context)?;
+    Ok(())
+}
+
 pub fn default_visit_statement_list_assignment<V, C, E>(
     visitor: &V,
     value: BorrowedStatementListAssignment,
@@ -1709,6 +1799,19 @@ where
 pub fn default_visit_statement_set_item<V, C, E>(
     visitor: &V,
     value: BorrowedStatementSetItem,
+    context: &mut C,
+) -> Result<(), E>
+where
+    V: GrazeVisitor<C, E> + ?Sized,
+{
+    visitor.visit_expression(value.2, context)?;
+    visitor.visit_expression(value.5, context)?;
+    Ok(())
+}
+
+pub fn default_visit_statement_special_set_item<V, C, E>(
+    visitor: &V,
+    value: BorrowedStatementSpecialSetItem,
     context: &mut C,
 ) -> Result<(), E>
 where

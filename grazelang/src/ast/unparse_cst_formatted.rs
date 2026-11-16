@@ -10,8 +10,9 @@ use crate::{
         CustomBlockParamKind, DataDeclaration, DataDeclarationScope, DictionaryEntry,
         DictionaryValue, DoubleColonOrDot, Expression, GetPos, GrazeProgram, Identifier, ListEntry,
         Literal, MonitorValue, SingleAssetDeclaration, SingleAssetDeclarationValue,
-        SingleDataDeclaration, SingleIdentifier, SpriteCodeBlock, SpriteStatement, StageCodeBlock,
-        StageStatement, Statement, TopLevelStatement, UnOp, UseStatementContent, WarpSpecifier,
+        SingleDataDeclaration, SingleIdentifier, SpecialAssignmentOperator, SpriteCodeBlock,
+        SpriteStatement, StageCodeBlock, StageStatement, Statement, TopLevelStatement, UnOp,
+        UseStatementContent, WarpSpecifier,
     },
     utils::string_escape,
 };
@@ -700,6 +701,30 @@ impl UnparseCSTFormatted for &BinOp {
     }
 }
 
+impl UnparseCSTFormatted for &SpecialAssignmentOperator {
+    fn into_pretty_doc<'a, 'ctx, D>(
+        self,
+        allocator: &'a D,
+        context: &mut Context<'ctx>,
+    ) -> DocBuilder<'a, D, ()>
+    where
+        Self: 'a,
+        'ctx: 'a,
+        D: DocAllocator<'a, ()>,
+        D::Doc: Clone,
+    {
+        let (text, span) = match self {
+            SpecialAssignmentOperator::PlusAssign(source_span) => ("+=", source_span.0),
+            SpecialAssignmentOperator::MinusAssign(source_span) => ("-=", source_span.0),
+            SpecialAssignmentOperator::TimesAssign(source_span) => ("*=", source_span.0),
+            SpecialAssignmentOperator::DivAssign(source_span) => ("/=", source_span.0),
+            SpecialAssignmentOperator::ModAssign(source_span) => ("%=", source_span.0),
+            SpecialAssignmentOperator::JoinAssign(source_span) => ("++=", source_span.0),
+        };
+        pretty_token_span!(text, span, allocator, context)
+    }
+}
+
 impl UnparseCSTFormatted for &SingleIdentifier {
     fn into_pretty_doc<'a, 'ctx, D>(
         self,
@@ -959,6 +984,19 @@ impl UnparseCSTFormatted for &Statement {
                         .group(),
                 )
             }
+            Statement::SpecialAssignment(target, operator, value, semicolon, _) => {
+                flush_before_group!(target, allocator, context).append(
+                    target
+                        .into_pretty_doc(allocator, context)
+                        .append(ws(Whitespace::Space, allocator, context))
+                        .append(operator.into_pretty_doc(allocator, context))
+                        .append(ws(Whitespace::Line, allocator, context))
+                        .append(value.into_pretty_doc(allocator, context))
+                        .append(pretty_token!(";", semicolon, allocator, context))
+                        .nest(context.indentation)
+                        .group(),
+                )
+            }
             Statement::ListAssignment(
                 target,
                 assignment,
@@ -1010,6 +1048,35 @@ impl UnparseCSTFormatted for &Statement {
                     .append(pretty_token!("]", right_bracket, allocator, context))
                     .append(ws(Whitespace::Space, allocator, context))
                     .append(pretty_token!("=", assignment, allocator, context))
+                    .append(ws(Whitespace::Line, allocator, context))
+                    .append(value.into_pretty_doc(allocator, context))
+                    .append(pretty_token!(";", semicolon, allocator, context))
+                    .nest(context.indentation)
+                    .group(),
+            ),
+            Statement::SpecialSetItem(
+                list,
+                left_bracket,
+                item,
+                right_bracket,
+                operator,
+                value,
+                semicolon,
+                _,
+            ) => flush_before_group!(list, allocator, context).append(
+                list.into_pretty_doc(allocator, context)
+                    .append(pretty_token!("[", left_bracket, allocator, context))
+                    .append(
+                        ws(Whitespace::Line_, allocator, context)
+                            .append(item.into_pretty_doc(allocator, context))
+                            .nest(context.indentation)
+                            .append(ws(Whitespace::Line_, allocator, context))
+                            .append(flush_whitespace(allocator, context))
+                            .group(),
+                    )
+                    .append(pretty_token!("]", right_bracket, allocator, context))
+                    .append(ws(Whitespace::Space, allocator, context))
+                    .append(operator.into_pretty_doc(allocator, context))
                     .append(ws(Whitespace::Line, allocator, context))
                     .append(value.into_pretty_doc(allocator, context))
                     .append(pretty_token!(";", semicolon, allocator, context))
