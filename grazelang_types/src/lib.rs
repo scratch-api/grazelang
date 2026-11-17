@@ -67,6 +67,7 @@ pub enum KnownBlock {
         canonical_name: String,
         id: IString,
         assign: SimpleCallableKnownBlockSignature,
+        change_by: Box<SimpleCallableKnownBlockSignature>,
         bind_info: Option<BindInfo>,
     },
     List {
@@ -332,10 +333,36 @@ impl KnownBlock {
                 },
             )],
         );
+        let change_by = Box::new(SimpleCallableKnownBlockSignature(
+            literal!("data_changevariableby"),
+            CallBlockParam {
+                kind: CallBlockParamKind::Input {
+                    default: Some("1".into()),
+                },
+                name: literal!("VALUE"),
+            },
+            vec![(
+                CallBlockParam {
+                    kind: CallBlockParamKind::Field {
+                        default: None,
+                        category: VARIABLES_CATEGORY_ID,
+                    },
+                    name: literal!("VARIABLE"),
+                },
+                KnownBlock::FieldValue {
+                    value: project_json::Sb3FieldValue::WithId {
+                        value: (&canonical_name as &str).into(),
+                        id: id.to_string(),
+                    },
+                    categories: HashSet::from([VARIABLES_CATEGORY_ID]),
+                },
+            )],
+        ));
         Self::Variable {
             canonical_name,
             id,
             assign,
+            change_by,
             bind_info,
         }
     }
@@ -363,6 +390,7 @@ impl ToTokens for KnownBlock {
                 canonical_name,
                 id,
                 assign,
+                change_by,
                 bind_info,
             } => {
                 let id = id.as_str();
@@ -372,6 +400,7 @@ impl ToTokens for KnownBlock {
                         canonical_name: #canonical_name.to_string(),
                         id: ::arcstr::literal!(#id),
                         assign: #assign,
+                        change_by: ::std::boxed::Box::new(#change_by),
                         bind_info: #bind_info,
                     }
                 });

@@ -179,6 +179,7 @@ impl ResolveKnownBlock for KnownBlock {
                 canonical_name,
                 id,
                 assign: _,
+                change_by: _,
                 bind_info,
             } => {
                 if let Some(bind_info) = bind_info
@@ -266,6 +267,7 @@ impl ResolveKnownBlock for KnownBlock {
                 canonical_name,
                 id,
                 assign: _,
+                change_by: _,
                 bind_info: _,
             } => (
                 Sb3FieldValue::WithId {
@@ -484,6 +486,7 @@ impl ResolveKnownBlock for KnownBlock {
                 canonical_name: _,
                 id: _,
                 assign,
+                change_by: _,
                 bind_info: _,
             } => Some(assign),
             KnownBlock::SingletonReporter {

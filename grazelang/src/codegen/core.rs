@@ -738,6 +738,7 @@ impl GrazeSb3GeneratorContext {
                             canonical_name,
                             id: _,
                             assign: _,
+                            change_by: _,
                             bind_info: _,
                         }) = symbol.known_block.as_deref()
                         {
@@ -882,6 +883,7 @@ impl GrazeSb3GeneratorContext {
                             canonical_name,
                             id: _,
                             assign: _,
+                            change_by: _,
                             bind_info: _,
                         }) = symbol.known_block.as_deref()
                         {

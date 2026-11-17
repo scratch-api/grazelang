@@ -180,7 +180,7 @@ pub enum Token {
 // TODO: Add `+=` etc
 //  - [x] `change_by` attribute for `SingletonReporter`s
 //  - [x] `change_by` data for `SingletonReporter`s in library_markups
-//  - [ ] `change_by` attribute for variables
+//  - [x] `change_by` attribute for variables
 //  - [ ] `resolve_for_change_by` in `ResolveKnownBlock`
 //  - [x] Assignment operator tokens in lexer
 //  - [x] Assignment operators in cst & ast
