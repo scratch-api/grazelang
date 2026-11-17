@@ -1130,7 +1130,8 @@ pub mod statement {
             ListKeyword, ListsKeyword, MonitorDeclarationFromContent, MonitorKeyword, MonitorValue,
             NormalAssignmentOperator, RightBrace, RightBracket, RightParens, Semicolon,
             SingleAssetDeclaration, SingleDataDeclaration, SingleDataDeclarationType,
-            SyntacticElse, SyntacticIf, Unwrap, VarKeyword, VarsKeyword, WarpSpecifier,
+            SpecialAssignmentOperator, SyntacticElse, SyntacticIf, Unwrap, VarKeyword, VarsKeyword,
+            WarpSpecifier,
         },
     };
 
@@ -2316,6 +2317,27 @@ pub mod statement {
         ))
     }
 
+    pub fn parse_special_assignment<T: PeekableTokenStream>(
+        token_stream: &mut T,
+        context: &mut ParseContext,
+        start_pos: (usize, usize),
+        identifier: Identifier,
+        special_assignment_operator: SpecialAssignmentOperator,
+    ) -> ParseOut<Statement> {
+        Ok(Statement::SpecialAssignment(
+            identifier,
+            special_assignment_operator,
+            parse_expression(token_stream, context)?,
+            expect_token!(
+                token_stream,
+                Token::Semicolon => from_stream_pos::<Semicolon, _>(token_stream),
+                "Expected ';'.",
+                "';'"
+            ),
+            token_stream.span_from_previous_to_current(start_pos),
+        ))
+    }
+
     #[inline]
     pub(crate) fn parse_rest_of_single_input_control<T: PeekableTokenStream>(
         token_stream: &mut T,
@@ -2549,6 +2571,42 @@ pub mod statement {
     ) -> ParseOut<Statement> {
         match peek_token!(token_stream) {
             Token::Assign => parse_assignment(token_stream, context, identifier),
+            Token::PlusAssign
+            | Token::MinusAssign
+            | Token::TimesAssign
+            | Token::DivAssign
+            | Token::ModAssign
+            | Token::JoinAssign => {
+                let start_pos = get_token_start(token_stream);
+                let special_assignment_operator = match next_token!(token_stream) {
+                    Token::PlusAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::PlusAssign)
+                    }
+                    Token::MinusAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::MinusAssign)
+                    }
+                    Token::TimesAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::TimesAssign)
+                    }
+                    Token::DivAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::DivAssign)
+                    }
+                    Token::ModAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::ModAssign)
+                    }
+                    Token::JoinAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::JoinAssign)
+                    }
+                    _ => unreachable!(),
+                };
+                parse_special_assignment(
+                    token_stream,
+                    context,
+                    start_pos,
+                    identifier,
+                    special_assignment_operator,
+                )
+            }
             Token::LeftParens => parse_call_or_control(token_stream, context, identifier),
             Token::LeftBrace => parse_forever(token_stream, context, identifier),
             Token::LeftBracket => {
@@ -2562,19 +2620,61 @@ pub mod statement {
                     "Expected ']'.",
                     "']'"
                 );
-                let assignment_operator = expect_token!(
-                    token_stream,
-                    Token::Assign => from_stream_pos::<NormalAssignmentOperator, _>(token_stream),
-                    "Expected '='.",
-                    "'='"
-                );
+                let operator = match next_token!(token_stream) {
+                    Token::PlusAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::PlusAssign)
+                    }
+                    Token::MinusAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::MinusAssign)
+                    }
+                    Token::TimesAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::TimesAssign)
+                    }
+                    Token::DivAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::DivAssign)
+                    }
+                    Token::ModAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::ModAssign)
+                    }
+                    Token::JoinAssign => {
+                        variant_from_stream_pos!(token_stream => SpecialAssignmentOperator::JoinAssign)
+                    }
+                    Token::Assign => {
+                        let assignment_operator =
+                            from_stream_pos::<NormalAssignmentOperator, _>(token_stream);
+                        let value = parse_expression(token_stream, context)?;
+                        return Ok(Statement::SetItem(
+                            identifier,
+                            left_bracket,
+                            item,
+                            right_bracket,
+                            assignment_operator,
+                            value,
+                            expect_token!(
+                                token_stream,
+                                Token::Semicolon => from_stream_pos::<Semicolon, _>(token_stream),
+                                "Expected ';'.",
+                                "';'"
+                            ),
+                            token_stream.span_from_previous_to_current(start_pos),
+                        ));
+                    }
+                    token => {
+                        emit_unexpected_token!(
+                            token_stream,
+                            "Expected '=', \"+=\", \"-=\", \"*=\", \"/=\", \"%=\" or \"++=\".",
+                            "'=', \"+=\", \"-=\", \"*=\", \"/=\", \"%=\" or \"++=\"",
+                            token
+                        );
+                    }
+                };
                 let value = parse_expression(token_stream, context)?;
-                Ok(Statement::SetItem(
+                Ok(Statement::SpecialSetItem(
                     identifier,
                     left_bracket,
                     item,
                     right_bracket,
-                    assignment_operator,
+                    operator,
                     value,
                     expect_token!(
                         token_stream,
@@ -2587,8 +2687,8 @@ pub mod statement {
             }
             _ => token_stream.substitude_unexpected_token_message(
                 |token_stream| parse_call_or_control(token_stream, context, identifier),
-                literal!("Expected '=', '(', '{', '[' or an expression."),
-                literal!("'=', '(', '{', '[' or an expression"),
+                literal!("Expected '=', \"+=\", \"-=\", \"*=\", \"/=\", \"%=\", \"++=\", '(', '{', '[' or an expression."),
+                literal!("'=', \"+=\", \"-=\", \"*=\", \"/=\", \"%=\", \"++=\", '(', '{', '[' or an expression"),
             ),
         }
     }
@@ -3939,7 +4039,8 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
                     );
                     if expressions.len() == 1
                         && expressions.tail_value.is_some()
-                        && let Some(binop) = expression::parse_binary_operation(token_stream, context)?
+                        && let Some(binop) =
+                            expression::parse_binary_operation(token_stream, context)?
                     {
                         let Some(expression) = expressions.tail_value else {
                             unreachable!();
@@ -3967,7 +4068,8 @@ pub fn parse_sprite_statement<T: PeekableTokenStream>(
                                     "Expected ']'.",
                                     "']'"
                                 );
-                                let source_span = string_expression.span_to_end(get_token_end(token_stream));
+                                let source_span =
+                                    string_expression.span_to_end(get_token_end(token_stream));
                                 expressions.push_back(Expression::GetLetter(
                                     Box::new(string_expression),
                                     left_bracket,
@@ -4365,7 +4467,8 @@ pub fn parse_stage_statement<T: PeekableTokenStream>(
                     );
                     if expressions.len() == 1
                         && expressions.tail_value.is_some()
-                        && let Some(binop) = expression::parse_binary_operation(token_stream, context)?
+                        && let Some(binop) =
+                            expression::parse_binary_operation(token_stream, context)?
                     {
                         let Some(expression) = expressions.tail_value else {
                             unreachable!();
@@ -4393,7 +4496,8 @@ pub fn parse_stage_statement<T: PeekableTokenStream>(
                                     "Expected ']'.",
                                     "']'"
                                 );
-                                let source_span = string_expression.span_to_end(get_token_end(token_stream));
+                                let source_span =
+                                    string_expression.span_to_end(get_token_end(token_stream));
                                 expressions.push_back(Expression::GetLetter(
                                     Box::new(string_expression),
                                     left_bracket,
