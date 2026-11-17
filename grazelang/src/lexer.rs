@@ -181,7 +181,7 @@ pub enum Token {
 //  - [x] `change_by` attribute for `SingletonReporter`s
 //  - [x] `change_by` data for `SingletonReporter`s in library_markups
 //  - [x] `change_by` attribute for variables
-//  - [ ] `resolve_for_change_by` in `ResolveKnownBlock`
+//  - [x] `resolve_for_change_by` in `ResolveKnownBlock`
 //  - [x] Assignment operator tokens in lexer
 //  - [x] Assignment operators in cst & ast
 //  - [x] Assignment operators in visitor

@@ -166,6 +166,18 @@ pub trait ResolveKnownBlock {
         source_span: SourceSpan,
         context: &mut codegen::core::GrazeSb3GeneratorContext,
     ) -> Option<&'a SimpleCallableKnownBlockSignature>;
+
+    fn resolve_for_change_by<'a>(
+        &'a self,
+        source_span: SourceSpan,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> ResolvedForChangeBy<'a>;
+}
+
+pub enum ResolvedForChangeBy<'a> {
+    ChangeBy(&'a SimpleCallableKnownBlockSignature),
+    Assign(&'a SimpleCallableKnownBlockSignature),
+    None,
 }
 
 impl ResolveKnownBlock for KnownBlock {
@@ -524,6 +536,63 @@ impl ResolveKnownBlock for KnownBlock {
             | KnownBlock::CustomBlock { .. }
             | KnownBlock::BoundMethod { .. }
             | KnownBlock::Empty => None,
+        }
+    }
+
+    fn resolve_for_change_by<'a>(
+        &'a self,
+        source_span: SourceSpan,
+        context: &mut codegen::core::GrazeSb3GeneratorContext,
+    ) -> ResolvedForChangeBy<'a> {
+        match self {
+            KnownBlock::Variable {
+                canonical_name: _,
+                id: _,
+                assign: _,
+                change_by,
+                bind_info: _,
+            } => ResolvedForChangeBy::ChangeBy(change_by),
+            KnownBlock::SingletonReporter {
+                opcode: _,
+                params: _,
+                field: _,
+                assign,
+                change_by,
+                bind_info,
+            } => {
+                if let Some(bind_info) = bind_info
+                    && let Some(target) = context.current_sb3_target.as_ref()
+                    && bind_info.parent_target.as_str() != target.get_field_value()
+                {
+                    emit_message_eager(
+                        context,
+                        GrazeSourceMessage::Warning(
+                            GrazeSourceWarning::Specific(
+                                GrazeSourceWarningKind::AssignPropertyOfOtherTarget,
+                                source_span,
+                            ),
+                            None,
+                        ),
+                        GrazeMessageSetting::Warnings,
+                    );
+                }
+                if let Some(change_by) = change_by {
+                    ResolvedForChangeBy::ChangeBy(change_by)
+                } else if let Some(assign) = assign {
+                    ResolvedForChangeBy::Assign(assign)
+                } else {
+                    ResolvedForChangeBy::None
+                }
+            }
+            KnownBlock::List { .. }
+            | KnownBlock::FieldValue { .. }
+            | KnownBlock::BlockRef { .. }
+            | KnownBlock::PrimitiveBlock { .. }
+            | KnownBlock::Callable(..)
+            | KnownBlock::PartialCallable(..)
+            | KnownBlock::CustomBlock { .. }
+            | KnownBlock::BoundMethod { .. }
+            | KnownBlock::Empty => ResolvedForChangeBy::None,
         }
     }
 }
