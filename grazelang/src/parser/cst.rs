@@ -1126,6 +1126,61 @@ impl GetPos for SpecialAssignmentOperator {
     }
 }
 
+impl SpecialAssignmentOperator {
+    pub fn get_descriptor(&self) -> BinOpDescriptor {
+        match self {
+            SpecialAssignmentOperator::PlusAssign(_) => BinOpDescriptor {
+                opcode: "operator_add".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                is_negated: false,
+            },
+            SpecialAssignmentOperator::MinusAssign(_) => BinOpDescriptor {
+                opcode: "operator_subtract".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                is_negated: false,
+            },
+            SpecialAssignmentOperator::TimesAssign(_) => BinOpDescriptor {
+                opcode: "operator_multiply".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                is_negated: false,
+            },
+            SpecialAssignmentOperator::DivAssign(_) => BinOpDescriptor {
+                opcode: "operator_divide".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                is_negated: false,
+            },
+            SpecialAssignmentOperator::ModAssign(_) => BinOpDescriptor {
+                opcode: "operator_mod".to_string(),
+                operand_a_input_name: "NUM1".to_string(),
+                operand_b_input_name: "NUM2".to_string(),
+                operand_a_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                operand_b_default: Some(Sb3PrimitiveBlock::Number("".into())),
+                is_negated: false,
+            },
+            SpecialAssignmentOperator::JoinAssign(_) => BinOpDescriptor {
+                opcode: "operator_join".to_string(),
+                operand_a_input_name: "STRING1".to_string(),
+                operand_b_input_name: "STRING2".to_string(),
+                operand_a_default: Some("apple ".into()),
+                operand_b_default: Some("banana".into()),
+                is_negated: false,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[expect(clippy::large_enum_variant)]
 pub enum DictionaryEntry {

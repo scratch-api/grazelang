@@ -66,9 +66,9 @@ use crate::{
         BorrowedStatementCall, BorrowedStatementDataDeclaration, BorrowedStatementForever,
         BorrowedStatementIfElse, BorrowedStatementListAssignment,
         BorrowedStatementMultiInputControl, BorrowedStatementSetItem,
-        BorrowedStatementSingleInputControl, BorrowedTopLevelStatementSprite,
-        BorrowedTopLevelStatementStage, BorrowedUseStatement, GrazeVisitor,
-        default_visit_code_block, default_visit_config_statement,
+        BorrowedStatementSingleInputControl, BorrowedStatementSpecialAssignment,
+        BorrowedTopLevelStatementSprite, BorrowedTopLevelStatementStage, BorrowedUseStatement,
+        GrazeVisitor, default_visit_code_block, default_visit_config_statement,
         default_visit_custom_block_definition, default_visit_expression_binary_operation,
         default_visit_expression_call, default_visit_expression_formatted_string,
         default_visit_expression_get_item, default_visit_expression_get_letter,
@@ -3153,6 +3153,92 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
                 context,
                 param,
                 assignment_value,
+                *value.2.get_source_span(),
+                &mut inputs,
+                &mut fields,
+            )?;
+            add_block(
+                context,
+                &this_id,
+                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+            );
+            Ok(())
+        })
+    }
+
+    fn visit_statement_special_assignment(
+        &self,
+        value: BorrowedStatementSpecialAssignment,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_statement(context, |context, parent, this_id| {
+            let symbol_id = get_symbol_id(context, value.0)?;
+            let symbol = &context.symbol_table[symbol_id];
+            let known_block = get_known_block(symbol, value.0)?.clone();
+            let SimpleCallableKnownBlockSignature(opcode, param, known_params) = known_block
+                .resolve_for_assignment(*value.0.get_source_span(), context)
+                .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotAssignable {
+                    identifier: value.0.clone(),
+                })?;
+            let assignment_value: KnownBlock =
+                wrap_in_reporter::<_, Result<_, GrazeSb3GeneratorError>>(
+                    context,
+                    |context, parent, this_id| {
+                        self.visit_expression_identifier(value.0, context)?;
+                        self.visit_expression(value.2, context)?;
+                        let (op_b_param, op_a_param) =
+                            (context.pop_param().unwrap(), context.pop_param().unwrap());
+                        let BinOpDescriptor {
+                            opcode,
+                            operand_a_input_name,
+                            operand_b_input_name,
+                            operand_a_default,
+                            operand_b_default,
+                            is_negated: _, // is_negated branch is skipped because there are no negated assignment operators
+                        } = value.1.get_descriptor();
+                        let mut inputs = HashMap::with_capacity(2);
+                        if let Some(input_value) = create_input_value(
+                            param_to_input_repr_no_menu(
+                                op_a_param,
+                                *value.0.get_source_span(),
+                                context,
+                            )?,
+                            operand_a_default.as_ref(),
+                        ) {
+                            inputs.insert(operand_a_input_name, input_value);
+                        }
+                        if let Some(input_value) = create_input_value(
+                            param_to_input_repr_no_menu(
+                                op_b_param,
+                                *value.2.get_source_span(),
+                                context,
+                            )?,
+                            operand_b_default.as_ref(),
+                        ) {
+                            inputs.insert(operand_b_input_name, input_value);
+                        }
+                        add_block(
+                            context,
+                            &this_id,
+                            make_block(
+                                parent,
+                                opcode.to_string(),
+                                inputs,
+                                HashMap::new(),
+                                false,
+                                None,
+                            ),
+                        );
+                        Ok(this_id.into())
+                    },
+                )?;
+            let mut fields = HashMap::new();
+            let mut inputs = HashMap::new();
+            add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+            add_known_block_to_params(
+                context,
+                param,
+                &assignment_value,
                 *value.2.get_source_span(),
                 &mut inputs,
                 &mut fields,

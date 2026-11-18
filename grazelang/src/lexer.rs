@@ -186,7 +186,7 @@ pub enum Token {
 //  - [x] Assignment operators in cst & ast
 //  - [x] Assignment operators in visitor
 //  - [x] Assignment operators in parser
-//  - [ ] Assignment operator codegen
+//  - [x] Assignment operator codegen
 //  - [ ] Assignment operator generation in detranspiler
 // Issue: #88
 
