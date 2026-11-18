@@ -649,10 +649,10 @@
     },
     "88": {
         "filepath": "grazelang/src/lexer.rs",
-        "text": "- [x] `change_by` attribute for `SingletonReporter`s\n- [x] `change_by` data for `SingletonReporter`s in library_markups\n- [x] `change_by` attribute for variables\n- [x] `resolve_for_change_by` in `ResolveKnownBlock`\n- [x] Assignment operator tokens in lexer\n- [x] Assignment operators in cst & ast\n- [x] Assignment operators in visitor\n- [x] Assignment operators in parser\n- [ ] Assignment operator codegen\n- [ ] Assignment operator generation in detranspiler",
+        "text": "- [x] `change_by` attribute for `SingletonReporter`s\n- [x] `change_by` data for `SingletonReporter`s in library_markups\n- [x] `change_by` attribute for variables\n- [x] `resolve_for_change_by` in `ResolveKnownBlock`\n- [x] Assignment operator tokens in lexer\n- [x] Assignment operators in cst & ast\n- [x] Assignment operators in visitor\n- [x] Assignment operators in parser\n- [x] Assignment operator codegen\n- [ ] Assignment operator generation in detranspiler",
         "status": "open",
         "lines": "L180-L191",
-        "commit": "6d9327658ef662469e659639e4db07cc99b84056",
+        "commit": "de1d6a7ce1375f86a8c4a53412ff741d9bb487cb",
         "title": "Add `+=` etc"
     },
     "89": {
