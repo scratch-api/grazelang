@@ -67,8 +67,9 @@ use crate::{
         BorrowedStatementIfElse, BorrowedStatementListAssignment,
         BorrowedStatementMultiInputControl, BorrowedStatementSetItem,
         BorrowedStatementSingleInputControl, BorrowedStatementSpecialAssignment,
-        BorrowedTopLevelStatementSprite, BorrowedTopLevelStatementStage, BorrowedUseStatement,
-        GrazeVisitor, default_visit_code_block, default_visit_config_statement,
+        BorrowedStatementSpecialSetItem, BorrowedTopLevelStatementSprite,
+        BorrowedTopLevelStatementStage, BorrowedUseStatement, GrazeVisitor,
+        default_visit_code_block, default_visit_config_statement,
         default_visit_custom_block_definition, default_visit_expression_binary_operation,
         default_visit_expression_call, default_visit_expression_formatted_string,
         default_visit_expression_get_item, default_visit_expression_get_letter,
@@ -3499,6 +3500,124 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let item_value = context.pop_param().unwrap();
             let item_value_input_value = create_input_value::<Sb3PrimitiveBlock>(
                 param_to_input_repr_no_menu(item_value, *value.5.get_source_span(), context)?,
+                Some("thing".into()),
+            );
+            let index = context.pop_param().unwrap();
+            let index_input_value = create_input_value(
+                param_to_input_repr_no_menu(index, *value.2.get_source_span(), context)?,
+                Some(Sb3PrimitiveBlock::Integer(Sb3Primitive::Int128(1))),
+            );
+            let symbol_id = get_symbol_id(context, value.0)?;
+            let symbol = &context.symbol_table[symbol_id];
+            let known_block = get_known_block(symbol, value.0)?.clone();
+            let (canonical_name, id) = match known_block.as_ref() {
+                KnownBlock::List { canonical_name, id } => (canonical_name, id),
+                _ => {
+                    return Err(GrazeSb3GeneratorError::ListAccessForNonList {
+                        identifier: value.0.clone(),
+                    });
+                }
+            };
+            let list_field_value = Sb3FieldValue::WithId {
+                value: canonical_name.as_str().into(),
+                id: id.to_string(),
+            };
+            let mut inputs = HashMap::with_capacity(2);
+            if let Some(index_input_value) = index_input_value {
+                inputs.insert("INDEX".to_string(), index_input_value);
+            }
+            if let Some(item_value_input_value) = item_value_input_value {
+                inputs.insert("ITEM".to_string(), item_value_input_value);
+            }
+            add_block(
+                context,
+                &this_id,
+                make_block(
+                    parent,
+                    "data_replaceitemoflist".to_string(),
+                    inputs,
+                    HashMap::from([("LIST".to_string(), list_field_value)]),
+                    false,
+                    None,
+                ),
+            );
+            Ok(())
+        })
+    }
+
+    fn visit_statement_special_set_item(
+        &self,
+        value: BorrowedStatementSpecialSetItem,
+        context: &mut GrazeSb3GeneratorContext,
+    ) -> Result<(), GrazeSb3GeneratorError> {
+        wrap_in_statement(context, |context, parent, this_id| {
+            self.visit_expression(value.2, context)?;
+            let item_value = wrap_in_reporter::<_, Result<_, GrazeSb3GeneratorError>>(
+                context,
+                |context, parent, this_id| {
+                    self.visit_expression_get_item(
+                        (
+                            value.0,
+                            value.1,
+                            value.2,
+                            value.3,
+                            &value.0.span_to(value.3),
+                        ),
+                        context,
+                    )?;
+                    self.visit_expression(value.5, context)?;
+                    let (op_b_param, op_a_param) =
+                        (context.pop_param().unwrap(), context.pop_param().unwrap());
+                    let BinOpDescriptor {
+                        opcode,
+                        operand_a_input_name,
+                        operand_b_input_name,
+                        operand_a_default,
+                        operand_b_default,
+                        is_negated: _, // is_negated branch is skipped because there are no negated assignment operators
+                    } = value.4.get_descriptor();
+                    let mut inputs = HashMap::with_capacity(2);
+                    if let Some(input_value) = create_input_value(
+                        param_to_input_repr_no_menu(
+                            op_a_param,
+                            *value.0.get_source_span(),
+                            context,
+                        )?,
+                        operand_a_default.as_ref(),
+                    ) {
+                        inputs.insert(operand_a_input_name, input_value);
+                    }
+                    if let Some(input_value) = create_input_value(
+                        param_to_input_repr_no_menu(
+                            op_b_param,
+                            *value.2.get_source_span(),
+                            context,
+                        )?,
+                        operand_b_default.as_ref(),
+                    ) {
+                        inputs.insert(operand_b_input_name, input_value);
+                    }
+                    add_block(
+                        context,
+                        &this_id,
+                        make_block(
+                            parent,
+                            opcode.to_string(),
+                            inputs,
+                            HashMap::new(),
+                            false,
+                            None,
+                        ),
+                    );
+                    Ok(this_id.into())
+                },
+            )?;
+            let item_value_input_value = create_input_value::<Sb3PrimitiveBlock>(
+                known_block_to_input_repr_no_menu(
+                    &item_value,
+                    *value.2.get_source_span(),
+                    context,
+                )?,
                 Some("thing".into()),
             );
             let index = context.pop_param().unwrap();
