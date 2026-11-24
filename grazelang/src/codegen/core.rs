@@ -16,9 +16,9 @@ use grazelang_types::{
     DIRECTIONS_CATEGORY_ID, HasShadow, LOCATIONS_CATEGORY_ID, NO_CATEGORY_ID, OBJECTS_CATEGORY_ID,
     PROPERTIES_CATEGORY_ID, SOUNDS_CATEGORY_ID, SimpleCallableKnownBlockSignature,
     project_json::{
-        Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr, Sb3InputValue,
-        Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3Primitive, Sb3PrimitiveBlock,
-        Sb3PrimitiveOrBool, Sb3Root, Sb3Target, TargetAttachment,
+        IsShadow, Sb3Block, Sb3BlockMutation, Sb3Costume, Sb3FieldValue, Sb3InputRepr,
+        Sb3InputValue, Sb3Monitor, Sb3MonitorMode, Sb3MonitorValue, Sb3Primitive,
+        Sb3PrimitiveBlock, Sb3PrimitiveOrBool, Sb3Root, Sb3Target, TargetAttachment,
     },
 };
 use rand::SeedableRng;
@@ -46,14 +46,14 @@ use crate::{
     names::CodegenNamespace,
     parser::{
         context::{
-            IdString, KnownBlock, ParseContext, ResolveKnownBlock, Symbol, SymbolId, SymbolTable,
-            Target, TargetSymbolDescriptor,
+            IdString, KnownBlock, ParseContext, ResolveKnownBlock, ResolvedForChangeBy, Symbol,
+            SymbolId, SymbolTable, Target, TargetSymbolDescriptor,
         },
         cst::{
             self, BinOpDescriptor, CustomBlockParamKind, CustomBlockParamKindValue,
             DataDeclarationScope, DictionaryTypeError, EMPTY_ISTRING_REF, Expression,
             FormattedStringContent, GetPos, Identifier, ListEntry, Literal, SingleIdentifier,
-            UnOpDescriptor,
+            SpecialAssignmentOperator, UnOpDescriptor,
         },
     },
     settings::{GrazeBuildSettings, GrazeMessageSetting, UseShadows},
@@ -3175,11 +3175,105 @@ impl GrazeVisitor<GrazeSb3GeneratorContext, GrazeSb3GeneratorError> for GrazeSb3
             let symbol_id = get_symbol_id(context, value.0)?;
             let symbol = &context.symbol_table[symbol_id];
             let known_block = get_known_block(symbol, value.0)?.clone();
-            let SimpleCallableKnownBlockSignature(opcode, param, known_params) = known_block
-                .resolve_for_assignment(*value.0.get_source_span(), context)
-                .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotAssignable {
-                    identifier: value.0.clone(),
-                })?;
+            let SimpleCallableKnownBlockSignature(opcode, param, known_params) =
+                if let SpecialAssignmentOperator::PlusAssign(_)
+                | SpecialAssignmentOperator::MinusAssign(_) = value.1
+                {
+                    match known_block.resolve_for_change_by(*value.0.get_source_span(), context) {
+                        ResolvedForChangeBy::ChangeBy(SimpleCallableKnownBlockSignature(
+                            opcode,
+                            param,
+                            known_params,
+                        )) => {
+                            let change_by_value = match value.1 {
+                                SpecialAssignmentOperator::PlusAssign(_) => {
+                                    self.visit_expression(value.2, context)?;
+                                    context.pop_param().unwrap()
+                                }
+                                SpecialAssignmentOperator::MinusAssign(_) => {
+                                    wrap_in_reporter::<_, Result<_, GrazeSb3GeneratorError>>(
+                                        context,
+                                        |context, parent, this_id| {
+                                            self.visit_expression(value.2, context)?;
+                                            let op_b_param = context.pop_param().unwrap();
+                                            let BinOpDescriptor {
+                                                opcode,
+                                                operand_a_input_name,
+                                                operand_b_input_name,
+                                                operand_a_default,
+                                                operand_b_default,
+                                                is_negated: _, // is_negated branch is skipped because there are no negated assignment operators
+                                            } = value.1.get_descriptor();
+                                            let mut inputs = HashMap::with_capacity(2);
+                                            if let Some(input_value) = create_input_value(
+                                                Some((
+                                                    Sb3InputRepr::PrimitiveBlock("".into()),
+                                                    IsShadow::Yes,
+                                                )),
+                                                operand_a_default.as_ref(),
+                                            ) {
+                                                inputs.insert(operand_a_input_name, input_value);
+                                            }
+                                            if let Some(input_value) = create_input_value(
+                                                param_to_input_repr_no_menu(
+                                                    op_b_param,
+                                                    *value.2.get_source_span(),
+                                                    context,
+                                                )?,
+                                                operand_b_default.as_ref(),
+                                            ) {
+                                                inputs.insert(operand_b_input_name, input_value);
+                                            }
+                                            add_block(
+                                                context,
+                                                &this_id,
+                                                make_block(
+                                                    parent,
+                                                    opcode.to_string(),
+                                                    inputs,
+                                                    HashMap::new(),
+                                                    false,
+                                                    None,
+                                                ),
+                                            );
+                                            Ok(Param::Owned(Box::new(this_id.into())))
+                                        },
+                                    )?
+                                }
+                                _ => unreachable!(),
+                            };
+                            let mut fields = HashMap::new();
+                            let mut inputs = HashMap::new();
+                            add_params(context, known_params.iter(), &mut inputs, &mut fields)?;
+                            add_param_to_params(
+                                context,
+                                param,
+                                change_by_value,
+                                *value.2.get_source_span(),
+                                &mut inputs,
+                                &mut fields,
+                            )?;
+                            add_block(
+                                context,
+                                &this_id,
+                                make_block(parent, opcode.to_string(), inputs, fields, false, None),
+                            );
+                            return Ok(());
+                        }
+                        ResolvedForChangeBy::Assign(value) => value,
+                        ResolvedForChangeBy::None => {
+                            return Err(GrazeSb3GeneratorError::IdentifierNotAssignable {
+                                identifier: value.0.clone(),
+                            });
+                        }
+                    }
+                } else {
+                    known_block
+                        .resolve_for_assignment(*value.0.get_source_span(), context)
+                        .ok_or_else(|| GrazeSb3GeneratorError::IdentifierNotAssignable {
+                            identifier: value.0.clone(),
+                        })?
+                };
             let assignment_value: KnownBlock =
                 wrap_in_reporter::<_, Result<_, GrazeSb3GeneratorError>>(
                     context,
